@@ -129,16 +129,17 @@ export function Broadcast({
       if (playing && beat.kind === "exchange" && local > 0.42 && hitRef.current !== beat.index) {
         hitRef.current = beat.index;
         shook = reduced ? 0 : 8;
-        spawn(sparks, result, beat.index);
+        const drive = fightDrive(canvas.width, canvas.height, result, beat, local, time);
+        spawn(sparks, drive.hitNx, drive.hitNy);
         playHit();
       }
       if (shook > 0) shook *= 0.86;
-      drawArena(ctx, canvas.width, canvas.height, result, beat, local, sparks, shook, reduced);
+      drawArena(ctx, canvas.width, canvas.height, result, beat, local, sparks, shook, reduced, time);
       for (let i = sparks.length - 1; i >= 0; i--) {
         const s = sparks[i]!;
         s.x += s.vx;
         s.y += s.vy;
-        s.vy += 0.15;
+        s.vy += 0.004;
         s.life -= dt;
         if (s.life <= 0) sparks.splice(i, 1);
       }
@@ -319,21 +320,163 @@ function smooth(local: number) {
   return t * t * (3 - 2 * t);
 }
 
-function spawn(sparks: Spark[], result: FightResult, index: number) {
-  const ex = result.exchanges[index];
-  if (!ex) return;
-  const fromRight = result.fighters[1] && (ex.attackerId === result.fighters[1].id || ex.attackerId.includes(result.fighters[1].id));
-  const x = fromRight ? 0.62 : 0.38;
-  for (let i = 0; i < 18; i++) {
+function spawn(sparks: Spark[], x: number, y: number) {
+  for (let i = 0; i < 22; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const kick = 0.004 + Math.random() * 0.012;
     sparks.push({
       x,
-      y: 0.58,
-      vx: (Math.random() - 0.5) * 0.02,
-      vy: -Math.random() * 0.02,
-      life: 0.35 + Math.random() * 0.3,
+      y,
+      vx: Math.cos(ang) * kick,
+      vy: Math.sin(ang) * kick - 0.01,
+      life: 0.35 + Math.random() * 0.35,
       color: i % 3 === 0 ? "#ff5a1f" : "#f0a202",
     });
   }
+}
+
+type Spot = { x: number; y: number };
+type Pose = "idle" | "lunge" | "hit" | "recoil" | "down";
+
+function ease(t: number) {
+  const x = Math.min(1, Math.max(0, t));
+  return x * x * (3 - 2 * x);
+}
+
+function mixSpot(a: Spot, b: Spot, t: number): Spot {
+  return { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t) };
+}
+
+function bend(from: Spot, to: Spot, t: number, amount: number): Spot {
+  const mid = mixSpot(from, to, t);
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const arc = Math.sin(Math.min(1, Math.max(0, t)) * Math.PI) * amount;
+  return { x: mid.x + (-dy / len) * arc, y: mid.y + (dx / len) * arc };
+}
+
+function corner(side: 0 | 1, step: number): Spot {
+  const xs = side === 0 ? [0.2, 0.32, 0.16, 0.38] : [0.8, 0.68, 0.84, 0.62];
+  const ys = [0.74, 0.46, 0.62, 0.4];
+  const i = ((step % 4) + 4) % 4;
+  return { x: xs[i]!, y: ys[i]! };
+}
+
+function sway(amount: number) {
+  return amount;
+}
+
+function curveOf(classId: ClassId) {
+  if (classId === "tank") return 0.03;
+  if (classId === "specialist") return 0.14;
+  return 0.09;
+}
+
+function project(spot: Spot, w: number, h: number) {
+  const y = Math.min(0.94, Math.max(0.28, spot.y));
+  const sy = h * (0.4 + y * 0.38);
+  const half = w * (0.18 + y * 0.28);
+  const sx = w * 0.5 + (spot.x - 0.5) * 2 * half;
+  const size = w * (0.1 + y * 0.1);
+  return { x: sx, y: sy, size };
+}
+
+function faceOf(from: Spot, to: Spot, fallback: number) {
+  if (to.x - from.x > 0.03) return 1;
+  if (from.x - to.x > 0.03) return -1;
+  return fallback;
+}
+
+function fightDrive(w: number, h: number, result: FightResult, beat: Beat, local: number, time: number) {
+  const a = result.fighters[0]!;
+  const b = result.fighters[1];
+  const step = beat.kind === "exchange" ? beat.index : beat.kind === "finisher" ? result.exchanges.length : 0;
+  let spotA = corner(0, step);
+  let spotB = b ? corner(1, step) : null;
+  let poseA: Pose = "idle";
+  let poseB: Pose = "idle";
+  let spotlight: 0 | 1 | null = null;
+  const endA = corner(0, step + 1);
+  const endB = corner(1, step + 1);
+
+  if (beat.kind === "bumper") {
+    spotA = bend({ x: -0.2, y: 0.82 }, corner(0, 0), ease(local), curveOf(a.classId));
+    if (b) spotB = bend({ x: 1.2, y: 0.82 }, corner(1, 0), ease(local), curveOf(b.classId));
+    poseA = "lunge";
+    poseB = "lunge";
+  } else if (beat.kind === "intro") {
+    spotlight = beat.side;
+    const lap = local * Math.PI * 2;
+    if (beat.side === 0) {
+      spotA = bend(corner(0, 0), { x: 0.46, y: 0.78 }, ease(Math.min(1, local / 0.7)), curveOf(a.classId));
+      if (b) spotB = { x: corner(1, 0).x + Math.sin(lap) * 0.06, y: corner(1, 0).y + Math.cos(lap) * 0.1 };
+    } else {
+      spotA = { x: corner(0, 1).x + Math.sin(lap) * 0.06, y: corner(0, 1).y + Math.cos(lap) * 0.08 };
+      if (b) spotB = bend(corner(1, 0), { x: 0.54, y: 0.78 }, ease(Math.min(1, local / 0.7)), curveOf(b.classId));
+    }
+  } else if (beat.kind === "stats") {
+    const lap = local * Math.PI * 2;
+    spotA = { x: corner(0, 1).x + Math.sin(lap) * sway(0.1), y: 0.5 + Math.cos(lap) * 0.16 };
+    if (b) spotB = { x: corner(1, 1).x + Math.sin(lap + Math.PI) * 0.1, y: 0.5 + Math.cos(lap + Math.PI) * 0.16 };
+  } else if ((beat.kind === "exchange" || beat.kind === "finisher") && b && spotB) {
+    const ex = beat.kind === "exchange" ? result.exchanges[beat.index] : result.exchanges[result.exchanges.length - 1];
+    const attackerA = !ex || ex.attackerId === a.id;
+    const fromA = corner(0, step);
+    const fromB = corner(1, step);
+    const impactA = attackerA ? mixSpot(fromA, fromB, 0.78) : fromA;
+    const impactB = attackerA ? fromB : mixSpot(fromB, fromA, 0.78);
+    const slideA = attackerA ? impactA : { x: Math.min(0.9, fromA.x - 0.12), y: Math.min(0.9, fromA.y + 0.1) };
+    const slideB = attackerA ? { x: Math.max(0.1, fromB.x + 0.12), y: Math.min(0.9, fromB.y + 0.1) } : impactB;
+    if (local < 0.42) {
+      const t = ease(local / 0.42);
+      spotA = bend(fromA, attackerA ? impactA : fromA, t, curveOf(a.classId));
+      spotB = bend(fromB, attackerA ? fromB : impactB, t, curveOf(b.classId));
+      if (attackerA) poseA = "lunge";
+      else poseB = "lunge";
+    } else if (local < 0.62) {
+      const t = ease((local - 0.42) / 0.2);
+      spotA = mixSpot(attackerA ? impactA : fromA, slideA, attackerA ? 0 : t);
+      spotB = mixSpot(attackerA ? fromB : impactB, slideB, attackerA ? t : 0);
+      poseA = attackerA ? "hit" : "recoil";
+      poseB = attackerA ? "recoil" : "hit";
+    } else {
+      const t = ease((local - 0.62) / 0.38);
+      spotA = bend(slideA, endA, t, curveOf(a.classId) * 0.6);
+      spotB = bend(slideB, endB, t, curveOf(b.classId) * 0.6);
+    }
+  } else if (beat.kind === "decision" && b && spotB) {
+    const aLost = result.loserIds.includes(a.id);
+    const bLost = result.loserIds.includes(b.id);
+    const lap = local * Math.PI * 2;
+    if (aLost) {
+      spotA = { x: 0.38, y: 0.86 };
+      poseA = "down";
+    } else {
+      spotA = { x: 0.42 + Math.sin(lap) * 0.1, y: 0.58 + Math.cos(lap) * 0.08 };
+    }
+    if (bLost) {
+      spotB = { x: 0.62, y: 0.86 };
+      poseB = "down";
+    } else if (spotB) {
+      spotB = { x: 0.58 + Math.sin(lap + 1) * 0.1, y: 0.58 + Math.cos(lap + 1) * 0.08 };
+    }
+  }
+
+  const pa = project(spotA, w, h);
+  const pb = spotB ? project(spotB, w, h) : null;
+  const hitSpot = spotB ? mixSpot(spotA, spotB, 0.5) : spotA;
+  const hit = project(hitSpot, w, h);
+  const facingA = faceOf(corner(0, step), spotA, 1);
+  const facingB = spotB ? faceOf(corner(1, step), spotB, -1) : -1;
+  return {
+    a: { ...pa, facing: facingA, pose: poseA, bot: a },
+    b: pb && b ? { ...pb, facing: facingB, pose: poseB, bot: b } : null,
+    hitNx: hit.x / w,
+    hitNy: hit.y / h,
+    spotlight,
+    spin: time,
+  };
 }
 
 export function armBroadcastAudio() {
@@ -350,6 +493,7 @@ function drawArena(
   sparks: Spark[],
   shake: number,
   reduced: boolean,
+  time: number,
 ) {
   ctx.save();
   ctx.clearRect(0, 0, w, h);
@@ -377,46 +521,21 @@ function drawArena(
   ctx.globalAlpha = 1;
 
   const a = result.fighters[0];
-  const b = result.fighters[1];
   if (!a) {
     ctx.restore();
     return;
   }
   if (result.method === "melee" || result.fighters.length > 2) {
-    drawMelee(ctx, w, h, result, beat, local);
+    drawMelee(ctx, w, h, result, beat, local, time);
     drawSparks(ctx, w, h, sparks);
     ctx.restore();
     return;
   }
 
-  let ax = w * 0.3;
-  let bx = w * 0.7;
-  let poseA: Pose = "idle";
-  let poseB: Pose = "idle";
-  let spotlight: 0 | 1 | null = null;
-  if (beat.kind === "intro") spotlight = beat.side;
-  if (beat.kind === "exchange") {
-    const ex = result.exchanges[beat.index];
-    const attackerLeft = ex?.attackerId === a.id;
-    const lunge = local > 0.28 && local < 0.62;
-    if (attackerLeft) {
-      poseA = lunge ? "lunge" : local > 0.5 ? "hit" : "idle";
-      poseB = local > 0.45 ? "recoil" : "idle";
-      if (lunge) ax += w * 0.08;
-    } else {
-      poseB = lunge ? "lunge" : local > 0.5 ? "hit" : "idle";
-      poseA = local > 0.45 ? "recoil" : "idle";
-      if (lunge) bx -= w * 0.08;
-    }
-  }
-  if (beat.kind === "decision" && result.loserIds.includes(a.id)) poseA = "down";
-  if (b && beat.kind === "decision" && result.loserIds.includes(b.id)) poseB = "down";
-  if (!reduced) {
-    drawBot(ctx, ax, h * 0.7, w * 0.22, 1, a, poseA, spotlight === 0);
-    if (b) drawBot(ctx, bx, h * 0.7, w * 0.22, -1, b, poseB, spotlight === 1);
-  } else {
-    drawBot(ctx, ax, h * 0.7, w * 0.22, 1, a, "idle", spotlight === 0);
-    if (b) drawBot(ctx, bx, h * 0.7, w * 0.22, -1, b, "idle", spotlight === 1);
+  const drive = fightDrive(w, h, result, beat, local, reduced ? 0 : time);
+  const order = [drive.a, drive.b].filter((row) => row != null).sort((p, q) => p.y - q.y);
+  for (const bot of order) {
+    drawBot(ctx, bot.x, bot.y, bot.size, bot.facing, bot.bot, reduced ? "idle" : bot.pose, drive.spotlight === (bot.bot.id === drive.a.bot.id ? 0 : 1), reduced ? 0 : drive.spin);
   }
   drawSparks(ctx, w, h, sparks);
   if (beat.kind === "bumper" || beat.kind === "decision") {
@@ -442,8 +561,6 @@ function decisionWord(result: FightResult) {
   return "DECISION";
 }
 
-type Pose = "idle" | "lunge" | "hit" | "recoil" | "down";
-
 function drawBot(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -453,6 +570,7 @@ function drawBot(
   bot: FighterSnap,
   pose: Pose,
   hot: boolean,
+  time: number,
 ) {
   ctx.save();
   ctx.translate(x, y);
@@ -471,7 +589,7 @@ function drawBot(
     ctx.strokeRect(-size * 0.55, -size * 0.7, size * 1.1, size);
     ctx.globalAlpha = 1;
   }
-  drawWheels(ctx, size, bot.classId, paint);
+  drawWheels(ctx, size, bot.classId, paint, time);
   ctx.fillStyle = paint;
   if (bot.classId === "tank") {
     roundRect(ctx, -size * 0.42, -size * 0.42, size * 0.84, size * 0.48, 4);
@@ -490,7 +608,7 @@ function drawBot(
   ctx.fill();
   drawLook(ctx, size, bot.look ?? "plain");
   drawBayNumber(ctx, size, bot.number ?? "", facing);
-  drawWeapon(ctx, size, bot.weaponFamily, pose === "hit");
+  drawWeapon(ctx, size, bot.weaponFamily, pose, time);
   ctx.fillStyle = "#0e0d0b";
   ctx.fillRect(size * 0.05, -size * 0.32, size * 0.12, size * 0.08);
   ctx.restore();
@@ -539,26 +657,47 @@ function drawBayNumber(ctx: CanvasRenderingContext2D, size: number, number: stri
   ctx.restore();
 }
 
-function drawWheels(ctx: CanvasRenderingContext2D, size: number, classId: ClassId, paint: string) {
+function drawWheels(ctx: CanvasRenderingContext2D, size: number, classId: ClassId, paint: string, time: number) {
   ctx.fillStyle = "#2a261f";
   if (classId === "tank") {
     roundRect(ctx, -size * 0.48, -size * 0.08, size * 0.96, size * 0.22, 6);
     ctx.fill();
     ctx.strokeStyle = paint;
     ctx.strokeRect(-size * 0.48, -size * 0.08, size * 0.96, size * 0.22);
+    ctx.strokeStyle = "#0e0d0b";
+    const roll = (time * 40) % (size * 0.16);
+    for (let i = -3; i <= 3; i++) {
+      const x = -size * 0.4 + i * size * 0.16 + roll;
+      ctx.beginPath();
+      ctx.moveTo(x, -size * 0.06);
+      ctx.lineTo(x, size * 0.12);
+      ctx.stroke();
+    }
     return;
   }
   for (const ox of [-0.28, 0.12]) {
     ctx.beginPath();
     ctx.arc(size * ox, size * 0.05, size * 0.12, 0, Math.PI * 2);
     ctx.fill();
+    ctx.save();
+    ctx.translate(size * ox, size * 0.05);
+    ctx.rotate(time * 8);
+    ctx.strokeStyle = paint;
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.09, 0);
+    ctx.lineTo(size * 0.09, 0);
+    ctx.stroke();
+    ctx.restore();
   }
 }
 
-function drawWeapon(ctx: CanvasRenderingContext2D, size: number, family: string, hit: boolean) {
+function drawWeapon(ctx: CanvasRenderingContext2D, size: number, family: string, pose: Pose, time: number) {
   ctx.save();
-  ctx.fillStyle = hit ? "#ff5a1f" : "#d9d3c7";
+  ctx.fillStyle = pose === "hit" ? "#ff5a1f" : "#d9d3c7";
   ctx.translate(size * 0.38, -size * 0.2);
+  const spinning = family === "saw" || family === "disc" || family === "drum";
+  if (spinning) ctx.rotate(time * (family === "disc" ? 16 : family === "drum" ? 11 : 9));
+  if (family === "hammer") ctx.rotate(pose === "lunge" ? -1 : pose === "hit" ? 1.15 : -0.2);
   if (family === "saw" || family === "disc" || family === "drum") {
     ctx.beginPath();
     ctx.arc(0, 0, size * (family === "disc" ? 0.2 : 0.16), 0, Math.PI * 2);
@@ -571,8 +710,9 @@ function drawWeapon(ctx: CanvasRenderingContext2D, size: number, family: string,
     ctx.lineTo(0, size * 0.14);
     ctx.stroke();
   } else if (family === "claw") {
+    const open = size * (0.1 + Math.sin(time * 3) * 0.03 + (pose === "hit" ? 0.06 : 0));
     ctx.fillRect(0, -size * 0.22, size * 0.08, size * 0.28);
-    ctx.fillRect(size * 0.12, -size * 0.22, size * 0.08, size * 0.28);
+    ctx.fillRect(open, -size * 0.22, size * 0.08, size * 0.28);
   } else if (family === "hammer") {
     ctx.fillRect(size * 0.02, -size * 0.34, size * 0.08, size * 0.34);
     ctx.fillRect(-size * 0.08, -size * 0.42, size * 0.28, size * 0.12);
@@ -601,16 +741,23 @@ function drawSparks(ctx: CanvasRenderingContext2D, w: number, h: number, sparks:
   ctx.globalAlpha = 1;
 }
 
-function drawMelee(ctx: CanvasRenderingContext2D, w: number, h: number, result: FightResult, beat: Beat, local: number) {
+function drawMelee(ctx: CanvasRenderingContext2D, w: number, h: number, result: FightResult, beat: Beat, local: number, time: number) {
   const bots = result.fighters.filter((f) => f.id !== "house");
-  bots.forEach((bot, i) => {
-    const ang = (Math.PI * 2 * i) / bots.length - Math.PI / 2;
-    const rad = Math.min(w, h) * 0.22;
-    const x = w * 0.5 + Math.cos(ang) * rad;
-    const y = h * 0.58 + Math.sin(ang) * rad * 0.45;
+  const attacker = beat.kind === "exchange" ? result.exchanges[beat.index]?.attackerId : null;
+  const placed = bots.map((bot, i) => {
+    const orbit = time * 0.45 + (Math.PI * 2 * i) / Math.max(1, bots.length);
+    let spot = { x: 0.5 + Math.cos(orbit) * 0.28, y: 0.58 + Math.sin(orbit) * 0.2 };
+    if (attacker === bot.id && beat.kind === "exchange") {
+      spot = mixSpot(spot, { x: 0.5, y: 0.62 }, local > 0.28 && local < 0.62 ? 0.65 : 0.2);
+    }
+    const p = project(spot, w, h);
     const dead = beat.kind === "decision" && result.meleeOrder && result.meleeOrder[0] !== bot.id && (result.hp[bot.id] ?? 0) < 30;
-    drawBot(ctx, x, y, w * 0.1, Math.cos(ang) > 0 ? 1 : -1, bot, dead ? "down" : "idle", false);
+    return { bot, ...p, dead, facing: Math.cos(orbit) > 0 ? 1 : -1 };
   });
+  placed.sort((p, q) => p.y - q.y);
+  for (const row of placed) {
+    drawBot(ctx, row.x, row.y, row.size, row.facing, row.bot, row.dead ? "down" : "lunge", false, time);
+  }
   if (beat.kind === "exchange" && local > 0.4) {
     ctx.fillStyle = "#f0a202";
     ctx.font = `600 ${Math.max(16, w / 28)}px Oswald, sans-serif`;
