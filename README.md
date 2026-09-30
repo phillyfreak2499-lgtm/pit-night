@@ -1,4 +1,4 @@
-# Pit Night — Store Wars
+# The Waterman Battle Bot League
 
 Period 12 for The Waterman Group. Ten Good Feet stores, four Saturdays, one trophy.
 
@@ -7,4 +7,4 @@ npm install
 npm run dev
 ```
 
-The app is a Vite / TanStack Start project. Import this repo in Vercel and set the production domain to `thewatermangames.live` when you want this build to replace the current site.
+The app is a Vite / TanStack Start project. Import this repo in Vercel and set the production domain to `thewatermangames.live` when this build should replace Waterman Rumble.

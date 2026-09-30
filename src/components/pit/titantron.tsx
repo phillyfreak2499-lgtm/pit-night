@@ -23,7 +23,11 @@ export function Titantron() {
         <div className="hazard h-2" />
         <div className="px-4 py-6 md:px-8 md:py-10">
           <SectionLabel>The Waterman Group · Good Feet</SectionLabel>
-          <h1 className="mt-2 font-display text-6xl leading-[0.85] tracking-wide md:text-8xl">PIT NIGHT</h1>
+          <h1 className="mt-2 max-w-4xl font-display text-5xl leading-[0.85] tracking-wide md:text-7xl">
+            THE WATERMAN
+            <span className="block">BATTLE BOT</span>
+            <span className="block">LEAGUE</span>
+          </h1>
           <p className="mt-3 max-w-2xl text-lg text-muted">{data.tagline}</p>
           <div className="mt-6 grid gap-3 md:grid-cols-3">
             <Panel className="p-4">

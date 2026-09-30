@@ -126,8 +126,14 @@ function useSoundMuted() {
 function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <Link to="/" className="block">
-      <p className="font-display text-2xl leading-none tracking-wide text-fg">PIT NIGHT</p>
-      {!compact ? <p className="mt-1 text-xs tracking-[0.28em] text-amber uppercase">Store Wars</p> : null}
+      {compact ? (
+        <p className="font-display text-xl leading-none tracking-wide text-fg">LEAGUE</p>
+      ) : (
+        <>
+          <p className="font-display text-xs tracking-[0.22em] text-amber uppercase">The Waterman</p>
+          <p className="mt-1 font-display text-xl leading-[0.9] tracking-wide text-fg">Battle Bot League</p>
+        </>
+      )}
     </Link>
   );
 }
@@ -194,8 +200,11 @@ function Boot() {
   return (
     <main className="px-4 py-8">
       <p className="font-display text-xs tracking-[0.28em] text-amber uppercase">The Waterman Group</p>
-      <h1 className="mt-2 font-display text-5xl leading-none">PIT NIGHT</h1>
-      <p className="mt-3 max-w-xl text-muted">Powering the cage. Ten store doors. No personal bots.</p>
+      <h1 className="mt-2 font-display text-4xl leading-[0.9] md:text-5xl">
+        THE WATERMAN
+        <span className="block">BATTLE BOT LEAGUE</span>
+      </h1>
+      <p className="mt-3 max-w-xl text-muted">Opening the league. Ten store doors. No personal bots.</p>
       <ul className="mt-6 grid grid-cols-2 gap-2">
         {stores.map((store) => (
           <li key={store.id} className="border border-line bg-surface px-3 py-3 text-sm">

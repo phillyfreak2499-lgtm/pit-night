@@ -421,9 +421,16 @@ function drawArena(
   drawSparks(ctx, w, h, sparks);
   if (beat.kind === "bumper" || beat.kind === "decision") {
     ctx.fillStyle = "#f3efe6";
-    ctx.font = `700 ${Math.max(28, w / 18)}px Oswald, sans-serif`;
     ctx.textAlign = "center";
-    ctx.fillText(beat.kind === "bumper" ? "PIT NIGHT" : decisionWord(result), w / 2, h * 0.28);
+    if (beat.kind === "bumper") {
+      ctx.font = `700 ${Math.max(16, w / 32)}px Oswald, sans-serif`;
+      ctx.fillText("THE WATERMAN", w / 2, h * 0.2);
+      ctx.font = `700 ${Math.max(22, w / 18)}px Oswald, sans-serif`;
+      ctx.fillText("BATTLE BOT LEAGUE", w / 2, h * 0.3);
+    } else {
+      ctx.font = `700 ${Math.max(28, w / 18)}px Oswald, sans-serif`;
+      ctx.fillText(decisionWord(result), w / 2, h * 0.28);
+    }
   }
   ctx.restore();
 }

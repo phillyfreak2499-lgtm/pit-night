@@ -7,7 +7,7 @@ export function RulesPage() {
         <SectionLabel>How it works</SectionLabel>
         <h1 className="font-display text-5xl leading-none">The store is the bot</h1>
         <p className="mt-3 text-muted">
-          Pit Night is the Saturday card for The Waterman Group. Period 12 runs October 25 through November 21. Ten Good Feet stores. One bot each. Four Saturdays. The trophy hangs in a building. Pit crew get a name on the titantron. They do not take hardware home.
+          The Waterman Battle Bot League is the Saturday card for The Waterman Group. Period 12 runs October 25 through November 21. Ten Good Feet stores. One bot each. Four Saturdays. The trophy hangs in a building. Pit crew get a name on the titantron. They do not take hardware home.
         </p>
       </div>
       <Rule title="The clock">

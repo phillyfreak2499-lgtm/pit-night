@@ -210,7 +210,11 @@ function ColdOpen({ data, bouts, live }: { data: PitData; bouts: Bout[]; live: b
       <div className="hazard h-2" />
       <div className="px-4 py-6 md:px-8 md:py-8">
         <p className="font-display text-sm tracking-[0.28em] text-amber uppercase">{live ? "Posted" : "Not posted"}</p>
-        <h2 className="mt-2 font-display text-6xl leading-none md:text-7xl">PIT NIGHT</h2>
+        <h2 className="mt-2 font-display text-5xl leading-[0.85] md:text-6xl">
+          THE WATERMAN
+          <span className="block">BATTLE BOT</span>
+          <span className="block">LEAGUE</span>
+        </h2>
         <p className="mt-3 max-w-xl text-muted">
           {bouts.length
             ? bouts.some((b) => b.kind === "bye")

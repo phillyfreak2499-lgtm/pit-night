@@ -4,7 +4,7 @@ import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { PitShell } from "@/components/pit/shell";
 import appCss from "../styles.css?url";
 
-const APP_NAME = "Pit Night";
+const APP_NAME = "The Waterman Battle Bot League";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -14,7 +14,7 @@ export const Route = createRootRoute({
       { title: APP_NAME },
       {
         name: "description",
-        content: "Pit Night — Store Wars. Period 12, October 25 through November 21. Ten Good Feet stores. One trophy.",
+        content: "The Waterman Battle Bot League. Period 12, October 25 through November 21. Ten Good Feet stores. One trophy.",
       },
       { name: "theme-color", content: "#0e0d0b" },
     ],
