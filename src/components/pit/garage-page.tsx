@@ -237,7 +237,7 @@ export function GaragePage({ storeId }: { storeId: string }) {
       {!captain ? (
         <section className="border border-line bg-surface p-4">
           <SectionLabel>Captain clipboard</SectionLabel>
-          <p className="mt-2 text-sm text-muted">Demo code for this bay is <span className="text-fg">{store.passcode}</span>.</p>
+          <p className="mt-2 text-sm text-muted">This bay's code is <span className="text-fg">{store.passcode}</span>.</p>
           <form
             className="mt-3 flex flex-col gap-2 sm:flex-row"
             onSubmit={(e) => {

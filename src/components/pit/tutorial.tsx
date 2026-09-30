@@ -9,8 +9,8 @@ const STEPS = [
   },
   {
     kicker: "Your door",
-    title: "Open a bay. The passcode is the store id.",
-    body: "Pit Map, then your door. The clipboard code is the lowercase id: waco, arlington, rockwall, southlake, college, hulen, allen, plano, temple, alliance, waxahachie. The commissioner PIN stays on the desk.",
+    title: "Open a bay. The code is four digits.",
+    body: "Pit Map, then your door. The desk gives each bay its own number. It is not the store name. The commissioner PIN stays on the desk.",
   },
   {
     kicker: "The bay",
