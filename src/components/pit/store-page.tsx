@@ -50,7 +50,7 @@ export function StorePage({ storeId }: { storeId: string }) {
           <StatStrip {...printed.stats} />
         </div>
       ) : (
-        <p className="mt-4 text-sm text-muted">Stats print when Friday locks. Parts stay hidden until the bell.</p>
+        <p className="mt-4 text-sm text-muted">Stats print when the bot locks Saturday. Parts stay hidden until the bell.</p>
       )}
       {freshSpy && note ? (
         <section className="mt-4 border border-line bg-deep p-3" data-testid="spy-note">

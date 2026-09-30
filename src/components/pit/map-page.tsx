@@ -12,7 +12,7 @@ export function PitMap() {
       <SectionLabel>The pit map</SectionLabel>
       <h1 className="mt-1 font-display text-5xl leading-none">Eleven doors</h1>
       <p className="mt-3 max-w-2xl text-muted">
-        One bay, one bot, one Friday lock. Click a door. The people inside are pit crew. They do not have bots of their own.
+        One bay, one bot, one Saturday lock. Click a door. The people inside are pit crew. They do not have bots of their own.
       </p>
       <ul className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4">
         {data.stores.map((store) => {

@@ -22,7 +22,7 @@ export function HonorsPage() {
           kind="build"
           kicker="Best Build"
           title={name(data.honors.bestBuild ?? pace?.storeId ?? null)}
-          detail={data.honors.bestBuildWhy || (pace ? `Pace through week ${pace.week}. Not locked until Title Saturday.` : "Nobody has fought yet.")}
+          detail={data.honors.bestBuildWhy || (pace ? `Pace through week ${pace.week}. Not locked until Title Monday.` : "Nobody has fought yet.")}
           href={data.honors.bestBuild ?? pace?.storeId ?? null}
           claimed={Boolean(data.honors.bestBuild)}
         />
@@ -71,7 +71,7 @@ function Plate({
       </div>
       <p className="mt-3 text-xs tracking-widest text-amber uppercase">{kicker}</p>
       <p className="font-display text-3xl leading-none">{title}</p>
-      <p className="mt-2 text-sm text-muted">{detail || (won ? "" : "Unclaimed. Four Saturdays to go.")}</p>
+      <p className="mt-2 text-sm text-muted">{detail || (won ? "" : "Unclaimed. Four fight days to go.")}</p>
     </div>
   );
   if (!href) return body;

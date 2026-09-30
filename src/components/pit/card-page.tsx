@@ -14,15 +14,15 @@ export function CardPage() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <SectionLabel>Saturday card</SectionLabel>
+      <SectionLabel>Fight day card</SectionLabel>
       <h1 className="font-display text-5xl leading-none">{meta?.name ?? `Week ${week}`}</h1>
       <p className="mt-3 max-w-2xl text-muted">{meta?.blurb}</p>
       <Link to="/broadcast" className="mt-4 inline-flex min-h-11 items-center text-amber">
-        Watch the Saturday broadcast
+        Watch the Monday broadcast
       </Link>
       {bouts.length === 0 ? (
         <p className="mt-6 border border-line bg-surface p-4">
-          The card is not printed yet. Captains lock. The commissioner hits Run Saturday on the desk. Week 1 main event is Plano against Allen.
+          The card is not printed yet. Captains lock. Monday morning the desk enters the official numbers and hits Run the card. Week 1 main event is Plano against Allen.
         </p>
       ) : groups ? (
         <div className="mt-6 flex flex-col gap-6">

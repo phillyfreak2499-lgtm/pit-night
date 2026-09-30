@@ -4,8 +4,8 @@ import { SectionLabel } from "./bits";
 const STEPS = [
   {
     kicker: "Period 12",
-    title: "Eleven stores. Four Saturdays.",
-    body: "October 25 through November 21. Waco, Arlington, Rockwall, Southlake, College Station, Fort Worth — Hulen, Allen, Plano, Temple, Alliance, and Waxahachie. One store is one bot. Specialists are pit crew. They do not get a personal bot.",
+    title: "Eleven stores. Four fight days.",
+    body: "October 25 through November 21. Fights run Monday mornings on the official numbers: Nov 2, 9, 16, and 23. Waco, Arlington, Rockwall, Southlake, College Station, Fort Worth — Hulen, Allen, Plano, Temple, Alliance, and Waxahachie. One store is one bot. Specialists are pit crew. They do not get a personal bot.",
   },
   {
     kicker: "Your door",
@@ -14,18 +14,23 @@ const STEPS = [
   },
   {
     kicker: "The bay",
-    title: "Dress the bot. Name the crew. Then lock Friday.",
-    body: "Paint, garage floor, stripes, and the bay number are decoration. They do not change the fight. Edit staff names. Bolt a Scry on utility, then call the weapon you think they are running. The spy does not talk until that call is in. Friday lock is the loadout.",
+    title: "Dress the bot. Name the crew. Lock by Saturday close.",
+    body: "Paint, finish, decals, trim, the flag, and the bay number are decoration. They do not change the fight. Edit staff names. Bolt a Scry on utility, then call the weapon you think they are running. The spy does not talk until that call is in. The Saturday lock is the loadout.",
   },
   {
-    kicker: "Saturday",
+    kicker: "Monday morning",
     title: "Hit Play. Five fights and a bye.",
-    body: "Saturday is the whole card. Eleven stores means one bye, and the bye counts as a win. The main event is last. Week 1 that is Plano against Waxahachie. After four Saturdays the best record takes the trophy. If that record is tied, those stores fight for it.",
+    body: "Monday morning the desk enters last week's numbers and runs the whole card live. Eleven stores means one bye, and the bye counts as a win. The main event is last. Week 1 that is Plano against Waxahachie. After four fight days the best record takes the trophy. If that record is tied, those stores fight for it.",
+  },
+  {
+    kicker: "Upgrades",
+    title: "Green earns keys. Keys open parts.",
+    body: "Every green grade earns one key for that part of the bot: Demo → drive, Closing → weapon, NSNU → chassis, Ticket → armor, Reviews → utility. Keys are never spent. 1 key opens Sport, 2 open Pro, 3 open Super. Every grade also pays scrap, and scrap buys the part.",
   },
   {
     kicker: "The trophy",
     title: "Hardware stays in the winning store.",
-    body: "After four Saturdays the best record hangs the trophy in one building. If two or more stores finish with the same wins and losses, they battle for it. A plate goes to the runner-up. Weekly MVP is a name on the titantron. It is not a personal bracket and it is not hardware.",
+    body: "After four fight days the best record hangs the trophy in one building. If two or more stores finish with the same wins and losses, they battle for it. A plate goes to the runner-up. Weekly MVP is a name on the titantron. It is not a personal bracket and it is not hardware.",
   },
 ];
 

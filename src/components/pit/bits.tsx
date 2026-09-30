@@ -18,12 +18,13 @@ export function useNow() {
 /** Period 12 opens at Central midnight, October 25, 2026. */
 export const PERIOD_OPENS = new Date("2026-10-25T05:00:00.000Z");
 
-export function nextFridayLock(now: Date) {
+/** Bots lock at Saturday close. Fights run Monday morning on the official numbers. */
+export function nextLock(now: Date) {
   const target = new Date(now);
   const day = target.getDay();
-  const add = (5 - day + 7) % 7;
+  const add = (6 - day + 7) % 7;
   target.setDate(target.getDate() + add);
-  target.setHours(19, 0, 0, 0);
+  target.setHours(18, 0, 0, 0);
   if (target.getTime() <= now.getTime()) target.setDate(target.getDate() + 7);
   return target;
 }

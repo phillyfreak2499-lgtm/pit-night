@@ -1,4 +1,4 @@
-import type { ClassId, KeyName, Slot, StatKey, Tier } from "./types";
+import type { BotDecal, BotFinish, BotStyle, ClassId, KeyName, Slot, StatKey, Tier } from "./types";
 
 export const SCRAP_CAP = 18;
 export const VERSION = 4;
@@ -42,7 +42,59 @@ export const PAINT: Record<string, string> = {
   brass: "#b9a24a",
   olive: "#7d8a6a",
   copper: "#d4783a",
+  cobalt: "#3d6fd1",
+  sky: "#5fb8e0",
+  lime: "#9bc53d",
+  forest: "#3f7d4e",
+  violet: "#8457c9",
+  magenta: "#cf4f93",
+  cherry: "#c0283f",
+  graphite: "#6b6f78",
 };
+
+export const FINISHES: { id: BotFinish; label: string; note: string }[] = [
+  { id: "factory", label: "Factory", note: "Clean gloss." },
+  { id: "chrome", label: "Chrome", note: "Mirror bands." },
+  { id: "matte", label: "Matte", note: "Flat, no shine." },
+  { id: "worn", label: "Battle-worn", note: "Scratches and rust." },
+];
+
+export const DECALS: { id: BotDecal; label: string }[] = [
+  { id: "none", label: "None" },
+  { id: "flames", label: "Flames" },
+  { id: "lightning", label: "Lightning" },
+  { id: "teeth", label: "Shark teeth" },
+  { id: "checker", label: "Race checks" },
+  { id: "hazard", label: "Hazard stripes" },
+  { id: "camo", label: "Camo" },
+  { id: "arch", label: "Arch badge" },
+];
+
+export const TRIM: Record<string, string> = {
+  steel: "#b8b2a6",
+  black: "#1a1918",
+  white: "#f3efe6",
+  gold: "#e8c25a",
+  red: "#e0402e",
+  blue: "#3d8fe8",
+  green: "#4fcf6a",
+  pink: "#ff5fa8",
+};
+
+export const EYES: Record<string, string> = {
+  green: "#50ff8c",
+  red: "#ff3b30",
+  amber: "#ffb020",
+  blue: "#3fb4ff",
+  white: "#f4f8ff",
+  purple: "#b46bff",
+};
+
+export const DEFAULT_STYLE: BotStyle = { finish: "factory", decal: "none", trim: "steel", eye: "green", flag: false };
+
+export function styleOf(source: { style?: Partial<BotStyle> } | null | undefined): BotStyle {
+  return { ...DEFAULT_STYLE, ...(source?.style ?? {}) };
+}
 
 export type Part = {
   id: string;
@@ -91,20 +143,36 @@ const TIER_COST: Record<Tier, number> = {
   super: 12,
   championship: 0,
 };
+/** Legacy green-week gate. Keys are the only gate now. */
 const TIER_GREENS: Record<Tier, number> = {
+  stock: 0,
+  sport: 0,
+  pro: 0,
+  super: 0,
+  championship: 0,
+};
+/**
+ * The ladder. A green week earns one key for that slot, and keys are never spent.
+ * Holding the keys unlocks the tier; scrap pays for the part.
+ */
+export const TIER_KEYS: Record<Tier, number> = {
   stock: 0,
   sport: 1,
   pro: 2,
-  super: 2,
+  super: 3,
   championship: 0,
 };
-const TIER_KEYS: Record<Tier, number> = {
-  stock: 0,
-  sport: 0,
-  pro: 1,
-  super: 2,
-  championship: 0,
+
+/** Which weekly number earns which key. */
+export const KEY_SOURCE: Record<KeyName, { stat: StatKey; label: string; green: string }> = {
+  chassis: { stat: "nsnu", label: "NSNU-to-goal", green: "100% of goal" },
+  drive: { stat: "demo", label: "Demo %", green: "80%+" },
+  weapon: { stat: "close", label: "Closing %", green: "65%+" },
+  armor: { stat: "ticket", label: "Former-customer ticket", green: "$400+" },
+  utility: { stat: "reviews", label: "Named 5-stars", green: "2 per crew on the clock" },
 };
+
+export const KEY_ORDER: KeyName[] = ["chassis", "drive", "weapon", "armor", "utility"];
 
 const FAMILIES: Family[] = [
   {
@@ -173,7 +241,7 @@ const FAMILIES: Family[] = [
       sport: "Tighter drum on the winch. Heat comes up cleaner.",
       pro: "A Windlass that does not miss the second grab.",
       super: "The grip gets mean. Strikers hate this shape.",
-      championship: "Title vice. Salvage or a Saturday drop. Never a price tag.",
+      championship: "Title vice. Salvage or a Title Monday drop. Never a price tag.",
     },
   },
   {
@@ -347,7 +415,7 @@ const FAMILIES: Family[] = [
     jobs: {
       stock: "Overhead. Slow. Honest. A tank's punctuation.",
       sport: "More mass, same sermon.",
-      pro: "The hammer that only needs one clean Saturday.",
+      pro: "The hammer that only needs one clean Monday.",
       super: "The gavel. Deliberation is over.",
       championship: "Title hammer. The sentence was already written.",
     },
@@ -519,7 +587,7 @@ const FAMILIES: Family[] = [
     jobs: {
       stock: "A lock that keeps a wild bot from eating its own week.",
       sport: "Cleaner disengage. You choose when it restarts.",
-      pro: "The lock a captain trusts on a loud Saturday.",
+      pro: "The lock a captain trusts on a loud Monday.",
       super: "Mercy. You can end it without a dumpster fire.",
       championship: "Title lock. The handshake is mandatory.",
     },
@@ -562,7 +630,7 @@ const FAMILIES: Family[] = [
     },
     jobs: {
       stock: "A bead that keeps a scratched week from becoming a bent one.",
-      sport: "Cleaner bead. The crew already did the work on Friday.",
+      sport: "Cleaner bead. The crew already did the work on Saturday.",
       pro: "Weld for a garage that does not panic at the quote.",
       super: "Crew Chief on the rail. The bot fights like somebody has the clipboard.",
       championship: "Title weld. Overtime, and the bead holds.",

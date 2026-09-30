@@ -7,6 +7,7 @@ import {
   VERSION,
   partById,
   stockPart,
+  styleOf,
 } from "./catalog";
 import {
   SLOTS,
@@ -33,7 +34,7 @@ import {
   writeGazette,
 } from "./engine";
 import { makeData } from "./seed";
-import type { Bot, BotLook, Condition, FightResult, GarageLook, Loadout, PitData, Slot, StoreCard } from "./types";
+import type { Bot, BotLook, BotStyle, Condition, FightResult, GarageLook, Loadout, PitData, Slot, StoreCard } from "./types";
 
 export type PitState = PitData & {
   flash: string;
@@ -60,6 +61,7 @@ export type PitState = PitData & {
   setPaint: (storeId: string, paint: string) => void;
   setGarage: (storeId: string, garage: GarageLook) => void;
   setLook: (storeId: string, look: BotLook) => void;
+  setStyle: (storeId: string, patch: Partial<BotStyle>) => void;
   setNumber: (storeId: string, number: string) => void;
   renameCrew: (crewId: string, name: string) => void;
   addCrew: (storeId: string, name: string) => void;
@@ -171,6 +173,7 @@ function fresh(): PitState {
     setPaint: () => {},
     setGarage: () => {},
     setLook: () => {},
+    setStyle: () => {},
     setNumber: () => {},
     renameCrew: () => {},
     addCrew: () => {},
@@ -258,7 +261,7 @@ export const usePit = create<PitState>()(
           return;
         }
         if (part.classLock && part.classLock !== bot.classId && data.week === 1) {
-          set({ flash: "Shakedown class is public. Reclass after Saturday." });
+          set({ flash: "Shakedown class is public. Reclass after the first fight." });
           return;
         }
         let next = bot;
@@ -324,7 +327,7 @@ export const usePit = create<PitState>()(
               locked: current.locked && isBoss(data) ? { ...draft } : current.locked,
             }),
           ),
-          flash: "Draft is the best lock in the bay. Friday still has to be locked.",
+          flash: "Draft is the best lock in the bay. It still has to be locked by Saturday close.",
         });
       },
       lockStore: (storeId) => {
@@ -434,7 +437,6 @@ export const usePit = create<PitState>()(
             return syncWear({
               ...bot,
               scrap: bot.scrap - check.cost,
-              keys: { ...bot.keys, [part.key]: bot.keys[part.key] - part.keys },
               owned,
               classId: part.classLock ?? bot.classId,
               draft,
@@ -642,6 +644,11 @@ export const usePit = create<PitState>()(
         if (!isCaptainOf(data, storeId)) return;
         set({ bots: patchBot(data.bots, storeId, (b) => ({ ...b, look })), flash: "Bot dressed. Still the same iron." });
       },
+      setStyle: (storeId, patch) => {
+        const data = get();
+        if (!isCaptainOf(data, storeId)) return;
+        set({ bots: patchBot(data.bots, storeId, (b) => ({ ...b, style: { ...styleOf(b), ...patch } })), flash: "Bot dressed. Still the same iron." });
+      },
       setNumber: (storeId, number) => {
         const data = get();
         if (!isCaptainOf(data, storeId)) return;
@@ -768,8 +775,8 @@ export const usePit = create<PitState>()(
           flash: same
             ? `${read.botName} has not moved.${called}`
             : read.locked
-              ? `${read.botName} is locked. This is the Friday iron.${called}`
-              : `${read.botName} read. Friday can still move it.${called}`,
+              ? `${read.botName} is locked. This is the locked iron.${called}`
+              : `${read.botName} read. The captain can still move it before Saturday close.${called}`,
         });
       },
       setTags: (week, on) => {
@@ -810,24 +817,24 @@ export const usePit = create<PitState>()(
           return;
         }
         if (data.phase !== "open" && data.phase !== "locked") {
-          set({ flash: "Friday already passed this week." });
+          set({ flash: "The bots are already locked this week." });
           return;
         }
         set({
           phase: "locked",
           bots: data.bots.map((b) => ({ ...b, locked: { ...(b.locked ?? b.draft) }, equipped: { ...(b.locked ?? b.draft) } })),
-          flash: "Friday lock. Eleven loadouts frozen.",
+          flash: "Locked. Eleven loadouts frozen for Monday. Enter the official numbers, then run the card.",
           log: [`Week ${data.week} locked.`, ...data.log.slice(0, 23)],
         });
       },
       runSaturday: () => {
         const data = get();
         if (!isBoss(data)) {
-          set({ flash: "Run Saturday from the desk." });
+          set({ flash: "Run the card from the desk." });
           return;
         }
         if (data.phase === "fought" || data.phase === "inspected" || data.phase === "complete") {
-          set({ flash: "This Saturday already happened." });
+          set({ flash: "This card already ran." });
           return;
         }
         const lockedBots = data.bots.map((b) => ({
@@ -876,7 +883,7 @@ export const usePit = create<PitState>()(
           gazette,
           craft,
           honors,
-          flash: data.week === 4 ? "Title Saturday is in the books." : "Saturday card is live. Watch it before you drop damage.",
+          flash: data.week === 4 ? "Title Monday is in the books." : "Monday card is live. Watch it before you drop damage.",
           log: [`Week ${data.week} fought.`, ...data.log.slice(0, 23)],
         });
       },
@@ -884,7 +891,7 @@ export const usePit = create<PitState>()(
         const data = get();
         if (!isBoss(data)) return;
         if (data.phase !== "fought") {
-          set({ flash: data.phase === "inspected" ? "Damage is already on the wall." : "Run Saturday first." });
+          set({ flash: data.phase === "inspected" ? "Damage is already on the wall." : "Run the card first." });
           return;
         }
         const weekBouts = data.bouts.filter((b) => b.week === data.week);
@@ -1037,7 +1044,7 @@ export const usePit = create<PitState>()(
       merge: (persisted, current) => {
         const saved = persisted as Partial<PitData> | undefined;
         if (!saved || saved.version !== VERSION) return current;
-        const fixed = applyHulen(saved as PitData);
+        const fixed = applyMondays(applyHulen(saved as PitData));
         return { ...current, ...fixed, intel: (Array.isArray(fixed.intel) ? fixed.intel : []).map((row) => ({ ...row, guess: row.guess ?? "" })), flash: "" };
       },
     },
@@ -1125,6 +1132,19 @@ function mapFight(result: FightResult): FightResult {
           call: result.finisher.call.replaceAll("Bryant Irvin", "Hulen").replaceAll("IRVIN", "HULEN"),
         }
       : null,
+  };
+}
+
+/** Moves an older save from Saturday fights to Monday fights without touching anything the stores set. */
+export function applyMondays<T extends Partial<PitData>>(data: T): T {
+  const fresh = makeData();
+  return {
+    ...data,
+    weeks: data.weeks?.map((week) => {
+      const next = fresh.weeks.find((row) => row.number === week.number);
+      return next ? { ...week, name: next.name, blurb: next.blurb } : week;
+    }),
+    gazette: data.gazette?.map((entry) => (entry.id === "g-open" ? (fresh.gazette.find((row) => row.id === "g-open") ?? entry) : entry)),
   };
 }
 

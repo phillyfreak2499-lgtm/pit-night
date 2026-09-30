@@ -3,6 +3,7 @@ import {
   partById,
   partsFor,
   stockPart,
+  KEY_SOURCE,
   type Part,
 } from "./catalog";
 import type {
@@ -557,6 +558,7 @@ function snapshot(data: PitData, storeId: string): FighterSnap {
     chassisName: partById(locked.chassis)?.name ?? CLASS_META[bot.classId].chassis,
     look: bot.look ?? "plain",
     number: bot.number ?? "",
+    style: bot.style,
   };
 }
 
@@ -1186,7 +1188,7 @@ function scrimmageNote(player: FighterSnap, drill: FighterSnap, won: boolean): s
     return `${player.botName} is on the wrong weapon for a ${player.classId}. The drill is stock, on a blue week, and still won. No damage was written.`;
   }
   if (!won && player.weekQ + 0.05 < drill.weekQ) {
-    return `The drill is only a blue week. ${player.botName} lost the range. Fix the card or the lock before Friday. Nothing was posted.`;
+    return `The drill is only a blue week. ${player.botName} lost the range. Fix the card or the lock before Saturday close. Nothing was posted.`;
   }
   if (!won) return `${drill.botName} kept the cage. ${player.botName} walks out clean. Change one part and run it again.`;
   if (wrong) return `The drill fell, but the lock is still wrong for a ${player.classId}. Do not trust a scrimmage win. No damage.`;
@@ -1471,7 +1473,7 @@ export function quoteFor(bot: Bot, slot: Slot): Quote | null {
   const loaner =
     slot === "utility"
       ? "the slot goes empty"
-      : `Saturday loans a stock ${stockPart(slot, bot.classId).name}`;
+      : `Fight day loans a stock ${stockPart(slot, bot.classId).name}`;
   const line =
     cond === "disabled"
       ? `${part.name} is dead. ${repairCost} scrap puts it back. ${weldCost} emergency-welds it to Bent for one week. Until then, ${loaner}.`
@@ -1596,18 +1598,19 @@ export function buyCheck(
   part: Part,
 ): { ok: boolean; reason: string; cost: number } {
   const bot = botFor(data, storeId);
-  if (!shopOpen(data)) return { ok: false, reason: "Shop is shuttered until after Saturday 1, and it stays shut once Friday locks.", cost: 0 };
+  if (!shopOpen(data)) return { ok: false, reason: "Shop is shut until after the first Monday fight, and it shuts again once the bots lock Saturday.", cost: 0 };
   if (part.tier === "championship") return { ok: false, reason: "Championship parts are never sold.", cost: 0 };
   if (part.tier === "stock") return { ok: false, reason: "Stock is already on the peg.", cost: 0 };
   if (part.classLock && part.slot !== "chassis") return { ok: false, reason: "Wrong class.", cost: 0 };
   if (ownsPart(bot, part)) return { ok: false, reason: "Already in the cage.", cost: part.scrap };
-  const greens = bot.greens[part.stat];
-  if (greens < part.greens) {
-    return { ok: false, reason: `Needs ${part.greens} green ${statLabel(part.stat)} week${part.greens > 1 ? "s" : ""}. You have ${greens}.`, cost: part.scrap };
-  }
   const keys = bot.keys[part.key];
   if (keys < part.keys) {
-    return { ok: false, reason: `Needs ${part.keys} ${part.key} key${part.keys > 1 ? "s" : ""}. You have ${keys}.`, cost: part.scrap };
+    const src = KEY_SOURCE[part.key];
+    return {
+      ok: false,
+      reason: `Needs ${part.keys} ${part.key} key${part.keys > 1 ? "s" : ""}. You have ${keys}. Each green ${src.label} week earns one.`,
+      cost: part.scrap,
+    };
   }
   let cost = part.scrap;
   if (part.slot === "chassis" && part.classLock && part.classLock !== bot.classId && data.week > 1) {

@@ -1,4 +1,4 @@
-import { PAINT } from "@/lib/pit/catalog";
+import { EYES, PAINT, TRIM, styleOf } from "@/lib/pit/catalog";
 import type { ClassId } from "@/lib/pit/types";
 import { PIT, clamp, hash, lerp, type BotState, type Drive, type Spot } from "./cage-motion";
 
@@ -891,7 +891,7 @@ function drawWheel(
   ctx.beginPath();
   ctx.arc(x, y, r * 0.45, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = shade(paint, -40);
+  ctx.fillStyle = paint;
   ctx.beginPath();
   ctx.arc(x, y, r * 0.3, 0, Math.PI * 2);
   ctx.fill();
@@ -966,6 +966,10 @@ export function drawSideBot(
 
   const u2 = scale;
   const dark = shade(paint, -80);
+  const style = styleOf(s.bot);
+  const trim = TRIM[style.trim] ?? TRIM.steel!;
+  const eye = EYES[style.eye] ?? EYES.green!;
+  const hub = style.trim === "steel" ? shade(paint, -40) : trim;
 
   // Weapon behind the hull (arms, hammer back swing).
   weaponBack(ctx, s, f, u2, spin);
@@ -991,13 +995,13 @@ export function drawSideBot(
       ctx.lineTo(tx, 0);
       ctx.stroke();
     }
-    for (const wh of f.wheels) drawWheel(ctx, wh.x * u2, -0.125 * u2, wh.r * u2, s.roll * 3, paint);
+    for (const wh of f.wheels) drawWheel(ctx, wh.x * u2, -0.125 * u2, wh.r * u2, s.roll * 3, hub);
   } else {
     // Far-side wheels peek out behind the hull.
     for (const wh of f.wheels) {
       ctx.save();
       ctx.globalAlpha *= 0.55;
-      drawWheel(ctx, (wh.x + 0.05) * u2, -wh.r * u2 - 0.015 * u2, wh.r * u2, s.roll * 3, paint);
+      drawWheel(ctx, (wh.x + 0.05) * u2, -wh.r * u2 - 0.015 * u2, wh.r * u2, s.roll * 3, hub);
       ctx.restore();
     }
   }
@@ -1005,10 +1009,22 @@ export function drawSideBot(
   // Hull: painted armour with a lit top edge.
   const top = f.deck * u2;
   const hg = ctx.createLinearGradient(0, top, 0, top + f.height * u2 * 0.9);
-  hg.addColorStop(0, shade(paint, 70));
-  hg.addColorStop(0.18, shade(paint, 25));
-  hg.addColorStop(0.55, paint);
-  hg.addColorStop(1, shade(paint, -70));
+  if (style.finish === "chrome") {
+    hg.addColorStop(0, shade(paint, 120));
+    hg.addColorStop(0.2, shade(paint, 10));
+    hg.addColorStop(0.38, shade(paint, 95));
+    hg.addColorStop(0.55, shade(paint, -45));
+    hg.addColorStop(0.75, shade(paint, 60));
+    hg.addColorStop(1, shade(paint, -90));
+  } else if (style.finish === "matte") {
+    hg.addColorStop(0, shade(paint, 12));
+    hg.addColorStop(1, shade(paint, -35));
+  } else {
+    hg.addColorStop(0, shade(paint, 70));
+    hg.addColorStop(0.18, shade(paint, 25));
+    hg.addColorStop(0.55, paint);
+    hg.addColorStop(1, shade(paint, -70));
+  }
   ctx.fillStyle = hg;
   poly(ctx, f.hull, u2);
   ctx.fill();
@@ -1029,15 +1045,27 @@ export function drawSideBot(
   ctx.moveTo(-0.08 * u2, top);
   ctx.lineTo(-0.08 * u2, 0);
   ctx.stroke();
-  // Specular sheen.
-  ctx.globalCompositeOperation = "lighter";
-  const sheen = ctx.createLinearGradient(-0.4 * u2, top, 0.2 * u2, top + f.height * u2);
-  sheen.addColorStop(0, "rgba(255,255,255,0)");
-  sheen.addColorStop(0.45, "rgba(255,255,255,0.16)");
-  sheen.addColorStop(0.55, "rgba(255,255,255,0)");
-  ctx.fillStyle = sheen;
-  ctx.fillRect(-0.6 * u2, top, 1.2 * u2, f.height * u2);
-  ctx.globalCompositeOperation = "source-over";
+  // Specular sheen, by finish.
+  if (style.finish !== "matte") {
+    ctx.globalCompositeOperation = "lighter";
+    const shine = style.finish === "chrome" ? 0.34 : style.finish === "worn" ? 0.07 : 0.16;
+    const sheen = ctx.createLinearGradient(-0.4 * u2, top, 0.2 * u2, top + f.height * u2);
+    sheen.addColorStop(0, "rgba(255,255,255,0)");
+    sheen.addColorStop(0.45, `rgba(255,255,255,${shine})`);
+    sheen.addColorStop(0.55, "rgba(255,255,255,0)");
+    ctx.fillStyle = sheen;
+    ctx.fillRect(-0.6 * u2, top, 1.2 * u2, f.height * u2);
+    if (style.finish === "chrome") {
+      const sheen2 = ctx.createLinearGradient(0.05 * u2, top, 0.45 * u2, top + f.height * u2);
+      sheen2.addColorStop(0.4, "rgba(255,255,255,0)");
+      sheen2.addColorStop(0.5, "rgba(255,255,255,0.28)");
+      sheen2.addColorStop(0.6, "rgba(255,255,255,0)");
+      ctx.fillStyle = sheen2;
+      ctx.fillRect(-0.6 * u2, top, 1.2 * u2, f.height * u2);
+    }
+    ctx.globalCompositeOperation = "source-over";
+  }
+  if (style.finish === "worn") drawWear(ctx, f, u2, top, s.bot.id);
   // Scorch as HP drops.
   const hurt = 1 - clamp(s.hp / 100, 0, 1);
   if (hurt > 0.25) {
@@ -1088,6 +1116,29 @@ export function drawSideBot(
     }
     ctx.restore();
   }
+  if (style.decal !== "none") {
+    ctx.save();
+    poly(ctx, f.hull, u2);
+    ctx.clip();
+    drawDecal(ctx, style.decal, f, u2, paint, s.bot.id, facing);
+    ctx.restore();
+  }
+
+  // Trim along the top edge.
+  if (style.trim !== "steel") {
+    ctx.save();
+    ctx.strokeStyle = trim;
+    ctx.lineWidth = Math.max(1.5, u2 * 0.022);
+    ctx.lineJoin = "round";
+    const edge = f.hull.filter(([, y]) => y <= f.deck + f.height * 0.35);
+    ctx.beginPath();
+    edge.forEach(([ex, ey], i) =>
+      i === 0 ? ctx.moveTo(ex * u2, ey * u2) : ctx.lineTo(ex * u2, ey * u2),
+    );
+    ctx.stroke();
+    ctx.restore();
+  }
+
   const boltR = u2 * 0.016;
   const bolts: [number, number][] = [
     [-0.4, top / u2 + 0.06],
@@ -1105,7 +1156,7 @@ export function drawSideBot(
       ctx.beginPath();
       ctx.arc(wh.x * u2, -wh.r * u2, wh.r * u2 * 1.12, Math.PI, 0);
       ctx.fill();
-      drawWheel(ctx, wh.x * u2, -wh.r * u2, wh.r * u2, s.roll * 3, paint);
+      drawWheel(ctx, wh.x * u2, -wh.r * u2, wh.r * u2, s.roll * 3, hub);
     }
   } else {
     // Armour skirt over the upper run of the track.
@@ -1135,6 +1186,32 @@ export function drawSideBot(
     ctx.restore();
   }
 
+  // Visor: the bot's eye.
+  {
+    const vx = (f.front - (f.treads ? 0.2 : 0.36)) * u2;
+    const vy = top + f.height * u2 * (f.treads ? 0.2 : 0.16);
+    const on = s.dead ? 0.15 : 0.85 + Math.sin(time * 3 + hash(s.bot.id)) * 0.15;
+    ctx.fillStyle = "#0b0b0a";
+    ctx.beginPath();
+    ctx.roundRect(vx - u2 * 0.07, vy - u2 * 0.022, u2 * 0.14, u2 * 0.044, u2 * 0.02);
+    ctx.fill();
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const eg = ctx.createRadialGradient(vx + u2 * 0.02, vy, 0, vx + u2 * 0.02, vy, u2 * 0.12);
+    eg.addColorStop(0, shade(eye, 0, 0.55 * on));
+    eg.addColorStop(1, shade(eye, 0, 0));
+    ctx.fillStyle = eg;
+    ctx.fillRect(vx - u2 * 0.15, vy - u2 * 0.12, u2 * 0.3, u2 * 0.24);
+    ctx.restore();
+    ctx.fillStyle = shade(eye, 0, on);
+    ctx.beginPath();
+    ctx.roundRect(vx - u2 * 0.05, vy - u2 * 0.01, u2 * 0.1, u2 * 0.02, u2 * 0.01);
+    ctx.fill();
+  }
+
+  if (style.flag && !s.flipped)
+    drawFlag(ctx, f, u2, top, trim, paint, s.bot.storeName ?? "", time, s.charging, facing);
+
   // Status LED.
   const blink = s.dead ? 0 : Math.sin(time * 6 + hash(s.bot.id)) > 0 ? 1 : 0.35;
   ctx.fillStyle = s.dead
@@ -1150,6 +1227,290 @@ export function drawSideBot(
 
   if (s.flame > 0) drawFlame(ctx, f.front * u2, top + f.height * u2 * 0.3, u2, s.flame, time);
 
+  ctx.restore();
+}
+
+function hullBounds(f: Frame) {
+  const xs = f.hull.map(([x]) => x);
+  const ys = f.hull.map(([, y]) => y);
+  return {
+    minX: Math.min(...xs),
+    maxX: Math.max(...xs),
+    top: Math.min(...ys),
+    bottom: Math.max(...ys),
+  };
+}
+
+function drawWear(ctx: CanvasRenderingContext2D, f: Frame, u: number, top: number, id: string) {
+  const b = hullBounds(f);
+  const r = seeded(hash(`${id}wear`));
+  ctx.save();
+  for (let i = 0; i < 4; i++) {
+    const x = lerp(b.minX, b.maxX, r()) * u;
+    const y = lerp(b.top, b.bottom, 0.3 + r() * 0.7) * u;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, u * (0.04 + r() * 0.05));
+    g.addColorStop(0, "rgba(120,58,20,0.75)");
+    g.addColorStop(1, "rgba(120,58,20,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(x - u * 0.1, y - u * 0.1, u * 0.2, u * 0.2);
+  }
+  ctx.strokeStyle = "rgba(225,220,210,0.45)";
+  ctx.lineWidth = Math.max(1, u * 0.006);
+  for (let i = 0; i < 12; i++) {
+    const x = lerp(b.minX, b.maxX, r()) * u;
+    const y = lerp(b.top, b.bottom, r()) * u;
+    const len = u * (0.03 + r() * 0.08);
+    const a = (r() - 0.5) * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "rgba(20,18,16,0.7)";
+  for (let i = 0; i < 6; i++) {
+    const x = lerp(b.minX, b.maxX, r()) * u;
+    ctx.fillRect(x, top, u * 0.02, u * 0.012);
+  }
+  ctx.restore();
+}
+
+function drawDecal(
+  ctx: CanvasRenderingContext2D,
+  decal: string,
+  f: Frame,
+  u: number,
+  paint: string,
+  id: string,
+  facing: number,
+) {
+  const b = hullBounds(f);
+  const w = b.maxX - b.minX;
+  const h = b.bottom - b.top;
+  const X = (t: number) => (b.minX + w * t) * u;
+  const Y = (t: number) => (b.top + h * t) * u;
+  if (decal === "flames") {
+    const layers: [string, string, number][] = [
+      ["#ffd23a", "#d8261a", 1],
+      ["#fff6b0", "#ff8c1a", 0.62],
+    ];
+    for (const [hot, cool, k] of layers) {
+      const g = ctx.createLinearGradient(X(1), 0, X(0.2), 0);
+      g.addColorStop(0, hot);
+      g.addColorStop(1, cool);
+      ctx.fillStyle = g;
+      for (let i = 0; i < 4; i++) {
+        const yc = lerp(0.8, 0.3, i / 3);
+        const reach = (0.55 + ((i * 37) % 4) * 0.1) * k;
+        const thick = 0.3 * k;
+        ctx.beginPath();
+        ctx.moveTo(X(1.05), Y(yc + thick / 2));
+        ctx.quadraticCurveTo(
+          X(1 - reach * 0.5),
+          Y(yc + thick * 0.7),
+          X(1 - reach),
+          Y(yc - thick * 0.45),
+        );
+        ctx.quadraticCurveTo(X(1 - reach * 0.4), Y(yc - thick * 0.05), X(1.05), Y(yc - thick / 2));
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+  } else if (decal === "lightning") {
+    const pts: [number, number][] = [
+      [0.12, 0.18],
+      [0.5, 0.36],
+      [0.42, 0.5],
+      [0.9, 0.78],
+      [0.46, 0.62],
+      [0.54, 0.5],
+    ];
+    ctx.fillStyle = "#ffe14a";
+    ctx.strokeStyle = "#1a1918";
+    ctx.lineWidth = Math.max(1, u * 0.01);
+    ctx.beginPath();
+    pts.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(X(px), Y(py)) : ctx.lineTo(X(px), Y(py))));
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  } else if (decal === "teeth") {
+    const mx = X(1);
+    const my = Y(0.62);
+    const back = X(0.66);
+    ctx.fillStyle = "#3a0b0b";
+    ctx.beginPath();
+    ctx.moveTo(mx, my - u * 0.05);
+    ctx.quadraticCurveTo(lerp(back, mx, 0.4), my - u * 0.06, back, my);
+    ctx.quadraticCurveTo(lerp(back, mx, 0.4), my + u * 0.08, mx, my + u * 0.07);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#f7f4ec";
+    const n = 6;
+    for (let i = 0; i < n; i++) {
+      const t0 = i / n;
+      const t1 = (i + 1) / n;
+      const xa = lerp(mx, back, t0);
+      const xb = lerp(mx, back, t1);
+      const ya = my - u * 0.05 * (1 - t0 * 0.8);
+      ctx.beginPath();
+      ctx.moveTo(xa, ya);
+      ctx.lineTo(xb, ya);
+      ctx.lineTo((xa + xb) / 2, ya + u * 0.04);
+      ctx.closePath();
+      ctx.fill();
+      const yb = my + u * 0.07 * (1 - t0 * 0.9);
+      ctx.beginPath();
+      ctx.moveTo(xa, yb);
+      ctx.lineTo(xb, yb);
+      ctx.lineTo((xa + xb) / 2, yb - u * 0.035);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.fillStyle = "#f7f4ec";
+    ctx.beginPath();
+    ctx.arc(X(0.72), Y(0.3), u * 0.03, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#0b0b0a";
+    ctx.beginPath();
+    ctx.arc(X(0.72) + u * 0.008, Y(0.3), u * 0.016, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (decal === "checker") {
+    const cell = u * 0.055;
+    const x0 = X(0);
+    for (let cx = 0; cx < 5; cx++) {
+      for (let cy = 0; cy * cell < h * u + cell; cy++) {
+        ctx.fillStyle = (cx + cy) % 2 === 0 ? "#f3efe6" : "#111";
+        ctx.fillRect(x0 + cx * cell, b.top * u + cy * cell, cell, cell);
+      }
+    }
+  } else if (decal === "hazard") {
+    const y0 = Y(0.62);
+    const band = h * u * 0.26;
+    ctx.fillStyle = "#f0b400";
+    ctx.fillRect(X(-0.05), y0, w * u * 1.1, band);
+    ctx.fillStyle = "#111";
+    const step = band * 1.6;
+    for (let sx = X(-0.1); sx < X(1.1); sx += step) {
+      ctx.beginPath();
+      ctx.moveTo(sx, y0 + band);
+      ctx.lineTo(sx + band, y0);
+      ctx.lineTo(sx + band + step / 2, y0);
+      ctx.lineTo(sx + step / 2, y0 + band);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else if (decal === "camo") {
+    const r = seeded(hash(`${id}camo`));
+    const tones = [shade(paint, -55), shade(paint, -25), "#4b5a3a", "#2e3326"];
+    for (let i = 0; i < 16; i++) {
+      ctx.fillStyle = tones[i % tones.length]!;
+      ctx.globalAlpha = 0.85;
+      ctx.beginPath();
+      ctx.ellipse(
+        X(r()),
+        Y(r()),
+        u * (0.04 + r() * 0.06),
+        u * (0.02 + r() * 0.03),
+        r() * 3,
+        0,
+        Math.PI * 2,
+      );
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  } else if (decal === "arch") {
+    const cx = X(0.3);
+    const cy = Y(0.38);
+    const r = Math.min(u * 0.075, h * u * 0.34);
+    ctx.fillStyle = "#f3efe6";
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#1a1918";
+    ctx.lineWidth = Math.max(1, r * 0.1);
+    ctx.stroke();
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(Math.sign(facing) || 1, 1);
+    ctx.fillStyle = "#1a1918";
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.62, r * 0.32);
+    ctx.quadraticCurveTo(-r * 0.62, -r * 0.18, -r * 0.3, -r * 0.2);
+    ctx.quadraticCurveTo(0, -r * 0.2, r * 0.05, r * 0.05);
+    ctx.quadraticCurveTo(r * 0.3, -r * 0.05, r * 0.62, r * 0.12);
+    ctx.lineTo(r * 0.62, r * 0.32);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#e2a21a";
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.42, r * 0.32);
+    ctx.quadraticCurveTo(-r * 0.1, -r * 0.05, r * 0.25, r * 0.32);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawFlag(
+  ctx: CanvasRenderingContext2D,
+  f: Frame,
+  u: number,
+  top: number,
+  trim: string,
+  paint: string,
+  name: string,
+  time: number,
+  charging: boolean,
+  facing: number,
+) {
+  const bx = (-0.38 + (f.treads ? 0.02 : 0)) * u;
+  const by = top;
+  const height = u * 0.5;
+  const sway = Math.sin(time * 2.4) * u * 0.03 + (charging ? -u * 0.12 : 0);
+  const tipX = bx + sway - u * 0.05;
+  const tipY = by - height;
+  ctx.save();
+  ctx.strokeStyle = "#a8a298";
+  ctx.lineWidth = Math.max(1.5, u * 0.012);
+  ctx.beginPath();
+  ctx.moveTo(bx, by);
+  ctx.quadraticCurveTo(bx, by - height * 0.6, tipX, tipY);
+  ctx.stroke();
+  ctx.fillStyle = "#1a1918";
+  ctx.fillRect(bx - u * 0.02, by - u * 0.03, u * 0.04, u * 0.03);
+  // Pennant trails backward from the tip.
+  const flutter = Math.sin(time * 7) * u * 0.015;
+  const len = u * 0.3;
+  const drop = u * 0.12;
+  ctx.fillStyle = trim === "#b8b2a6" ? paint : trim;
+  ctx.beginPath();
+  ctx.moveTo(tipX, tipY);
+  ctx.quadraticCurveTo(
+    tipX - len * 0.5,
+    tipY + drop * 0.25 + flutter,
+    tipX - len,
+    tipY + drop * 0.5 + flutter * 1.5,
+  );
+  ctx.quadraticCurveTo(tipX - len * 0.5, tipY + drop * 0.75 + flutter, tipX, tipY + drop);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.5)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  if (name) {
+    ctx.save();
+    ctx.translate(tipX - len * 0.42, tipY + drop * 0.52 + flutter);
+    ctx.scale(Math.sign(facing) || 1, 1);
+    ctx.fillStyle = "#0e0d0b";
+    ctx.font = `700 ${Math.max(7, u * 0.05)}px Oswald, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const label = name
+      .split(/[\s—-]+/)[0]!
+      .toUpperCase()
+      .slice(0, 9);
+    ctx.fillText(label, 0, 0);
+    ctx.restore();
+  }
   ctx.restore();
 }
 
@@ -1998,9 +2359,24 @@ function drawTopBot(
   }
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = "rgba(0,0,0,0.7)";
-  ctx.lineWidth = 1;
+  const style = styleOf(s.bot);
+  ctx.strokeStyle = style.trim === "steel" ? "rgba(0,0,0,0.7)" : (TRIM[style.trim] ?? "#000");
+  ctx.lineWidth = style.trim === "steel" ? 1 : Math.max(1.5, cage * 0.005);
   ctx.stroke();
+  {
+    const eye = EYES[style.eye] ?? EYES.green!;
+    const ex = len * 0.3;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const g = ctx.createRadialGradient(ex, 0, 0, ex, 0, wid * 0.5);
+    g.addColorStop(0, shade(eye, 0, s.dead ? 0.1 : 0.6));
+    g.addColorStop(1, shade(eye, 0, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(ex - wid * 0.5, -wid * 0.5, wid, wid);
+    ctx.restore();
+    ctx.fillStyle = shade(eye, 0, s.dead ? 0.2 : 1);
+    ctx.fillRect(ex - len * 0.02, -wid * 0.18, len * 0.04, wid * 0.36);
+  }
   // Lid panel and bolts.
   ctx.fillStyle = shade(paint, 25);
   ctx.fillRect(-len * 0.34, -wid * 0.28, len * 0.52, wid * 0.56);

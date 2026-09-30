@@ -75,14 +75,14 @@ export function ShowPage() {
     <div className="mx-auto flex max-w-5xl flex-col gap-4" data-testid="saturday-broadcast">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <SectionLabel>Saturday broadcast</SectionLabel>
+          <SectionLabel>Monday broadcast</SectionLabel>
           <h1 className="font-display text-5xl leading-none">{weekName(data, weekPick)}</h1>
           <p className="mt-2 max-w-xl text-sm text-muted">
             {tape.live
               ? "Posted card. This is the tape the stores get."
               : tape.bouts.length
                 ? "House tape. The gazette does not have this yet. A lock can still change it. The desk posts the card."
-                : "That Saturday was never posted."}
+                : "That fight day was never posted."}
           </p>
         </div>
         <Link to="/card" className="inline-flex min-h-11 items-center text-sm text-amber">
@@ -259,7 +259,7 @@ function SignOff({ bouts, live }: { bouts: Bout[]; live: boolean }) {
         <p className="font-display text-sm tracking-[0.28em] text-amber uppercase">Sign-off</p>
         <h2 className="mt-2 font-display text-5xl leading-none">Lights up.</h2>
         <p className="mt-3 max-w-xl text-muted">
-          {live ? "The card is on the wall. Damage waits on the desk." : "Nothing on the wall moved. Post it from the desk if this is the Saturday you want."}
+          {live ? "The card is on the wall. Damage waits on the desk." : "Nothing on the wall moved. Post it from the desk if this is the card you want."}
         </p>
         <ul className="mt-6 flex flex-col gap-2">
           {bouts.map((bout) => (

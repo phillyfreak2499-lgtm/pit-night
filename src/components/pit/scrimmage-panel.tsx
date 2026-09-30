@@ -66,7 +66,7 @@ export function ScrimmagePanel({ storeId }: { storeId: string }) {
     <section className="border border-line bg-surface p-4" data-testid="bay-scrimmage">
       <SectionLabel>Best lock</SectionLabel>
       <p className="mt-2 max-w-2xl text-sm text-muted">
-        Uses this week's grades and only iron already in the bay. It does not spend scrap, change class, or lock Friday.
+        Uses this week's grades and only iron already in the bay. It does not spend scrap, change class, or lock the bot.
       </p>
       <div className="mt-3">
         <Btn testId="optimize-build" onClick={optimize}>

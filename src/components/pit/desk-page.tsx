@@ -95,10 +95,10 @@ function DeskLive() {
       </div>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <Btn testId="lock-friday" onClick={lockFriday}>
-          Lock Friday
+          Lock the bots (Sat close)
         </Btn>
         <Btn testId="run-saturday" tone="spark" onClick={runSaturday}>
-          Run Saturday
+          Run the card (Monday)
         </Btn>
         <Btn testId="drop-damage" tone="line" onClick={dropDamage}>
           Drop damage

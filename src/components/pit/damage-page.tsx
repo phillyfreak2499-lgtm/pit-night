@@ -19,7 +19,7 @@ export function DamagePage() {
   const posted = data.phase === "inspected" || data.phase === "complete" || data.phase === "fought";
   return (
     <div className="mx-auto max-w-6xl">
-      <SectionLabel>Saturday afternoon</SectionLabel>
+      <SectionLabel>Monday afternoon</SectionLabel>
       <h1 className="font-display text-5xl leading-none">Damage report</h1>
       <p className="mt-3 max-w-2xl text-muted">
         Winners still take scratches. Blowouts kill weapon and drive. A disabled slot fights on loaner stock until the quote is paid. Emergency weld buys one Bent week.

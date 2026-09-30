@@ -80,7 +80,7 @@ export function SpyPanel({ storeId }: { storeId: string }) {
                       {line}
                     </p>
                   ))}
-                  <p className="mt-2 text-xs tracking-widest text-muted uppercase">{live?.locked ? "Friday lock" : "Still a draft"}</p>
+                  <p className="mt-2 text-xs tracking-widest text-muted uppercase">{live?.locked ? "Saturday lock" : "Still a draft"}</p>
                 </div>
               ) : null}
               {stale ? <p className="mt-2 text-sm text-amber">They moved the iron. The old read is dead. Your call still stands.</p> : null}

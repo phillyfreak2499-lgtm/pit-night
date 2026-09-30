@@ -10,6 +10,19 @@ export type BoutKind = "bout" | "bye" | "tag" | "semi" | "final" | "melee";
 export type Method = "ko" | "dump" | "decision" | "melee" | "scrimmage" | "bye";
 export type GarageLook = "hazard" | "concrete" | "night" | "bone" | "checker";
 export type BotLook = "plain" | "stripe" | "chevron" | "rivets";
+export type BotFinish = "factory" | "chrome" | "matte" | "worn";
+export type BotDecal = "none" | "flames" | "lightning" | "teeth" | "checker" | "hazard" | "camo" | "arch";
+
+/** Cosmetics only. None of it touches Power, Speed, Armor, or Heat. */
+export type BotStyle = {
+  finish: BotFinish;
+  decal: BotDecal;
+  /** Key into TRIM. Edges, rims, and the flag. */
+  trim: string;
+  /** Key into EYES. The visor light. */
+  eye: string;
+  flag: boolean;
+};
 
 export type StatBlock = {
   power: number;
@@ -70,6 +83,8 @@ export type Bot = {
   look: BotLook;
   /** Bay number painted on the bot. Decoration, not a stat. */
   number: string;
+  /** Older saves do not have it. Read through styleOf(). */
+  style?: BotStyle;
 };
 
 export type StoreCard = {
@@ -118,6 +133,7 @@ export type FighterSnap = {
   chassisName: string;
   look: BotLook;
   number: string;
+  style?: BotStyle;
 };
 
 export type FightResult = {

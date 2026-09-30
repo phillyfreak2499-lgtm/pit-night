@@ -83,7 +83,7 @@ export function GazettePage() {
 
         <div className="mt-6 grid gap-3 border-t border-(--ink) pt-3 text-[11px] tracking-widest text-(--ink-soft) uppercase sm:grid-cols-3">
           <p>Classifieds: one wedge, lightly used. Ask for the captain.</p>
-          <p className="sm:text-center">Weather: 100% chance of sparks Saturday.</p>
+          <p className="sm:text-center">Weather: 100% chance of sparks Monday.</p>
           <p className="sm:text-right">Corrections: none. The desk does not miss.</p>
         </div>
       </div>

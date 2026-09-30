@@ -1,4 +1,5 @@
 import { SectionLabel } from "./bits";
+import { KeyLadder, UpgradeHowTo } from "./key-ladder";
 
 export function RulesPage() {
   return (
@@ -7,29 +8,34 @@ export function RulesPage() {
         <SectionLabel>How it works</SectionLabel>
         <h1 className="font-display text-5xl leading-none">The store is the bot</h1>
         <p className="mt-3 text-muted">
-          The Waterman Battle Bot League is the Saturday card for The Waterman Group. Period 12 runs October 25 through November 21. Eleven Good Feet stores. One bot each. Four Saturdays. The trophy hangs in a building. Pit crew get a name on the titantron. They do not take hardware home.
+          The Waterman Battle Bot League is the Monday morning card for The Waterman Group. Period 12 runs October 25 through November 21. Eleven Good Feet stores. One bot each. Four fight days: November 2, 9, 16, and 23. The trophy hangs in a building. Pit crew get a name on the titantron. They do not take hardware home.
         </p>
       </div>
       <Rule title="The clock">
-        Monday through Friday the store runs the floor and the scrap lands in that bay. Friday night is one lock: chassis, drive, weapon, armor, utility. Saturday is five fights and one bye. The bye counts as a win and does not damage the bot. Saturday afternoon is the damage report. Sunday the stores are closed. The site stays up. Nothing new gets fought and nothing new gets scrapped.
+        Monday through Saturday the store runs the floor. That whole week is the card. Saturday at close is one lock: chassis, drive, weapon, armor, utility. The captain locks before the final numbers are in, so the lock is a bet on the week. Sunday the stores are closed and the official numbers come out. Monday morning the desk enters them and runs the card live: five fights and one bye. The bye counts as a win and does not damage the bot. Monday afternoon is the damage report, the scrap and keys pay out, and the shop opens for the next week.
       </Rule>
       <Rule title="What scores">
         Demo percent is demos divided by opportunities, not a traffic count. Closing percent is sales divided by demos. NSNU is judged against that store's weekly goal, never as raw units. A short week is a prorated goal, set by the commissioner. Reviews are named 5-stars, capped at two per pit-crew member on the clock. Former-customer average ticket is the armor stat. There is no traffic field and no volume field.
       </Rule>
       <Rule title="Grades and scrap">
-        Green pays 3 scrap, blue 2, orange 1, red 0. Every green after the first adds one more. The bank caps at 18. Repair bills spend the bank. They are not a second tax, and a last-place stipend is repair-only voucher that does not sit in the cap. Green Demo is a drive key. Green closing is a weapon key. Green NSNU-to-goal is a chassis key. Green ticket is armor. Green reviews unlock utility keys.
+        Every grade pays scrap: green 3, blue 2, orange 1, red 0. Every green after the first adds one more. The bank caps at 18. Every green also earns one key for the part of the bot that number feeds: Demo builds the drive, Closing the weapon, NSNU-to-goal the chassis, former-customer ticket the armor, reviews the utility. Keys are never spent. Repair bills spend the bank, and a last-place stipend is repair-only voucher that does not sit in the cap.
       </Rule>
+      <section className="flex flex-col gap-3 border-t border-line pt-4">
+        <h2 className="font-display text-2xl">Upgrades in one look</h2>
+        <UpgradeHowTo compact />
+        <KeyLadder />
+      </section>
       <Rule title="The triangle">
         Striker — Shrike. Demo and closing. Hits first. Dies if it goes long. Pressures a tank early. Tank — Keystone. Ticket and a stack of greens. Wins late. Smothers a specialist if the claw misses. Specialist — Windlass. Reviews and NSNU-to-goal. Grapple and Heat. Shuts a striker down when Heat is real. A correct counter can flip a modest underdog. The best week with the worst lock can still lose. A Super on bent wheels is not a Super.
       </Rule>
       <Rule title="Iron">
-        Week 1 is all stock. The shop opens after Saturday 1. Sport wants one green week. Pro wants two greens and the matching key. Super wants the scrap and two keys. Championship is a Title Saturday drop or salvage off a wrecked Super after a win. Never sold. Open cage has no Super. Changing class after Week 1 costs scrap. A disabled chassis fights stock of the same class. You do not get a free swap off a wreck.
+        Week 1 is all stock. The shop opens after the first Monday fight. Every part has a tier. Sport needs 1 key in its slot and 4 scrap. Pro needs 2 keys and 7 scrap. Super needs 3 keys and 12 scrap. Keys only go up, so a store that stays green on Closing every week opens Sport weapons for week 2, Pro for week 3, and Super for the title fight. Championship is a Title Monday drop or salvage off a wrecked Super after a win. Never sold. Changing class after Week 1 costs scrap. A disabled chassis fights stock of the same class. You do not get a free swap off a wreck.
       </Rule>
       <Rule title="The card">
-        Eleven stores. Seeds 1 through 11, Southlake down to Waxahachie. Each Saturday the wheel turns one spot. The store at the top of that week's wheel draws the bye. Seeds 1 through 4 each get one bye across the four weeks. A bye is a win. It is not a scrimmage. Week 4 is the last card, not a semifinal. The best record takes the trophy. Same wins and same losses is a tie, and those stores battle it out. Two stores fight. Three or more go in one cage. Best Build can still come from any bay.
+        Eleven stores. Seeds 1 through 11, Southlake down to Waxahachie. Each week the wheel turns one spot. The store at the top of that week's wheel draws the bye. Seeds 1 through 4 each get one bye across the four weeks. A bye is a win. It is not a scrimmage. Week 4 is the last card, not a semifinal. The best record takes the trophy. Same wins and same losses is a tie, and those stores battle it out. Two stores fight. Three or more go in one cage. Best Build can still come from any bay.
       </Rule>
       <Rule title="The bay">
-        Paint, garage floor, stripes, and the bay number are decoration. They do not change Power, Speed, Armor, or Heat. A Scry on the utility slot is the spy, and it stays shut until the bay calls the weapon family out loud. Then it says whether that call was right, and whether the weapon belongs on their class. It does not name the part. One call per fight. They can still change the draft until Friday. Captains can test the build against three house drills. That tape does not post damage, scrap, or a record. Captains rename the crew, add up to eight specialists, and keep at least one. Staff edits are not the Friday lock.
+        Paint, finish, decals, trim, eye color, the flag, garage floor, stripes, and the bay number are decoration. They do not change Power, Speed, Armor, or Heat. A Scry on the utility slot is the spy, and it stays shut until the bay calls the weapon family out loud. Then it says whether that call was right, and whether the weapon belongs on their class. It does not name the part. One call per fight. They can still change the draft until Saturday close. Captains can test the build against three house drills. That tape does not post damage, scrap, or a record. Captains rename the crew, add up to eight specialists, and keep at least one. Staff edits are not the lock.
       </Rule>
       <Rule title="Damage">
         Clean, scratched, bent, disabled. Bent is half effect. Disabled falls back to a stock loaner until you pay. Winners still scratch. Blowouts can kill weapon and drive. Emergency weld turns Disabled into Bent for one week. Salvage strips a rare part for a little scrap and drops the slot to stock.

@@ -3,13 +3,13 @@ import { Newspaper, Play, Radio, ScrollText, Swords, Trophy, Tv, Volume2, Volume
 import { useEffect, useState } from "react";
 import { applyHulen, usePit } from "@/lib/pit/store";
 import { setSoundMuted, soundMuted, subscribeSound } from "@/lib/pit/sound";
-import { formatRemain, nextFridayLock, PERIOD_OPENS, TextInput, useNow } from "./bits";
+import { formatRemain, nextLock, PERIOD_OPENS, TextInput, useNow } from "./bits";
 import { Tutorial } from "./tutorial";
 
 const NAV = [
   { to: "/", label: "Titantron", icon: Tv },
   { to: "/map", label: "Pit Map", icon: Warehouse },
-  { to: "/broadcast", label: "Saturday", icon: Swords },
+  { to: "/broadcast", label: "Fight Day", icon: Swords },
   { to: "/preview", label: "Preview", icon: Play },
   { to: "/damage", label: "Damage", icon: Wrench },
   { to: "/gazette", label: "Gazette", icon: Newspaper },
@@ -188,11 +188,11 @@ function ClockLine() {
   const week = usePit((s) => s.week);
   const now = useNow();
   const beforeOpen = Boolean(now && now.getTime() < PERIOD_OPENS.getTime());
-  const remain = now ? formatRemain((beforeOpen ? PERIOD_OPENS : nextFridayLock(now)).getTime() - now.getTime()) : "—";
+  const remain = now ? formatRemain((beforeOpen ? PERIOD_OPENS : nextLock(now)).getTime() - now.getTime()) : "—";
   return (
     <p className="truncate text-sm text-muted">
       Week {week} · {phaseLabel(phase)}
-      {phase === "open" ? (beforeOpen ? ` · Opens Oct 25 ${remain}` : ` · Friday lock ${remain}`) : ""}
+      {phase === "open" ? (beforeOpen ? ` · Opens Oct 25 ${remain}` : ` · Saturday lock ${remain}`) : ""}
     </p>
   );
 }
@@ -226,8 +226,8 @@ function Boot() {
 
 function phaseLabel(phase: string) {
   if (phase === "open") return "Floor open";
-  if (phase === "locked") return "Friday lock";
-  if (phase === "fought") return "Saturday card";
+  if (phase === "locked") return "Locked for Monday";
+  if (phase === "fought") return "Monday card";
   if (phase === "inspected") return "Damage posted";
   return "Season closed";
 }
@@ -259,7 +259,7 @@ function PassSheet({ onClose }: { onClose: () => void }) {
         </div>
         <p className="mt-3 text-sm text-muted">
           Signed in as {session.role}
-          {session.storeId ? ` · ${session.storeId}` : ""}. Specialists can propose. Captains lock. The desk runs Saturday.
+          {session.storeId ? ` · ${session.storeId}` : ""}. Specialists can propose. Captains lock. The desk runs Monday.
         </p>
         <label className="mt-4 block text-sm text-muted">
           Store

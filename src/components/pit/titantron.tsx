@@ -5,7 +5,7 @@ import { botFor, cardFor, houseTape, rankedStores, recordOf } from "@/lib/pit/en
 import { paintHex, usePit } from "@/lib/pit/store";
 import { ArenaHero } from "./arena-hero";
 import { BotPortrait, useBotLook } from "./bot-portrait";
-import { BoutWatch, ClassTag, formatRemain, GradeRow, nextFridayLock, Panel, PERIOD_OPENS, ResultLine, SectionLabel, useNow } from "./bits";
+import { BoutWatch, ClassTag, formatRemain, GradeRow, nextLock, Panel, PERIOD_OPENS, ResultLine, SectionLabel, useNow } from "./bits";
 
 export function Titantron() {
   const data = usePit();
@@ -13,7 +13,7 @@ export function Titantron() {
   const weekMeta = data.weeks.find((w) => w.number === data.week);
   const now = useNow();
   const beforeOpen = !now || now.getTime() < PERIOD_OPENS.getTime();
-  const remain = now ? formatRemain((beforeOpen ? PERIOD_OPENS : nextFridayLock(now)).getTime() - now.getTime()) : "—";
+  const remain = now ? formatRemain((beforeOpen ? PERIOD_OPENS : nextLock(now)).getTime() - now.getTime()) : "—";
   const gazette = data.gazette[0];
   const featured =
     data.bouts.find((b) => b.week === data.week && b.title === "Main event") ??
@@ -52,7 +52,7 @@ export function Titantron() {
             <p className="mt-2 text-sm text-muted">{weekMeta?.blurb}</p>
           </Panel>
           <Panel className="p-4">
-            <p className="text-xs tracking-widest text-muted uppercase">{beforeOpen ? "Opens Oct 25" : "Next Friday lock"}</p>
+            <p className="text-xs tracking-widest text-muted uppercase">{beforeOpen ? "Opens Oct 25" : "Saturday lock"}</p>
             <p className="font-display text-4xl leading-none text-amber tabular-nums">{data.phase === "open" || beforeOpen ? remain : phaseWord(data.phase)}</p>
             <p className="mt-2 text-sm text-muted">
               {beforeOpen
@@ -79,7 +79,7 @@ export function Titantron() {
                 {featured ? featured.title : "Plano vs Allen"}
               </h2>
             </div>
-            {featured?.result ? <BoutWatch bout={featured} /> : <Link to="/broadcast" className="text-sm text-amber">Saturday broadcast</Link>}
+            {featured?.result ? <BoutWatch bout={featured} /> : <Link to="/broadcast" className="text-sm text-amber">Monday broadcast</Link>}
           </div>
           <div className="grid gap-px bg-line md:grid-cols-2">
             <FighterCard storeId={featured?.teamA[0] ?? "plano"} facing={1} />
@@ -97,7 +97,7 @@ export function Titantron() {
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link to="/broadcast" className="inline-flex min-h-11 items-center bg-amber px-4 font-display text-sm tracking-wide text-deep uppercase">
-              Saturday broadcast
+              Monday broadcast
             </Link>
             <Link to="/preview" className="inline-flex min-h-11 items-center border border-line px-4 font-display text-sm tracking-wide uppercase">
               Watch a house fight

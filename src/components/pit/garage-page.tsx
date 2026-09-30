@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { CLASS_META, PAINT, partById, partsFor, SLOT_LABEL } from "@/lib/pit/catalog";
+import { CLASS_META, DECALS, EYES, FINISHES, PAINT, partById, partsFor, SLOT_LABEL, styleOf, TRIM } from "@/lib/pit/catalog";
 import {
   buyCheck,
   canSeeLoadout,
@@ -15,6 +15,7 @@ import {
 import { paintHex, usePit, type PitState } from "@/lib/pit/store";
 import type { BotLook, GarageLook, Slot, StoreCard } from "@/lib/pit/types";
 import { BotPortrait, useBotLook } from "./bot-portrait";
+import { KeyLadder } from "./key-ladder";
 import { Btn, Field, GradeRow, SectionLabel, StatStrip, TextInput } from "./bits";
 import { ScrimmagePanel } from "./scrimmage-panel";
 import { SpyPanel } from "./spy-panel";
@@ -32,10 +33,6 @@ export function GaragePage({ storeId }: { storeId: string }) {
   const renameCrew = usePit((s) => s.renameCrew);
   const addCrew = usePit((s) => s.addCrew);
   const removeCrew = usePit((s) => s.removeCrew);
-  const setPaint = usePit((s) => s.setPaint);
-  const setGarage = usePit((s) => s.setGarage);
-  const setLook = usePit((s) => s.setLook);
-  const setNumber = usePit((s) => s.setNumber);
   const acceptProposal = usePit((s) => s.acceptProposal);
   const dismissProposal = usePit((s) => s.dismissProposal);
   const repairSlot = usePit((s) => s.repairSlot);
@@ -95,59 +92,7 @@ export function GaragePage({ storeId }: { storeId: string }) {
       </section>
 
       {captain ? (
-        <section className="border border-line bg-surface p-4">
-          <SectionLabel>Decorate</SectionLabel>
-          <p className="mt-2 text-sm text-muted">Paint, floor, stripes, and the number are cosmetic. They do not replace the Friday lock.</p>
-          <p className="mt-4 text-xs tracking-widest text-muted uppercase">Paint</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {Object.keys(PAINT).map((key) => (
-              <button
-                key={key}
-                type="button"
-                aria-label={`${key} paint`}
-                className={`min-h-11 min-w-11 border ${store.paint === key ? "border-amber" : "border-line"}`}
-                style={{ background: paintHex(key) }}
-                onClick={() => setPaint(storeId, key)}
-              />
-            ))}
-          </div>
-          <p className="mt-4 text-xs tracking-widest text-muted uppercase">Garage</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {GARAGES.map((look) => (
-              <button
-                key={look.id}
-                type="button"
-                className={`min-h-11 border px-3 font-display text-sm uppercase ${store.garage === look.id ? "border-amber text-amber" : "border-line"}`}
-                onClick={() => setGarage(storeId, look.id)}
-              >
-                {look.label}
-              </button>
-            ))}
-          </div>
-          <p className="mt-4 text-xs tracking-widest text-muted uppercase">Bot</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {LOOKS.map((look) => (
-              <button
-                key={look.id}
-                type="button"
-                className={`min-h-11 border px-3 font-display text-sm uppercase ${bot.look === look.id ? "border-amber text-amber" : "border-line"}`}
-                onClick={() => setLook(storeId, look.id)}
-              >
-                {look.label}
-              </button>
-            ))}
-          </div>
-          <div className="mt-4 max-w-xs">
-            <Field label="Bay number">
-              <TextInput
-                value={bot.number}
-                aria-label="Bay number"
-                maxLength={3}
-                onChange={(e) => setNumber(storeId, e.target.value)}
-              />
-            </Field>
-          </div>
-        </section>
+        <DecoratePanel storeId={storeId} />
       ) : (
         <p className="text-sm text-muted">Decoration is on the door. It does not change the fight. The captain dresses the bay.</p>
       )}
@@ -156,27 +101,21 @@ export function GaragePage({ storeId }: { storeId: string }) {
         <Meter label="Scrap" value={`${bot.scrap} / 18`} hint="Repair does not raise the cap." />
         <Meter label="Repair voucher" value={`${bot.voucher}`} hint="Last-place money. Repair first." />
         <Meter label="Class" value={CLASS_META[bot.classId].chassis} hint={CLASS_META[bot.classId].blurb} />
-        <Meter label="Lock" value={bot.locked ? "Friday locked" : "Still drafting"} hint={bot.locked ? "Frozen until the commissioner overrides." : "One lock. Then the cage."} />
+        <Meter label="Lock" value={bot.locked ? "Locked" : "Still drafting"} hint={bot.locked ? "Frozen until the commissioner overrides." : "One lock. Then the cage."} />
       </section>
 
-      <section className="grid grid-cols-5 gap-2 text-center text-xs">
-        {(
-          [
-            ["Chassis", bot.keys.chassis],
-            ["Drive", bot.keys.drive],
-            ["Weapon", bot.keys.weapon],
-            ["Armor", bot.keys.armor],
-            ["Utility", bot.keys.utility],
-          ] as const
-        ).map(([label, n]) => (
-          <div key={label} className="border border-line bg-surface py-2">
-            <p className="text-muted">{label} keys</p>
-            <p className="font-display text-2xl">{n}</p>
-          </div>
-        ))}
+      <section>
+        <div className="mb-2 flex items-end justify-between gap-3">
+          <SectionLabel>Upgrade keys</SectionLabel>
+          <Link to="/shop/$storeId" params={{ storeId }} className="text-sm text-amber">
+            Open the shop →
+          </Link>
+        </div>
+        <KeyLadder keys={bot.keys} />
+        <p className="mt-2 text-xs text-muted">Keys are never spent. 1 opens Sport, 2 Pro, 3 Super. Scrap pays for the part.</p>
       </section>
 
-      {showStats && printed ? <StatStrip {...printed.stats} /> : <p className="text-sm text-muted">Power, Speed, Armor, and Heat print at the Friday lock.</p>}
+      {showStats && printed ? <StatStrip {...printed.stats} /> : <p className="text-sm text-muted">Power, Speed, Armor, and Heat print when the bot locks Saturday.</p>}
 
       <section className="grid gap-3 md:grid-cols-2">
         {SLOTS.map((slot) => {
@@ -231,7 +170,7 @@ export function GaragePage({ storeId }: { storeId: string }) {
                 </button>
               ))}
           </div>
-          {!shopOpen(data) ? <p className="mt-3 text-sm text-muted">Sport and up stay in the shop until after Saturday 1.</p> : null}
+          {!shopOpen(data) ? <p className="mt-3 text-sm text-muted">Sport and up stay in the shop until after the first Monday fight.</p> : null}
         </section>
       ) : null}
 
@@ -259,7 +198,7 @@ export function GaragePage({ storeId }: { storeId: string }) {
       ) : (
         <section className="flex flex-wrap gap-2">
           <Btn testId="lock-button" onClick={() => lockStore(storeId)} disabled={Boolean(bot.locked) || (data.phase !== "open" && data.phase !== "locked")}>
-            {bot.locked ? "Locked" : "Lock Friday"}
+            {bot.locked ? "Locked" : "Lock for Monday"}
           </Btn>
           <p className="self-center text-sm text-muted">{store.captain} is on the clipboard.</p>
         </section>
@@ -449,9 +388,9 @@ function CardForm({
         <Num label="Crew on the clock" value={card.crewOnClock} disabled={frozen} onChange={(crewOnClock) => onChange({ crewOnClock })} />
         <Num label="Former-customer avg ticket" value={card.formerTicket} disabled={frozen} onChange={(formerTicket) => onChange({ formerTicket })} />
       </div>
-      {card.projected ? <p className="mt-3 text-sm text-amber">House projection. Overwrite it before Friday.</p> : null}
+      {card.projected ? <p className="mt-3 text-sm text-amber">House projection. The desk puts the official numbers in Monday morning before the fights.</p> : null}
       <p className="mt-2 text-xs text-muted" data-testid={`card-${storeId}`}>
-        Greens pay keys. Demo green is a drive key. Closing is a weapon key. NSNU is chassis. Ticket is armor. Reviews unlock utility.
+        Every green earns a key: Demo → drive, Closing → weapon, NSNU → chassis, Ticket → armor, Reviews → utility.
       </p>
     </section>
   );
@@ -518,5 +457,149 @@ function GarageBot({ storeId }: { storeId: string }) {
     <span data-bot-hover className="block h-36 w-60 shrink-0 md:h-44 md:w-80">
       <BotPortrait look={look} facing={-1} className="h-full w-full" />
     </span>
+  );
+}
+
+function Swatch({ color, active, label, onClick, glow }: { color: string; active: boolean; label: string; onClick: () => void; glow?: boolean }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={active}
+      title={label}
+      className={`relative min-h-11 min-w-11 border-2 transition-transform hover:scale-105 ${active ? "border-amber" : "border-line"}`}
+      style={{ background: color, boxShadow: glow ? `0 0 12px ${color}` : undefined }}
+      onClick={onClick}
+    >
+      {active ? <span className="absolute inset-0 grid place-items-center font-display text-lg text-deep mix-blend-difference">✓</span> : null}
+    </button>
+  );
+}
+
+function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      className={`min-h-11 border px-3 font-display text-sm tracking-wide uppercase transition-colors ${active ? "border-amber bg-amber/10 text-amber" : "border-line hover:border-muted"}`}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Group({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-xs tracking-widest text-muted uppercase">{label}</p>
+      <div className="mt-2 flex flex-wrap gap-2">{children}</div>
+    </div>
+  );
+}
+
+function DecoratePanel({ storeId }: { storeId: string }) {
+  const data = usePit();
+  const setPaint = usePit((s) => s.setPaint);
+  const setGarage = usePit((s) => s.setGarage);
+  const setLook = usePit((s) => s.setLook);
+  const setNumber = usePit((s) => s.setNumber);
+  const setStyle = usePit((s) => s.setStyle);
+  const store = data.stores.find((s) => s.id === storeId)!;
+  const bot = data.bots.find((b) => b.storeId === storeId)!;
+  const style = styleOf(bot);
+  const look = useBotLook(storeId);
+  const pick = <T,>(list: readonly T[]) => list[Math.floor(Math.random() * list.length)]!;
+  const surprise = () => {
+    setPaint(storeId, pick(Object.keys(PAINT)));
+    setLook(storeId, pick(LOOKS).id);
+    setStyle(storeId, {
+      finish: pick(FINISHES).id,
+      decal: pick(DECALS).id,
+      trim: pick(Object.keys(TRIM)),
+      eye: pick(Object.keys(EYES)),
+      flag: Math.random() > 0.4,
+    });
+  };
+
+  return (
+    <section className="border border-line bg-surface">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
+        <div>
+          <SectionLabel>Paint shop</SectionLabel>
+          <p className="text-sm text-muted">Looks only. None of this changes Power, Speed, Armor, or Heat.</p>
+        </div>
+        <Btn tone="line" onClick={surprise}>
+          Surprise me
+        </Btn>
+      </div>
+      <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div className="lg:sticky lg:top-4 lg:self-start">
+          <div data-bot-hover className={`relative h-64 overflow-hidden border border-line md:h-72 ${garageClass(store.garage)}`}>
+            <div className="absolute inset-0 bg-deep/55" />
+            <BotPortrait look={look ? { ...look, weapon: look.weapon === "hidden" ? "none" : look.weapon } : null} facing={-1} zoom={0.74} className="relative h-full w-full" />
+          </div>
+          <p className="mt-2 text-xs text-muted">Hover the preview to rev it.</p>
+        </div>
+        <div className="flex flex-col gap-4">
+          <Group label="Paint">
+            {Object.keys(PAINT).map((key) => (
+              <Swatch key={key} color={paintHex(key)} active={store.paint === key} label={`${key} paint`} onClick={() => setPaint(storeId, key)} />
+            ))}
+          </Group>
+          <Group label="Finish">
+            {FINISHES.map((row) => (
+              <Chip key={row.id} active={style.finish === row.id} onClick={() => setStyle(storeId, { finish: row.id })}>
+                {row.label}
+              </Chip>
+            ))}
+          </Group>
+          <Group label="Decal">
+            {DECALS.map((row) => (
+              <Chip key={row.id} active={style.decal === row.id} onClick={() => setStyle(storeId, { decal: row.id })}>
+                {row.label}
+              </Chip>
+            ))}
+          </Group>
+          <Group label="Stripes">
+            {LOOKS.map((row) => (
+              <Chip key={row.id} active={bot.look === row.id} onClick={() => setLook(storeId, row.id)}>
+                {row.label}
+              </Chip>
+            ))}
+          </Group>
+          <Group label="Trim">
+            {Object.entries(TRIM).map(([key, hex]) => (
+              <Swatch key={key} color={hex} active={style.trim === key} label={`${key} trim`} onClick={() => setStyle(storeId, { trim: key })} />
+            ))}
+          </Group>
+          <Group label="Eye">
+            {Object.entries(EYES).map(([key, hex]) => (
+              <Swatch key={key} color={hex} glow active={style.eye === key} label={`${key} eye`} onClick={() => setStyle(storeId, { eye: key })} />
+            ))}
+          </Group>
+          <Group label="Flag">
+            <Chip active={style.flag} onClick={() => setStyle(storeId, { flag: true })}>
+              Flag up
+            </Chip>
+            <Chip active={!style.flag} onClick={() => setStyle(storeId, { flag: false })}>
+              No flag
+            </Chip>
+          </Group>
+          <Group label="Garage floor">
+            {GARAGES.map((row) => (
+              <Chip key={row.id} active={store.garage === row.id} onClick={() => setGarage(storeId, row.id)}>
+                {row.label}
+              </Chip>
+            ))}
+          </Group>
+          <div className="max-w-xs">
+            <Field label="Bay number">
+              <TextInput value={bot.number} aria-label="Bay number" maxLength={3} onChange={(e) => setNumber(storeId, e.target.value)} />
+            </Field>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
