@@ -9,22 +9,53 @@ export function DeskPage() {
   const boss = data.session.role === "commissioner";
 
   if (!boss) {
+    const press = (key: string) => {
+      if (key === "clr") setPin("");
+      else if (key === "del") setPin((p) => p.slice(0, -1));
+      else setPin((p) => (p + key).slice(0, 8));
+    };
     return (
       <div className="mx-auto max-w-md">
         <SectionLabel>House desk</SectionLabel>
         <h1 className="font-display text-5xl leading-none">Commissioner</h1>
         <p className="mt-3 text-sm text-muted">Demo house PIN is 8472. This clipboard runs the season. It does not belong to a salesperson.</p>
         <form
-          className="mt-4 flex flex-col gap-3"
+          className="control-panel mt-5 border border-line"
           onSubmit={(e) => {
             e.preventDefault();
             signCommissioner(pin);
           }}
         >
-          <TextInput data-testid="desk-pin" value={pin} onChange={(e) => setPin(e.target.value)} inputMode="numeric" placeholder="PIN" aria-label="Commissioner PIN" />
-          <Btn type="submit" testId="desk-unlock">
-            Unlock the desk
-          </Btn>
+          <div className="hazard h-2" />
+          <div className="flex flex-col gap-4 p-4 md:p-5">
+            <div className="flex items-center justify-between">
+              <span className="font-display text-xs tracking-[0.25em] text-muted uppercase">Arena control</span>
+              <span className="flex items-center gap-2 font-display text-xs tracking-widest text-bad uppercase">
+                <span className="live-dot h-2 w-2 rounded-full bg-bad" /> Locked
+              </span>
+            </div>
+            <TextInput
+              data-testid="desk-pin"
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              inputMode="numeric"
+              type="password"
+              autoComplete="off"
+              placeholder="ENTER PIN"
+              aria-label="Commissioner PIN"
+              className="lcd h-16 text-center font-display text-3xl tracking-[0.4em] placeholder:text-base placeholder:tracking-[0.3em]"
+            />
+            <div className="grid grid-cols-3 gap-2">
+              {["1", "2", "3", "4", "5", "6", "7", "8", "9", "clr", "0", "del"].map((key) => (
+                <button key={key} type="button" className="key min-h-14 font-display text-2xl uppercase" onClick={() => press(key)} aria-label={key === "clr" ? "Clear" : key === "del" ? "Delete" : key}>
+                  {key === "clr" ? <span className="text-sm tracking-widest">Clr</span> : key === "del" ? <span className="text-sm tracking-widest">Del</span> : key}
+                </button>
+              ))}
+            </div>
+            <Btn type="submit" testId="desk-unlock">
+              Unlock the desk
+            </Btn>
+          </div>
         </form>
       </div>
     );

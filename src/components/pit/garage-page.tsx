@@ -14,6 +14,7 @@ import {
 } from "@/lib/pit/engine";
 import { paintHex, usePit, type PitState } from "@/lib/pit/store";
 import type { BotLook, GarageLook, Slot, StoreCard } from "@/lib/pit/types";
+import { BotPortrait, useBotLook } from "./bot-portrait";
 import { Btn, Field, GradeRow, SectionLabel, StatStrip, TextInput } from "./bits";
 import { ScrimmagePanel } from "./scrimmage-panel";
 import { SpyPanel } from "./spy-panel";
@@ -89,7 +90,7 @@ export function GaragePage({ storeId }: { storeId: string }) {
               {lookLabel(bot.look)} · {garageLabel(store.garage)} floor
             </p>
           </div>
-          <BayBot paint={store.paint} look={bot.look} number={bot.number} />
+          <GarageBot storeId={storeId} />
         </div>
       </section>
 
@@ -511,28 +512,11 @@ function lookLabel(look: BotLook) {
   return LOOKS.find((row) => row.id === look)?.label ?? "Plain";
 }
 
-function BayBot({ paint, look, number }: { paint: string; look: BotLook; number: string }) {
-  const hex = paintHex(paint);
+function GarageBot({ storeId }: { storeId: string }) {
+  const look = useBotLook(storeId);
   return (
-    <svg viewBox="0 0 120 80" className="h-20 w-28 shrink-0" aria-hidden>
-      <rect x="10" y="28" width="76" height="30" fill={hex} />
-      {look === "stripe" ? <rect x="10" y="40" width="76" height="6" fill="var(--color-deep)" /> : null}
-      {look === "chevron" ? (
-        <polyline points="22,34 46,48 22,58" fill="none" stroke="var(--color-deep)" strokeWidth="4" />
-      ) : null}
-      {look === "rivets" ? (
-        <>
-          <circle cx="20" cy="36" r="2.4" fill="var(--color-fg)" />
-          <circle cx="76" cy="36" r="2.4" fill="var(--color-fg)" />
-          <circle cx="20" cy="52" r="2.4" fill="var(--color-fg)" />
-          <circle cx="76" cy="52" r="2.4" fill="var(--color-fg)" />
-        </>
-      ) : null}
-      <text x="48" y="49" textAnchor="middle" fontFamily="Oswald, sans-serif" fontSize="14" fill="var(--color-deep)">
-        {number}
-      </text>
-      <circle cx="28" cy="64" r="7" fill="var(--color-surface-2)" />
-      <circle cx="68" cy="64" r="7" fill="var(--color-surface-2)" />
-    </svg>
+    <span data-bot-hover className="block h-36 w-60 shrink-0 md:h-44 md:w-80">
+      <BotPortrait look={look} facing={-1} className="h-full w-full" />
+    </span>
   );
 }

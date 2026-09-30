@@ -4,6 +4,7 @@ import { canSeeLoadout, cardFor, loadSignature, printedStats, recordOf, weaponFa
 import { paintHex, usePit } from "@/lib/pit/store";
 import type { Slot } from "@/lib/pit/types";
 import { ClassTag, GradeRow, SectionLabel, StatStrip } from "./bits";
+import { BotPortrait, useBotLook } from "./bot-portrait";
 
 const SLOTS: Slot[] = ["chassis", "drive", "weapon", "armor", "utility"];
 
@@ -35,6 +36,7 @@ export function StorePage({ storeId }: { storeId: string }) {
       <p className="mt-2 font-display text-2xl leading-tight text-muted">
         Bay {bot.number} · {bot.name}
       </p>
+      <StoreBot storeId={storeId} />
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <ClassTag classId={bot.classId} />
         <span className="font-display text-2xl">
@@ -102,6 +104,16 @@ export function StorePage({ storeId }: { storeId: string }) {
       <Link to="/garage/$storeId" params={{ storeId }} className="mt-6 inline-flex min-h-11 items-center bg-amber px-4 font-display text-sm tracking-wide text-deep uppercase">
         Enter the bay
       </Link>
+    </div>
+  );
+}
+
+function StoreBot({ storeId }: { storeId: string }) {
+  const look = useBotLook(storeId);
+  return (
+    <div data-bot-hover className="cage-floor relative mt-4 h-44 overflow-hidden border border-line bg-deep md:h-52">
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/50" />
+      <BotPortrait look={look} zoom={0.8} className="relative h-full w-full" />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { CLASS_META } from "@/lib/pit/catalog";
 import { botFor, recordOf } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
 import { SectionLabel } from "./bits";
+import { BotPortrait, useBotLook } from "./bot-portrait";
 
 export function PitMap() {
   const data = usePit();
@@ -25,16 +26,22 @@ export function PitMap() {
                 to="/garage/$storeId"
                 params={{ storeId: store.id }}
                 data-testid={`door-${store.id}`}
-                className="relative flex min-h-56 flex-col justify-between overflow-hidden border border-line bg-deep p-3"
+                data-bot-hover
+                className="bay group lift relative flex flex-col overflow-hidden border border-line bg-deep p-3"
               >
-                <span className="bay-door pointer-events-none absolute inset-0 opacity-70" />
                 <span className="relative flex items-center justify-between text-xs tracking-widest uppercase">
                   <span style={{ color: paintHex(store.paint) }}>{store.region}</span>
                   <span className="font-display text-lg" style={{ color: paintHex(store.paint) }}>
                     {bot.number}
                   </span>
                 </span>
-                <span className="relative">
+                <span className="relative -mx-3 mt-2 block h-32 overflow-hidden border-y border-black/60">
+                  <span className="bay-inside absolute inset-0" />
+                  <span className="bay-lamp absolute inset-x-0 top-0 h-24" style={{ ["--lamp" as string]: paintHex(store.paint) }} />
+                  <DoorBot storeId={store.id} />
+                  <span className="bay-door bay-shutter absolute inset-x-0 top-0 h-[30%] border-b-4 border-black/70" />
+                </span>
+                <span className="relative mt-3 block">
                   <span className="block text-xs tracking-widest text-muted uppercase">{CLASS_META[bot.classId].label}</span>
                   <span className="block font-display text-2xl leading-tight">{store.name}</span>
                   <span className="mt-1 block text-sm text-fg">{bot.name}</span>
@@ -49,4 +56,9 @@ export function PitMap() {
       </ul>
     </div>
   );
+}
+
+function DoorBot({ storeId }: { storeId: string }) {
+  const look = useBotLook(storeId);
+  return <BotPortrait look={look} zoom={0.78} className="absolute inset-0 h-full w-full" />;
 }

@@ -915,7 +915,7 @@ function bolt(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
   ctx.fill();
 }
 
-function drawSideBot(
+export function drawSideBot(
   ctx: CanvasRenderingContext2D,
   s: BotState,
   x: number,
@@ -1399,7 +1399,7 @@ function weaponFront(
     ctx.beginPath();
     ctx.arc(px, py, 0.045 * u, 0, Math.PI * 2);
     ctx.fill();
-  } else if (fam !== "hammer" && fam !== "saw") {
+  } else if (fam !== "hammer" && fam !== "saw" && fam !== "hidden" && fam !== "none") {
     // Ram spike.
     const cy = f.deck * u * 0.5;
     ctx.fillStyle = steel(ctx, fx, cy - 0.05 * u, fx, cy + 0.05 * u);
@@ -2115,7 +2115,7 @@ function topWeapon(
     ctx.fillStyle = "#b9b4aa";
     ctx.fillRect(len * 0.4, -wid * 0.42 - open, len * 0.38, wid * 0.14);
     ctx.fillRect(len * 0.4, wid * 0.28 + open, len * 0.38, wid * 0.14);
-  } else {
+  } else if (fam !== "hidden" && fam !== "none") {
     ctx.fillStyle = "#d9d5cc";
     ctx.beginPath();
     ctx.moveTo(len * 0.45, -wid * 0.2);

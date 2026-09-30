@@ -19,6 +19,7 @@ const NAV = [
 ] as const;
 
 export function PitShell({ children }: { children: React.ReactNode }) {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [ready, setReady] = useState(false);
   const [passOpen, setPassOpen] = useState(false);
   const [guide, setGuide] = useState(false);
@@ -93,7 +94,13 @@ export function PitShell({ children }: { children: React.ReactNode }) {
             </div>
           </header>
           <Flash />
-          {ready ? <main className="px-4 pt-5 pb-28 md:px-6 md:pb-10">{children}</main> : <Boot />}
+          {ready ? (
+            <main key={pathname} className="page-in px-4 pt-5 pb-28 md:px-6 md:pb-10">
+              {children}
+            </main>
+          ) : (
+            <Boot />
+          )}
           <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-line bg-deep md:hidden">
             {NAV.filter((item) => ["/", "/map", "/broadcast", "/gazette", "/desk"].includes(item.to)).map((item) => (
               <NavLink key={item.to} to={item.to} label={item.label} icon={item.icon} compact />
