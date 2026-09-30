@@ -63,6 +63,7 @@ export function Broadcast({
 }) {
   const result = bout.result;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const topRef = useRef<HTMLCanvasElement | null>(null);
   const [playingState, setPlayingState] = useState(false);
   const [speedState, setSpeedState] = useState(1);
   const playing = playingProp ?? playingState;
@@ -89,9 +90,11 @@ export function Broadcast({
   useEffect(() => {
     if (!result) return;
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const top = topRef.current;
+    if (!canvas || !top) return;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    const topCtx = top.getContext("2d");
+    if (!ctx || !topCtx) return;
     const beats = buildBeats(result);
     const total = beats.reduce((m, b) => Math.max(m, b.t + b.dur), 0);
     const sparks: Spark[] = [];
@@ -100,15 +103,19 @@ export function Broadcast({
     let last = performance.now();
     let shook = 0;
 
+    const trails: Spot[][] = [[], []];
     const resize = () => {
-      const rect = canvas.getBoundingClientRect();
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = Math.max(1, Math.floor(rect.width * dpr));
-      canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+      for (const node of [canvas, top]) {
+        const rect = node.getBoundingClientRect();
+        node.width = Math.max(1, Math.floor(rect.width * dpr));
+        node.height = Math.max(1, Math.floor(rect.height * dpr));
+      }
     };
     resize();
     const observer = new ResizeObserver(resize);
     observer.observe(canvas);
+    observer.observe(top);
 
     const frame = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000);
@@ -135,6 +142,12 @@ export function Broadcast({
       }
       if (shook > 0) shook *= 0.86;
       drawArena(ctx, canvas.width, canvas.height, result, beat, local, sparks, shook, reduced, time);
+      const plan = fightDrive(Math.max(1, top.width), Math.max(1, top.height), result, beat, local, reduced ? 0 : time);
+      if (!reduced && result.fighters.length <= 2 && result.method !== "melee") {
+        pushTrail(trails[0]!, plan.spotA);
+        if (plan.spotB) pushTrail(trails[1]!, plan.spotB);
+      }
+      drawTop(topCtx, top.width, top.height, result, beat, local, time, trails, reduced);
       for (let i = sparks.length - 1; i >= 0; i--) {
         const s = sparks[i]!;
         s.x += s.vx;
@@ -184,13 +197,18 @@ export function Broadcast({
         <p className="font-display text-sm tracking-[0.18em] text-amber uppercase">{kicker ?? "Live cage"}</p>
         <p className="font-display text-sm text-muted">{clock} / {Math.round(total)}s</p>
       </div>
-      <div className="relative">
-        <canvas ref={canvasRef} className="aspect-video w-full bg-deep" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 grid gap-2 p-3 md:grid-cols-2">
-          {left ? <Health name={left.botName} store={left.storeName} hp={hp[left.id] ?? 100} paint={left.paint} align="left" /> : null}
-          {right ? <Health name={right.botName} store={right.storeName} hp={hp[right.id] ?? 100} paint={right.paint} align="right" /> : null}
+      <div className="grid gap-px bg-line lg:grid-cols-[minmax(0,1.55fr)_minmax(190px,0.72fr)]">
+        <div className="relative min-w-0 bg-deep">
+          <canvas ref={canvasRef} className="aspect-video w-full bg-deep" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 grid gap-2 p-3 md:grid-cols-2">
+            {left ? <Health name={left.botName} store={left.storeName} hp={hp[left.id] ?? 100} paint={left.paint} align="left" /> : null}
+            {right ? <Health name={right.botName} store={right.storeName} hp={hp[right.id] ?? 100} paint={right.paint} align="right" /> : null}
+          </div>
+          <p className="absolute inset-x-0 bottom-0 bg-deep/80 px-3 py-3 text-sm md:text-base">{caption}</p>
         </div>
-        <p className="absolute inset-x-0 bottom-0 bg-deep/80 px-3 py-3 text-sm md:text-base">{caption}</p>
+        <div className="relative min-w-0 bg-deep lg:min-h-full">
+          <canvas ref={topRef} className="aspect-square w-full bg-deep lg:absolute lg:inset-0 lg:h-full lg:w-full" />
+        </div>
       </div>
       {chromeless ? null : (
       <div className="flex flex-wrap gap-2 border-t border-line p-3">
@@ -388,6 +406,29 @@ function faceOf(from: Spot, to: Spot, fallback: number) {
   return fallback;
 }
 
+function headingOf(from: Spot, to: Spot, fallback: number) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (Math.hypot(dx, dy) < 0.025) return fallback;
+  return Math.atan2(dy, dx);
+}
+
+function pushTrail(trail: Spot[], spot: Spot) {
+  const last = trail[trail.length - 1];
+  if (last && Math.hypot(last.x - spot.x, last.y - spot.y) < 0.012) return;
+  trail.push({ x: spot.x, y: spot.y });
+  if (trail.length > 16) trail.shift();
+}
+
+function shade(hex: string, amt: number) {
+  const raw = hex.replace("#", "");
+  const full = raw.length === 3 ? raw.split("").map((c) => c + c).join("") : raw;
+  const num = Number.parseInt(full, 16);
+  if (Number.isNaN(num)) return hex;
+  const ch = (shift: number) => Math.min(255, Math.max(0, ((num >> shift) & 255) + amt));
+  return `rgb(${ch(16)}, ${ch(8)}, ${ch(0)})`;
+}
+
 function fightDrive(w: number, h: number, result: FightResult, beat: Beat, local: number, time: number) {
   const a = result.fighters[0]!;
   const b = result.fighters[1];
@@ -472,6 +513,10 @@ function fightDrive(w: number, h: number, result: FightResult, beat: Beat, local
   return {
     a: { ...pa, facing: facingA, pose: poseA, bot: a },
     b: pb && b ? { ...pb, facing: facingB, pose: poseB, bot: b } : null,
+    spotA,
+    spotB,
+    headingA: headingOf(corner(0, step), spotA, 0),
+    headingB: spotB ? headingOf(corner(1, step), spotB, Math.PI) : Math.PI,
     hitNx: hit.x / w,
     hitNy: hit.y / h,
     spotlight,
@@ -498,27 +543,7 @@ function drawArena(
   ctx.save();
   ctx.clearRect(0, 0, w, h);
   ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
-  ctx.fillStyle = "#080807";
-  ctx.fillRect(-20, -20, w + 40, h + 40);
-  ctx.strokeStyle = "#3a342c";
-  ctx.lineWidth = Math.max(1, w / 400);
-  for (let i = 0; i < 8; i++) {
-    ctx.beginPath();
-    ctx.moveTo((w / 7) * i, h * 0.42);
-    ctx.lineTo(w * 0.5 + (i - 3.5) * w * 0.12, h * 0.92);
-    ctx.stroke();
-  }
-  ctx.fillStyle = "#12100d";
-  ctx.beginPath();
-  ctx.moveTo(0, h * 0.72);
-  ctx.lineTo(w, h * 0.72);
-  ctx.lineTo(w, h);
-  ctx.lineTo(0, h);
-  ctx.fill();
-  ctx.strokeStyle = "#f0a202";
-  ctx.globalAlpha = 0.35;
-  ctx.strokeRect(w * 0.08, h * 0.16, w * 0.84, h * 0.7);
-  ctx.globalAlpha = 1;
+  drawPit(ctx, w, h);
 
   const a = result.fighters[0];
   if (!a) {
@@ -561,6 +586,81 @@ function decisionWord(result: FightResult) {
   return "DECISION";
 }
 
+function drawPit(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  ctx.fillStyle = "#080807";
+  ctx.fillRect(-20, -20, w + 40, h + 40);
+  const wall = ctx.createLinearGradient(0, h * 0.1, 0, h * 0.48);
+  wall.addColorStop(0, "#0c0b09");
+  wall.addColorStop(1, "#2a231c");
+  ctx.fillStyle = wall;
+  ctx.fillRect(w * 0.06, h * 0.14, w * 0.88, h * 0.32);
+  ctx.fillStyle = "#12100e";
+  ctx.beginPath();
+  ctx.moveTo(0, h * 0.3);
+  ctx.lineTo(w * 0.06, h * 0.14);
+  ctx.lineTo(w * 0.06, h * 0.46);
+  ctx.lineTo(0, h);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(w, h * 0.3);
+  ctx.lineTo(w * 0.94, h * 0.14);
+  ctx.lineTo(w * 0.94, h * 0.46);
+  ctx.lineTo(w, h);
+  ctx.fill();
+  const floor = ctx.createLinearGradient(0, h * 0.46, 0, h * 0.96);
+  floor.addColorStop(0, "#3a3228");
+  floor.addColorStop(1, "#100e0b");
+  ctx.fillStyle = floor;
+  ctx.beginPath();
+  ctx.moveTo(w * 0.06, h * 0.46);
+  ctx.lineTo(w * 0.94, h * 0.46);
+  ctx.lineTo(w * 0.99, h * 0.96);
+  ctx.lineTo(w * 0.01, h * 0.96);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "#4a4338";
+  ctx.lineWidth = Math.max(1, w / 500);
+  for (let i = 0; i <= 8; i++) {
+    const t = i / 8;
+    ctx.beginPath();
+    ctx.moveTo(lerp(w * 0.06, w * 0.94, t), h * 0.46);
+    ctx.lineTo(lerp(w * 0.01, w * 0.99, t), h * 0.96);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = "#f0a202";
+  ctx.globalAlpha = 0.75;
+  ctx.lineWidth = Math.max(2, w / 280);
+  ctx.beginPath();
+  ctx.moveTo(w * 0.06, h * 0.46);
+  ctx.lineTo(w * 0.94, h * 0.46);
+  ctx.lineTo(w * 0.99, h * 0.96);
+  ctx.lineTo(w * 0.01, h * 0.96);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "#8a8175";
+  ctx.font = `600 ${Math.max(11, w / 46)}px Oswald, sans-serif`;
+  ctx.textAlign = "left";
+  ctx.fillText("SIDE", w * 0.03, h * 0.08);
+}
+
+function hullPath(ctx: CanvasRenderingContext2D, size: number, classId: ClassId) {
+  ctx.beginPath();
+  if (classId === "tank") {
+    ctx.roundRect(-size * 0.42, -size * 0.48, size * 0.84, size * 0.52, 5);
+    return;
+  }
+  if (classId === "specialist") {
+    ctx.roundRect(-size * 0.24, -size * 0.54, size * 0.46, size * 0.58, 3);
+    return;
+  }
+  ctx.moveTo(-size * 0.48, size * 0.02);
+  ctx.lineTo(size * 0.16, -size * 0.34);
+  ctx.lineTo(size * 0.44, -size * 0.16);
+  ctx.lineTo(size * 0.44, size * 0.02);
+  ctx.closePath();
+}
+
 function drawBot(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -579,9 +679,11 @@ function drawBot(
   if (pose === "lunge") ctx.rotate(-0.12);
   if (pose === "down") ctx.rotate(0.9);
   const paint = PAINT[bot.paint] ?? "#e2a21a";
-  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  const dark = shade(paint, -70);
+  const lid = shade(paint, 48);
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
   ctx.beginPath();
-  ctx.ellipse(0, size * 0.28, size * 0.46, size * 0.08, 0, 0, Math.PI * 2);
+  ctx.ellipse(size * 0.06, size * 0.34, size * 0.5, size * 0.1, 0, 0, Math.PI * 2);
   ctx.fill();
   if (hot) {
     ctx.strokeStyle = paint;
@@ -590,22 +692,26 @@ function drawBot(
     ctx.globalAlpha = 1;
   }
   drawWheels(ctx, size, bot.classId, paint, time);
-  ctx.fillStyle = paint;
-  if (bot.classId === "tank") {
-    roundRect(ctx, -size * 0.42, -size * 0.42, size * 0.84, size * 0.48, 4);
-  } else if (bot.classId === "specialist") {
-    roundRect(ctx, -size * 0.28, -size * 0.5, size * 0.5, size * 0.55, 2);
-    ctx.strokeStyle = "#f3efe6";
-    ctx.strokeRect(-size * 0.34, -size * 0.56, size * 0.62, size * 0.66);
-  } else {
-    ctx.beginPath();
-    ctx.moveTo(-size * 0.45, -size * 0.05);
-    ctx.lineTo(size * 0.4, -size * 0.28);
-    ctx.lineTo(size * 0.4, -size * 0.02);
-    ctx.closePath();
-    ctx.fill();
-  }
+  ctx.save();
+  ctx.translate(size * 0.05, size * 0.12);
+  ctx.fillStyle = dark;
+  hullPath(ctx, size, bot.classId);
   ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = paint;
+  hullPath(ctx, size, bot.classId);
+  ctx.fill();
+  ctx.fillStyle = lid;
+  ctx.save();
+  ctx.translate(0, -size * 0.08);
+  ctx.scale(0.72, 0.55);
+  hullPath(ctx, size, bot.classId);
+  ctx.fill();
+  ctx.restore();
+  if (bot.classId === "specialist") {
+    ctx.strokeStyle = "#f3efe6";
+    ctx.strokeRect(-size * 0.3, -size * 0.58, size * 0.56, size * 0.66);
+  }
   drawLook(ctx, size, bot.look ?? "plain");
   drawBayNumber(ctx, size, bot.number ?? "", facing);
   drawWeapon(ctx, size, bot.weaponFamily, pose, time);
@@ -699,8 +805,14 @@ function drawWeapon(ctx: CanvasRenderingContext2D, size: number, family: string,
   if (spinning) ctx.rotate(time * (family === "disc" ? 16 : family === "drum" ? 11 : 9));
   if (family === "hammer") ctx.rotate(pose === "lunge" ? -1 : pose === "hit" ? 1.15 : -0.2);
   if (family === "saw" || family === "disc" || family === "drum") {
+    const radius = size * (family === "disc" ? 0.2 : 0.16);
+    ctx.fillStyle = "#4a4338";
     ctx.beginPath();
-    ctx.arc(0, 0, size * (family === "disc" ? 0.2 : 0.16), 0, Math.PI * 2);
+    ctx.arc(0, size * 0.05, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = pose === "hit" ? "#ff5a1f" : "#d9d3c7";
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = "#0e0d0b";
     ctx.beginPath();
@@ -739,6 +851,142 @@ function drawSparks(ctx: CanvasRenderingContext2D, w: number, h: number, sparks:
     ctx.fillRect(s.x * w, s.y * h, 3, 3);
   }
   ctx.globalAlpha = 1;
+}
+
+function drawTop(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  result: FightResult,
+  beat: Beat,
+  local: number,
+  time: number,
+  trails: Spot[][],
+  reduced: boolean,
+) {
+  ctx.save();
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = "#080807";
+  ctx.fillRect(0, 0, w, h);
+  const side = Math.min(w, h);
+  const ox = (w - side) / 2;
+  const oy = (h - side) / 2;
+  const pad = side * 0.1;
+  const x0 = ox + pad;
+  const y0 = oy + pad;
+  const s = side - pad * 2;
+  ctx.fillStyle = "#3a3228";
+  ctx.fillRect(x0 - side * 0.025, y0 - side * 0.025, s + side * 0.05, s + side * 0.05);
+  const floor = ctx.createLinearGradient(x0, y0, x0, y0 + s);
+  floor.addColorStop(0, "#2a241c");
+  floor.addColorStop(1, "#100e0b");
+  ctx.fillStyle = floor;
+  ctx.fillRect(x0, y0, s, s);
+  ctx.strokeStyle = "#f0a202";
+  ctx.globalAlpha = 0.8;
+  ctx.lineWidth = Math.max(2, s * 0.012);
+  ctx.strokeRect(x0 + s * 0.04, y0 + s * 0.04, s * 0.92, s * 0.92);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "#8a8175";
+  for (const [px, py] of [
+    [0.08, 0.08],
+    [0.92, 0.08],
+    [0.08, 0.92],
+    [0.92, 0.92],
+  ] as const) {
+    ctx.beginPath();
+    ctx.arc(x0 + s * px, y0 + s * py, Math.max(2, s * 0.016), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.font = `600 ${Math.max(11, s * 0.05)}px Oswald, sans-serif`;
+  ctx.textAlign = "left";
+  ctx.fillText("TOP", x0 + s * 0.05, y0 + s * 0.09);
+  const map = (spot: Spot) => ({ x: x0 + spot.x * s, y: y0 + spot.y * s });
+
+  if (result.method === "melee" || result.fighters.length > 2) {
+    const bots = result.fighters.filter((f) => f.id !== "house");
+    const attacker = beat.kind === "exchange" ? result.exchanges[beat.index]?.attackerId : null;
+    bots.forEach((bot, i) => {
+      const orbit = time * 0.45 + (Math.PI * 2 * i) / Math.max(1, bots.length);
+      let spot = { x: 0.5 + Math.cos(orbit) * 0.28, y: 0.58 + Math.sin(orbit) * 0.2 };
+      if (attacker === bot.id && beat.kind === "exchange") spot = mixSpot(spot, { x: 0.5, y: 0.62 }, local > 0.28 && local < 0.62 ? 0.65 : 0.2);
+      const dead = beat.kind === "decision" && result.meleeOrder && result.meleeOrder[0] !== bot.id && (result.hp[bot.id] ?? 0) < 30;
+      drawTopBot(ctx, map(spot), orbit + Math.PI / 2, bot, dead ? "down" : "lunge", s);
+    });
+    ctx.restore();
+    return;
+  }
+
+  const drive = fightDrive(Math.max(1, w), Math.max(1, h), result, beat, local, reduced ? 0 : time);
+  drawTrail(ctx, trails[0] ?? [], map, PAINT[drive.a.bot.paint] ?? "#e2a21a");
+  drawTopBot(ctx, map(drive.spotA), drive.headingA, drive.a.bot, reduced ? "idle" : drive.a.pose, s);
+  if (drive.b && drive.spotB) {
+    drawTrail(ctx, trails[1] ?? [], map, PAINT[drive.b.bot.paint] ?? "#3c8f78");
+    drawTopBot(ctx, map(drive.spotB), drive.headingB, drive.b.bot, reduced ? "idle" : drive.b.pose, s);
+  }
+  ctx.restore();
+}
+
+function drawTrail(ctx: CanvasRenderingContext2D, trail: Spot[], map: (spot: Spot) => { x: number; y: number }, color: string) {
+  if (trail.length < 2) return;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = 0.45;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  trail.forEach((spot, i) => {
+    const p = map(spot);
+    if (i === 0) ctx.moveTo(p.x, p.y);
+    else ctx.lineTo(p.x, p.y);
+  });
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawTopBot(
+  ctx: CanvasRenderingContext2D,
+  at: { x: number; y: number },
+  heading: number,
+  bot: FighterSnap,
+  pose: Pose,
+  cage: number,
+) {
+  const paint = PAINT[bot.paint] ?? "#e2a21a";
+  const len = cage * (bot.classId === "tank" ? 0.16 : bot.classId === "specialist" ? 0.11 : 0.14);
+  const wid = cage * (bot.classId === "tank" ? 0.12 : 0.075);
+  ctx.save();
+  ctx.translate(at.x, at.y);
+  ctx.rotate(pose === "down" ? heading + 0.8 : heading);
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.beginPath();
+  ctx.ellipse(3, 4, len * 0.55, wid * 0.7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = shade(paint, -65);
+  ctx.fillRect(-len * 0.5, -wid * 0.5 + 3, len, wid);
+  ctx.fillStyle = paint;
+  roundRect(ctx, -len * 0.5, -wid * 0.5, len, wid, 3);
+  ctx.fill();
+  ctx.fillStyle = shade(paint, 45);
+  ctx.fillRect(-len * 0.22, -wid * 0.28, len * 0.38, wid * 0.56);
+  ctx.fillStyle = pose === "hit" ? "#ff5a1f" : "#d9d3c7";
+  if (bot.weaponFamily === "saw" || bot.weaponFamily === "disc" || bot.weaponFamily === "drum") {
+    ctx.beginPath();
+    ctx.arc(len * 0.42, 0, wid * 0.55, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (bot.weaponFamily === "hammer") {
+    ctx.fillRect(len * 0.35, -wid * 0.7, wid * 0.28, wid * 1.4);
+  } else if (bot.weaponFamily === "claw") {
+    ctx.fillRect(len * 0.4, -wid * 0.7, wid * 0.22, wid * 0.45);
+    ctx.fillRect(len * 0.4, wid * 0.25, wid * 0.22, wid * 0.45);
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(len * 0.35, -wid * 0.35);
+    ctx.lineTo(len * 0.72, 0);
+    ctx.lineTo(len * 0.35, wid * 0.35);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 function drawMelee(ctx: CanvasRenderingContext2D, w: number, h: number, result: FightResult, beat: Beat, local: number, time: number) {
