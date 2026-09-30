@@ -218,7 +218,7 @@ function ColdOpen({ data, bouts, live }: { data: PitData; bouts: Bout[]; live: b
         <p className="mt-3 max-w-xl text-muted">
           {bouts.length
             ? bouts.some((b) => b.kind === "bye")
-              ? `${bouts.length} tapes. A bye is not a win. The main event is last.`
+              ? `${bouts.length} tapes. A bye counts as a win. The main event is last.`
               : `${bouts.length} tapes. No bye. The main event is last.`
             : "No tape on this week."}
         </p>
@@ -349,8 +349,8 @@ function storeBot(data: PitData, id: string) {
 }
 
 function matchup(data: PitData, bout: Bout) {
-  if (bout.kind === "bye") return `${storeBot(data, bout.teamA[0] ?? "")} · bye scrimmage`;
-  if (bout.kind === "melee") return `${bout.teamA.length} stores in the consolation cage`;
+  if (bout.kind === "bye") return `${storeBot(data, bout.teamA[0] ?? "")} · bye, counts as a win`;
+  if (bout.kind === "melee") return `${bout.teamA.length} stores battle the tie`;
   const left = bout.teamA.map((id) => storeBot(data, id)).join(" + ");
   const right = bout.teamB.map((id) => storeBot(data, id)).join(" + ");
   return right ? `${left} vs ${right}` : left;
@@ -379,7 +379,8 @@ function nextFight(segments: Segment[], index: number) {
 
 function methodWord(bout: Bout) {
   const method = bout.result?.method;
-  if (bout.kind === "bye" || method === "scrimmage") return "SCRIMMAGE";
+  if (bout.kind === "bye" || method === "bye") return "BYE";
+  if (method === "scrimmage") return "SCRIMMAGE";
   if (method === "ko") return "KO";
   if (method === "dump") return "DUMP";
   if (method === "melee") return "LAST BOT";

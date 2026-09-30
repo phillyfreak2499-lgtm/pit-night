@@ -107,7 +107,7 @@ function DeskLive() {
         </div>
       </section>
       <section>
-        <SectionLabel>Ten stores</SectionLabel>
+        <SectionLabel>Eleven stores</SectionLabel>
         <div className="mt-3 flex flex-col gap-3">
           {data.stores.map((store) => {
             const bot = data.bots.find((b) => b.storeId === store.id);

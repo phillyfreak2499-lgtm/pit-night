@@ -89,7 +89,7 @@ export function Titantron() {
               Watch a house fight
             </Link>
             <Link to="/map" className="inline-flex min-h-11 items-center border border-line px-4 font-display text-sm tracking-wide uppercase">
-              Ten doors
+              Eleven doors
             </Link>
             <Link to="/rules" className="inline-flex min-h-11 items-center border border-line px-4 font-display text-sm tracking-wide uppercase">
               How it works

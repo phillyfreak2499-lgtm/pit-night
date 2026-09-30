@@ -7,7 +7,7 @@ export type Phase = "open" | "locked" | "fought" | "inspected" | "complete";
 export type StatKey = "demo" | "close" | "nsnu" | "reviews" | "ticket";
 export type KeyName = "chassis" | "drive" | "weapon" | "armor" | "utility";
 export type BoutKind = "bout" | "bye" | "tag" | "semi" | "final" | "melee";
-export type Method = "ko" | "dump" | "decision" | "melee" | "scrimmage";
+export type Method = "ko" | "dump" | "decision" | "melee" | "scrimmage" | "bye";
 export type GarageLook = "hazard" | "concrete" | "night" | "bone" | "checker";
 export type BotLook = "plain" | "stripe" | "chevron" | "rivets";
 

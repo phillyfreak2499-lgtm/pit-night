@@ -4,13 +4,13 @@ import { SectionLabel } from "./bits";
 const STEPS = [
   {
     kicker: "Period 12",
-    title: "Ten stores. Four Saturdays.",
-    body: "October 25 through November 21. Waco, Arlington, Rockwall, Southlake, College Station, Fort Worth — Hulen, Allen, Plano, Temple, and Alliance. One store is one bot. Specialists are pit crew. They do not get a personal bot.",
+    title: "Eleven stores. Four Saturdays.",
+    body: "October 25 through November 21. Waco, Arlington, Rockwall, Southlake, College Station, Fort Worth — Hulen, Allen, Plano, Temple, Alliance, and Waxahachie. One store is one bot. Specialists are pit crew. They do not get a personal bot.",
   },
   {
     kicker: "Your door",
     title: "Open a bay. The passcode is the store id.",
-    body: "Pit Map, then your door. The clipboard code is the lowercase id: waco, arlington, rockwall, southlake, college, hulen, allen, plano, temple, alliance. The commissioner PIN stays on the desk.",
+    body: "Pit Map, then your door. The clipboard code is the lowercase id: waco, arlington, rockwall, southlake, college, hulen, allen, plano, temple, alliance, waxahachie. The commissioner PIN stays on the desk.",
   },
   {
     kicker: "The bay",
@@ -19,13 +19,13 @@ const STEPS = [
   },
   {
     kicker: "Saturday",
-    title: "Hit Play. Five fights. Jump to your store.",
-    body: "Saturday broadcast is the whole card. This period has five fights and no bye. The main event is last: Plano against Allen. Use the chapter list to jump straight to your store.",
+    title: "Hit Play. Five fights and a bye.",
+    body: "Saturday is the whole card. Eleven stores means one bye, and the bye counts as a win. The main event is last. Week 1 that is Plano against Waxahachie. After four Saturdays the best record takes the trophy. If that record is tied, those stores fight for it.",
   },
   {
     kicker: "The trophy",
     title: "Hardware stays in the winning store.",
-    body: "Title Saturday, November 21, hangs the trophy in one building. A plate goes to the runner-up. Weekly MVP is a name on the titantron. It is not a personal bracket and it is not hardware.",
+    body: "After four Saturdays the best record hangs the trophy in one building. If two or more stores finish with the same wins and losses, they battle for it. A plate goes to the runner-up. Weekly MVP is a name on the titantron. It is not a personal bracket and it is not hardware.",
   },
 ];
 

@@ -7,11 +7,11 @@ export function RulesPage() {
         <SectionLabel>How it works</SectionLabel>
         <h1 className="font-display text-5xl leading-none">The store is the bot</h1>
         <p className="mt-3 text-muted">
-          The Waterman Battle Bot League is the Saturday card for The Waterman Group. Period 12 runs October 25 through November 21. Ten Good Feet stores. One bot each. Four Saturdays. The trophy hangs in a building. Pit crew get a name on the titantron. They do not take hardware home.
+          The Waterman Battle Bot League is the Saturday card for The Waterman Group. Period 12 runs October 25 through November 21. Eleven Good Feet stores. One bot each. Four Saturdays. The trophy hangs in a building. Pit crew get a name on the titantron. They do not take hardware home.
         </p>
       </div>
       <Rule title="The clock">
-        Monday through Friday the store runs the floor and the scrap lands in that bay. Friday night is one lock: chassis, drive, weapon, armor, utility. Saturday is five fights, each a short broadcast. No bye this period. Saturday afternoon is the damage report. Sunday the stores are closed. The site stays up. Nothing new gets fought and nothing new gets scrapped.
+        Monday through Friday the store runs the floor and the scrap lands in that bay. Friday night is one lock: chassis, drive, weapon, armor, utility. Saturday is five fights and one bye. The bye counts as a win and does not damage the bot. Saturday afternoon is the damage report. Sunday the stores are closed. The site stays up. Nothing new gets fought and nothing new gets scrapped.
       </Rule>
       <Rule title="What scores">
         Demo percent is demos divided by opportunities, not a traffic count. Closing percent is sales divided by demos. NSNU is judged against that store's weekly goal, never as raw units. A short week is a prorated goal, set by the commissioner. Reviews are named 5-stars, capped at two per pit-crew member on the clock. Former-customer average ticket is the armor stat. There is no traffic field and no volume field.
@@ -26,7 +26,7 @@ export function RulesPage() {
         Week 1 is all stock. The shop opens after Saturday 1. Sport wants one green week. Pro wants two greens and the matching key. Super wants the scrap and two keys. Championship is a Title Saturday drop or salvage off a wrecked Super after a win. Never sold. Open cage has no Super. Changing class after Week 1 costs scrap. A disabled chassis fights stock of the same class. You do not get a free swap off a wreck.
       </Rule>
       <Rule title="The card">
-        Ten stores, five bouts, no bye. Week 1 is Shakedown, Saturday October 31, stock versus stock. Week 2 is Class Night, Saturday November 7, still one-on-one, grouped on the titantron. Week 3 is Grudge Night, Saturday November 14: rematches, an optional allied tag, and the last-place stipend. Week 4 is Title Saturday, November 21. Top four play semis and a final for the trophy. The other six run a last-bot melee. A plate to the runner-up. Best Build can come from any of the ten.
+        Eleven stores. Seeds 1 through 11, Southlake down to Waxahachie. Each Saturday the wheel turns one spot. The store at the top of that week's wheel draws the bye. Seeds 1 through 4 each get one bye across the four weeks. A bye is a win. It is not a scrimmage. Week 4 is the last card, not a semifinal. The best record takes the trophy. Same wins and same losses is a tie, and those stores battle it out. Two stores fight. Three or more go in one cage. Best Build can still come from any bay.
       </Rule>
       <Rule title="The bay">
         Paint, garage floor, stripes, and the bay number are decoration. They do not change Power, Speed, Armor, or Heat. A Scry on the utility slot is the spy, and it stays shut until the bay calls the weapon family out loud. Then it says whether that call was right, and whether the weapon belongs on their class. It does not name the part. One call per fight. They can still change the draft until Friday. Captains can test the build against three house drills. That tape does not post damage, scrap, or a record. Captains rename the crew, add up to eight specialists, and keep at least one. Staff edits are not the Friday lock.

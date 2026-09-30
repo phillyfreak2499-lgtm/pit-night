@@ -27,6 +27,7 @@ import {
   scrapMath,
   shopOpen,
   spyRead,
+  titleField,
   WEAPON_FAMILIES,
   wonThisWeek,
   writeGazette,
@@ -223,7 +224,7 @@ export const usePit = create<PitState>()(
         }
         set({
           session: { role: "commissioner", storeId: null, crewId: null },
-          flash: "Desk is live. Ten stores, one bell.",
+          flash: "Desk is live. Eleven stores, one bell.",
         });
         return true;
       },
@@ -815,7 +816,7 @@ export const usePit = create<PitState>()(
         set({
           phase: "locked",
           bots: data.bots.map((b) => ({ ...b, locked: { ...(b.locked ?? b.draft) }, equipped: { ...(b.locked ?? b.draft) } })),
-          flash: "Friday lock. Ten loadouts frozen.",
+          flash: "Friday lock. Eleven loadouts frozen.",
           log: [`Week ${data.week} locked.`, ...data.log.slice(0, 23)],
         });
       },
@@ -843,9 +844,15 @@ export const usePit = create<PitState>()(
         ];
         let honors = data.honors;
         if (data.week === 4) {
-          const finalBout = bouts.find((b) => b.kind === "final");
-          const belt = finalBout?.result?.winnerIds[0] ?? null;
-          const plate = finalBout?.result?.loserIds[0] ?? null;
+          const field = titleField({ ...staged, bouts });
+          const tie = bouts.find((b) => b.title === "Tiebreaker");
+          const belt = tie?.result?.winnerIds[0] ?? field.leaders[0] ?? null;
+          const plate =
+            tie?.kind === "final"
+              ? (tie.result?.loserIds[0] ?? null)
+              : tie?.kind === "melee"
+                ? (tie.result?.meleeOrder?.[1] ?? null)
+                : (field.ranked.find((store) => store.id !== belt)?.id ?? null);
           const best = [...craft].sort((a, b) => b.score - a.score)[0];
           const why = best ? bestBuildId({ ...staged, bouts })?.why ?? "" : "";
           const bestStore = best?.storeId ?? null;
@@ -995,7 +1002,7 @@ export const usePit = create<PitState>()(
       },
       resetSeason: () => {
         const session = { role: "public" as const, storeId: null, crewId: null };
-        set({ ...makeData(), session, flash: "Period 12 reset. Ten stock bots. Week 1." });
+        set({ ...makeData(), session, flash: "Period 12 reset. Eleven stock bots. Week 1." });
       },
     }),
     {

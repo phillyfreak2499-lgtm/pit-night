@@ -137,7 +137,11 @@ export function recordOf(data: PitData, storeId: string): { w: number; l: number
   let w = 0;
   let l = 0;
   for (const bout of data.bouts) {
-    if (!bout.result || bout.kind === "bye") continue;
+    if (!bout.result) continue;
+    if (bout.kind === "bye" || bout.result.method === "bye") {
+      if (bout.result.winnerIds.includes(storeId)) w += 1;
+      continue;
+    }
     if (bout.result.method === "scrimmage") continue;
     if (bout.kind === "melee") {
       if (bout.result.winnerIds.includes(storeId)) w += 1;
@@ -168,6 +172,27 @@ export function rankedStores(data: PitData) {
     if (nb !== na) return nb - na;
     return a.seed - b.seed;
   });
+}
+
+/** Best record is wins, then losses. The same W-L is a tie, and those stores fight. */
+export function titleField(data: PitData) {
+  const ranked = [...data.stores].sort((a, b) => {
+    const ra = recordOf(data, a.id);
+    const rb = recordOf(data, b.id);
+    if (rb.w !== ra.w) return rb.w - ra.w;
+    if (ra.l !== rb.l) return ra.l - rb.l;
+    return a.seed - b.seed;
+  });
+  const top = ranked[0];
+  if (!top) return { leaders: [] as string[], ranked };
+  const mark = recordOf(data, top.id);
+  const leaders = ranked
+    .filter((store) => {
+      const rec = recordOf(data, store.id);
+      return rec.w === mark.w && rec.l === mark.l;
+    })
+    .map((store) => store.id);
+  return { leaders, ranked };
 }
 
 export function hashString(s: string): number {
@@ -840,15 +865,15 @@ export function simulateBye(data: PitData, storeId: string, seed: string): Fight
       defenderHp: hp[defender.id]!,
       call:
         i === 1
-          ? `DRILL gives ${snap.botName} a honest look. It is not a win. It is a rep.`
-          : `${attacker.botName} works the drill. The trophy is not in this cage.`,
+          ? `${snap.botName} draws the bye. It counts as a win. The bot does not take a quote.`
+          : `${attacker.botName} works the empty cage. The win is already on the card.`,
       tags: ["scrimmage"],
     });
   }
   return {
-    winnerIds: [],
+    winnerIds: [storeId],
     loserIds: [],
-    method: "scrimmage",
+    method: "bye",
     blowout: false,
     exchanges,
     finisher: null,
@@ -996,13 +1021,39 @@ function pairKey(a: string, b: string) {
   return [a, b].sort().join("|");
 }
 
-const WEEK_ONE: { kind: Bout["kind"]; title: string; a: string[]; b: string[] }[] = [
-  { kind: "bout", title: "Undercard", a: ["college"], b: ["waco"] },
-  { kind: "bout", title: "Undercard", a: ["southlake"], b: ["hulen"] },
-  { kind: "bout", title: "Counter card", a: ["arlington"], b: ["temple"] },
-  { kind: "bout", title: "Specialist scrap", a: ["alliance"], b: ["rockwall"] },
-  { kind: "bout", title: "Main event", a: ["plano"], b: ["allen"] },
-];
+function seededWheel(stores: { id: string; seed: number }[], week: number): { bye: string | null; pairs: [string, string][] } {
+  const ring = [...stores].sort((a, b) => a.seed - b.seed).map((store) => store.id);
+  const n = ring.length;
+  if (n < 2) return { bye: ring[0] ?? null, pairs: [] };
+  const turns = ((week - 1) % n + n) % n;
+  for (let i = 0; i < turns; i++) ring.push(ring.shift()!);
+  if (n % 2 === 1) {
+    const bye = ring[0]!;
+    const pairs: [string, string][] = [];
+    for (let i = 1; i <= (n - 1) / 2; i++) pairs.push([ring[i]!, ring[n - i]!]);
+    return { bye, pairs };
+  }
+  const pairs: [string, string][] = [];
+  for (let i = 0; i < n / 2; i++) pairs.push([ring[i]!, ring[n - 1 - i]!]);
+  return { bye: null, pairs };
+}
+
+export function buildCard(data: PitData): Bout[] {
+  const week = data.week;
+  const { bye, pairs } = seededWheel(data.stores, week);
+  const seedOf = new Map(data.stores.map((store) => [store.id, store.seed]));
+  const ordered = [...pairs].sort((a, b) => {
+    const best = (pair: [string, string]) => Math.min(seedOf.get(pair[0]) ?? 99, seedOf.get(pair[1]) ?? 99);
+    return best(b) - best(a);
+  });
+  const bouts: Bout[] = [];
+  if (bye) bouts.push(makeBout(week, 1, "bye", "Bye", [bye], []));
+  ordered.forEach((pair, index) => {
+    const main = index === ordered.length - 1;
+    bouts.push(makeBout(week, bouts.length + 1, "bout", main ? "Main event" : "Card", [pair[0]], [pair[1]]));
+  });
+  return bouts.map((bout, index) => ({ ...bout, slot: index + 1 }));
+}
 
 function makeBout(
   week: number,
@@ -1023,53 +1074,6 @@ function makeBout(
     teamB,
     result: null,
   };
-}
-
-export function buildCard(data: PitData): Bout[] {
-  const week = data.week;
-  if (week === 1) {
-    return WEEK_ONE.map((row, i) => makeBout(1, i + 1, row.kind, row.title, row.a, row.b));
-  }
-  if (week === 4) return buildTitleCard(data);
-
-  const ranked = rankedStores(data);
-  const bye = ranked.length % 2 === 1 ? ranked[0]! : null;
-  let pool = (bye ? ranked.slice(1) : ranked).map((s) => s.id);
-  const history = priorPairs(data);
-  const meta = data.weeks.find((w) => w.number === week);
-  const bouts: Bout[] = [];
-  let slot = 1;
-
-  if (week === 3 && meta?.tagsEnabled && pool.length >= 6) {
-    const tagIds = pool.slice(0, 4);
-    pool = pool.slice(4);
-    bouts.push(
-      makeBout(week, slot++, "tag", "Allied tag", [tagIds[0]!, tagIds[1]!], [tagIds[2]!, tagIds[3]!]),
-    );
-  }
-
-  const wantRematch = week === 3;
-  while (pool.length >= 2) {
-    const a = pool.shift()!;
-    let idx = pool.findIndex((b) => (wantRematch ? history.has(pairKey(a, b)) : !history.has(pairKey(a, b))));
-    if (idx < 0) idx = pool.length - 1;
-    const [b] = pool.splice(idx, 1);
-    const main = pool.length === 0;
-    bouts.push(makeBout(week, slot++, "bout", main ? "Main event" : "Card", [a], [b!]));
-  }
-  if (bye) bouts.unshift(makeBout(week, 0, "bye", "Bye scrimmage", [bye.id], []));
-  return bouts.map((b, i) => ({ ...b, slot: i + 1 }));
-}
-
-function buildTitleCard(data: PitData): Bout[] {
-  const ranked = rankedStores(data);
-  const top = ranked.slice(0, 4).map((s) => s.id);
-  const rest = ranked.slice(4).map((s) => s.id);
-  return [
-    makeBout(4, 1, "semi", "Semifinal", [top[0]!], [top[3]!]),
-    makeBout(4, 2, "semi", "Semifinal", [top[1]!], [top[2]!]),
-    makeBout(4, 3, "melee", "Consolation melee", rest, []),
-  ];
 }
 
 export function simulateBout(data: PitData, bout: Bout): FightResult {
@@ -1324,22 +1328,27 @@ export function previewSaturday(data: PitData): Bout[] {
 }
 
 export function runSaturday(data: PitData): Bout[] {
-  const card = buildCard(data).filter((b) => b.kind !== "final");
+  const card = buildCard(data);
   const played = card.map((bout) => ({ ...bout, result: simulateBout(data, bout) }));
   if (data.week !== 4) return played;
-  const semis = played.filter((b) => b.kind === "semi");
-  const a = semis[0]?.result?.winnerIds[0];
-  const b = semis[1]?.result?.winnerIds[0];
-  if (!a || !b) return played;
-  const finalBout = makeBout(4, 4, "final", "Title fight", [a], [b]);
-  finalBout.result = simulateBout(
-    {
-      ...data,
-      phase: "locked",
-    },
-    finalBout,
+  const staged: PitData = {
+    ...data,
+    phase: "locked",
+    bouts: [...data.bouts.filter((bout) => bout.week !== data.week), ...played],
+  };
+  const { leaders } = titleField(staged);
+  if (leaders.length < 2) return played;
+  const kind = leaders.length === 2 ? "final" : "melee";
+  const tie = makeBout(
+    4,
+    played.length + 1,
+    kind,
+    "Tiebreaker",
+    leaders.length === 2 ? [leaders[0]!] : leaders,
+    leaders.length === 2 ? [leaders[1]!] : [],
   );
-  return [...played, finalBout];
+  tie.result = simulateBout(staged, tie);
+  return [...played, tie];
 }
 
 export function methodLabel(method: Method): string {
@@ -1347,6 +1356,7 @@ export function methodLabel(method: Method): string {
   if (method === "dump") return "Dump";
   if (method === "decision") return "Decision";
   if (method === "melee") return "Last bot";
+  if (method === "bye") return "Bye";
   return "Scrimmage";
 }
 
@@ -1373,8 +1383,8 @@ export function writeGazette(data: PitData, bouts: Bout[]): GazetteEntry[] {
         week: data.week,
         boutId: bout.id,
         kicker: "Bye",
-        headline: `${store.name} draws the bye and still gets a rep.`,
-        body: `${bot.name} sparred the house drill. It is not a win. The garage stays on the titantron anyway. ${r.exchanges[1]?.call ?? ""}`.trim(),
+        headline: `${store.name} draws the bye. It counts.`,
+        body: `${bot.name} does not take a hit. The win goes on the store, not on a person. ${r.exchanges[1]?.call ?? ""}`.trim(),
       });
       continue;
     }
@@ -1387,9 +1397,15 @@ export function writeGazette(data: PitData, bouts: Bout[]): GazetteEntry[] {
         week: data.week,
         boutId: bout.id,
         kicker: "Melee",
-        headline: wStore ? `${wStore.name} is the last bot moving.` : "The consolation cage goes quiet.",
+        headline: wStore
+          ? bout.title === "Tiebreaker"
+            ? `${wStore.name} wins the tie and takes the trophy.`
+            : `${wStore.name} is the last bot moving.`
+          : "The consolation cage goes quiet.",
         body: wBot
-          ? `${wBot.name} walks out of a ${bout.teamA.length}-store scrum. No trophy. The plate on the wall still has to mention it.`
+          ? bout.title === "Tiebreaker"
+            ? `${wBot.name} walks out of a ${bout.teamA.length}-store tie. Same record going in. One store coming out.`
+            : `${wBot.name} walks out of a ${bout.teamA.length}-store scrum. No trophy. The plate on the wall still has to mention it.`
           : "The melee did not crown a store.",
       });
       continue;
@@ -1401,9 +1417,12 @@ export function writeGazette(data: PitData, bouts: Bout[]): GazetteEntry[] {
     const wBot = botFor(data, winnerId);
     const lBot = botFor(data, loserId);
     const tag = r.winnerIds.length > 1;
-    const headline = tag
-      ? `${r.winnerIds.map((id) => storeFor(data, id).name).join(" & ")} take the tag.`
-      : `${w.name} beats ${l.name} by ${methodLabel(r.method).toLowerCase()}.`;
+    const headline =
+      bout.title === "Tiebreaker"
+        ? `${w.name} wins the tie and takes the trophy.`
+        : tag
+          ? `${r.winnerIds.map((id) => storeFor(data, id).name).join(" & ")} take the tag.`
+          : `${w.name} beats ${l.name} by ${methodLabel(r.method).toLowerCase()}.`;
     const disc = lBot.draft.weapon.includes("disc") || (lBot.locked?.weapon ?? "").includes("disc");
     const counter =
       r.fighters.find((f) => f.id === loserId)?.fit !== undefined &&
@@ -1484,7 +1503,7 @@ export function quotesForBot(bot: Bot, wonThisWeek: boolean): Quote[] {
 
 export function wonThisWeek(data: PitData, storeId: string): boolean {
   return data.bouts.some(
-    (b) => b.week === data.week && b.result?.winnerIds.includes(storeId) && b.kind !== "bye",
+    (b) => b.week === data.week && b.result?.winnerIds.includes(storeId),
   );
 }
 

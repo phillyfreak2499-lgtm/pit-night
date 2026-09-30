@@ -14,7 +14,7 @@ export const Route = createRootRoute({
       { title: APP_NAME },
       {
         name: "description",
-        content: "The Waterman Battle Bot League. Period 12, October 25 through November 21. Ten Good Feet stores. One trophy.",
+        content: "The Waterman Battle Bot League. Period 12, October 25 through November 21. Eleven Good Feet stores. One trophy.",
       },
       { name: "theme-color", content: "#0e0d0b" },
     ],

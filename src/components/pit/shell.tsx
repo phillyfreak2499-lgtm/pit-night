@@ -205,7 +205,7 @@ function Boot() {
         THE WATERMAN
         <span className="block">BATTLE BOT LEAGUE</span>
       </h1>
-      <p className="mt-3 max-w-xl text-muted">Opening the league. Ten store doors. No personal bots.</p>
+      <p className="mt-3 max-w-xl text-muted">Opening the league. Eleven store doors. No personal bots.</p>
       <ul className="mt-6 grid grid-cols-2 gap-2">
         {stores.map((store) => (
           <li key={store.id} className="border border-line bg-surface px-3 py-3 text-sm">

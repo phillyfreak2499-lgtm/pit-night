@@ -279,7 +279,8 @@ function Health({
 }
 
 function captionFor(result: FightResult, bout: Bout, beat: Beat, noDamage: boolean) {
-  if (beat.kind === "bumper") return noDamage ? "Bay scrimmage. The house drill. Nothing posts." : `${bout.title}. Ten stores. This cage holds ${bout.kind === "melee" ? "the rest of the card" : "two"}.`;
+  if (beat.kind === "bumper" && bout.kind === "bye") return "Bye. It counts as a win. The bot does not take damage.";
+  if (beat.kind === "bumper") return noDamage ? "Bay scrimmage. The house drill. Nothing posts." : `${bout.title}. Eleven stores. This cage holds ${bout.kind === "melee" ? "the tie" : "two"}.`;
   if (beat.kind === "intro") {
     const f = result.fighters[beat.side];
     if (!f) return "";
@@ -288,6 +289,10 @@ function captionFor(result: FightResult, bout: Bout, beat: Beat, noDamage: boole
   if (beat.kind === "stats") return "Printed before the bell. Power. Speed. Armor. Heat. The week set the range. The lock picked the number.";
   if (beat.kind === "exchange") return result.exchanges[beat.index]?.call ?? "";
   if (beat.kind === "finisher") return result.finisher?.call ?? "";
+  if (result.method === "bye" || bout.kind === "bye") {
+    const store = result.fighters.find((fighter) => fighter.id !== "house");
+    return `${store?.storeName ?? "The store"} draws the bye. It counts as a win.`;
+  }
   if (result.method === "scrimmage") return "Scrimmage over. Not a win. The store still got a tape.";
   if (result.method === "melee") {
     const winner = result.fighters.find((f) => f.id === result.winnerIds[0]);
@@ -580,6 +585,7 @@ function drawArena(
 }
 
 function decisionWord(result: FightResult) {
+  if (result.method === "bye") return "BYE";
   if (result.method === "scrimmage") return "SCRIMMAGE";
   if (result.method === "ko") return "KO";
   if (result.method === "dump") return "DUMP";

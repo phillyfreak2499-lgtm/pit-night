@@ -81,7 +81,7 @@ function BoutRow({ bout }: { bout: Bout }) {
     bout.teamA[0] && bout.teamB[0]
       ? `${CLASS_META[botFor(data, bout.teamA[0]).classId].label} vs ${CLASS_META[botFor(data, bout.teamB[0]).classId].label}`
       : bout.kind === "bye"
-        ? "Bye · scrimmage"
+        ? "Bye · counts as a win"
         : bout.kind;
 
   return (

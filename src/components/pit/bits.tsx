@@ -224,7 +224,7 @@ export function ResultLine({ bout }: { bout: Bout }) {
   const stores = usePit((s) => s.stores);
   const name = (id: string) => stores.find((s) => s.id === id)?.name ?? id;
   if (!bout.result) return <span className="text-muted">Waiting on the bell</span>;
-  if (bout.kind === "bye") return <span className="text-muted">Scrimmage · not a win</span>;
+  if (bout.kind === "bye") return <span className="text-muted">Bye · counts as a win</span>;
   if (bout.kind === "melee") {
     const winner = bout.result.winnerIds[0];
     return (

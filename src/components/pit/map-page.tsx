@@ -9,7 +9,7 @@ export function PitMap() {
   return (
     <div className="mx-auto max-w-6xl" data-testid="pit-map">
       <SectionLabel>The pit map</SectionLabel>
-      <h1 className="mt-1 font-display text-5xl leading-none">Ten doors</h1>
+      <h1 className="mt-1 font-display text-5xl leading-none">Eleven doors</h1>
       <p className="mt-3 max-w-2xl text-muted">
         One bay, one bot, one Friday lock. Click a door. The people inside are pit crew. They do not have bots of their own.
       </p>

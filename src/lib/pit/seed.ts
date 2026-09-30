@@ -223,6 +223,25 @@ const ROWS: Row[] = [
     armor: "cage",
     card: [70, 55, 102, 8, 4, 290],
   },
+  {
+    id: "waxahachie",
+    name: "Waxahachie",
+    region: "Central",
+    paint: "gold",
+    garage: "concrete",
+    look: "stripe",
+    number: "11",
+    seed: 11,
+    goal: 12,
+    captain: "Lydia Marsh",
+    crew: ["Owen Blake", "Gina Peralta", "Chris Adeyemi", "Holly Nguyen"],
+    bot: "CHALK LINE",
+    classId: "striker",
+    drive: "mag",
+    weapon: "drum",
+    armor: "angle",
+    card: [68, 52, 96, 4, 4, 260],
+  },
 ];
 
 function loadout(classId: ClassId, drive: string, weapon: string, armor: string): Loadout {
@@ -263,25 +282,25 @@ export const WEEK_META: WeekMeta[] = [
   {
     number: 1,
     name: "Shakedown",
-    blurb: "Oct 25–31. Saturday Oct 31. Stock versus stock. Five fights, no bye.",
+    blurb: "Oct 25–31. Saturday Oct 31. Seeded card. One bye, and the bye counts as a win.",
     tagsEnabled: false,
   },
   {
     number: 2,
     name: "Class Night",
-    blurb: "Nov 1–7. Saturday Nov 7. Still one store against one store, filed by class.",
+    blurb: "Nov 1–7. Saturday Nov 7. The wheel turns. Next seed draws the bye.",
     tagsEnabled: false,
   },
   {
     number: 3,
     name: "Grudge Night",
-    blurb: "Nov 8–14. Saturday Nov 14. Rematches, an allied tag, and a last-place stipend.",
-    tagsEnabled: true,
+    blurb: "Nov 8–14. Saturday Nov 14. Seeded card again. Last-place stipend still pays. No tag.",
+    tagsEnabled: false,
   },
   {
     number: 4,
     name: "Title Saturday",
-    blurb: "Nov 15–21. Saturday Nov 21. Top four play for the trophy. The other six run the consolation cage. Best Build can come from any bay.",
+    blurb: "Nov 15–21. Saturday Nov 21. Last seeded card. Best record takes the trophy. A tie fights for it.",
     tagsEnabled: false,
   },
 ];
@@ -326,7 +345,7 @@ export function makeData(): PitData {
   return {
     version: VERSION,
     seasonName: "Period 12",
-    tagline: "Oct 25 – Nov 21, 2026. Ten stores. One trophy.",
+    tagline: "Oct 25 – Nov 21, 2026. Eleven stores. One trophy.",
     pin: "8472",
     week: 1,
     phase: "open",
@@ -343,7 +362,7 @@ export function makeData(): PitData {
         boutId: null,
         kicker: "Shakedown",
         headline: "The bays are numbered. The trophy is not.",
-        body: "Period 12 opens October 25. Five fights on October 31, no bye. Plano's NORTH SAW is booked against Allen's DISC COUNTY. Allen's disc is bolted to a tank. Temple's reviews can still flip a busier striker.",
+        body: "Period 12 opens October 25. Eleven stores. October 31 is five fights and a bye. Southlake draws the first bye, and a bye counts as a win. The main event is Plano against Waxahachie.",
       },
     ],
     quotes: {},
@@ -352,7 +371,7 @@ export function makeData(): PitData {
     honors: { pitBelt: null, plate: null, bestBuild: null, bestBuildWhy: "", titleDrop: null },
     craft: [],
     session: { role: "public", storeId: null, crewId: null },
-    log: ["Period 12 opened. Ten bays. Oct 25 through Nov 21. Week 1 cards are on the clipboards."],
+    log: ["Period 12 opened. Eleven bays. Oct 25 through Nov 21. Week 1 is seeded. A bye counts as a win."],
     tutorialSeen: false,
     intel: [],
   };
