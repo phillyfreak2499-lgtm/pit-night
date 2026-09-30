@@ -1,0 +1,538 @@
+import { Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { CLASS_META, PAINT, partById, partsFor, SLOT_LABEL } from "@/lib/pit/catalog";
+import {
+  buyCheck,
+  canSeeLoadout,
+  cardFor,
+  gradesOf,
+  printedStats,
+  quotesForBot,
+  shopOpen,
+  weekQuality,
+  wonThisWeek,
+} from "@/lib/pit/engine";
+import { paintHex, usePit, type PitState } from "@/lib/pit/store";
+import type { BotLook, GarageLook, Slot, StoreCard } from "@/lib/pit/types";
+import { Btn, Field, GradeRow, SectionLabel, StatStrip, TextInput } from "./bits";
+import { ScrimmagePanel } from "./scrimmage-panel";
+import { SpyPanel } from "./spy-panel";
+
+const SLOTS: Slot[] = ["chassis", "drive", "weapon", "armor", "utility"];
+
+export function GaragePage({ storeId }: { storeId: string }) {
+  const data = usePit();
+  const store = data.stores.find((s) => s.id === storeId);
+  const signCaptain = usePit((s) => s.signCaptain);
+  const lockStore = usePit((s) => s.lockStore);
+  const setDraftPart = usePit((s) => s.setDraftPart);
+  const updateCard = usePit((s) => s.updateCard);
+  const nameMvp = usePit((s) => s.nameMvp);
+  const renameCrew = usePit((s) => s.renameCrew);
+  const addCrew = usePit((s) => s.addCrew);
+  const removeCrew = usePit((s) => s.removeCrew);
+  const setPaint = usePit((s) => s.setPaint);
+  const setGarage = usePit((s) => s.setGarage);
+  const setLook = usePit((s) => s.setLook);
+  const setNumber = usePit((s) => s.setNumber);
+  const acceptProposal = usePit((s) => s.acceptProposal);
+  const dismissProposal = usePit((s) => s.dismissProposal);
+  const repairSlot = usePit((s) => s.repairSlot);
+  const [code, setCode] = useState("");
+  const [hire, setHire] = useState("");
+  const [openSlot, setOpenSlot] = useState<Slot | null>(null);
+
+  if (!store) return <p>That bay does not exist.</p>;
+  const bot = data.bots.find((b) => b.storeId === storeId);
+  if (!bot) return null;
+  const card = cardFor(data, storeId);
+  const see = canSeeLoadout(data, storeId);
+  const captain = data.session.role === "commissioner" || (data.session.role === "captain" && data.session.storeId === storeId);
+  const crewHere = (data.session.role === "crew" || captain) && (data.session.role === "commissioner" || data.session.storeId === storeId);
+  const loadout = bot.locked ?? bot.draft;
+  const grades = card ? gradesOf(card) : null;
+  const printed = grades ? printedStats(bot, loadout, weekQuality(grades)) : null;
+  const showStats = Boolean(printed && (data.phase !== "open" || see));
+  const quotes = data.phase === "inspected" || data.phase === "complete" ? quotesForBot(bot, wonThisWeek(data, storeId)) : data.quotes[storeId] ?? [];
+  const crew = data.crew.filter((c) => c.storeId === storeId);
+  const proposals = data.proposals.filter((p) => p.storeId === storeId);
+
+  return (
+    <div className="mx-auto flex max-w-6xl flex-col gap-5" data-testid={`garage-${storeId}`}>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <SectionLabel>{store.region} bay</SectionLabel>
+          <h1 className="font-display text-4xl leading-tight md:text-5xl">{store.name}</h1>
+          <p className="mt-2 text-muted">
+            {see ? bot.name : "Bot under the tarp"} · {CLASS_META[bot.classId].label} · Captain {store.captain}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link to="/shop/$storeId" params={{ storeId }} className="inline-flex min-h-11 items-center border border-line px-4 font-display text-sm tracking-wide uppercase">
+            Shop
+          </Link>
+          <Link to="/stores/$storeId" params={{ storeId }} className="inline-flex min-h-11 items-center border border-line px-4 font-display text-sm tracking-wide uppercase">
+            Public card
+          </Link>
+        </div>
+      </div>
+
+      <div className="h-2" style={{ background: paintHex(store.paint) }} />
+
+      <section className={`relative overflow-hidden border border-line ${garageClass(store.garage)}`} data-testid="bay-decor">
+        <div className="absolute inset-0 bg-deep/60" />
+        <div className="relative flex items-end justify-between gap-3 p-4">
+          <div>
+            <p className="text-xs tracking-widest text-amber uppercase">Bay {bot.number || "—"}</p>
+            <p className="font-display text-4xl leading-none">{bot.name}</p>
+            <p className="mt-1 text-sm text-muted">
+              {lookLabel(bot.look)} · {garageLabel(store.garage)} floor
+            </p>
+          </div>
+          <BayBot paint={store.paint} look={bot.look} number={bot.number} />
+        </div>
+      </section>
+
+      {captain ? (
+        <section className="border border-line bg-surface p-4">
+          <SectionLabel>Decorate</SectionLabel>
+          <p className="mt-2 text-sm text-muted">Paint, floor, stripes, and the number are cosmetic. They do not replace the Friday lock.</p>
+          <p className="mt-4 text-xs tracking-widest text-muted uppercase">Paint</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {Object.keys(PAINT).map((key) => (
+              <button
+                key={key}
+                type="button"
+                aria-label={`${key} paint`}
+                className={`min-h-11 min-w-11 border ${store.paint === key ? "border-amber" : "border-line"}`}
+                style={{ background: paintHex(key) }}
+                onClick={() => setPaint(storeId, key)}
+              />
+            ))}
+          </div>
+          <p className="mt-4 text-xs tracking-widest text-muted uppercase">Garage</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {GARAGES.map((look) => (
+              <button
+                key={look.id}
+                type="button"
+                className={`min-h-11 border px-3 font-display text-sm uppercase ${store.garage === look.id ? "border-amber text-amber" : "border-line"}`}
+                onClick={() => setGarage(storeId, look.id)}
+              >
+                {look.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-4 text-xs tracking-widest text-muted uppercase">Bot</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {LOOKS.map((look) => (
+              <button
+                key={look.id}
+                type="button"
+                className={`min-h-11 border px-3 font-display text-sm uppercase ${bot.look === look.id ? "border-amber text-amber" : "border-line"}`}
+                onClick={() => setLook(storeId, look.id)}
+              >
+                {look.label}
+              </button>
+            ))}
+          </div>
+          <div className="mt-4 max-w-xs">
+            <Field label="Bay number">
+              <TextInput
+                value={bot.number}
+                aria-label="Bay number"
+                maxLength={3}
+                onChange={(e) => setNumber(storeId, e.target.value)}
+              />
+            </Field>
+          </div>
+        </section>
+      ) : (
+        <p className="text-sm text-muted">Decoration is on the door. It does not change the fight. The captain dresses the bay.</p>
+      )}
+
+      <section className="grid gap-3 md:grid-cols-4">
+        <Meter label="Scrap" value={`${bot.scrap} / 18`} hint="Repair does not raise the cap." />
+        <Meter label="Repair voucher" value={`${bot.voucher}`} hint="Last-place money. Repair first." />
+        <Meter label="Class" value={CLASS_META[bot.classId].chassis} hint={CLASS_META[bot.classId].blurb} />
+        <Meter label="Lock" value={bot.locked ? "Friday locked" : "Still drafting"} hint={bot.locked ? "Frozen until the commissioner overrides." : "One lock. Then the cage."} />
+      </section>
+
+      <section className="grid grid-cols-5 gap-2 text-center text-xs">
+        {(
+          [
+            ["Chassis", bot.keys.chassis],
+            ["Drive", bot.keys.drive],
+            ["Weapon", bot.keys.weapon],
+            ["Armor", bot.keys.armor],
+            ["Utility", bot.keys.utility],
+          ] as const
+        ).map(([label, n]) => (
+          <div key={label} className="border border-line bg-surface py-2">
+            <p className="text-muted">{label} keys</p>
+            <p className="font-display text-2xl">{n}</p>
+          </div>
+        ))}
+      </section>
+
+      {showStats && printed ? <StatStrip {...printed.stats} /> : <p className="text-sm text-muted">Power, Speed, Armor, and Heat print at the Friday lock.</p>}
+
+      <section className="grid gap-3 md:grid-cols-2">
+        {SLOTS.map((slot) => {
+          const id = loadout[slot];
+          const part = id ? partById(id) : undefined;
+          const cond = bot.wear[slot];
+          return (
+            <button
+              key={slot}
+              type="button"
+              data-testid={slot === "weapon" ? `slot-weapon-${storeId}` : undefined}
+              className="border border-line bg-surface p-4 text-left"
+              onClick={() => setOpenSlot(openSlot === slot ? null : slot)}
+            >
+              <p className="text-xs tracking-widest text-muted uppercase">{SLOT_LABEL[slot]}</p>
+              {see ? (
+                <>
+                  <p className="font-display text-2xl leading-none">{part?.name ?? "Empty"}</p>
+                  <p className="mt-1 text-sm text-amber">{part ? part.tier : "—"} · {cond}</p>
+                  {part ? <p className="mt-2 text-sm text-muted">{part.job}</p> : <p className="mt-2 text-sm text-muted">Utility can stay empty.</p>}
+                </>
+              ) : (
+                <p className="font-display text-2xl leading-none">Under the tarp</p>
+              )}
+            </button>
+          );
+        })}
+      </section>
+
+      {openSlot && see && captain && !bot.locked ? (
+        <section className="border border-amber bg-deep p-4">
+          <p className="font-display text-xl">{SLOT_LABEL[openSlot]} in the cage</p>
+          <div className="mt-3 flex flex-col gap-2">
+            {openSlot === "utility" ? (
+              <Btn tone="line" onClick={() => setDraftPart(storeId, "utility", null)}>
+                Run empty
+              </Btn>
+            ) : null}
+            {partsFor(openSlot, bot.classId)
+              .filter((part) => part.tier === "stock" || bot.owned.includes(part.id))
+              .filter((part) => !part.classLock || part.classLock === bot.classId || data.week > 1)
+              .map((part) => (
+                <button
+                  key={part.id}
+                  type="button"
+                  className="min-h-11 border border-line px-3 text-left"
+                  onClick={() => setDraftPart(storeId, openSlot, part.id)}
+                >
+                  <span className="font-medium">{part.name}</span>
+                  <span className="ml-2 text-xs tracking-widest text-amber uppercase">{part.tier}</span>
+                  <span className="mt-1 block text-sm text-muted">{part.job}</span>
+                </button>
+              ))}
+          </div>
+          {!shopOpen(data) ? <p className="mt-3 text-sm text-muted">Sport and up stay in the shop until after Saturday 1.</p> : null}
+        </section>
+      ) : null}
+
+      {!captain ? (
+        <section className="border border-line bg-surface p-4">
+          <SectionLabel>Captain clipboard</SectionLabel>
+          <p className="mt-2 text-sm text-muted">Demo code for this bay is <span className="text-fg">{store.passcode}</span>.</p>
+          <form
+            className="mt-3 flex flex-col gap-2 sm:flex-row"
+            onSubmit={(e) => {
+              e.preventDefault();
+              signCaptain(storeId, code);
+            }}
+          >
+            <TextInput
+              data-testid="lock-passcode"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="Passcode"
+              aria-label="Store passcode"
+            />
+            <Btn type="submit">Enter</Btn>
+          </form>
+        </section>
+      ) : (
+        <section className="flex flex-wrap gap-2">
+          <Btn testId="lock-button" onClick={() => lockStore(storeId)} disabled={Boolean(bot.locked) || (data.phase !== "open" && data.phase !== "locked")}>
+            {bot.locked ? "Locked" : "Lock Friday"}
+          </Btn>
+          <p className="self-center text-sm text-muted">{store.captain} is on the clipboard.</p>
+        </section>
+      )}
+
+      {see ? <SpyPanel storeId={storeId} /> : null}
+      {see ? (
+        <ScrimmagePanel storeId={storeId} />
+      ) : (
+        <p className="text-sm text-muted">Sign in with the bay code to test this build against the house drills. The tape does not damage the bot.</p>
+      )}
+
+      {card && captain ? <CardForm storeId={storeId} card={card} frozen={data.phase !== "open" && data.session.role !== "commissioner"} onChange={(patch) => updateCard(storeId, patch)} /> : null}
+      {card && !captain ? (
+        <section className="border border-line p-4">
+          <SectionLabel>This week's card</SectionLabel>
+          <div className="mt-3">
+            <GradeRow card={card} />
+          </div>
+        </section>
+      ) : null}
+
+      {quotes.length ? (
+        <section className="border border-line p-4">
+          <SectionLabel>Repair quotes</SectionLabel>
+          <ul className="mt-3 flex flex-col gap-3">
+            {quotes.map((quote) => (
+              <li key={quote.slot} className="border border-line bg-deep p-3" data-testid={storeId === "allen" && quote.slot === "weapon" ? "allen-weapon-quote" : undefined}>
+                <p className="font-display text-xl">{quote.partName} · {quote.condition}</p>
+                <p className="mt-1 text-sm text-muted">{quote.line}</p>
+                {captain ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Btn tone="line" onClick={() => repairSlot(storeId, quote.slot, "full")}>
+                      Repair {quote.repairCost}
+                    </Btn>
+                    {quote.weldCost ? (
+                      <Btn tone="line" onClick={() => repairSlot(storeId, quote.slot, "weld")}>
+                        Weld {quote.weldCost}
+                      </Btn>
+                    ) : null}
+                    {quote.salvageScrap ? (
+                      <Btn tone="ghost" onClick={() => repairSlot(storeId, quote.slot, "salvage")}>
+                        Salvage +{quote.salvageScrap}
+                      </Btn>
+                    ) : null}
+                    {quote.crown ? (
+                      <Btn onClick={() => repairSlot(storeId, quote.slot, "crown")}>Crown the wreck</Btn>
+                    ) : null}
+                  </div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      <section className="border border-line p-4" data-testid="staff-editor">
+        <SectionLabel>Pit crew</SectionLabel>
+        <p className="mt-2 text-sm text-muted">Names on the titantron. Not a personal record. Specialists on the clock set the review cap.</p>
+        <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+          {crew.map((member) => (
+            <li key={member.id} className="border border-line px-3 py-2">
+              {captain ? (
+                <TextInput
+                  aria-label={`${member.role} name`}
+                  defaultValue={member.name}
+                  key={`${member.id}-${member.name}`}
+                  onBlur={(e) => renameCrew(member.id, e.target.value)}
+                />
+              ) : (
+                <span className="block py-2">{member.name}</span>
+              )}
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs tracking-widest text-muted uppercase">{member.role}</span>
+                <span className="flex gap-2">
+                  {captain && member.role === "specialist" && crew.filter((c) => c.role === "specialist").length > 1 ? (
+                    <button type="button" className="min-h-11 text-sm text-bad" onClick={() => removeCrew(storeId, member.id)}>
+                      Remove
+                    </button>
+                  ) : null}
+                  {captain ? (
+                    <button type="button" className="min-h-11 text-sm text-amber" onClick={() => nameMvp(storeId, member.id)}>
+                      Name MVP
+                    </button>
+                  ) : null}
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
+        {captain && crew.filter((c) => c.role === "specialist").length < 8 ? (
+          <form
+            className="mt-3 flex flex-col gap-2 sm:flex-row"
+            onSubmit={(e) => {
+              e.preventDefault();
+              addCrew(storeId, hire);
+              setHire("");
+            }}
+          >
+            <TextInput value={hire} onChange={(e) => setHire(e.target.value)} placeholder="Specialist name" aria-label="New specialist" />
+            <Btn type="submit">Add to the clock</Btn>
+          </form>
+        ) : null}
+      </section>
+
+      {proposals.length && (captain || crewHere) ? (
+        <section className="border border-line p-4">
+          <SectionLabel>Proposals</SectionLabel>
+          <ul className="mt-3 flex flex-col gap-2">
+            {proposals.map((proposal) => {
+              const part = partById(proposal.partId);
+              return (
+                <li key={proposal.id} className="border border-line p-3">
+                  <p>
+                    {proposal.crewName} wants {part?.name}
+                  </p>
+                  <p className="text-sm text-muted">{proposal.note}</p>
+                  {captain ? (
+                    <div className="mt-2 flex gap-2">
+                      <Btn tone="line" onClick={() => acceptProposal(proposal.id)}>
+                        Bolt it on
+                      </Btn>
+                      <Btn tone="ghost" onClick={() => dismissProposal(proposal.id)}>
+                        Dismiss
+                      </Btn>
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ) : null}
+
+      {captain && openSlot ? null : null}
+      <p className="text-xs text-muted">
+        {grades ? `Week quality is the range. The lock decides where ${bot.name} lands inside it.` : ""}
+        {openSlot && partById(loadout[openSlot] ?? "") ? "" : ""}
+        {captain && shopOpen(data) && openSlot ? buyHint(data, storeId, loadout[openSlot]) : ""}
+      </p>
+    </div>
+  );
+}
+
+function buyHint(data: PitState, storeId: string, partId: string | null) {
+  if (!partId) return "";
+  const part = partById(partId);
+  if (!part) return "";
+  return buyCheck(data, storeId, part).reason;
+}
+
+function Meter({ label, value, hint }: { label: string; value: string; hint: string }) {
+  return (
+    <div className="border border-line bg-surface p-3">
+      <p className="text-xs tracking-widest text-muted uppercase">{label}</p>
+      <p className="font-display text-2xl leading-none">{value}</p>
+      <p className="mt-2 text-xs text-muted">{hint}</p>
+    </div>
+  );
+}
+
+function CardForm({
+  storeId,
+  card,
+  frozen,
+  onChange,
+}: {
+  storeId: string;
+  card: StoreCard;
+  frozen: boolean;
+  onChange: (patch: Partial<StoreCard>) => void;
+}) {
+  const cap = Math.max(1, card.crewOnClock) * 2;
+  return (
+    <section className="border border-line bg-surface p-4">
+      <SectionLabel>Weekly store card</SectionLabel>
+      <p className="mt-2 text-sm text-muted">No traffic. No raw units. NSNU is a percent of this store's goal.</p>
+      <div className="mt-3">
+        <GradeRow card={card} />
+      </div>
+      {card.prorate < 1 ? <p className="mt-2 text-sm text-warn">House prorated the goal to {Math.round(card.prorate * 100)}%. The grade uses the short-week number.</p> : null}
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <Num label="Demo %" value={card.demoPct} disabled={frozen} onChange={(demoPct) => onChange({ demoPct })} />
+        <Num label="Closing %" value={card.closePct} disabled={frozen} onChange={(closePct) => onChange({ closePct })} />
+        <Num label="NSNU vs goal %" hint="Percent of goal, not a unit count." value={card.nsnuPct} disabled={frozen} onChange={(nsnuPct) => onChange({ nsnuPct })} />
+        <Num label="Named 5-stars" hint={`Capped at ${cap}, two per crew member on the clock.`} value={card.reviews} disabled={frozen} onChange={(reviews) => onChange({ reviews })} />
+        <Num label="Crew on the clock" value={card.crewOnClock} disabled={frozen} onChange={(crewOnClock) => onChange({ crewOnClock })} />
+        <Num label="Former-customer avg ticket" value={card.formerTicket} disabled={frozen} onChange={(formerTicket) => onChange({ formerTicket })} />
+      </div>
+      {card.projected ? <p className="mt-3 text-sm text-amber">House projection. Overwrite it before Friday.</p> : null}
+      <p className="mt-2 text-xs text-muted" data-testid={`card-${storeId}`}>
+        Greens pay keys. Demo green is a drive key. Closing is a weapon key. NSNU is chassis. Ticket is armor. Reviews unlock utility.
+      </p>
+    </section>
+  );
+}
+
+function Num({
+  label,
+  hint,
+  value,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  hint?: string;
+  value: number;
+  onChange: (n: number) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Field label={label} hint={hint}>
+      <TextInput
+        type="number"
+        disabled={disabled}
+        value={Number.isFinite(value) ? value : 0}
+        onChange={(e) => {
+          const n = Number(e.target.value);
+          if (Number.isFinite(n)) onChange(n);
+        }}
+      />
+    </Field>
+  );
+}
+
+const GARAGES: { id: GarageLook; label: string }[] = [
+  { id: "hazard", label: "Hazard" },
+  { id: "concrete", label: "Concrete" },
+  { id: "night", label: "Night" },
+  { id: "bone", label: "Bone" },
+  { id: "checker", label: "Checker" },
+];
+
+const LOOKS: { id: BotLook; label: string }[] = [
+  { id: "plain", label: "Plain" },
+  { id: "stripe", label: "Stripe" },
+  { id: "chevron", label: "Chevron" },
+  { id: "rivets", label: "Rivets" },
+];
+
+function garageClass(look: GarageLook) {
+  return `garage-${look}`;
+}
+
+function garageLabel(look: GarageLook) {
+  return GARAGES.find((row) => row.id === look)?.label ?? "Concrete";
+}
+
+function lookLabel(look: BotLook) {
+  return LOOKS.find((row) => row.id === look)?.label ?? "Plain";
+}
+
+function BayBot({ paint, look, number }: { paint: string; look: BotLook; number: string }) {
+  const hex = paintHex(paint);
+  return (
+    <svg viewBox="0 0 120 80" className="h-20 w-28 shrink-0" aria-hidden>
+      <rect x="10" y="28" width="76" height="30" fill={hex} />
+      {look === "stripe" ? <rect x="10" y="40" width="76" height="6" fill="var(--color-deep)" /> : null}
+      {look === "chevron" ? (
+        <polyline points="22,34 46,48 22,58" fill="none" stroke="var(--color-deep)" strokeWidth="4" />
+      ) : null}
+      {look === "rivets" ? (
+        <>
+          <circle cx="20" cy="36" r="2.4" fill="var(--color-fg)" />
+          <circle cx="76" cy="36" r="2.4" fill="var(--color-fg)" />
+          <circle cx="20" cy="52" r="2.4" fill="var(--color-fg)" />
+          <circle cx="76" cy="52" r="2.4" fill="var(--color-fg)" />
+        </>
+      ) : null}
+      <text x="48" y="49" textAnchor="middle" fontFamily="Oswald, sans-serif" fontSize="14" fill="var(--color-deep)">
+        {number}
+      </text>
+      <circle cx="28" cy="64" r="7" fill="var(--color-surface-2)" />
+      <circle cx="68" cy="64" r="7" fill="var(--color-surface-2)" />
+    </svg>
+  );
+}
