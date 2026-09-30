@@ -15,6 +15,9 @@ export function useNow() {
   return now;
 }
 
+/** Period 12 opens at Central midnight, October 25, 2026. */
+export const PERIOD_OPENS = new Date("2026-10-25T05:00:00.000Z");
+
 export function nextFridayLock(now: Date) {
   const target = new Date(now);
   const day = target.getDay();

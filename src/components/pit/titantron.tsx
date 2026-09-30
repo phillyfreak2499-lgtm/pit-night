@@ -2,14 +2,15 @@ import { Link } from "@tanstack/react-router";
 import { CLASS_META } from "@/lib/pit/catalog";
 import { botFor, cardFor, rankedStores, recordOf } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
-import { BoutWatch, ClassTag, formatRemain, GradeRow, nextFridayLock, Panel, ResultLine, SectionLabel, useNow } from "./bits";
+import { BoutWatch, ClassTag, formatRemain, GradeRow, nextFridayLock, Panel, PERIOD_OPENS, ResultLine, SectionLabel, useNow } from "./bits";
 
 export function Titantron() {
   const data = usePit();
   const ranked = rankedStores(data);
   const weekMeta = data.weeks.find((w) => w.number === data.week);
   const now = useNow();
-  const remain = now ? formatRemain(nextFridayLock(now).getTime() - now.getTime()) : "—";
+  const beforeOpen = !now || now.getTime() < PERIOD_OPENS.getTime();
+  const remain = now ? formatRemain((beforeOpen ? PERIOD_OPENS : nextFridayLock(now)).getTime() - now.getTime()) : "—";
   const gazette = data.gazette[0];
   const featured =
     data.bouts.find((b) => b.week === data.week && b.title === "Main event") ??
@@ -36,9 +37,13 @@ export function Titantron() {
               <p className="mt-2 text-sm text-muted">{weekMeta?.blurb}</p>
             </Panel>
             <Panel className="p-4">
-              <p className="text-xs tracking-widest text-muted uppercase">Next Friday lock</p>
-              <p className="font-display text-4xl leading-none">{data.phase === "open" ? remain : phaseWord(data.phase)}</p>
-              <p className="mt-2 text-sm text-muted">One lock per store. The bot freezes. The crew does not get a bracket.</p>
+              <p className="text-xs tracking-widest text-muted uppercase">{beforeOpen ? "Opens Oct 25" : "Next Friday lock"}</p>
+              <p className="font-display text-4xl leading-none">{data.phase === "open" || beforeOpen ? remain : phaseWord(data.phase)}</p>
+              <p className="mt-2 text-sm text-muted">
+                {beforeOpen
+                  ? "October 25, 2026. Build now. The first bell has not rung."
+                  : "One lock per store. The bot freezes. The crew does not get a bracket."}
+              </p>
             </Panel>
             <Panel className="p-4">
               <p className="text-xs tracking-widest text-muted uppercase">Last gazette</p>

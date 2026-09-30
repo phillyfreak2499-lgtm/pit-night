@@ -3,7 +3,7 @@ import { Newspaper, Play, Radio, ScrollText, Swords, Trophy, Tv, Volume2, Volume
 import { useEffect, useState } from "react";
 import { applyHulen, usePit } from "@/lib/pit/store";
 import { setSoundMuted, soundMuted, subscribeSound } from "@/lib/pit/sound";
-import { formatRemain, nextFridayLock, TextInput, useNow } from "./bits";
+import { formatRemain, nextFridayLock, PERIOD_OPENS, TextInput, useNow } from "./bits";
 import { Tutorial } from "./tutorial";
 
 const NAV = [
@@ -180,11 +180,12 @@ function ClockLine() {
   const phase = usePit((s) => s.phase);
   const week = usePit((s) => s.week);
   const now = useNow();
-  const remain = now ? formatRemain(nextFridayLock(now).getTime() - now.getTime()) : "—";
+  const beforeOpen = Boolean(now && now.getTime() < PERIOD_OPENS.getTime());
+  const remain = now ? formatRemain((beforeOpen ? PERIOD_OPENS : nextFridayLock(now)).getTime() - now.getTime()) : "—";
   return (
     <p className="truncate text-sm text-muted">
       Week {week} · {phaseLabel(phase)}
-      {phase === "open" ? ` · Friday lock ${remain}` : ""}
+      {phase === "open" ? (beforeOpen ? ` · Opens Oct 25 ${remain}` : ` · Friday lock ${remain}`) : ""}
     </p>
   );
 }
