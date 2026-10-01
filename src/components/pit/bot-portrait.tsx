@@ -20,6 +20,8 @@ export type BotLookProps = {
   brainTier?: Tier;
   /** Damaged parts not yet repaired. */
   scars?: number;
+  armorFamily?: string;
+  driveFamily?: string;
 };
 
 /** What a store's bot looks like to whoever is viewing. Weapons stay under the tarp until the bell. */
@@ -48,6 +50,8 @@ export function useBotLook(storeId: string): BotLookProps | null {
     style: bot.style,
     storeName: store.name,
     brainTier: see ? (partById((bot.locked ?? bot.draft).brain)?.tier ?? "stock") : "stock",
+    armorFamily: see ? partById((bot.locked ?? bot.draft).armor)?.family : undefined,
+    driveFamily: see ? partById((bot.locked ?? bot.draft).drive)?.family : undefined,
   };
 }
 
@@ -62,6 +66,8 @@ function stateFor(look: BotLookProps): BotState {
     style: look.style,
     storeName: look.storeName,
     brainTier: look.brainTier,
+    armorFamily: look.armorFamily,
+    driveFamily: look.driveFamily,
   } as FighterSnap;
   return {
     bot: snap,

@@ -141,6 +141,9 @@ export class Fx {
   }
 
   step(dt: number) {
+    // Bound cosmetic work during busy walk-outs and multi-bot cards.
+    if (this.side.length > 360) this.side.splice(0, this.side.length - 360);
+    if (this.top.length > 200) this.top.splice(0, this.top.length - 200);
     for (const list of [this.side, this.top]) {
       for (let i = list.length - 1; i >= 0; i--) {
         const p = list[i]!;
@@ -1231,22 +1234,27 @@ export function drawSideBot(
   spin: number,
   facing: number,
 ) {
-  const f = frameOf(s.bot.classId);
+  const baseFrame = frameOf(s.bot.classId);
+  const f = s.bot.driveFamily ? { ...baseFrame, treads: s.bot.driveFamily === "treads" } : baseFrame;
   const paint = paintOf(s.bot.paint);
   const scale = u * (s.bot.classId === "tank" ? 1.06 : s.bot.classId === "specialist" ? 0.94 : 1);
   const liftPx = s.lift * scale;
 
   // Shadow stays on the floor.
   if (s.gone < 1) {
-    const spread = 1 - clamp(s.lift, 0, 1.2) * 0.5;
+    const spread = 1 + clamp(s.lift, 0, 1.2) * 0.22;
     ctx.save();
     ctx.globalAlpha = (1 - s.gone) * clamp(1 - s.lift * 0.6, 0.25, 1);
-    const g = ctx.createRadialGradient(x, y, 0, x, y, scale * 0.6 * spread);
-    g.addColorStop(0, "rgba(0,0,0,0.75)");
+    ctx.translate(x + liftPx * 0.12, y);
+    ctx.scale(1, 0.18);
+    const radius = scale * 0.62 * spread;
+    const g = ctx.createRadialGradient(0, 0, radius * 0.12, 0, 0, radius);
+    g.addColorStop(0, "rgba(0,0,0,0.82)");
+    g.addColorStop(0.45, "rgba(0,0,0,0.48)");
     g.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.ellipse(x, y, scale * 0.6 * spread, scale * 0.11 * spread, 0, 0, Math.PI * 2);
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
@@ -1269,6 +1277,8 @@ export function drawSideBot(
     ctx.scale(1, -1);
   }
   if (s.charging && !s.dead) ctx.rotate(-0.035);
+  // A damaged drive shudders mechanically rather than making the whole hull blink.
+  if (!s.dead && s.hp < 20) ctx.rotate(Math.sin(time * 21 + hash(s.bot.id)) * 0.006);
 
   const u2 = scale;
   const dark = shade(paint, -80);
@@ -1338,6 +1348,27 @@ export function drawSideBot(
   ctx.lineWidth = Math.max(1, u2 * 0.014);
   ctx.stroke();
 
+  // Extruded deck: the roof catches the overhead rig, while the near face stays painted.
+  ctx.save();
+  const depth = 0.075 * u2;
+  const roof = f.hull.filter(([, py]) => py < -f.height * 0.55);
+  if (roof.length > 1) {
+    const metal = ctx.createLinearGradient(0, top - depth, 0, top + depth);
+    metal.addColorStop(0, shade(paint, style.finish === "matte" ? 35 : 100));
+    metal.addColorStop(0.5, shade(paint, 30));
+    metal.addColorStop(1, shade(paint, -35));
+    ctx.fillStyle = metal;
+    ctx.beginPath();
+    roof.forEach(([px, py], i) => i ? ctx.lineTo(px * u2, py * u2) : ctx.moveTo(px * u2, py * u2));
+    [...roof].reverse().forEach(([px, py]) => ctx.lineTo(px * u2 - depth, py * u2 - depth * 0.65));
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "rgba(230,241,255,0.65)";
+    ctx.lineWidth = Math.max(0.7, u2 * 0.006);
+    ctx.stroke();
+  }
+  ctx.restore();
+
   // Panel lines and bolts.
   ctx.save();
   poly(ctx, f.hull, u2);
@@ -1351,6 +1382,37 @@ export function drawSideBot(
   ctx.moveTo(-0.08 * u2, top);
   ctx.lineTo(-0.08 * u2, 0);
   ctx.stroke();
+  // Small, deterministic manufacturing differences identify each store even before its number is visible.
+  const identity = hash(s.bot.id);
+  const panelCount = 2 + identity % 3;
+  const ventY = top + f.height * u2 * 0.25;
+  for (let i = 0; i < panelCount; i++) {
+    const vx = (-0.31 + i * 0.065) * u2;
+    ctx.fillStyle = "rgba(4,8,12,0.8)";
+    ctx.fillRect(vx, ventY, u2 * 0.032, u2 * 0.065);
+    ctx.fillStyle = "rgba(214,228,241,0.45)";
+    ctx.fillRect(vx, ventY + u2 * 0.065, u2 * 0.032, Math.max(0.7, u2 * 0.005));
+  }
+  // Recessed fasteners, a service hatch, and a fine brushed-metal grain.
+  const hatchX = (0.08 + (identity % 3) * 0.025) * u2;
+  ctx.fillStyle = "rgba(5,12,20,0.23)";
+  ctx.fillRect(hatchX, panelY + u2 * 0.035, u2 * 0.15, u2 * 0.07);
+  ctx.strokeStyle = "rgba(218,232,246,0.24)";
+  ctx.strokeRect(hatchX, panelY + u2 * 0.035, u2 * 0.15, u2 * 0.07);
+  for (const bx of [-0.35, -0.1, 0.28]) {
+    ctx.fillStyle = "#111820";
+    ctx.beginPath(); ctx.arc(bx * u2, panelY + u2 * 0.018, Math.max(1.2, u2 * 0.013), 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#a2afbb";
+    ctx.beginPath(); ctx.arc(bx * u2 - u2 * 0.003, panelY + u2 * 0.014, Math.max(0.6, u2 * 0.007), 0, Math.PI * 2); ctx.fill();
+  }
+  if (u2 > 65) {
+    ctx.strokeStyle = "rgba(225,236,246,0.065)";
+    ctx.lineWidth = 0.6;
+    for (let i = 0; i < 16; i++) {
+      const gy = top + i * f.height * u2 / 20;
+      ctx.beginPath(); ctx.moveTo(-0.4 * u2, gy); ctx.lineTo(0.4 * u2, gy - u2 * 0.01); ctx.stroke();
+    }
+  }
   // Specular sheen, by finish.
   if (style.finish !== "matte") {
     ctx.globalCompositeOperation = "lighter";
@@ -1425,6 +1487,27 @@ export function drawSideBot(
   ctx.restore();
 
   // Look.
+  // Armor silhouettes track the installed family, with readable thickness and mechanical mounts.
+  if (s.bot.armorFamily === "skirt") {
+    ctx.fillStyle = shade(paint, -55);
+    ctx.strokeStyle = "#9ba8b7";
+    ctx.lineWidth = Math.max(1, u2 * 0.009);
+    poly(ctx, [[-0.49, -0.19], [0.49, -0.19], [0.55, -0.04], [-0.54, -0.04]], u2);
+    ctx.fill(); ctx.stroke();
+  } else if (s.bot.armorFamily === "cage") {
+    ctx.strokeStyle = "#8e9cab";
+    ctx.lineWidth = Math.max(1.5, u2 * 0.018);
+    ctx.beginPath();
+    for (const bx of [-0.34, -0.08, 0.2]) {
+      ctx.moveTo(bx * u2, -0.12 * u2); ctx.lineTo(bx * u2, top - u2 * 0.07);
+    }
+    ctx.moveTo(-0.38 * u2, top - u2 * 0.07); ctx.lineTo(0.3 * u2, top - u2 * 0.07); ctx.stroke();
+  } else if (s.bot.armorFamily === "angle") {
+    ctx.fillStyle = shade(paint, 25);
+    ctx.strokeStyle = "rgba(223,235,250,0.5)";
+    poly(ctx, [[0.18, -0.13], [0.38, -0.37], [0.51, -0.09]], u2);
+    ctx.fill(); ctx.stroke();
+  }
   const look = s.bot.look ?? "plain";
   if (look === "stripe") {
     ctx.save();
@@ -2250,6 +2333,15 @@ export function drawSide(
   ctx.scale(cam.z, cam.z);
   ctx.translate(-cx, -cy);
   ctx.drawImage(backdrop(ctx, w, h), 0, 0);
+  // Contact light belongs on the steel and floor, with falloff at arena scale.
+  if (drive.impact && fx.flash > 0 && !opts.reduced) {
+    const hit = project(drive.impact, w, h);
+    const glow = ctx.createRadialGradient(hit.x, hit.y - hit.size * 0.22, 0, hit.x, hit.y - hit.size * 0.22, hit.size * 1.6);
+    glow.addColorStop(0, `rgba(255,222,165,${fx.flash * 0.45})`);
+    glow.addColorStop(1, "rgba(255,135,40,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(hit.x - hit.size * 2, hit.y - hit.size * 2, hit.size * 4, hit.size * 3);
+  }
   if (!opts.reduced) crowdFlashes(ctx, w, h, time, opts.hype + (opts.ko ? 1 : 0));
   if (opts.hazards) drawHazards(ctx, w, h, fx, time, dt, opts.reduced);
   drawWreck(ctx, fx.wreck);
@@ -2357,13 +2449,7 @@ export function drawSide(
       ctx.restore();
       continue;
     }
-    const failing = !s.dead && s.hp > 0 && s.hp < 20 && !opts.reduced;
-    if (failing) {
-      ctx.save();
-      ctx.globalAlpha = 0.72 + 0.28 * Math.abs(Math.sin(time * 17 + hash(s.bot.id)));
-    }
     drawSideBot(ctx, s, p.x, p.y, p.size, time, spin, facingOf(s.heading));
-    if (failing) ctx.restore();
   }
 
   drawParticles(ctx, fx.side);

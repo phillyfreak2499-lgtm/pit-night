@@ -1,3 +1,4 @@
+import { TaleOfTape } from "./tale-of-tape";
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { previewSaturday, cardKey } from "@/lib/pit/engine";
@@ -251,6 +252,7 @@ function Sting({ bout, next, data }: { bout: Bout; next: Bout | null; data: PitD
       <p className="mt-4 max-w-lg text-lg">
         <ResultLine bout={bout} />
       </p>
+      <TaleOfTape bout={bout} compact />
       {next ? <p className="mt-6 text-sm text-muted">Next · {matchup(data, next)}</p> : <p className="mt-6 text-sm text-muted">Last tape.</p>}
     </section>
   );
