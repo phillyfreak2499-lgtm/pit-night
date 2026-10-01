@@ -1,0 +1,424 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0e0d0b;
+  --color-deep: #080807;
+  --color-surface: #171512;
+  --color-surface-2: #241f1a;
+  --color-fg: #f3efe6;
+  --color-muted: #a39b90;
+  --color-line: #3a342c;
+  --color-amber: #f0a202;
+  --color-spark: #ff5a1f;
+  --color-ok: #8fbf78;
+  --color-info: #8eafc9;
+  --color-warn: #e0a15a;
+  --color-bad: #e06a52;
+  --font-sans: "Barlow", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Oswald", ui-sans-serif, sans-serif;
+  --radius-sm: 0.15rem;
+  --radius-md: 0.35rem;
+}
+
+@layer base {
+  html,
+  body {
+    background: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    min-height: 100%;
+  }
+
+  body {
+    background-image:
+      radial-gradient(ellipse at top, color-mix(in oklab, var(--color-amber) 8%, transparent), transparent 42%),
+      linear-gradient(to bottom, var(--color-deep), var(--color-bg) 28%);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  ::selection {
+    background: var(--color-amber);
+    color: var(--color-deep);
+  }
+}
+
+.cage-floor {
+  background-image:
+    linear-gradient(to right, color-mix(in oklab, var(--color-line) 80%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklab, var(--color-line) 65%, transparent) 1px, transparent 1px);
+  background-size: 3rem 3rem;
+}
+
+.bay-door {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--color-surface-2) 0 0.55rem,
+    var(--color-deep) 0.55rem 0.8rem
+  );
+}
+
+.hazard {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--color-amber) 0 0.45rem,
+    var(--color-deep) 0.45rem 0.9rem
+  );
+}
+
+.garage-hazard {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    color-mix(in oklab, var(--color-amber) 80%, var(--color-deep)) 0 0.55rem,
+    var(--color-deep) 0.55rem 1.1rem
+  );
+}
+
+.garage-concrete {
+  background-color: var(--color-surface-2);
+  background-image:
+    linear-gradient(color-mix(in oklab, var(--color-line) 80%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklab, var(--color-line) 80%, transparent) 1px, transparent 1px);
+  background-size: 1.15rem 1.15rem;
+}
+
+.garage-night {
+  background-image:
+    radial-gradient(circle at 18% 30%, color-mix(in oklab, var(--color-info) 40%, transparent), transparent 26%),
+    radial-gradient(circle at 82% 72%, color-mix(in oklab, var(--color-amber) 28%, transparent), transparent 30%),
+    linear-gradient(var(--color-deep), var(--color-bg));
+}
+
+.garage-bone {
+  background-color: color-mix(in oklab, var(--color-fg) 78%, var(--color-amber));
+}
+
+.garage-checker {
+  background-image: repeating-conic-gradient(var(--color-surface-2) 0% 25%, var(--color-deep) 0% 50%);
+  background-size: 1.5rem 1.5rem;
+}
+
+.ticker {
+  animation: ticker 28s linear infinite;
+}
+
+@keyframes ticker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker {
+    animation: none;
+  }
+}
+
+/* ---------- Bays: a lit garage behind a roll-up door ---------- */
+
+.bay-inside {
+  background:
+    radial-gradient(ellipse at 50% 72%, rgb(255 225 170 / 0.1), transparent 55%),
+    linear-gradient(to bottom, #0b0a09 0%, #1a1714 55%, #26221d 70%, #0c0b0a 100%);
+}
+
+.bay-lamp {
+  background: radial-gradient(ellipse at 50% 0%, color-mix(in oklab, var(--lamp, var(--color-amber)) 35%, transparent), transparent 70%);
+  opacity: 0.35;
+  transition: opacity 0.3s ease;
+}
+
+.bay-shutter {
+  transition: transform 0.55s cubic-bezier(0.6, 0, 0.2, 1);
+  box-shadow: 0 6px 12px rgb(0 0 0 / 0.5);
+}
+
+.bay:hover .bay-shutter,
+.bay:focus-visible .bay-shutter {
+  transform: translateY(-100%);
+}
+
+.bay:hover .bay-lamp,
+.bay:focus-visible .bay-lamp {
+  opacity: 1;
+  animation: lamp-flicker 0.7s steps(1, end) 1;
+}
+
+@keyframes lamp-flicker {
+  0% { opacity: 0.2; }
+  12% { opacity: 1; }
+  20% { opacity: 0.3; }
+  34% { opacity: 1; }
+  42% { opacity: 0.55; }
+  60% { opacity: 1; }
+}
+
+/* ---------- Motion & feel ---------- */
+
+.lift {
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.lift:hover,
+.lift:focus-visible {
+  transform: translateY(-2px);
+  border-color: color-mix(in oklab, var(--color-amber) 55%, var(--color-line));
+  box-shadow:
+    0 10px 24px -12px rgb(0 0 0 / 0.9),
+    0 0 0 1px color-mix(in oklab, var(--color-amber) 25%, transparent);
+}
+
+.page-in {
+  animation: page-in 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.glow-text {
+  text-shadow:
+    0 0 24px color-mix(in oklab, var(--color-amber) 35%, transparent),
+    0 2px 0 rgb(0 0 0 / 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bay-shutter,
+  .lift,
+  .page-in,
+  .bay-lamp {
+    transition: none;
+    animation: none;
+  }
+  .lift:hover {
+    transform: none;
+  }
+}
+
+.live-dot {
+  box-shadow: 0 0 8px var(--color-spark);
+  animation: live-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot {
+    animation: none;
+  }
+}
+
+/* ---------- Honors wall ---------- */
+
+.pegboard {
+  background-color: #1b1814;
+  background-image: radial-gradient(circle, #0a0908 2.2px, transparent 2.6px);
+  background-size: 22px 22px;
+  box-shadow: inset 0 0 60px rgb(0 0 0 / 0.7);
+}
+
+.honor-dim {
+  filter: grayscale(1) brightness(0.45) contrast(1.1);
+}
+
+.honor-shine {
+  filter: drop-shadow(0 0 18px color-mix(in oklab, var(--color-amber) 45%, transparent));
+}
+
+.honor-dim {
+  transition: filter 0.35s ease;
+}
+
+.lift:hover .honor-dim {
+  filter: grayscale(0.15) brightness(0.9);
+}
+
+/* ---------- Gazette: newsprint ---------- */
+
+.newsprint {
+  --ink: #1d1a15;
+  --ink-soft: #4a4439;
+  background-color: #e7dfcc;
+  background-image:
+    radial-gradient(rgb(0 0 0 / 0.05) 1px, transparent 1.2px),
+    linear-gradient(135deg, rgb(255 255 255 / 0.35), transparent 40%, rgb(0 0 0 / 0.06));
+  background-size:
+    4px 4px,
+    100% 100%;
+  color: var(--ink);
+  box-shadow:
+    0 24px 50px -20px rgb(0 0 0 / 0.9),
+    0 0 0 1px rgb(0 0 0 / 0.4);
+}
+
+.newsprint .rule-double {
+  border-top: 3px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+  height: 6px;
+}
+
+.dropcap::first-letter {
+  float: left;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 3.4em;
+  line-height: 0.85;
+  padding: 0.05em 0.08em 0 0;
+  color: var(--ink);
+}
+
+/* ---------- Desk: arena control ---------- */
+
+.control-panel {
+  background:
+    linear-gradient(to bottom, rgb(255 255 255 / 0.04), transparent 30%),
+    repeating-linear-gradient(90deg, #1d1b18 0 2px, #191714 2px 4px);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    0 20px 40px -20px rgb(0 0 0 / 0.9);
+}
+
+.lcd {
+  background: #0d1a10 !important;
+  color: #7dff9a !important;
+  border-color: #000 !important;
+  text-shadow: 0 0 10px rgb(125 255 154 / 0.6);
+  box-shadow: inset 0 2px 10px rgb(0 0 0 / 0.8);
+}
+
+.lcd::placeholder {
+  color: rgb(125 255 154 / 0.45);
+}
+
+.key {
+  background: linear-gradient(to bottom, #3a3733, #24221f);
+  border: 1px solid #0a0a09;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
+    0 3px 0 #0a0a09;
+  color: var(--color-fg);
+  transition:
+    transform 0.06s ease,
+    box-shadow 0.06s ease;
+}
+
+.key:hover {
+  background: linear-gradient(to bottom, #45423c, #2b2925);
+}
+
+.key:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    0 1px 0 #0a0a09;
+}
+
+/* ---------- Bay keypad ---------- */
+
+.keypad-shake {
+  animation: keypad-shake 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes keypad-shake {
+  10%,
+  90% { transform: translateX(-2px); }
+  20%,
+  80% { transform: translateX(4px); }
+  30%,
+  50%,
+  70% { transform: translateX(-8px); }
+  40%,
+  60% { transform: translateX(8px); }
+}
+
+.lcd-bad {
+  color: #ff5a4a !important;
+  text-shadow: 0 0 10px rgb(255 90 74 / 0.6);
+  background: #1a0b0b !important;
+}
+
+.lcd-bad::placeholder {
+  color: rgb(255 90 74 / 0.8);
+}
+
+.key-go {
+  background: linear-gradient(to bottom, #f5b12a, #c98400);
+  color: #1a1206;
+}
+
+.key-go:hover {
+  background: linear-gradient(to bottom, #ffc445, #d99100);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .keypad-shake {
+    animation: none;
+  }
+}
+
+/* ---------- Coins ---------- */
+
+.coin {
+  background: radial-gradient(circle at 35% 30%, #ffe9a6, #f0a202 55%, #a86a05);
+  box-shadow:
+    inset 0 -2px 0 rgb(0 0 0 / 0.25),
+    0 0 10px color-mix(in oklab, var(--color-amber) 45%, transparent);
+  border: 1px solid #7a4c05;
+}
+
+/* ---------- Pit Week ---------- */
+
+.bolt {
+  background: radial-gradient(circle at 35% 30%, #e8eef5, #9fb3c8 55%, #4a5866);
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+}
+
+.tuned-glow {
+  box-shadow:
+    0 0 0 1px var(--color-amber),
+    0 0 28px color-mix(in oklab, var(--color-amber) 45%, transparent);
+  animation: tuned-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes tuned-pulse {
+  50% {
+    box-shadow:
+      0 0 0 1px var(--color-amber),
+      0 0 40px color-mix(in oklab, var(--color-amber) 65%, transparent);
+  }
+}
+
+.spark-btn {
+  background: linear-gradient(90deg, color-mix(in oklab, var(--color-amber) 12%, transparent), transparent);
+  transition: background 0.2s ease;
+}
+
+.spark-btn:hover {
+  background: linear-gradient(90deg, color-mix(in oklab, var(--color-amber) 24%, transparent), transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tuned-glow {
+    animation: none;
+  }
+}
