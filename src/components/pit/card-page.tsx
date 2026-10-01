@@ -22,7 +22,7 @@ export function CardPage() {
       </Link>
       {bouts.length === 0 ? (
         <p className="mt-6 border border-line bg-surface p-4">
-          The card is not printed yet. Captains lock. Monday morning the desk enters the official numbers and hits Run the card. Week 1 main event is Plano against Allen.
+          The card is not printed yet. Captains lock Saturday at close. Sunday the desk clicks in the official colors. Monday morning the desk hits Run the card.
         </p>
       ) : groups ? (
         <div className="mt-6 flex flex-col gap-6">

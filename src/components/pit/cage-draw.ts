@@ -310,6 +310,107 @@ export class Fx {
     });
   }
 
+  /** Walk-out pyro: a flame column, rising. */
+  pyro(x: number, y: number, scale: number) {
+    for (let i = 0; i < 3; i++) {
+      this.side.push({
+        kind: "fire",
+        x: x + (Math.random() - 0.5) * scale * 0.08,
+        y,
+        vx: (Math.random() - 0.5) * scale * 0.3,
+        vy: -scale * (3.2 + Math.random() * 1.6),
+        life: 0.45 + Math.random() * 0.25,
+        max: 0.7,
+        size: scale * (0.1 + Math.random() * 0.08),
+        color: "",
+        ground: 0,
+        rot: 0,
+        vr: 0,
+      });
+    }
+  }
+
+  /** Sparks raining from the truss. */
+  sparkRain(x: number, y: number, scale: number, ground: number) {
+    this.side.push({
+      kind: "spark",
+      x: x + (Math.random() - 0.5) * scale * 1.6,
+      y,
+      vx: (Math.random() - 0.5) * scale * 0.4,
+      vy: scale * (0.5 + Math.random()),
+      life: 0.9 + Math.random() * 0.6,
+      max: 1.5,
+      size: Math.max(1, scale * 0.012),
+      color: Math.random() < 0.4 ? "#fff3c0" : "#ffb030",
+      ground,
+      rot: 0,
+      vr: 0,
+      g: scale * 6,
+    });
+  }
+
+  /** Coloured smoke for a walk-out. */
+  stageSmoke(x: number, y: number, scale: number) {
+    this.side.push({
+      kind: "smoke",
+      x: x + (Math.random() - 0.5) * scale * 1.4,
+      y: y - Math.random() * scale * 0.1,
+      vx: (Math.random() - 0.5) * scale * 0.5,
+      vy: -scale * (0.05 + Math.random() * 0.2),
+      life: 2.4,
+      max: 2.4,
+      size: scale * (0.25 + Math.random() * 0.2),
+      color: "190,185,200",
+      ground: 0,
+      rot: 0,
+      vr: 0,
+    });
+  }
+
+  confetti(x: number, y: number, scale: number, colors: string[], ground: number) {
+    for (let i = 0; i < 6; i++) {
+      this.side.push({
+        kind: "debris",
+        x: x + (Math.random() - 0.5) * scale * 3,
+        y: y - Math.random() * scale * 0.4,
+        vx: (Math.random() - 0.5) * scale * 0.8,
+        vy: scale * (0.2 + Math.random() * 0.4),
+        life: 2.2 + Math.random(),
+        max: 3.2,
+        size: scale * (0.018 + Math.random() * 0.02),
+        color: colors[Math.floor(Math.random() * colors.length)]!,
+        ground: ground + (Math.random() - 0.3) * scale * 0.5,
+        rot: Math.random() * 6,
+        vr: (Math.random() - 0.5) * 18,
+        g: scale * 1.2,
+      });
+    }
+  }
+
+  firework(x: number, y: number, scale: number, color: string) {
+    const n = 36;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const sp = scale * (1.6 + Math.random() * 0.6);
+      this.side.push({
+        kind: "spark",
+        x,
+        y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp,
+        life: 0.9 + Math.random() * 0.4,
+        max: 1.3,
+        size: Math.max(1.2, scale * 0.016),
+        color: Math.random() < 0.3 ? "#ffffff" : color,
+        ground: y + scale * 20,
+        rot: 0,
+        vr: 0,
+        g: scale * 1.4,
+      });
+    }
+    this.side.push({ kind: "flash", x, y, vx: 0, vy: 0, life: 0.18, max: 0.18, size: scale * 1.2, color: "#fff", ground: 0, rot: 0, vr: 0 });
+  }
+
   /** Rate-limited emitter. Returns how many to spawn this frame. */
   tick(key: string, rate: number, dt: number) {
     const acc = (this.emit.get(key) ?? 0) + rate * dt;
@@ -1982,6 +2083,30 @@ export function drawSide(
             p.size * 1.5,
             Math.sign(facing),
           );
+      }
+      const look = styleOf(s.bot);
+      if (s.spotlight && look.walkout) {
+        if (look.walkout === "walkout-pyro") {
+          for (let i = fx.tick(`pyro-${s.bot.id}`, 26, dt); i > 0; i--) {
+            fx.pyro(p.x - p.size * 0.8, p.y, p.size);
+            fx.pyro(p.x + p.size * 0.8, p.y, p.size);
+          }
+        } else if (look.walkout === "walkout-sparks") {
+          for (let i = fx.tick(`rain-${s.bot.id}`, 70, dt); i > 0; i--) fx.sparkRain(p.x, h * 0.04, p.size, p.y);
+        } else if (look.walkout === "walkout-smoke") {
+          for (let i = fx.tick(`stage-${s.bot.id}`, 9, dt); i > 0; i--) fx.stageSmoke(p.x, p.y, p.size);
+        }
+      }
+      if (s.celebrate && look.victory) {
+        const paint = paintOf(s.bot.paint);
+        const trim = TRIM[look.trim] ?? "#f3efe6";
+        if (look.victory === "victory-confetti") {
+          for (let i = fx.tick(`conf-${s.bot.id}`, 10, dt); i > 0; i--) fx.confetti(p.x, h * 0.1, p.size, [paint, trim, "#f3efe6", "#f0a202"], p.y);
+        } else if (look.victory === "victory-fireworks") {
+          for (let i = fx.tick(`fw-${s.bot.id}`, 1.6, dt); i > 0; i--) {
+            fx.firework(w * (0.25 + Math.random() * 0.5), h * (0.12 + Math.random() * 0.12), p.size, Math.random() < 0.5 ? paint : trim);
+          }
+        }
       }
       if (s.flame > 0.2) {
         for (let i = fx.tick(`flame-${s.bot.id}`, 50 * s.flame, dt); i > 0; i--) {

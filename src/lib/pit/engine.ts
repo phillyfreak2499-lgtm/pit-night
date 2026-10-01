@@ -10,6 +10,8 @@ import {
   metricFor,
   type Part,
 } from "./catalog";
+import { TUNE_UP_BONUS } from "./training";
+import { tunedUp } from "./week";
 import type {
   Bot,
   Bout,
@@ -63,20 +65,36 @@ export function gradeMetric(stat: StatKey, value: number): Grade {
 export type GradeSet = Record<StatKey, Grade>;
 
 export function gradesOf(card: StoreCard): GradeSet {
+  const o = card.grades ?? {};
   return {
-    nsnu: gradeMetric("nsnu", card.nsnu),
-    conv: gradeMetric("conv", card.conv),
-    demoRate: gradeMetric("demoRate", card.demoRate),
-    demoClose: gradeMetric("demoClose", card.demoClose),
-    arch: gradeMetric("arch", card.arch),
-    ticket: gradeMetric("ticket", card.demoTicket),
+    nsnu: o.nsnu ?? gradeMetric("nsnu", card.nsnu),
+    conv: o.conv ?? gradeMetric("conv", card.conv),
+    demoRate: o.demoRate ?? gradeMetric("demoRate", card.demoRate),
+    demoClose: o.demoClose ?? gradeMetric("demoClose", card.demoClose),
+    arch: o.arch ?? gradeMetric("arch", card.arch),
+    ticket: o.ticket ?? gradeMetric("ticket", card.demoTicket),
   };
+}
+
+/** Kickoff ranking from Period 11 colors: coins, then greens, then NSNU, then the old seed. */
+export function kickoffRank(data: Pick<PitData, "stores" | "kickoff">) {
+  const ORDER = { green: 3, blue: 2, orange: 1, red: 0 } as const;
+  const rows = data.stores.map((store) => {
+    const g = data.kickoff?.grades?.[store.id] ?? {};
+    const filled = METRICS.filter((m) => g[m.stat]).length;
+    const full = Object.fromEntries(METRICS.map((m) => [m.stat, g[m.stat] ?? "red"])) as GradeSet;
+    const math = coinMath(full);
+    return { store, filled, coins: math.total, bySlot: math.bySlot, greens: math.greens, nsnu: ORDER[full.nsnu] };
+  });
+  rows.sort((a, b) => b.coins - a.coins || b.greens - a.greens || b.nsnu - a.nsnu || a.store.seed - b.store.seed);
+  return rows.map((row, i) => ({ ...row, seed: i + 1 }));
 }
 
 /** Stable text for a card, for seeding the fight dice. */
 export function cardKey(card: StoreCard | undefined) {
   if (!card) return "none";
-  return `${card.nsnu}:${card.conv}:${card.demoRate}:${card.demoClose}:${card.arch}:${card.demoTicket}`;
+  const g = card.grades ? Object.entries(card.grades).sort().map(([k, v]) => `${k}=${v}`).join(",") : "";
+  return `${card.nsnu}:${card.conv}:${card.demoRate}:${card.demoClose}:${card.arch}:${card.demoTicket}${g ? `:${g}` : ""}`;
 }
 
 export function cardValue(card: StoreCard, stat: StatKey): number {
@@ -139,10 +157,12 @@ export function recordOf(data: PitData, storeId: string): { w: number; l: number
   return { w, l };
 }
 
+/** Tie-break weight: clicked colors first, then NSNU dollars. */
 export function nsnuOf(data: PitData, storeId: string, week: number): number {
   const card = data.storeCards.find((c) => c.storeId === storeId && c.week === week);
   if (!card) return 0;
-  return card.nsnu;
+  // Clicked colors outrank a leftover projection number.
+  return weekQuality(gradesOf(card)) * 100000 + card.nsnu;
 }
 
 export function rankedStores(data: PitData) {
@@ -523,6 +543,11 @@ function snapshot(data: PitData, storeId: string): FighterSnap {
   const loadout = activeLoadout(bot, data.phase === "open" ? "locked" : data.phase);
   const locked = bot.locked ?? bot.draft;
   const printed = printedStats(bot, data.phase === "open" ? locked : loadout, weekQ);
+  // Full Tune-Up: every job and Spark done this week. A small, earned edge.
+  const tuned = Boolean(data.jobLog && tunedUp(data, storeId, data.week));
+  if (tuned) {
+    for (const k of ["power", "speed", "armor", "heat"] as const) printed.stats[k] = Math.min(99, printed.stats[k] + TUNE_UP_BONUS);
+  }
   const weapon = resolvePart(bot, "weapon", locked);
   const drive = resolvePart(bot, "drive", locked);
   const armor = resolvePart(bot, "armor", locked);
@@ -550,6 +575,7 @@ function snapshot(data: PitData, storeId: string): FighterSnap {
     style: bot.style,
     brainTier: resolvePart(bot, "brain", locked).part?.tier ?? "stock",
     brainName: resolvePart(bot, "brain", locked).part?.name ?? "Logic Board",
+    tuned,
   };
 }
 
@@ -1292,6 +1318,12 @@ function houseWorld(): PitData {
     log: [],
     tutorialSeen: true,
     intel: [],
+    jobLog: [],
+    sparkLog: [],
+    shouts: [],
+    picks: [],
+    trainingOpenAll: false,
+    kickoff: { grades: {}, paid: {}, appliedAt: null },
   };
 }
 

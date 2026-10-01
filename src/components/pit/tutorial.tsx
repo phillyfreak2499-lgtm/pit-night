@@ -20,7 +20,7 @@ const STEPS = [
   {
     kicker: "Monday morning",
     title: "Hit Play. Five fights and a bye.",
-    body: "Monday morning the desk enters last week's numbers and runs the whole card live. Eleven stores means one bye, and the bye counts as a win. The main event is last. Week 1 that is Plano against Waxahachie. After four fight days the best record takes the trophy. If that record is tied, those stores fight for it.",
+    body: "Sunday the desk clicks in last week's colors. Monday morning it runs the whole card live. Eleven stores means one bye, and the bye counts as a win. The main event is last. Week 1 is seeded on Period 11, and Period 11 pays the opening coins. After four fight days the best record takes the trophy. If that record is tied, those stores fight for it.",
   },
   {
     kicker: "Upgrades",

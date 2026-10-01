@@ -43,6 +43,8 @@ export type BotState = {
   spotlight: boolean;
   /** 0..1 flame from the utility bay. */
   flame: number;
+  /** Winner on the decision beat. Fires the Bolt Locker victory effect. */
+  celebrate?: boolean;
 };
 
 export type Drive = {
@@ -611,6 +613,7 @@ export function fightDrive(result: FightResult, beat: Beat, local: number, time:
     lose.dead = true;
     lose.rev = 0;
   } else if (result.method !== "scrimmage") {
+    win.celebrate = local > 0.2;
     // Victory lap: a spin in place and a rev.
     const t = clamp((local - 0.15) / 0.6, 0, 1);
     win.heading = win.heading + ease(t) * Math.PI * 4;
@@ -729,6 +732,7 @@ function meleeDrive(result: FightResult, beat: Beat, local: number, time: number
     const winner = result.winnerIds[0];
     states.forEach((s) => {
       if (s.bot.id === winner) {
+        s.celebrate = local > 0.25;
         s.spot = mix(s.spot, center, ease(local * 2));
         s.heading += ease(clamp((local - 0.3) / 0.6, 0, 1)) * Math.PI * 4;
         s.rev = 1;

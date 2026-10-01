@@ -185,8 +185,8 @@ export function Broadcast({
         <div className="relative min-w-0 bg-deep">
           <canvas ref={canvasRef} className="aspect-video w-full bg-deep" />
           <div className="pointer-events-none absolute inset-x-0 top-0 grid grid-cols-2 gap-3 p-2 pb-6 md:p-3 md:pb-8" style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.78), rgba(0,0,0,0))" }}>
-            {left ? <Health name={left.botName} store={left.storeName} hp={hp[left.id] ?? 100} paint={left.paint} align="left" /> : null}
-            {right ? <Health name={right.botName} store={right.storeName} hp={hp[right.id] ?? 100} paint={right.paint} align="right" /> : null}
+            {left ? <Health name={left.botName} store={left.storeName} hp={hp[left.id] ?? 100} paint={left.paint} align="left" tuned={left.tuned} /> : null}
+            {right ? <Health name={right.botName} store={right.storeName} hp={hp[right.id] ?? 100} paint={right.paint} align="right" tuned={right.tuned} /> : null}
           </div>
           <p className="absolute inset-x-0 bottom-0 bg-deep/80 px-3 py-1.5 text-xs md:py-3 md:text-base">{caption}</p>
         </div>
@@ -244,17 +244,22 @@ function Health({
   hp,
   paint,
   align,
+  tuned,
 }: {
   name: string;
   store: string;
   hp: number;
   paint: string;
   align: "left" | "right";
+  tuned?: boolean;
 }) {
   return (
     <div className={align === "right" ? "text-right" : ""}>
       <p className="truncate font-display text-sm leading-none md:text-2xl">{name}</p>
-      <p className="truncate text-[10px] tracking-widest text-muted uppercase md:text-xs">{store}</p>
+      <p className="truncate text-[10px] tracking-widest text-muted uppercase md:text-xs">
+        {store}
+        {tuned ? <span className="ml-1 text-amber">· Tuned +4</span> : null}
+      </p>
       <div className={`mt-1 h-1.5 w-full max-w-xs bg-line md:h-2 ${align === "right" ? "ml-auto" : ""}`}>
         <div className="h-full transition-[width] duration-200" style={{ width: `${hp}%`, background: PAINT[paint] ?? "#f0a202" }} />
       </div>

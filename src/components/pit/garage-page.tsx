@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { CLASS_META, DECALS, EYES, FINISHES, PAINT, partById, partsFor, SLOT_LABEL, styleOf, TRIM } from "@/lib/pit/catalog";
+import { CLASS_META, DECALS, EYES, FINISHES, LOCKER_PAINTS, PAINT, partById, partsFor, SLOT_LABEL, styleOf, TRIM } from "@/lib/pit/catalog";
 import {
   buyCheck,
   canSeeLoadout,
@@ -384,7 +384,7 @@ function CardForm({
       <div className="mt-4">
         <ScoreInputs card={card} disabled={frozen} onChange={onChange} />
       </div>
-      {card.projected ? <p className="mt-3 text-sm text-amber">House projection. The desk puts the official numbers in Monday morning before the fights.</p> : null}
+      {card.projected ? <p className="mt-3 text-sm text-amber">House projection. The desk clicks in the official colors Sunday, before Monday's fights.</p> : null}
       <p className="mt-2 text-xs text-muted" data-testid={`card-${storeId}`}>
         NSNU → chassis · Conv → armor · Demo Rate → drive · Demo Close → weapon · Arch Supports → utility · Demo Ticket → brain.
       </p>
@@ -507,7 +507,7 @@ function DecoratePanel({ storeId }: { storeId: string }) {
   const look = useBotLook(storeId);
   const pick = <T,>(list: readonly T[]) => list[Math.floor(Math.random() * list.length)]!;
   const surprise = () => {
-    setPaint(storeId, pick(Object.keys(PAINT)));
+    setPaint(storeId, pick(Object.keys(PAINT).filter((key) => !LOCKER_PAINTS[key] || (store.unlocks ?? []).includes(LOCKER_PAINTS[key]!))));
     setLook(storeId, pick(LOOKS).id);
     setStyle(storeId, {
       finish: pick(FINISHES).id,
@@ -539,9 +539,11 @@ function DecoratePanel({ storeId }: { storeId: string }) {
         </div>
         <div className="flex flex-col gap-4">
           <Group label="Paint">
-            {Object.keys(PAINT).map((key) => (
-              <Swatch key={key} color={paintHex(key)} active={store.paint === key} label={`${key} paint`} onClick={() => setPaint(storeId, key)} />
-            ))}
+            {Object.keys(PAINT)
+              .filter((key) => !LOCKER_PAINTS[key] || (store.unlocks ?? []).includes(LOCKER_PAINTS[key]!))
+              .map((key) => (
+                <Swatch key={key} color={paintHex(key)} active={store.paint === key} label={`${key} paint`} onClick={() => setPaint(storeId, key)} />
+              ))}
           </Group>
           <Group label="Finish">
             {FINISHES.map((row) => (

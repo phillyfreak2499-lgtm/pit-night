@@ -50,7 +50,14 @@ export const PAINT: Record<string, string> = {
   magenta: "#cf4f93",
   cherry: "#c0283f",
   graphite: "#6b6f78",
+  neon: "#39ff6a",
+  candy: "#e3123f",
+  ice: "#bfe8ff",
+  royal: "#6a2bd9",
 };
+
+/** Paints only the Bolt Locker sells. Key is the paint, value is the locker item. */
+export const LOCKER_PAINTS: Record<string, string> = { neon: "paint-neon", candy: "paint-candy", ice: "paint-ice", royal: "paint-royal" };
 
 export const FINISHES: { id: BotFinish; label: string; note: string }[] = [
   { id: "factory", label: "Factory", note: "Clean gloss." },

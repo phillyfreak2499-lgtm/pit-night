@@ -24,6 +24,9 @@ export type BotStyle = {
   /** Key into EYES. The visor light. */
   eye: string;
   flag: boolean;
+  /** Bolt Locker unlocks. Shown on fight day. */
+  walkout?: string;
+  victory?: string;
 };
 
 export type StatBlock = {
@@ -42,6 +45,9 @@ export type Store = {
   paint: string;
   garage: GarageLook;
   seed: number;
+  /** Bolt Locker items this bay owns. */
+  unlocks?: string[];
+  boltsSpent?: number;
 };
 
 export type Crew = {
@@ -49,6 +55,8 @@ export type Crew = {
   storeId: string;
   name: string;
   role: "captain" | "specialist";
+  /** Weeks the captain marked this person off. They do not count against the Full Tune-Up. */
+  offWeeks?: number[];
 };
 
 export type Loadout = {
@@ -105,6 +113,8 @@ export type StoreCard = {
   /** Dollars. */
   demoTicket: number;
   projected: boolean;
+  /** Colors the desk clicked in. Beat the typed number for that metric. */
+  grades?: Partial<Record<StatKey, Grade>>;
 };
 
 export type Exchange = {
@@ -141,6 +151,8 @@ export type FighterSnap = {
   /** Brain tier, for the sensor dome. */
   brainTier?: Tier;
   brainName?: string;
+  /** Full Tune-Up this week: every job and Spark done. */
+  tuned?: boolean;
 };
 
 export type FightResult = {
@@ -261,4 +273,67 @@ export type PitData = {
   log: string[];
   tutorialSeen: boolean;
   intel: Intel[];
+  /** Pit Week. */
+  jobLog: JobEntry[];
+  sparkLog: SparkEntry[];
+  shouts: Shout[];
+  picks: Pick[];
+  /** Desk switch: open every training day now, ignoring dates. */
+  trainingOpenAll: boolean;
+  /** Week 1 kickoff: Period 11 colors pay the first coins and set the seeds. */
+  kickoff: Kickoff;
+};
+
+export type Kickoff = {
+  grades: Record<string, Partial<Record<StatKey, Grade>>>;
+  /** Coins already paid per store, so a correction pays only the difference. */
+  paid: Record<string, Partial<Record<KeyName, number>>>;
+  appliedAt: number | null;
+};
+
+export type JobEntry = {
+  /** `${week}:${jobId}:${crewId}` */
+  id: string;
+  week: number;
+  jobId: string;
+  storeId: string;
+  crewId: string;
+  crewName: string;
+  note: string;
+  status: "pending" | "approved";
+  at: number;
+};
+
+export type SparkEntry = {
+  /** `${week}:${day}:${crewId}` */
+  id: string;
+  week: number;
+  day: string;
+  storeId: string;
+  crewId: string;
+  correct: number;
+  total: number;
+  at: number;
+};
+
+export type Shout = {
+  id: string;
+  week: number;
+  storeId: string;
+  fromCrewId: string;
+  fromName: string;
+  to: string;
+  text: string;
+  at: number;
+};
+
+export type Pick = {
+  /** `${boutId}:${crewId}` */
+  id: string;
+  week: number;
+  boutId: string;
+  storeId: string;
+  crewId: string;
+  pick: string;
+  at: number;
 };

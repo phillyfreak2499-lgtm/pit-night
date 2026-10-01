@@ -1,7 +1,8 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Newspaper, Play, Radio, ScrollText, Swords, Trophy, Tv, Volume2, VolumeX, Warehouse, Wrench } from "lucide-react";
+import { ClipboardCheck, Newspaper, Play, Radio, ScrollText, Swords, Trophy, Tv, Volume2, VolumeX, Warehouse, Wrench } from "lucide-react";
 import { useEffect, useState } from "react";
 import { applyHulen, usePit } from "@/lib/pit/store";
+import { startSync, useSyncStatus } from "@/lib/pit/sync";
 import { setSoundMuted, soundMuted, subscribeSound } from "@/lib/pit/sound";
 import { formatRemain, nextLock, PERIOD_OPENS, TextInput, useNow } from "./bits";
 import { Tutorial } from "./tutorial";
@@ -9,6 +10,7 @@ import { Tutorial } from "./tutorial";
 const NAV = [
   { to: "/", label: "Titantron", icon: Tv },
   { to: "/map", label: "Pit Map", icon: Warehouse },
+  { to: "/week", label: "Pit Week", icon: ClipboardCheck },
   { to: "/broadcast", label: "Fight Day", icon: Swords },
   { to: "/preview", label: "Preview", icon: Play },
   { to: "/damage", label: "Damage", icon: Wrench },
@@ -22,6 +24,11 @@ export function PitShell({ children }: { children: React.ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [ready, setReady] = useState(false);
   const [passOpen, setPassOpen] = useState(false);
+  useEffect(() => {
+    const open = () => setPassOpen(true);
+    window.addEventListener("pit:open-clipboard", open);
+    return () => window.removeEventListener("pit:open-clipboard", open);
+  }, []);
   const [guide, setGuide] = useState(false);
   const tutorialSeen = usePit((s) => s.tutorialSeen);
   const dismissTutorial = usePit((s) => s.dismissTutorial);
@@ -34,6 +41,7 @@ export function PitShell({ children }: { children: React.ReactNode }) {
       const data = usePit.getState();
       if (data.stores.some((store) => store.id === "bryant")) usePit.setState(applyHulen(data));
       setReady(true);
+      startSync();
     });
     return () => {
       live = false;
@@ -63,6 +71,7 @@ export function PitShell({ children }: { children: React.ReactNode }) {
               <ClockLine />
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              <SyncDot />
               <button
                 type="button"
                 data-testid="mute-sound"
@@ -102,7 +111,7 @@ export function PitShell({ children }: { children: React.ReactNode }) {
             <Boot />
           )}
           <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-line bg-deep md:hidden">
-            {NAV.filter((item) => ["/", "/map", "/broadcast", "/gazette", "/desk"].includes(item.to)).map((item) => (
+            {NAV.filter((item) => ["/", "/map", "/week", "/broadcast", "/desk"].includes(item.to)).map((item) => (
               <NavLink key={item.to} to={item.to} label={item.label} icon={item.icon} compact />
             ))}
           </nav>
@@ -194,6 +203,36 @@ function ClockLine() {
       Week {week} · {phaseLabel(phase)}
       {phase === "open" ? (beforeOpen ? ` · Opens Oct 25 ${remain}` : ` · Saturday lock ${remain}`) : ""}
     </p>
+  );
+}
+
+function SyncDot() {
+  const sync = useSyncStatus();
+  const shared = sync.mode === "live" || sync.mode === "preview";
+  const bad = sync.state === "error" || sync.state === "mismatch";
+  const label =
+    sync.mode === "starting"
+      ? "Connecting"
+      : !shared
+        ? "This device only"
+        : bad
+          ? "Not syncing"
+          : sync.state === "saving"
+            ? "Saving"
+            : "Live";
+  const color = !shared || bad ? "bg-bad" : sync.state === "saving" || sync.mode === "starting" ? "bg-amber" : "bg-ok";
+  return (
+    <Link
+      to="/desk"
+      hash="sync"
+      data-testid="sync-dot"
+      title={sync.error || (shared ? "Every device sees the same season." : "Changes stay on this device until the league database is connected.")}
+      className="inline-flex min-h-11 items-center gap-2 border border-line px-2.5 text-xs text-muted"
+    >
+      <span className={`size-2 rounded-full ${color}`} aria-hidden />
+      <span className="hidden lg:inline">{label}</span>
+      <span className="sr-only lg:hidden">{label}</span>
+    </Link>
   );
 }
 

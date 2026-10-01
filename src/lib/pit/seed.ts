@@ -373,7 +373,7 @@ export function makeData(): PitData {
         boutId: null,
         kicker: "Shakedown",
         headline: "The bays are numbered. The trophy is not.",
-        body: "Period 12 opens October 25. Eleven stores. The first card runs Monday morning, November 2: five fights and a bye, on the official week 1 numbers. Southlake draws the first bye, and a bye counts as a win. The main event is Plano against Waxahachie.",
+        body: "Period 12 opens October 25. Eleven stores. The first card runs Monday morning, November 2: five fights and a bye, seeded on Period 11. The 1 seed draws the first bye, and a bye counts as a win.",
       },
     ],
     quotes: {},
@@ -385,6 +385,12 @@ export function makeData(): PitData {
     log: ["Period 12 opened. Eleven bays. Oct 25 through Nov 21. Week 1 is seeded. A bye counts as a win."],
     tutorialSeen: false,
     intel: [],
+    jobLog: [],
+    sparkLog: [],
+    shouts: [],
+    picks: [],
+    trainingOpenAll: false,
+    kickoff: { grades: {}, paid: {}, appliedAt: null },
   };
 }
 

@@ -2,6 +2,11 @@ import { useState } from "react";
 import { paintHex, usePit } from "@/lib/pit/store";
 import { Btn, Field, SectionLabel, TextInput } from "./bits";
 import { ScoreInputs } from "./score-card";
+import { GradeGrid } from "./grade-grid";
+import { buildCard, gradeMetric, cardValue, coinMath, gradesOf, kickoffRank } from "@/lib/pit/engine";
+import { METRICS } from "@/lib/pit/catalog";
+import type { Grade, StatKey } from "@/lib/pit/types";
+import { sendThisSeason, takeLeagueSeason, useSyncStatus } from "@/lib/pit/sync";
 
 export function DeskPage() {
   const data = usePit();
@@ -107,6 +112,9 @@ function DeskLive() {
           Advance week
         </Btn>
       </div>
+      <KickoffPanel />
+      <SyncPanel />
+      <TrainingSwitch />
       <HousePin />
       <section className="border border-line p-4">
         <SectionLabel>Theme</SectionLabel>
@@ -138,28 +146,7 @@ function DeskLive() {
           </Btn>
         </div>
       </section>
-      <section className="border border-amber/60 bg-surface p-4">
-        <SectionLabel>Official numbers · Monday morning</SectionLabel>
-        <p className="mt-2 text-sm text-muted">
-          Lock the bots, then type each store&apos;s official week here and run the card. Colors update as you type. Each grade pays that part&apos;s coin jar when you advance the week.
-        </p>
-        <div className="mt-4 flex flex-col gap-4">
-          {data.stores.map((store) => {
-            const card = data.storeCards.find((c) => c.storeId === store.id && c.week === data.week);
-            if (!card) return null;
-            return (
-              <div key={store.id}>
-                <p className="mb-1 flex items-center gap-2 font-display text-lg leading-none">
-                  <span className="h-3 w-3" style={{ background: paintHex(store.paint) }} />
-                  {store.name}
-                  {card.projected ? <span className="text-xs tracking-widest text-warn uppercase">projection</span> : <span className="text-xs tracking-widest text-ok uppercase">entered</span>}
-                </p>
-                <ScoreInputs compact card={card} disabled={data.phase === "fought" || data.phase === "inspected" || data.phase === "complete"} onChange={(patch) => updateCard(store.id, patch)} />
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      <SundayScores />
       <section>
         <SectionLabel>Eleven stores</SectionLabel>
         <div className="mt-3 flex flex-col gap-3">
@@ -199,7 +186,13 @@ function DeskLive() {
           ))}
         </ul>
         <div className="mt-4">
-          <Btn tone="ghost" onClick={resetSeason}>
+          <Btn
+            tone="ghost"
+            onClick={() => {
+              resetSeason();
+              void sendThisSeason().catch(() => undefined);
+            }}
+          >
             Reset season
           </Btn>
         </div>
@@ -228,6 +221,224 @@ function HousePin() {
           Change PIN
         </Btn>
       </form>
+    </section>
+  );
+}
+
+function SundayScores() {
+  const data = usePit();
+  const setGrade = usePit((s) => s.setGrade);
+  const updateCard = usePit((s) => s.updateCard);
+  const [typing, setTyping] = useState<string | null>(null);
+  const frozen = data.phase !== "open" && data.phase !== "locked";
+  const cards = data.stores.map((store) => ({ store, card: data.storeCards.find((c) => c.storeId === store.id && c.week === data.week) }));
+  const doneCount = cards.filter(({ card }) => card && METRICS.every((m) => card.grades?.[m.stat])).length;
+  return (
+    <section id="sunday" className="border border-amber/60 bg-surface p-4">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <SectionLabel>Sunday scorecard · week {data.week}</SectionLabel>
+          <p className="mt-2 max-w-3xl text-sm text-muted">
+            Click each store&apos;s color for all six numbers. Green pays 3 coins, blue 2, orange 1, red 0, into that part&apos;s jar when you advance the week. Click a color again to clear it. A dashed box is the house projection until you click.
+          </p>
+        </div>
+        <p className="font-display text-2xl leading-none" data-testid="sunday-progress">
+          {doneCount}<span className="text-muted">/{data.stores.length} done</span>
+        </p>
+      </div>
+      {frozen ? <p className="mt-3 text-sm text-warn">This week&apos;s card already ran. Colors are frozen until you advance.</p> : null}
+      <div className="mt-4">
+        <GradeGrid
+          testId="sunday-grid"
+          disabled={frozen}
+          rows={cards.flatMap(({ store, card }) => {
+            if (!card) return [];
+            const fallback = Object.fromEntries(METRICS.map((m) => [m.stat, gradeMetric(m.stat, cardValue(card, m.stat))])) as Record<StatKey, Grade>;
+            return [{ id: store.id, name: store.name, paint: store.paint, grades: card.grades ?? {}, fallback, coins: coinMath(gradesOf(card)).total }];
+          })}
+          onPick={(storeId, stat, grade) => setGrade(storeId, stat, grade)}
+          aside={(row) => (
+            <button type="button" className="min-h-9 text-xs text-muted underline-offset-2 hover:underline" onClick={() => setTyping(typing === row.id ? null : row.id)}>
+              {typing === row.id ? "Hide numbers" : "Type numbers"}
+            </button>
+          )}
+        />
+        {typing
+          ? (() => {
+              const card = data.storeCards.find((c) => c.storeId === typing && c.week === data.week);
+              const store = data.stores.find((s) => s.id === typing);
+              if (!card || !store) return null;
+              return (
+                <div className="mt-3 border border-line p-3">
+                  <p className="mb-2 text-sm text-muted">Exact numbers for {store.name}. Typing a number replaces the clicked color for that metric.</p>
+                  <ScoreInputs compact card={card} disabled={frozen} onChange={(patch) => updateCard(store.id, patch)} />
+                </div>
+              );
+            })()
+          : null}
+      </div>
+    </section>
+  );
+}
+
+function KickoffPanel() {
+  const data = usePit();
+  const setKickoffGrade = usePit((s) => s.setKickoffGrade);
+  const applyKickoff = usePit((s) => s.applyKickoff);
+  const open = data.week === 1 && !data.bouts.some((b) => b.week === 1 && b.result);
+  if (!open && !data.kickoff.appliedAt) return null;
+  const ranked = kickoffRank(data);
+  const filled = ranked.filter((r) => r.filled === METRICS.length).length;
+  const preview = buildCard({ ...data, week: 1, stores: data.stores.map((s) => ({ ...s, seed: ranked.find((r) => r.store.id === s.id)?.seed ?? s.seed })) });
+  const name = (id: string | undefined) => data.stores.find((s) => s.id === id)?.name ?? "";
+  const ready = filled === data.stores.length;
+  return (
+    <section id="kickoff" className="border border-spark/60 bg-surface p-4">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <SectionLabel>Week 1 kickoff · Period 11</SectionLabel>
+          <p className="mt-2 max-w-3xl text-sm text-muted">
+            Click each store&apos;s Period 11 colors. They pay the first coins, so every bay has something to spend in week 1, and they set the week 1 seeds. The top seed takes the bye; 2 fights 11, 3 fights 10, and so on.
+            {data.kickoff.appliedAt ? " Already paid. Fix a color and press it again; it only pays the difference." : ""}
+          </p>
+        </div>
+        <p className="font-display text-2xl leading-none">
+          {filled}<span className="text-muted">/{data.stores.length} done</span>
+        </p>
+      </div>
+      {open ? (
+        <div className="mt-4">
+          <GradeGrid
+            testId="kickoff-grid"
+            rows={data.stores.map((store) => ({ id: store.id, name: store.name, paint: store.paint, grades: data.kickoff.grades[store.id] ?? {} }))}
+            onPick={(storeId, stat, grade) => setKickoffGrade(storeId, stat, grade)}
+          />
+        </div>
+      ) : null}
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <div>
+          <p className="text-xs tracking-widest text-muted uppercase">Seeds {ready ? "" : "(so far)"}</p>
+          <ol className="mt-2 grid gap-1 text-sm sm:grid-cols-2">
+            {ranked.map((r) => (
+              <li key={r.store.id} className="flex items-center justify-between gap-2 border border-line px-2 py-1">
+                <span>
+                  <span className="mr-2 font-display text-amber">{r.seed}</span>
+                  {r.store.name}
+                </span>
+                <span className="text-muted">{r.coins} coins</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+        <div>
+          <p className="text-xs tracking-widest text-muted uppercase">Week 1 card</p>
+          <ul className="mt-2 flex flex-col gap-1 text-sm">
+            {preview.map((b) => (
+              <li key={b.id} className="border border-line px-2 py-1">
+                <span className="mr-2 text-xs tracking-widest text-muted uppercase">{b.kind === "bye" ? "Bye" : b.title}</span>
+                {b.kind === "bye" ? name(b.teamA[0]) : `${name(b.teamA[0])} vs ${name(b.teamB[0])}`}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      {open ? (
+        <div className="mt-4">
+          <Btn testId="apply-kickoff" tone="spark" disabled={!ready} onClick={applyKickoff}>
+            {data.kickoff.appliedAt ? "Update coins and seeds" : "Pay the coins and set the seeds"}
+          </Btn>
+          {!ready ? <p className="mt-2 text-sm text-muted">Every store needs all six colors first.</p> : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function SyncPanel() {
+  const sync = useSyncStatus();
+  const [busy, setBusy] = useState("");
+  const [note, setNote] = useState("");
+  const [armed, setArmed] = useState(false);
+  const shared = sync.mode === "live" || sync.mode === "preview";
+  const run = async (what: string, fn: () => Promise<void>) => {
+    setBusy(what);
+    setNote("");
+    try {
+      await fn();
+      setNote(what === "send" ? "Every device now has this season." : "This device now matches the league.");
+    } catch (err) {
+      setNote(err instanceof Error ? err.message : "That did not go through.");
+    } finally {
+      setBusy("");
+    }
+  };
+  return (
+    <section id="sync" className="border border-line p-4">
+      <SectionLabel>One season, every device</SectionLabel>
+      {shared ? (
+        <p className="mt-2 text-sm text-muted">
+          {sync.mode === "live" ? "Live." : "Preview database (resets when the preview restarts)."} Every phone and laptop pulls the same season every few
+          seconds. Two bays saving at once both land.
+          {sync.lastSync ? ` Last sync ${new Date(sync.lastSync).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" })}.` : ""}
+          {sync.error ? <span className="block text-bad">{sync.error}</span> : null}
+        </p>
+      ) : (
+        <div className="mt-2 text-sm text-muted">
+          <p className="text-warn">
+            {sync.mode === "starting" ? "Checking for the league database…" : "This device only. Jobs, Sparks, picks and builds stay on the phone that made them."}
+          </p>
+          <p className="mt-2">To share one season with every store, connect a database in Vercel once:</p>
+          <ol className="mt-1 list-decimal pl-5">
+            <li>Vercel → your pit-night project → Storage → Create Database → Neon (free plan is plenty).</li>
+            <li>Connect it to the project for Production. Vercel adds DATABASE_URL by itself.</li>
+            <li>Redeploy. The dot at the top turns green.</li>
+            <li>Open the Desk on the device with the real season first and press Send this season to everyone.</li>
+          </ol>
+        </div>
+      )}
+      {shared ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Btn
+            tone={armed ? "spark" : "line"}
+            disabled={Boolean(busy)}
+            onClick={() => {
+              if (!armed) {
+                setArmed(true);
+                setNote("This replaces the league copy for every store. Press again to send.");
+                return;
+              }
+              setArmed(false);
+              void run("send", sendThisSeason);
+            }}
+          >
+            {busy === "send" ? "Sending…" : armed ? "Yes, replace the league copy" : "Send this season to everyone"}
+          </Btn>
+          <Btn tone="ghost" disabled={Boolean(busy)} onClick={() => void run("take", takeLeagueSeason)}>
+            {busy === "take" ? "Pulling…" : "Take the league copy"}
+          </Btn>
+        </div>
+      ) : null}
+      {note ? <p className="mt-2 text-sm text-amber">{note}</p> : null}
+    </section>
+  );
+}
+
+function TrainingSwitch() {
+  const on = usePit((s) => s.trainingOpenAll);
+  const setTrainingOpenAll = usePit((s) => s.setTrainingOpenAll);
+  return (
+    <section className="flex flex-wrap items-center justify-between gap-3 border border-line p-4">
+      <div className="max-w-xl">
+        <SectionLabel>Pit Week days</SectionLabel>
+        <p className="mt-2 text-sm text-muted">
+          {on
+            ? "Practice mode: every training day is open right now, whatever the date."
+            : "Training days open on their dates, Tuesday through Saturday of each week. Turn this on to preview or start early."}
+        </p>
+      </div>
+      <Btn tone={on ? "spark" : "line"} onClick={() => setTrainingOpenAll(!on)}>
+        {on ? "Close to dates" : "Open every day"}
+      </Btn>
     </section>
   );
 }

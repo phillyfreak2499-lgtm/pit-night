@@ -3,6 +3,8 @@ import { CLASS_META } from "@/lib/pit/catalog";
 import { useMemo } from "react";
 import { botFor, cardFor, houseTape, rankedStores, recordOf } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
+import { programWeek } from "@/lib/pit/training";
+import { tunedUp } from "@/lib/pit/week";
 import { ArenaHero } from "./arena-hero";
 import { BotPortrait, useBotLook } from "./bot-portrait";
 import { BoutWatch, ClassTag, formatRemain, GradeRow, nextLock, Panel, PERIOD_OPENS, ResultLine, SectionLabel, useNow } from "./bits";
@@ -123,6 +125,8 @@ export function Titantron() {
         </Panel>
       </section>
 
+      <PitWeekCallout />
+
       <section>
         <div className="mb-3 flex items-end justify-between">
           <h2 className="font-display text-3xl leading-none">Standings</h2>
@@ -214,5 +218,29 @@ function StandingBot({ storeId }: { storeId: string }) {
     <span className="hidden h-16 w-32 sm:block">
       <BotPortrait look={look} facing={-1} floor={false} zoom={0.9} className="h-full w-full" />
     </span>
+  );
+}
+
+function PitWeekCallout() {
+  const data = usePit();
+  const plan = programWeek(Math.min(4, Math.max(1, data.week)));
+  if (!plan) return null;
+  const tuned = data.stores.filter((s) => tunedUp(data, s.id, plan.week)).length;
+  return (
+    <Link to="/week" className="lift group grid gap-3 border border-amber/60 bg-surface p-4 md:grid-cols-[1fr_auto] md:items-center">
+      <span>
+        <span className="block font-display text-xs tracking-[0.22em] text-amber uppercase">Pit Week · Tuesday to Saturday</span>
+        <span className="mt-1 block font-display text-3xl leading-none">
+          Week {plan.week}: {plan.theme}
+        </span>
+        <span className="mt-1 block text-sm text-muted">
+          Two jobs and a Daily Spark every day. Finish the whole week as a crew and your bot fights Monday with a Full Tune-Up: +4 to every stat.
+        </span>
+      </span>
+      <span className="flex items-center gap-3 font-display">
+        <span className="text-sm text-muted">{tuned} of {data.stores.length} bays tuned</span>
+        <span className="bg-amber px-4 py-2 text-sm tracking-wide text-deep uppercase">Open Pit Week</span>
+      </span>
+    </Link>
   );
 }

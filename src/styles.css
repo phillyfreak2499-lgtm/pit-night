@@ -385,3 +385,40 @@
     0 0 10px color-mix(in oklab, var(--color-amber) 45%, transparent);
   border: 1px solid #7a4c05;
 }
+
+/* ---------- Pit Week ---------- */
+
+.bolt {
+  background: radial-gradient(circle at 35% 30%, #e8eef5, #9fb3c8 55%, #4a5866);
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+}
+
+.tuned-glow {
+  box-shadow:
+    0 0 0 1px var(--color-amber),
+    0 0 28px color-mix(in oklab, var(--color-amber) 45%, transparent);
+  animation: tuned-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes tuned-pulse {
+  50% {
+    box-shadow:
+      0 0 0 1px var(--color-amber),
+      0 0 40px color-mix(in oklab, var(--color-amber) 65%, transparent);
+  }
+}
+
+.spark-btn {
+  background: linear-gradient(90deg, color-mix(in oklab, var(--color-amber) 12%, transparent), transparent);
+  transition: background 0.2s ease;
+}
+
+.spark-btn:hover {
+  background: linear-gradient(90deg, color-mix(in oklab, var(--color-amber) 24%, transparent), transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tuned-glow {
+    animation: none;
+  }
+}
