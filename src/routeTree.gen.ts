@@ -14,6 +14,7 @@ import { Route as BroadcastRouteImport } from './routes/broadcast'
 import { Route as CardRouteImport } from './routes/card'
 import { Route as DamageRouteImport } from './routes/damage'
 import { Route as DeskRouteImport } from './routes/desk'
+import { Route as FaqRouteImport } from './routes/faq'
 import { Route as GazetteRouteImport } from './routes/gazette'
 import { Route as HonorsRouteImport } from './routes/honors'
 import { Route as MapRouteImport } from './routes/map'
@@ -50,6 +51,11 @@ const DamageRoute = DamageRouteImport.update({
 const DeskRoute = DeskRouteImport.update({
   id: '/desk',
   path: '/desk',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FaqRoute = FaqRouteImport.update({
+  id: '/faq',
+  path: '/faq',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GazetteRoute = GazetteRouteImport.update({
@@ -119,6 +125,7 @@ export interface FileRoutesByFullPath {
   '/card': typeof CardRoute
   '/damage': typeof DamageRoute
   '/desk': typeof DeskRoute
+  '/faq': typeof FaqRoute
   '/gazette': typeof GazetteRoute
   '/honors': typeof HonorsRoute
   '/map': typeof MapRoute
@@ -138,6 +145,7 @@ export interface FileRoutesByTo {
   '/card': typeof CardRoute
   '/damage': typeof DamageRoute
   '/desk': typeof DeskRoute
+  '/faq': typeof FaqRoute
   '/gazette': typeof GazetteRoute
   '/honors': typeof HonorsRoute
   '/map': typeof MapRoute
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   '/card': typeof CardRoute
   '/damage': typeof DamageRoute
   '/desk': typeof DeskRoute
+  '/faq': typeof FaqRoute
   '/gazette': typeof GazetteRoute
   '/honors': typeof HonorsRoute
   '/map': typeof MapRoute
@@ -179,6 +188,7 @@ export interface FileRouteTypes {
     | '/card'
     | '/damage'
     | '/desk'
+    | '/faq'
     | '/gazette'
     | '/honors'
     | '/map'
@@ -198,6 +208,7 @@ export interface FileRouteTypes {
     | '/card'
     | '/damage'
     | '/desk'
+    | '/faq'
     | '/gazette'
     | '/honors'
     | '/map'
@@ -217,6 +228,7 @@ export interface FileRouteTypes {
     | '/card'
     | '/damage'
     | '/desk'
+    | '/faq'
     | '/gazette'
     | '/honors'
     | '/map'
@@ -237,6 +249,7 @@ export interface RootRouteChildren {
   CardRoute: typeof CardRoute
   DamageRoute: typeof DamageRoute
   DeskRoute: typeof DeskRoute
+  FaqRoute: typeof FaqRoute
   GazetteRoute: typeof GazetteRoute
   HonorsRoute: typeof HonorsRoute
   MapRoute: typeof MapRoute
@@ -286,6 +299,13 @@ declare module '@tanstack/react-router' {
       path: '/desk'
       fullPath: '/desk'
       preLoaderRoute: typeof DeskRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/faq': {
+      id: '/faq'
+      path: '/faq'
+      fullPath: '/faq'
+      preLoaderRoute: typeof FaqRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/gazette': {
@@ -381,6 +401,7 @@ const rootRouteChildren: RootRouteChildren = {
   CardRoute: CardRoute,
   DamageRoute: DamageRoute,
   DeskRoute: DeskRoute,
+  FaqRoute: FaqRoute,
   GazetteRoute: GazetteRoute,
   HonorsRoute: HonorsRoute,
   MapRoute: MapRoute,

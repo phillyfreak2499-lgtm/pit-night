@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { SectionLabel } from "./bits";
 import { KeyLadder, UpgradeHowTo } from "./key-ladder";
 
@@ -9,6 +10,13 @@ export function RulesPage() {
         <h1 className="font-display text-5xl leading-none">The store is the bot</h1>
         <p className="mt-3 text-muted">
           The Waterman Battle Bot League is the Monday morning card for The Waterman Group. Period 12 runs October 25 through November 21. Eleven Good Feet stores. One bot each. Four fight days: November 2, 9, 16, and 23. The trophy hangs in a building. Pit crew get a name on the titantron. They do not take hardware home.
+        </p>
+        <p className="mt-2 text-sm">
+          New here? Start with the{" "}
+          <Link to="/faq" className="text-amber">
+            FAQ
+          </Link>
+          .
         </p>
       </div>
       <Rule title="The clock">

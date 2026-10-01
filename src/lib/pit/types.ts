@@ -275,7 +275,8 @@ export type PitData = {
   craft: { week: number; storeId: string; score: number }[];
   session: Session;
   log: string[];
-  tutorialSeen: boolean;
+  /** Which tutorial this device has finished. Old saves hold `true` (the first one). */
+  tutorialSeen: boolean | number;
   intel: Intel[];
   /** Pit Week. */
   jobLog: JobEntry[];

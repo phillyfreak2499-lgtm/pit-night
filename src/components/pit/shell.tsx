@@ -1,7 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ClipboardCheck, Newspaper, Play, Radio, ScrollText, Swords, Trophy, Tv, Volume2, VolumeX, Warehouse, Wrench } from "lucide-react";
+import { ClipboardCheck, HelpCircle, Newspaper, Play, Radio, ScrollText, Swords, Trophy, Tv, Volume2, VolumeX, Warehouse, Wrench } from "lucide-react";
 import { useEffect, useState } from "react";
-import { applyHulen, usePit } from "@/lib/pit/store";
+import { TUTORIAL_REV, applyHulen, usePit } from "@/lib/pit/store";
 import { startSync, useSyncStatus } from "@/lib/pit/sync";
 import { setSoundMuted, soundMuted, subscribeSound } from "@/lib/pit/sound";
 import { formatRemain, nextLock, PERIOD_OPENS, TextInput, useNow } from "./bits";
@@ -18,6 +18,7 @@ const NAV = [
   { to: "/gazette", label: "Gazette", icon: Newspaper },
   { to: "/honors", label: "Honors", icon: Trophy },
   { to: "/rules", label: "Rules", icon: ScrollText },
+  { to: "/faq", label: "FAQ", icon: HelpCircle },
   { to: "/desk", label: "Desk", icon: Radio },
 ] as const;
 
@@ -123,7 +124,7 @@ export function PitShell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
       {passOpen ? <PassSheet onClose={() => setPassOpen(false)} /> : null}
-      {ready && (tutorialSeen !== true || guide) ? (
+      {ready && (tutorialSeen !== TUTORIAL_REV || guide) ? (
         <Tutorial
           onClose={() => {
             dismissTutorial();
@@ -310,6 +311,13 @@ function PassSheet({ onClose }: { onClose: () => void }) {
           {session.storeId ? ` · ${stores.find((st) => st.id === session.storeId)?.name ?? ""}` : ""}
           {session.crewId && session.role !== "commissioner" ? ` · ${crew.find((c) => c.id === session.crewId)?.name ?? ""}` : ""}. Pit crew suggest parts and do Pit Week jobs. Captains lock the bot. The desk runs Monday.
         </p>
+        <nav className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm md:hidden" aria-label="More pages">
+          {NAV.filter((item) => !["/", "/map", "/week", "/broadcast", "/desk"].includes(item.to)).map((item) => (
+            <Link key={item.to} to={item.to} onClick={onClose} className="inline-flex min-h-11 items-center text-amber">
+              {item.label}
+            </Link>
+          ))}
+        </nav>
         <label className="mt-4 block text-sm text-muted">
           Store
           <select

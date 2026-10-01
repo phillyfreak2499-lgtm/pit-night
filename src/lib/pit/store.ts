@@ -242,6 +242,9 @@ function fresh(): PitState {
   };
 }
 
+/** Bump when the tutorial changes so every device sees the new one once. */
+export const TUTORIAL_REV = 2;
+
 /** Everything the league shares. Session and tutorial stay on the device. */
 export const SHARED_KEYS = [
   "version", "seasonName", "tagline", "pin", "week", "phase", "stores", "crew", "bots", "weeks", "storeCards", "bouts",
@@ -1030,7 +1033,7 @@ export const usePit = create<PitState>()(
           flash: `${member.name} is off the clock.`,
         });
       },
-      dismissTutorial: () => set({ tutorialSeen: true }),
+      dismissTutorial: () => set({ tutorialSeen: TUTORIAL_REV }),
       showTutorial: () => set({ tutorialSeen: false }),
       callSpy: (storeId, targetId, family) => {
         const data = get();
