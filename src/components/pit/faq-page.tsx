@@ -52,7 +52,7 @@ const GROUPS: Group[] = [
       ),
       faq(
         "When does each day open?",
-        "At midnight Central on that day. Everything for the week closes at Saturday lock (store close). Jobs you sent before the lock can still be approved afterward.",
+        "At midnight Central on that day. Everything for the week closes at Saturday lock (store close). Jobs must be submitted before Saturday lock. Captains may approve already-submitted jobs after lock and before the Monday card runs. No new job or Spark can be submitted after lock.",
       ),
       faq(
         "What are Bolts?",
@@ -64,7 +64,7 @@ const GROUPS: Group[] = [
       ),
       faq(
         "Someone is on vacation. Do we lose the Tune-Up?",
-        "No. The captain can mark them Off this week on the Pit Week page. They won't count toward the Tune-Up that week.",
+        "No. Off is for specialists unavailable for the week. Set it before Tuesday at 12:00 AM Central, when eligibility freezes. After that, ask the Desk to record a legitimate absence; unfinished training is not an absence.",
       ),
       faq(
         "What is the Mystery Crate?",
@@ -155,7 +155,7 @@ const GROUPS: Group[] = [
     items: [
       faq(
         "How are the standings ranked?",
-        "By record first. Ties in the table are broken by NSNU. On Title Monday (Week 4), Bolts earned in Pit Week break ties first, then NSNU.",
+        "By record first. Ties in the table are broken by actual NSNU dollars recorded by the Desk. On Title Monday (the Week 4 fight card), Bolts earned in Pit Week break ties first, then NSNU.",
       ),
       faq(
         "What if stores tie for first?",

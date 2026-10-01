@@ -1,3 +1,4 @@
+import { BuildLockBanner } from "./build-lock-banner";
 import { useState } from "react";
 import { KEY_SOURCE, PARTS, SLOT_LABEL, tierWord } from "@/lib/pit/catalog";
 import { buyCheck, canSeeLoadout, shopOpen } from "@/lib/pit/engine";
@@ -26,6 +27,7 @@ export function ShopPage({ storeId }: { storeId: string }) {
 
   return (
     <div className="mx-auto max-w-6xl">
+      <BuildLockBanner storeId={storeId} />
       <SectionLabel>{store.name} wallet</SectionLabel>
       <h1 className="font-display text-5xl leading-none">Shop</h1>
       <p className="mt-3 max-w-2xl text-muted">

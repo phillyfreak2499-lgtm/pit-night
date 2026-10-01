@@ -1,3 +1,4 @@
+import { submitDailySpark } from "@/lib/pit/sync";
 import { Check, Clock, Flame, Lock, Package, Sparkles, Wrench } from "lucide-react";
 import { useMemo, useState } from "react";
 import { buildCard } from "@/lib/pit/engine";
@@ -295,12 +296,12 @@ function JobCard({ job, week }: { job: Job; week: number }) {
 
 function SparkCard({ week, day, questions, done }: { week: number; day: DayKey; questions: Spark[]; done?: { correct: number; total: number } }) {
   const { data, me } = useMe();
-  const submitSpark = usePit((s) => s.submitSpark);
+  const submitSpark = submitDailySpark;
   const streak = me ? sparkStreak(data, me.id) : null;
   const [playing, setPlaying] = useState(false);
   const [i, setI] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
-  const [score, setScore] = useState(0);
+  const [answers, setAnswers] = useState<number[]>([]);
 
   if (done) {
     return (
@@ -324,7 +325,7 @@ function SparkCard({ week, day, questions, done }: { week: number; day: DayKey; 
       <button
         type="button"
         className="spark-btn flex items-center gap-2 border border-amber/60 p-2 text-left text-sm"
-        onClick={() => (me ? setPlaying(true) : openClipboard())}
+        onClick={() => (me ? (setI(0), setPicked(null), setAnswers([]), setPlaying(true)) : openClipboard())}
       >
         <Sparkles size={16} className="text-amber" />
         <span className="font-display tracking-wide uppercase">Daily Spark</span>
@@ -352,7 +353,7 @@ function SparkCard({ week, day, questions, done }: { week: number; day: DayKey; 
               className={`min-h-11 border px-2 py-1 text-left ${show ? (right ? "border-ok bg-ok/15 text-ok" : k === picked ? "border-bad bg-bad/10 text-bad" : "border-line text-muted") : "border-line hover:border-amber"}`}
               onClick={() => {
                 setPicked(k);
-                if (k === q.answer) setScore((n) => n + 1);
+                setAnswers((a) => [...a, k]);
               }}
             >
               {c}
@@ -367,7 +368,7 @@ function SparkCard({ week, day, questions, done }: { week: number; day: DayKey; 
             className="mt-2 w-full"
             onClick={() => {
               if (last) {
-                submitSpark(week, day, score, questions.length);
+                submitSpark(week, day, answers);
                 setPlaying(false);
               } else {
                 setI((n) => n + 1);

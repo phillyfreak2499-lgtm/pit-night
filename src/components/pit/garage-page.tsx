@@ -1,3 +1,4 @@
+import { BuildLockBanner } from "./build-lock-banner";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { CLASS_META, DECALS, EYES, FINISHES, LOCKER_PAINTS, PAINT, partById, partsFor, SLOT_LABEL, styleOf, TRIM } from "@/lib/pit/catalog";
@@ -64,6 +65,7 @@ export function GaragePage({ storeId }: { storeId: string }) {
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-5" data-testid={`garage-${storeId}`}>
+      <BuildLockBanner storeId={storeId} />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <SectionLabel>{store.region} bay</SectionLabel>
@@ -177,7 +179,7 @@ export function GaragePage({ storeId }: { storeId: string }) {
                 </button>
               ))}
           </div>
-          {!shopOpen(data) ? <p className="mt-3 text-sm text-muted">Sport and up stay in the shop until after the first Monday fight.</p> : null}
+          {!shopOpen(data) ? <p className="mt-3 text-sm text-muted">The Desk applies Period 11 colors to open the first shop. Later weeks open after Monday&apos;s payout.</p> : null}
         </section>
       ) : null}
 

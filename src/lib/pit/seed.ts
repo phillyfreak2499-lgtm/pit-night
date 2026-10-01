@@ -32,20 +32,6 @@ type Row = {
   card: [number, number, number, number, number, number];
 };
 
-/** Four-digit bay codes. Not the store id. The desk can change them. */
-const PASSCODES: Record<string, string> = {
-  waco: "4821",
-  arlington: "1937",
-  rockwall: "6504",
-  southlake: "2746",
-  college: "8153",
-  hulen: "3068",
-  allen: "9412",
-  plano: "5280",
-  temple: "1675",
-  alliance: "7394",
-  waxahachie: "4029",
-};
 const ROWS: Row[] = [
   {
     id: "waco",
@@ -324,7 +310,6 @@ export function makeData(): PitData {
     name: row.name,
     region: row.region,
     captain: row.captain,
-    passcode: PASSCODES[row.id] ?? row.id,
     paint: row.paint,
     garage: row.garage,
     seed: row.seed,
@@ -357,7 +342,6 @@ export function makeData(): PitData {
     version: VERSION,
     seasonName: "Period 12",
     tagline: "Oct 25 – Nov 21, 2026. Eleven stores. One trophy.",
-    pin: "8472",
     week: 1,
     phase: "open",
     stores,

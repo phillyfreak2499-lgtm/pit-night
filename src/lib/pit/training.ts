@@ -49,7 +49,7 @@ export type TrainingWeek = {
 export const DAY_LABEL: Record<DayKey, string> = { tue: "Tuesday", wed: "Wednesday", thu: "Thursday", fri: "Friday", sat: "Saturday" };
 export const DAY_ORDER: DayKey[] = ["tue", "wed", "thu", "fri", "sat"];
 
-/** Coins are performance. Bolts are effort. Bolts never touch the fight except through the Full Tune-Up. */
+/** Coins are performance. Bolts are effort. Bolts buy looks only. Completing the Full Tune-Up earns the separate +4 fight bonus. */
 export const BOLTS = { job: 2, sparkCorrect: 1, pickCorrect: 2, crate: 5 } as const;
 
 /** Perfect Sparks in a row for the streak badge. */
