@@ -35,6 +35,21 @@ test("session migration strips exposed credentials without discarding the league
     await db.exec(migration);
     assert.equal((await db.query("select rev from pit_season")).rows[0].rev, 9);
     assert.equal((await db.query("select * from pit_sessions")).rows.length, 0);
+    const vault = readFileSync(
+      new URL("../migrations/0004_pit_code_vault.sql", import.meta.url),
+      "utf8",
+    );
+    await db.exec(vault);
+    await db.exec(vault);
+    assert.equal(
+      (
+        await db.query(
+          "select column_name from information_schema.columns where table_name = 'pit_credentials' and column_name = 'code_cipher'",
+        )
+      ).rows.length,
+      1,
+    );
+    assert.equal((await db.query("select rev from pit_season")).rows[0].rev, 9);
   } finally {
     await db.close();
   }

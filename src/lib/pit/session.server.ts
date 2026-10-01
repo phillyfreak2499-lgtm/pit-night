@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-start/server";
 import { getSql } from "@/lib/db";
 import type { PitData, Session } from "./types";
+import { sealCode, openCode, requireCodeVault } from "./code-vault.server";
 const COOKIE = "pit_role";
 const TTL = 8 * 60 * 60;
 const digest = (s: string) => createHash("sha256").update(s).digest("hex");
@@ -65,6 +66,12 @@ export async function session(data?: PitData): Promise<Session> {
     return publicSession;
   return identity;
 }
+function configuredCode(id: string): string | undefined {
+  const [role, store] = id.split(":");
+  if (role === "desk") return process.env.PIT_DESK_PIN;
+  const raw = process.env[role === "captain" ? "PIT_CAPTAIN_CODES" : "PIT_BAY_CODES"];
+  return raw ? (JSON.parse(raw) as Record<string, string>)[store!] : undefined;
+}
 async function credential(id: string) {
   const sql = await getSql();
   const rows = await sql<{
@@ -92,7 +99,7 @@ async function credential(id: string) {
     if ((other[0] && matches(secret, other[0].hash)) || otherSecret === secret)
       throw new Error("Crew and captain codes must be different.");
   }
-  await sql`insert into pit_credentials (id, hash) values (${id}, ${passwordHash(secret)}) on conflict (id) do nothing`;
+  await sql`insert into pit_credentials (id, hash, code_cipher) values (${id}, ${passwordHash(secret)}, ${id === "desk" ? null : sealCode(id, secret)}) on conflict (id) do nothing`;
   return (
     await sql<{
       hash: string;
@@ -157,5 +164,60 @@ export async function changeCredential(id: string, code: string) {
     if ((other[0] && matches(code, other[0].hash)) || otherSecret === code)
       throw new Error("Crew and captain codes must be different.");
   }
-  await sql`insert into pit_credentials (id, hash) values (${id}, ${passwordHash(code)}) on conflict (id) do update set hash = excluded.hash, generation = pit_credentials.generation + 1`;
+  await sql`insert into pit_credentials (id, hash, code_cipher) values (${id}, ${passwordHash(code)}, ${id === "desk" ? null : sealCode(id, code)}) on conflict (id) do update set hash = excluded.hash, code_cipher = excluded.code_cipher, generation = pit_credentials.generation + 1`;
+}
+
+/** Called only after the server verifies a commissioner session. Never part of league sync. */
+export async function readStoreCodes(data: PitData) {
+  sameOrigin();
+  requireCodeVault();
+  const sql = await getSql();
+  const result: { storeId: string; captain: string | null; crew: string | null }[] = [];
+  for (const store of data.stores) {
+    const row: { storeId: string; captain: string | null; crew: string | null } = {
+      storeId: store.id,
+      captain: null,
+      crew: null,
+    };
+    for (const role of ["captain", "bay"] as const) {
+      const id = `${role}:${store.id}`;
+      let stored = (
+        await sql<{
+          hash: string;
+          code_cipher: string | null;
+        }>`select hash, code_cipher from pit_credentials where id = ${id}`
+      )[0];
+      const configured = configuredCode(id);
+      if (!stored && configured) {
+        await credential(id);
+        stored = (
+          await sql<{
+            hash: string;
+            code_cipher: string | null;
+          }>`select hash, code_cipher from pit_credentials where id = ${id}`
+        )[0];
+      }
+      if (stored && !stored.code_cipher && configured && matches(configured, stored.hash)) {
+        const sealed = sealCode(id, configured);
+        await sql`update pit_credentials set code_cipher = ${sealed} where id = ${id} and hash = ${stored.hash} and code_cipher is null`;
+        stored = (
+          await sql<{
+            hash: string;
+            code_cipher: string | null;
+          }>`select hash, code_cipher from pit_credentials where id = ${id}`
+        )[0];
+      }
+      try {
+        row[role === "captain" ? "captain" : "crew"] = stored?.code_cipher
+          ? openCode(id, stored.code_cipher)
+          : null;
+      } catch {
+        // A lost vault key or damaged ciphertext never yields an unverified code.
+        // The Desk may replace that code through the existing verified control.
+        row[role === "captain" ? "captain" : "crew"] = null;
+      }
+    }
+    result.push(row);
+  }
+  return result;
 }
