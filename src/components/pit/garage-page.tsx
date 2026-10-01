@@ -16,12 +16,13 @@ import { paintHex, usePit, type PitState } from "@/lib/pit/store";
 import type { BotLook, GarageLook, Slot, StoreCard } from "@/lib/pit/types";
 import { BotPortrait, useBotLook } from "./bot-portrait";
 import { KeyLadder } from "./key-ladder";
+import { ScoreInputs } from "./score-card";
 import { canEnterBay, LockedBay } from "./bay-lock";
 import { Btn, Field, GradeRow, SectionLabel, StatStrip, TextInput } from "./bits";
 import { ScrimmagePanel } from "./scrimmage-panel";
 import { SpyPanel } from "./spy-panel";
 
-const SLOTS: Slot[] = ["chassis", "drive", "weapon", "armor", "utility"];
+const SLOTS: Slot[] = ["chassis", "drive", "weapon", "armor", "utility", "brain"];
 
 export function GaragePage({ storeId }: { storeId: string }) {
   const data = usePit();
@@ -100,21 +101,21 @@ export function GaragePage({ storeId }: { storeId: string }) {
       )}
 
       <section className="grid gap-3 md:grid-cols-4">
-        <Meter label="Scrap" value={`${bot.scrap} / 18`} hint="Repair does not raise the cap." />
-        <Meter label="Repair voucher" value={`${bot.voucher}`} hint="Last-place money. Repair first." />
+        <Meter label="Coins" value={`${Object.values(bot.coins).reduce((a, b) => a + b, 0)}`} hint="Across all six jars. Each jar only buys its own part." />
+        <Meter label="Repair voucher" value={`${bot.voucher}`} hint="Last-place money. Fixes any part." />
         <Meter label="Class" value={CLASS_META[bot.classId].chassis} hint={CLASS_META[bot.classId].blurb} />
         <Meter label="Lock" value={bot.locked ? "Locked" : "Still drafting"} hint={bot.locked ? "Frozen until the commissioner overrides." : "One lock. Then the cage."} />
       </section>
 
       <section>
         <div className="mb-2 flex items-end justify-between gap-3">
-          <SectionLabel>Upgrade keys</SectionLabel>
+          <SectionLabel>Coin jars</SectionLabel>
           <Link to="/shop/$storeId" params={{ storeId }} className="text-sm text-amber">
             Open the shop →
           </Link>
         </div>
-        <KeyLadder keys={bot.keys} />
-        <p className="mt-2 text-xs text-muted">Keys are never spent. 1 opens Sport, 2 Pro, 3 Super. Scrap pays for the part.</p>
+        <KeyLadder coins={bot.coins} />
+        <p className="mt-2 text-xs text-muted">Each number pays its part&apos;s jar every Monday: green 3, blue 2, orange 1. Sport 3, Pro 5, Super 8. Repairs come out of the same jar.</p>
       </section>
 
       {showStats && printed ? <StatStrip {...printed.stats} /> : <p className="text-sm text-muted">Power, Speed, Armor, and Heat print when the bot locks Saturday.</p>}
@@ -243,7 +244,7 @@ export function GaragePage({ storeId }: { storeId: string }) {
                     ) : null}
                     {quote.salvageScrap ? (
                       <Btn tone="ghost" onClick={() => repairSlot(storeId, quote.slot, "salvage")}>
-                        Salvage +{quote.salvageScrap}
+                        Salvage +{quote.salvageScrap} coins
                       </Btn>
                     ) : null}
                     {quote.crown ? (
@@ -373,26 +374,19 @@ function CardForm({
   frozen: boolean;
   onChange: (patch: Partial<StoreCard>) => void;
 }) {
-  const cap = Math.max(1, card.crewOnClock) * 2;
   return (
     <section className="border border-line bg-surface p-4">
       <SectionLabel>Weekly store card</SectionLabel>
-      <p className="mt-2 text-sm text-muted">No traffic. No raw units. NSNU is a percent of this store's goal.</p>
+      <p className="mt-2 text-sm text-muted">Six numbers. Each one pays coins to one part of the bot: green 3, blue 2, orange 1.</p>
       <div className="mt-3">
         <GradeRow card={card} />
       </div>
-      {card.prorate < 1 ? <p className="mt-2 text-sm text-warn">House prorated the goal to {Math.round(card.prorate * 100)}%. The grade uses the short-week number.</p> : null}
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <Num label="Demo %" value={card.demoPct} disabled={frozen} onChange={(demoPct) => onChange({ demoPct })} />
-        <Num label="Closing %" value={card.closePct} disabled={frozen} onChange={(closePct) => onChange({ closePct })} />
-        <Num label="NSNU vs goal %" hint="Percent of goal, not a unit count." value={card.nsnuPct} disabled={frozen} onChange={(nsnuPct) => onChange({ nsnuPct })} />
-        <Num label="Named 5-stars" hint={`Capped at ${cap}, two per crew member on the clock.`} value={card.reviews} disabled={frozen} onChange={(reviews) => onChange({ reviews })} />
-        <Num label="Crew on the clock" value={card.crewOnClock} disabled={frozen} onChange={(crewOnClock) => onChange({ crewOnClock })} />
-        <Num label="Former-customer avg ticket" value={card.formerTicket} disabled={frozen} onChange={(formerTicket) => onChange({ formerTicket })} />
+      <div className="mt-4">
+        <ScoreInputs card={card} disabled={frozen} onChange={onChange} />
       </div>
       {card.projected ? <p className="mt-3 text-sm text-amber">House projection. The desk puts the official numbers in Monday morning before the fights.</p> : null}
       <p className="mt-2 text-xs text-muted" data-testid={`card-${storeId}`}>
-        Every green earns a key: Demo → drive, Closing → weapon, NSNU → chassis, Ticket → armor, Reviews → utility.
+        NSNU → chassis · Conv → armor · Demo Rate → drive · Demo Close → weapon · Arch Supports → utility · Demo Ticket → brain.
       </p>
     </section>
   );

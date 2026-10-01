@@ -6,7 +6,7 @@ import type { Slot } from "@/lib/pit/types";
 import { ClassTag, GradeRow, SectionLabel, StatStrip } from "./bits";
 import { BotPortrait, useBotLook } from "./bot-portrait";
 
-const SLOTS: Slot[] = ["chassis", "drive", "weapon", "armor", "utility"];
+const SLOTS: Slot[] = ["chassis", "drive", "weapon", "armor", "utility", "brain"];
 
 export function StorePage({ storeId }: { storeId: string }) {
   const data = usePit();

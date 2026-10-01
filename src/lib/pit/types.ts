@@ -1,11 +1,13 @@
 export type ClassId = "striker" | "tank" | "specialist";
-export type Slot = "chassis" | "drive" | "weapon" | "armor" | "utility";
+export type Slot = "chassis" | "drive" | "weapon" | "armor" | "utility" | "brain";
 export type Tier = "stock" | "sport" | "pro" | "super" | "championship";
 export type Grade = "green" | "blue" | "orange" | "red";
 export type Condition = "clean" | "scratched" | "bent" | "disabled";
 export type Phase = "open" | "locked" | "fought" | "inspected" | "complete";
-export type StatKey = "demo" | "close" | "nsnu" | "reviews" | "ticket";
-export type KeyName = "chassis" | "drive" | "weapon" | "armor" | "utility";
+/** The six weekly numbers. Each one pays coins to one part of the bot. */
+export type StatKey = "nsnu" | "conv" | "demoRate" | "demoClose" | "arch" | "ticket";
+/** A coin jar. One per part of the bot. */
+export type KeyName = Slot;
 export type BoutKind = "bout" | "bye" | "tag" | "semi" | "final" | "melee";
 export type Method = "ko" | "dump" | "decision" | "melee" | "scrimmage" | "bye";
 export type GarageLook = "hazard" | "concrete" | "night" | "bone" | "checker";
@@ -40,8 +42,6 @@ export type Store = {
   paint: string;
   garage: GarageLook;
   seed: number;
-  /** Weekly NSNU goal. Desk only — never shown as units on the floor. */
-  nsnuGoal: number;
 };
 
 export type Crew = {
@@ -57,6 +57,8 @@ export type Loadout = {
   weapon: string;
   armor: string;
   utility: string | null;
+  /** How smart the bot is. Fed by Demo Ticket Avg. */
+  brain: string;
 };
 
 export type Bot = {
@@ -64,13 +66,12 @@ export type Bot = {
   storeId: string;
   name: string;
   classId: ClassId;
-  scrap: number;
-  /** Repair-only scrap. Does not sit in the bank cap. */
+  /** Repair-only credit, any part. Last place gets it. */
   voucher: number;
   repairSpent: number;
   owned: string[];
-  keys: Record<KeyName, number>;
-  greens: Record<StatKey, number>;
+  /** One coin jar per part. Green pays 3, blue 2, orange 1. Spent on that part only. */
+  coins: Record<KeyName, number>;
   wear: Record<Slot, Condition>;
   /** Condition stored on the part itself, so a swap does not move the scar. */
   partWear: Record<string, Condition>;
@@ -91,15 +92,18 @@ export type StoreCard = {
   id: string;
   storeId: string;
   week: number;
-  demoPct: number;
-  closePct: number;
-  /** Percent of the printed goal, before proration. */
-  nsnuPct: number;
-  /** 1 full week, 0.5 means the commissioner cut the goal in half. */
-  prorate: number;
-  reviews: number;
-  crewOnClock: number;
-  formerTicket: number;
+  /** Dollars. */
+  nsnu: number;
+  /** Percent. */
+  conv: number;
+  /** Percent. */
+  demoRate: number;
+  /** Percent. */
+  demoClose: number;
+  /** Arch supports per sale. */
+  arch: number;
+  /** Dollars. */
+  demoTicket: number;
   projected: boolean;
 };
 
@@ -134,6 +138,9 @@ export type FighterSnap = {
   look: BotLook;
   number: string;
   style?: BotStyle;
+  /** Brain tier, for the sensor dome. */
+  brainTier?: Tier;
+  brainName?: string;
 };
 
 export type FightResult = {

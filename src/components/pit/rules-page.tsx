@@ -12,13 +12,13 @@ export function RulesPage() {
         </p>
       </div>
       <Rule title="The clock">
-        Monday through Saturday the store runs the floor. That whole week is the card. Saturday at close is one lock: chassis, drive, weapon, armor, utility. The captain locks before the final numbers are in, so the lock is a bet on the week. Sunday the stores are closed and the official numbers come out. Monday morning the desk enters them and runs the card live: five fights and one bye. The bye counts as a win and does not damage the bot. Monday afternoon is the damage report, the scrap and keys pay out, and the shop opens for the next week.
+        Monday through Saturday the store runs the floor. That whole week is the card. Saturday at close is one lock: chassis, drive, weapon, armor, utility, brain. The captain locks before the final numbers are in, so the lock is a bet on the week. Sunday the stores are closed and the official numbers come out. Monday morning the desk enters them and runs the card live: five fights and one bye. The bye counts as a win and does not damage the bot. Monday afternoon is the damage report, the coins pay out, and the shop opens for the next week.
       </Rule>
       <Rule title="What scores">
-        Demo percent is demos divided by opportunities, not a traffic count. Closing percent is sales divided by demos. NSNU is judged against that store's weekly goal, never as raw units. A short week is a prorated goal, set by the commissioner. Reviews are named 5-stars, capped at two per pit-crew member on the clock. Former-customer average ticket is the armor stat. There is no traffic field and no volume field.
+        Six numbers, graded green, blue, orange, or red. NSNU: green $1,000+, blue $900–$999, orange $800–$899. Conv %: green 64%+, blue 56–63%, orange 47–55%. Demo Rate: green 88%+, blue 80–87%, orange 72–79%. Demo Close %: green 73%+, blue 70–72%, orange 65–69%. Arch Supports: green 3.8+, blue 3.0–3.7, orange 2.5–2.9. Demo Ticket Avg: green $1,800+, blue $1,600–$1,799, orange $1,400–$1,599. Anything under orange is red. The better the week, the higher the bot's rating going into the fight.
       </Rule>
-      <Rule title="Grades and scrap">
-        Every grade pays scrap: green 3, blue 2, orange 1, red 0. Every green after the first adds one more. The bank caps at 18. Every green also earns one key for the part of the bot that number feeds: Demo builds the drive, Closing the weapon, NSNU-to-goal the chassis, former-customer ticket the armor, reviews the utility. Keys are never spent. Repair bills spend the bank, and a last-place stipend is repair-only voucher that does not sit in the cap.
+      <Rule title="Grades and coins">
+        Each number pays coins into one part's jar every Monday: green 3, blue 2, orange 1, red 0. NSNU fills the chassis jar. Conv % fills armor. Demo Rate fills drive. Demo Close % fills weapon. Arch Supports fill utility. Demo Ticket Avg fills the brain, which is how smart the bot fights. A jar only buys its own part, and repairs on that part come out of the same jar. Last place gets a 3-coin repair voucher that fixes any part.
       </Rule>
       <section className="flex flex-col gap-3 border-t border-line pt-4">
         <h2 className="font-display text-2xl">Upgrades in one look</h2>
@@ -26,10 +26,10 @@ export function RulesPage() {
         <KeyLadder />
       </section>
       <Rule title="The triangle">
-        Striker — Shrike. Demo and closing. Hits first. Dies if it goes long. Pressures a tank early. Tank — Keystone. Ticket and a stack of greens. Wins late. Smothers a specialist if the claw misses. Specialist — Windlass. Reviews and NSNU-to-goal. Grapple and Heat. Shuts a striker down when Heat is real. A correct counter can flip a modest underdog. The best week with the worst lock can still lose. A Super on bent wheels is not a Super.
+        Striker — Shrike. Demo Rate and Demo Close. Hits first. Dies if it goes long. Pressures a tank early. Tank — Keystone. Demo Ticket and Conv. Wins late. Smothers a specialist if the claw misses. Specialist — Windlass. Arch Supports and NSNU. Grapple and Heat. Shuts a striker down when Heat is real. A correct counter can flip a modest underdog. The best week with the worst lock can still lose. A Super on bent wheels is not a Super.
       </Rule>
       <Rule title="Iron">
-        Week 1 is all stock. The shop opens after the first Monday fight. Every part has a tier. Sport needs 1 key in its slot and 4 scrap. Pro needs 2 keys and 7 scrap. Super needs 3 keys and 12 scrap. Keys only go up, so a store that stays green on Closing every week opens Sport weapons for week 2, Pro for week 3, and Super for the title fight. Championship is a Title Monday drop or salvage off a wrecked Super after a win. Never sold. Changing class after Week 1 costs scrap. A disabled chassis fights stock of the same class. You do not get a free swap off a wreck.
+        Week 1 is all stock, but you choose which stock weapon and which brain. The shop opens after the first Monday fight. Sport costs 3 coins from that part's jar, Pro 5, Super 8. One green week buys a Sport. A green and a blue buys a Pro. Green, green, blue buys a Super, so a store that stays green on Demo Close all month brings a Super weapon to the title fight. Championship is a Title Monday drop or salvage off a wrecked Super after a win. Never sold. Changing class after Week 1 costs 3 chassis coins. A disabled chassis fights stock of the same class. You do not get a free swap off a wreck.
       </Rule>
       <Rule title="The card">
         Eleven stores. Seeds 1 through 11, Southlake down to Waxahachie. Each week the wheel turns one spot. The store at the top of that week's wheel draws the bye. Seeds 1 through 4 each get one bye across the four weeks. A bye is a win. It is not a scrimmage. Week 4 is the last card, not a semifinal. The best record takes the trophy. Same wins and same losses is a tie, and those stores battle it out. Two stores fight. Three or more go in one cage. Best Build can still come from any bay.
@@ -38,7 +38,7 @@ export function RulesPage() {
         Paint, finish, decals, trim, eye color, the flag, garage floor, stripes, and the bay number are decoration. They do not change Power, Speed, Armor, or Heat. A Scry on the utility slot is the spy, and it stays shut until the bay calls the weapon family out loud. Then it says whether that call was right, and whether the weapon belongs on their class. It does not name the part. One call per fight. They can still change the draft until Saturday close. Captains can test the build against three house drills. That tape does not post damage, scrap, or a record. Captains rename the crew, add up to eight specialists, and keep at least one. Staff edits are not the lock.
       </Rule>
       <Rule title="Damage">
-        Clean, scratched, bent, disabled. Bent is half effect. Disabled falls back to a stock loaner until you pay. Winners still scratch. Blowouts can kill weapon and drive. Emergency weld turns Disabled into Bent for one week. Salvage strips a rare part for a little scrap and drops the slot to stock.
+        Clean, scratched, bent, disabled. Bent is half effect. Disabled falls back to a stock loaner until you pay. Winners still scratch. Blowouts can kill weapon and drive. Repairs come out of that part's jar: scratched 1 coin, bent 2, disabled 4. An emergency weld turns Disabled into Bent for one week for 1 coin. Salvage strips a rare part for a few coins back and drops the slot to stock.
       </Rule>
     </div>
   );

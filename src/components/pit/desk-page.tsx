@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { usePit } from "@/lib/pit/store";
+import { paintHex, usePit } from "@/lib/pit/store";
 import { Btn, Field, SectionLabel, TextInput } from "./bits";
+import { ScoreInputs } from "./score-card";
 
 export function DeskPage() {
   const data = usePit();
@@ -74,8 +75,7 @@ function DeskLive() {
   const unlockStore = usePit((s) => s.unlockStore);
   const renameBot = usePit((s) => s.renameBot);
   const renameCaptain = usePit((s) => s.renameCaptain);
-  const setGoal = usePit((s) => s.setGoal);
-  const setProrate = usePit((s) => s.setProrate);
+  const updateCard = usePit((s) => s.updateCard);
   const setPasscode = usePit((s) => s.setPasscode);
   const setTagline = usePit((s) => s.setTagline);
   const setTags = usePit((s) => s.setTags);
@@ -138,6 +138,28 @@ function DeskLive() {
           </Btn>
         </div>
       </section>
+      <section className="border border-amber/60 bg-surface p-4">
+        <SectionLabel>Official numbers · Monday morning</SectionLabel>
+        <p className="mt-2 text-sm text-muted">
+          Lock the bots, then type each store&apos;s official week here and run the card. Colors update as you type. Each grade pays that part&apos;s coin jar when you advance the week.
+        </p>
+        <div className="mt-4 flex flex-col gap-4">
+          {data.stores.map((store) => {
+            const card = data.storeCards.find((c) => c.storeId === store.id && c.week === data.week);
+            if (!card) return null;
+            return (
+              <div key={store.id}>
+                <p className="mb-1 flex items-center gap-2 font-display text-lg leading-none">
+                  <span className="h-3 w-3" style={{ background: paintHex(store.paint) }} />
+                  {store.name}
+                  {card.projected ? <span className="text-xs tracking-widest text-warn uppercase">projection</span> : <span className="text-xs tracking-widest text-ok uppercase">entered</span>}
+                </p>
+                <ScoreInputs compact card={card} disabled={data.phase === "fought" || data.phase === "inspected" || data.phase === "complete"} onChange={(patch) => updateCard(store.id, patch)} />
+              </div>
+            );
+          })}
+        </div>
+      </section>
       <section>
         <SectionLabel>Eleven stores</SectionLabel>
         <div className="mt-3 flex flex-col gap-3">
@@ -159,17 +181,6 @@ function DeskLive() {
                   </Field>
                   <Field label="Captain">
                     <TextInput defaultValue={store.captain} onBlur={(e) => renameCaptain(store.id, e.target.value)} />
-                  </Field>
-                  <Field label="Weekly NSNU goal" hint="Desk only. The floor sees percent of goal.">
-                    <TextInput type="number" defaultValue={store.nsnuGoal} onBlur={(e) => setGoal(store.id, Number(e.target.value))} />
-                  </Field>
-                  <Field label="Goal proration" hint="1 is a full week. 0.5 cuts the goal in half.">
-                    <TextInput
-                      type="number"
-                      step="0.25"
-                      value={card?.prorate ?? 1}
-                      onChange={(e) => setProrate(store.id, Number(e.target.value) || 1)}
-                    />
                   </Field>
                   <Field label="Clipboard code">
                     <TextInput defaultValue={store.passcode} onBlur={(e) => setPasscode(store.id, e.target.value)} />

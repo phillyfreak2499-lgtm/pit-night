@@ -1228,6 +1228,39 @@ export function drawSideBot(
     ctx.restore();
   }
 
+  // Brain: a sensor dome on the deck. The lens colour is the tier.
+  {
+    const tier = s.bot.brainTier ?? "stock";
+    const lens = tier === "super" ? "#b46bff" : tier === "pro" ? "#ffb020" : tier === "sport" ? "#3fb4ff" : tier === "championship" ? "#ffe066" : "#8e8a82";
+    const dx = (f.treads ? -0.12 : -0.16) * u2;
+    const dy = top + 0.004 * u2;
+    const r = u2 * (tier === "stock" ? 0.05 : 0.06);
+    ctx.fillStyle = "#24221f";
+    ctx.fillRect(dx - r * 1.2, dy - r * 0.25, r * 2.4, r * 0.3);
+    const dg = ctx.createRadialGradient(dx - r * 0.3, dy - r * 0.6, r * 0.1, dx, dy, r);
+    dg.addColorStop(0, "#8f8a82");
+    dg.addColorStop(1, "#2b2926");
+    ctx.fillStyle = dg;
+    ctx.beginPath();
+    ctx.arc(dx, dy, r, Math.PI, 0);
+    ctx.fill();
+    const pulse = s.dead ? 0.15 : tier === "stock" ? 0.55 : 0.75 + Math.sin(time * 4 + hash(s.bot.id)) * 0.25;
+    if (tier !== "stock" && !s.dead) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      const lg = ctx.createRadialGradient(dx, dy - r * 0.45, 0, dx, dy - r * 0.45, r * 2.2);
+      lg.addColorStop(0, shade(lens, 0, 0.5 * pulse));
+      lg.addColorStop(1, shade(lens, 0, 0));
+      ctx.fillStyle = lg;
+      ctx.fillRect(dx - r * 2.2, dy - r * 2.7, r * 4.4, r * 4.4);
+      ctx.restore();
+    }
+    ctx.fillStyle = shade(lens, 0, Math.max(0.35, pulse));
+    ctx.beginPath();
+    ctx.arc(dx + r * 0.25, dy - r * 0.45, r * 0.32, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   // Visor: the bot's eye.
   {
     const vx = (f.front - (f.treads ? 0.2 : 0.36)) * u2;

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { CLASS_META, SLOT_LABEL } from "@/lib/pit/catalog";
-import { bestLock, cardFor, gradesOf, methodLabel, scrimmageDrills, weekQuality, type LockAdvice, type ScrimmageHit } from "@/lib/pit/engine";
+import { bestLock, cardFor, gradesOf, methodLabel, scrimmageDrills, weekQuality, type LockAdvice, type ScrimmageHit, cardKey } from "@/lib/pit/engine";
 import { usePit } from "@/lib/pit/store";
 import type { ClassId, StatBlock } from "@/lib/pit/types";
 import { Broadcast } from "./broadcast";
@@ -21,7 +21,7 @@ export function ScrimmagePanel({ storeId }: { storeId: string }) {
   const card = cardFor(data, storeId);
   const load = bot?.locked ?? bot?.draft;
   const signature = load
-    ? `${load.chassis}:${load.drive}:${load.weapon}:${load.armor}:${load.utility}:${bot?.wear.weapon}:${card?.demoPct}:${card?.closePct}:${card?.nsnuPct}:${card?.reviews}`
+    ? `${load.chassis}:${load.drive}:${load.weapon}:${load.armor}:${load.utility}:${load.brain}:${bot?.wear.weapon}:${cardKey(card)}`
     : "";
   const stale = Boolean(stamp) && stamp !== signature;
   const watching = hits.find((hit) => hit.id === watchId) ?? null;
@@ -66,7 +66,7 @@ export function ScrimmagePanel({ storeId }: { storeId: string }) {
     <section className="border border-line bg-surface p-4" data-testid="bay-scrimmage">
       <SectionLabel>Best lock</SectionLabel>
       <p className="mt-2 max-w-2xl text-sm text-muted">
-        Uses this week's grades and only iron already in the bay. It does not spend scrap, change class, or lock the bot.
+        Uses this week's grades and only iron already in the bay. It does not spend coins, change class, or lock the bot.
       </p>
       <div className="mt-3">
         <Btn testId="optimize-build" onClick={optimize}>
@@ -116,7 +116,7 @@ export function ScrimmagePanel({ storeId }: { storeId: string }) {
       <div className="mt-6 border-t border-line pt-4">
         <SectionLabel>Test the build</SectionLabel>
         <p className="mt-2 max-w-2xl text-sm text-muted">
-          Three house drills. Stock iron, a blue week, and the right weapon for the class. Your current build fights them. Nothing posts. No damage, no scrap, no record.
+          Three house drills. Stock iron, a blue week, and the right weapon for the class. Your current build fights them. Nothing posts. No damage, no coins, no record.
         </p>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">

@@ -126,7 +126,7 @@ export function Titantron() {
       <section>
         <div className="mb-3 flex items-end justify-between">
           <h2 className="font-display text-3xl leading-none">Standings</h2>
-          <p className="text-sm text-muted">Record, then NSNU-to-goal. Not units.</p>
+          <p className="text-sm text-muted">Record first. NSNU breaks a tie.</p>
         </div>
         <ol className="flex flex-col gap-2">
           {ranked.map((store, index) => {

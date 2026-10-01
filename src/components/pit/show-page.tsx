@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { previewSaturday } from "@/lib/pit/engine";
+import { previewSaturday, cardKey } from "@/lib/pit/engine";
 import { usePit } from "@/lib/pit/store";
 import type { Bout, PitData } from "@/lib/pit/types";
 import { ResultLine, SectionLabel } from "./bits";
@@ -321,12 +321,8 @@ function tapeSignature(data: PitData, week: number) {
         loadout.weapon,
         loadout.armor,
         loadout.utility ?? "",
-        card?.demoPct,
-        card?.closePct,
-        card?.nsnuPct,
-        card?.reviews,
-        card?.formerTicket,
-        card?.prorate,
+        loadout.brain,
+        cardKey(card),
       ].join(":");
     })
     .join("|");

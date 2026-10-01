@@ -3,7 +3,7 @@ import { persist } from "zustand/middleware";
 import {
   CLASS_META,
   PAINT,
-  SCRAP_CAP,
+  REPAIR_PRICE,
   VERSION,
   partById,
   stockPart,
@@ -25,7 +25,7 @@ import {
   mergeWear,
   quotesForBot,
   runSaturday as playCard,
-  scrapMath,
+  coinMath,
   shopOpen,
   spyRead,
   titleField,
@@ -56,8 +56,6 @@ export type PitState = PitData & {
   nameMvp: (storeId: string, crewId: string) => void;
   renameBot: (storeId: string, name: string) => void;
   renameCaptain: (storeId: string, name: string) => void;
-  setGoal: (storeId: string, goal: number) => void;
-  setProrate: (storeId: string, prorate: number) => void;
   setPasscode: (storeId: string, passcode: string) => void;
   setPaint: (storeId: string, paint: string) => void;
   setGarage: (storeId: string, garage: GarageLook) => void;
@@ -108,14 +106,16 @@ function setPartWear(bot: Bot, partId: string, condition: Condition): Bot {
   return syncWear({ ...bot, partWear });
 }
 
-function payRepair(bot: Bot, cost: number): Bot | null {
-  if (bot.voucher + bot.scrap < cost) return null;
+/** Repairs come out of the voucher first, then that part's own coin jar. */
+function payRepair(bot: Bot, slot: Slot, cost: number): Bot | null {
+  const jar = bot.coins[slot] ?? 0;
+  if (bot.voucher + jar < cost) return null;
   const fromVoucher = Math.min(bot.voucher, cost);
   const rest = cost - fromVoucher;
   return {
     ...bot,
     voucher: bot.voucher - fromVoucher,
-    scrap: bot.scrap - rest,
+    coins: { ...bot.coins, [slot]: jar - rest },
     repairSpent: bot.repairSpent + rest,
   };
 }
@@ -136,13 +136,12 @@ function projectCard(prev: StoreCard, week: number): StoreCard {
     id: `${prev.storeId}-w${week}`,
     storeId: prev.storeId,
     week,
-    demoPct: clamp(prev.demoPct + j(1, 4), 42, 96),
-    closePct: clamp(prev.closePct + j(2, 4), 38, 90),
-    nsnuPct: clamp(prev.nsnuPct + j(3, 8), 60, 150),
-    prorate: 1,
-    reviews: clamp(prev.reviews + j(4, 1), 0, prev.crewOnClock * 2),
-    crewOnClock: prev.crewOnClock,
-    formerTicket: clamp(prev.formerTicket + j(5, 20), 180, 640),
+    nsnu: clamp(prev.nsnu + j(1, 6) * 10, 600, 1500),
+    conv: clamp(prev.conv + j(2, 3), 35, 85),
+    demoRate: clamp(prev.demoRate + j(3, 3), 60, 98),
+    demoClose: clamp(prev.demoClose + j(4, 2), 55, 85),
+    arch: clamp(Math.round((prev.arch + j(5, 3) / 10) * 10) / 10, 1.8, 5),
+    demoTicket: clamp(prev.demoTicket + j(6, 6) * 10, 1100, 2400),
     projected: true,
   };
 }
@@ -169,8 +168,6 @@ function fresh(): PitState {
     nameMvp: () => {},
     renameBot: () => {},
     renameCaptain: () => {},
-    setGoal: () => {},
-    setProrate: () => {},
     setPasscode: () => {},
     setPaint: () => {},
     setGarage: () => {},
@@ -277,11 +274,11 @@ export const usePit = create<PitState>()(
         }
         let next = bot;
         if (part.classLock && part.classLock !== bot.classId) {
-          if (bot.scrap < RECLASS_FEE) {
-            set({ flash: `Reclass costs ${RECLASS_FEE} scrap.` });
+          if ((bot.coins.chassis ?? 0) < RECLASS_FEE) {
+            set({ flash: `Reclass costs ${RECLASS_FEE} chassis coins.` });
             return;
           }
-          next = { ...bot, scrap: bot.scrap - RECLASS_FEE, classId: part.classLock };
+          next = { ...bot, coins: { ...bot.coins, chassis: bot.coins.chassis - RECLASS_FEE }, classId: part.classLock };
         }
         const draft: Loadout = { ...next.draft, [slot]: part.id };
         set({
@@ -293,7 +290,7 @@ export const usePit = create<PitState>()(
               locked: next.locked && isBoss(data) ? { ...draft } : next.locked,
             }),
           ),
-          flash: part.classLock && part.classLock !== bot.classId ? `Reclassed to ${CLASS_META[part.classLock].label}. ${RECLASS_FEE} scrap.` : `${part.name} is on the ${slot}.`,
+          flash: part.classLock && part.classLock !== bot.classId ? `Reclassed to ${CLASS_META[part.classLock].label}. ${RECLASS_FEE} chassis coins.` : `${part.name} is on the ${slot}.`,
         });
       },
       setDraftLoadout: (storeId, loadout) => {
@@ -384,9 +381,7 @@ export const usePit = create<PitState>()(
         set({
           storeCards: data.storeCards.map((card) => {
             if (card.storeId !== storeId || card.week !== data.week) return card;
-            const next = { ...card, ...patch, projected: false, week: data.week, storeId };
-            next.reviews = Math.max(0, Math.min(next.reviews, Math.max(1, next.crewOnClock) * 2));
-            return next;
+            return { ...card, ...patch, projected: false, week: data.week, storeId };
           }),
           flash: "Card updated. Grades moved with it.",
         });
@@ -447,7 +442,7 @@ export const usePit = create<PitState>()(
             const owned = bot.owned.includes(part.id) ? bot.owned : [...bot.owned, part.id];
             return syncWear({
               ...bot,
-              scrap: bot.scrap - check.cost,
+              coins: { ...bot.coins, [part.key]: (bot.coins[part.key] ?? 0) - check.cost },
               owned,
               classId: part.classLock ?? bot.classId,
               draft,
@@ -458,7 +453,7 @@ export const usePit = create<PitState>()(
           flash: classChangeNote(part.name, check.cost),
         });
         function classChangeNote(name: string, cost: number) {
-          return `${name} bought for ${cost} scrap.`;
+          return `${name} bought for ${cost} coins.`;
         }
       },
       repairSlot: (storeId, slot, mode) => {
@@ -487,9 +482,9 @@ export const usePit = create<PitState>()(
             set({ flash: "Emergency weld is only for a dead part." });
             return;
           }
-          const paid = payRepair(current, 2);
+          const paid = payRepair(current, slot, REPAIR_PRICE.weld);
           if (!paid) {
-            set({ flash: "Weld is 2 scrap. The bank cannot cover it." });
+            set({ flash: `Weld is ${REPAIR_PRICE.weld} ${slot} coin. The jar cannot cover it.` });
             return;
           }
           const week = nextFightWeek(data);
@@ -515,7 +510,7 @@ export const usePit = create<PitState>()(
               delete partWear[partId];
               return syncWear({
                 ...bot,
-                scrap: Math.min(SCRAP_CAP, bot.scrap + refund),
+                coins: { ...bot.coins, [slot]: (bot.coins[slot] ?? 0) + refund },
                 owned: bot.owned.filter((id) => id !== partId),
                 draft,
                 equipped: { ...draft },
@@ -523,7 +518,7 @@ export const usePit = create<PitState>()(
                 weldForWeek: { ...bot.weldForWeek, [slot]: undefined },
               });
             }),
-            flash: `${part.name} stripped. ${refund} scrap back. Slot dropped to stock.`,
+            flash: `${part.name} stripped. ${refund} ${slot} coins back. Slot dropped to stock.`,
           });
           return;
         }
@@ -555,10 +550,10 @@ export const usePit = create<PitState>()(
           });
           return;
         }
-        const cost = cond === "scratched" ? 1 : cond === "bent" ? 3 : 6;
-        const paid = payRepair(current, cost);
+        const cost = REPAIR_PRICE[cond];
+        const paid = payRepair(current, slot, cost);
         if (!paid) {
-          set({ flash: `Quote is ${cost}. Wallet cannot cover it.` });
+          set({ flash: `Quote is ${cost} ${slot} coins. The jar cannot cover it.` });
           return;
         }
         set({
@@ -567,7 +562,7 @@ export const usePit = create<PitState>()(
             delete weldForWeek[slot];
             return setPartWear({ ...paid, weldForWeek }, partId, "clean");
           }),
-          flash: `${part.name} is clean. ${cost} scrap.`,
+          flash: `${part.name} is clean. ${cost} ${slot} coins.`,
         });
       },
       nameMvp: (storeId, crewId) => {
@@ -603,23 +598,6 @@ export const usePit = create<PitState>()(
           crew: data.crew.map((c) => (c.storeId === storeId && c.role === "captain" ? { ...c, name: clean } : c)),
           mvps: data.mvps.map((m) => (m.storeId === storeId && data.crew.find((c) => c.id === m.crewId)?.role === "captain" ? { ...m, name: clean } : m)),
           flash: `Captain of record is ${clean}.`,
-        });
-      },
-      setGoal: (storeId, goal) => {
-        if (!isBoss(get())) return;
-        set({
-          stores: get().stores.map((s) => (s.id === storeId ? { ...s, nsnuGoal: Math.max(1, Math.round(goal)) } : s)),
-          flash: "Weekly NSNU goal updated. The floor still only sees the percent.",
-        });
-      },
-      setProrate: (storeId, prorate) => {
-        const data = get();
-        if (!isBoss(data)) return;
-        set({
-          storeCards: data.storeCards.map((c) =>
-            c.storeId === storeId && c.week === data.week ? { ...c, prorate } : c,
-          ),
-          flash: prorate < 1 ? "Short week. Goal prorated. NSNU-to-goal moved. No traffic was invented." : "Full goal restored.",
         });
       },
       setPasscode: (storeId, passcode) => {
@@ -701,7 +679,6 @@ export const usePit = create<PitState>()(
         const count = specialists.length + 1;
         set({
           crew: [...data.crew, { id: `${storeId}-crew-${Date.now().toString(36)}`, storeId, name: clean, role: "specialist" }],
-          storeCards: syncCrewCount(data, storeId, count),
           flash: `${clean} is on the clock.`,
         });
       },
@@ -719,7 +696,6 @@ export const usePit = create<PitState>()(
           crew: data.crew.filter((c) => c.id !== crewId),
           mvps: data.mvps.filter((m) => m.crewId !== crewId),
           proposals: data.proposals.filter((p) => p.crewId !== crewId),
-          storeCards: syncCrewCount(data, storeId, specialists.length - 1),
           flash: `${member.name} is off the clock.`,
         });
       },
@@ -954,18 +930,9 @@ export const usePit = create<PitState>()(
           const card = cardFor(data, bot.storeId);
           if (!card) return bot;
           const grades = gradesOf(card);
-          const earned = scrapMath(grades).total;
-          const room = Math.max(0, SCRAP_CAP - bot.scrap);
-          const banked = Math.min(room, earned);
-          const keys = { ...bot.keys };
-          const greens = { ...bot.greens };
-          (Object.keys(grades) as (keyof typeof grades)[]).forEach((stat) => {
-            if (grades[stat] === "green") {
-              greens[stat] += 1;
-              const key = keyForStat(stat);
-              keys[key] += 1;
-            }
-          });
+          const paid = coinMath(grades).bySlot;
+          const coins = { ...bot.coins };
+          for (const slot of SLOTS) coins[slot] = (coins[slot] ?? 0) + paid[slot];
           const weldForWeek = { ...bot.weldForWeek };
           let partWear = { ...bot.partWear };
           for (const slot of SLOTS) {
@@ -977,17 +944,15 @@ export const usePit = create<PitState>()(
           }
           return syncWear({
             ...bot,
-            scrap: bot.scrap + banked,
-            voucher: bot.voucher + (bot.storeId === last ? 4 : 0),
+            voucher: bot.voucher + (bot.storeId === last ? 3 : 0),
             repairSpent: 0,
-            keys,
-            greens,
+            coins,
             partWear,
             weldForWeek,
             locked: null,
           });
         });
-        const lines = [`Week ${data.week} paid out. Bank cap ${SCRAP_CAP}.`];
+        const lines = [`Week ${data.week} paid out. Green 3, blue 2, orange 1 coins per part.`];
         if (last) {
           const store = data.stores.find((s) => s.id === last);
           lines.unshift(`${store?.name ?? last} takes the last-place stipend. Repair first.`);
@@ -1051,10 +1016,11 @@ export const usePit = create<PitState>()(
         tutorialSeen: state.tutorialSeen,
         intel: state.intel,
       }),
-      migrate: () => makeData(),
+      migrate: (persisted, version) => (version === 4 && persisted ? carryCosmetics(applyHulen(persisted as PitData)) : makeData()),
       merge: (persisted, current) => {
         const saved = persisted as Partial<PitData> | undefined;
-        if (!saved || saved.version !== VERSION) return current;
+        if (!saved) return current;
+        if (saved.version !== VERSION) return current;
         const fixed = applyMondays(applyHulen(saved as PitData));
         return { ...current, ...fixed, intel: (Array.isArray(fixed.intel) ? fixed.intel : []).map((row) => ({ ...row, guess: row.guess ?? "" })), flash: "" };
       },
@@ -1076,12 +1042,6 @@ function spyReady(
   return { ok: true, scry };
 }
 
-function syncCrewCount(data: PitData, storeId: string, count: number) {
-  return data.storeCards.map((card) => {
-    if (card.storeId !== storeId || card.week !== data.week) return card;
-    return { ...card, crewOnClock: count, reviews: Math.min(card.reviews, count * 2) };
-  });
-}
 
 function titlePart(classId: Bot["classId"]) {
   if (classId === "tank") return "chassis-keystone-championship";
@@ -1143,6 +1103,31 @@ function mapFight(result: FightResult): FightResult {
           call: result.finisher.call.replaceAll("Bryant Irvin", "Hulen").replaceAll("IRVIN", "HULEN"),
         }
       : null,
+  };
+}
+
+/**
+ * Version 4 saves predate the six-number scorecard, the brain slot, and coins.
+ * Nothing had been fought yet, so start a fresh season but keep everything people set by hand.
+ */
+function carryCosmetics(old: PitData): PitData {
+  const next = makeData();
+  return {
+    ...next,
+    pin: old.pin || next.pin,
+    tagline: old.tagline || next.tagline,
+    tutorialSeen: old.tutorialSeen,
+    stores: next.stores.map((store) => {
+      const was = old.stores?.find((row) => row.id === store.id);
+      return was
+        ? { ...store, name: was.name, captain: was.captain, passcode: was.passcode, paint: was.paint, garage: was.garage }
+        : store;
+    }),
+    crew: Array.isArray(old.crew) && old.crew.length ? old.crew : next.crew,
+    bots: next.bots.map((bot) => {
+      const was = old.bots?.find((row) => row.storeId === bot.storeId);
+      return was ? { ...bot, name: was.name, look: was.look, number: was.number, style: was.style } : bot;
+    }),
   };
 }
 

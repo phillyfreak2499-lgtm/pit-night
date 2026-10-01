@@ -4,6 +4,10 @@ import {
   partsFor,
   stockPart,
   KEY_SOURCE,
+  GRADE_COINS,
+  METRICS,
+  REPAIR_PRICE,
+  metricFor,
   type Part,
 } from "./catalog";
 import type {
@@ -29,7 +33,7 @@ import type {
   StoreCard,
 } from "./types";
 
-export const SLOTS: Slot[] = ["chassis", "drive", "weapon", "armor", "utility"];
+export const SLOTS: Slot[] = ["chassis", "drive", "weapon", "armor", "utility", "brain"];
 
 const GRADE_Q: Record<Grade, number> = {
   green: 1,
@@ -46,75 +50,56 @@ const TIER_FIT: Record<string, number> = {
   championship: 0.19,
 };
 
-export function gradeDemo(pct: number): Grade {
-  if (pct >= 80) return "green";
-  if (pct >= 70) return "blue";
-  if (pct >= 60) return "orange";
+/** Grade one number against its bands from the scorecard chart. */
+export function gradeMetric(stat: StatKey, value: number): Grade {
+  const [g, b, o] = metricFor(stat).bands;
+  const v = Math.round(value * 100) / 100;
+  if (v >= g) return "green";
+  if (v >= b) return "blue";
+  if (v >= o) return "orange";
   return "red";
-}
-
-export function gradeClose(pct: number): Grade {
-  if (pct >= 65) return "green";
-  if (pct >= 55) return "blue";
-  if (pct >= 45) return "orange";
-  return "red";
-}
-
-export function gradeNsnu(pct: number): Grade {
-  if (pct >= 100) return "green";
-  if (pct >= 85) return "blue";
-  if (pct >= 70) return "orange";
-  return "red";
-}
-
-export function reviewCap(crewOnClock: number): number {
-  return Math.max(1, crewOnClock) * 2;
-}
-
-export function gradeReviews(count: number, crewOnClock: number): Grade {
-  const cap = reviewCap(crewOnClock);
-  const ratio = Math.min(count, cap) / cap;
-  if (ratio >= 0.999) return "green";
-  if (ratio >= 0.6) return "blue";
-  if (ratio >= 0.3) return "orange";
-  return "red";
-}
-
-export function gradeTicket(ticket: number): Grade {
-  if (ticket >= 400) return "green";
-  if (ticket >= 320) return "blue";
-  if (ticket >= 250) return "orange";
-  return "red";
-}
-
-export function effectiveNsnu(card: StoreCard): number {
-  const factor = card.prorate > 0 ? card.prorate : 1;
-  return card.nsnuPct / factor;
 }
 
 export type GradeSet = Record<StatKey, Grade>;
 
 export function gradesOf(card: StoreCard): GradeSet {
   return {
-    demo: gradeDemo(card.demoPct),
-    close: gradeClose(card.closePct),
-    nsnu: gradeNsnu(effectiveNsnu(card)),
-    reviews: gradeReviews(card.reviews, card.crewOnClock),
-    ticket: gradeTicket(card.formerTicket),
+    nsnu: gradeMetric("nsnu", card.nsnu),
+    conv: gradeMetric("conv", card.conv),
+    demoRate: gradeMetric("demoRate", card.demoRate),
+    demoClose: gradeMetric("demoClose", card.demoClose),
+    arch: gradeMetric("arch", card.arch),
+    ticket: gradeMetric("ticket", card.demoTicket),
   };
 }
 
-export function scrapMath(grades: GradeSet): { base: number; bonus: number; total: number; greens: number } {
-  const list = [grades.demo, grades.close, grades.nsnu, grades.reviews, grades.ticket];
-  const value: Record<Grade, number> = { green: 3, blue: 2, orange: 1, red: 0 };
-  const base = list.reduce((sum, g) => sum + value[g], 0);
-  const greens = list.filter((g) => g === "green").length;
-  const bonus = Math.max(0, greens - 1);
-  return { base, bonus, total: base + bonus, greens };
+/** Stable text for a card, for seeding the fight dice. */
+export function cardKey(card: StoreCard | undefined) {
+  if (!card) return "none";
+  return `${card.nsnu}:${card.conv}:${card.demoRate}:${card.demoClose}:${card.arch}:${card.demoTicket}`;
+}
+
+export function cardValue(card: StoreCard, stat: StatKey): number {
+  if (stat === "ticket") return card.demoTicket;
+  return card[stat];
+}
+
+/** What a card pays: coins per part, by grade. */
+export function coinMath(grades: GradeSet): { bySlot: Record<KeyName, number>; total: number; greens: number } {
+  const bySlot = { chassis: 0, drive: 0, weapon: 0, armor: 0, utility: 0, brain: 0 } as Record<KeyName, number>;
+  let total = 0;
+  let greens = 0;
+  for (const m of METRICS) {
+    const g = grades[m.stat];
+    bySlot[m.slot] += GRADE_COINS[g];
+    total += GRADE_COINS[g];
+    if (g === "green") greens += 1;
+  }
+  return { bySlot, total, greens };
 }
 
 export function weekQuality(grades: GradeSet): number {
-  const list = [grades.demo, grades.close, grades.nsnu, grades.reviews, grades.ticket];
+  const list = METRICS.map((m) => grades[m.stat]);
   return list.reduce((sum, g) => sum + GRADE_Q[g], 0) / list.length;
 }
 
@@ -157,7 +142,7 @@ export function recordOf(data: PitData, storeId: string): { w: number; l: number
 export function nsnuOf(data: PitData, storeId: string, week: number): number {
   const card = data.storeCards.find((c) => c.storeId === storeId && c.week === week);
   if (!card) return 0;
-  return effectiveNsnu(card);
+  return card.nsnu;
 }
 
 export function rankedStores(data: PitData) {
@@ -272,7 +257,7 @@ function synergy(classId: ClassId, weapon: Part | null, drive: Part | null, util
 }
 
 export function buildFit(bot: Bot, loadout: Loadout): number {
-  const slots: Slot[] = ["chassis", "drive", "weapon", "armor"];
+  const slots: Slot[] = ["chassis", "drive", "weapon", "armor", "brain"];
   let fit = 0.46;
   const resolved = slots.map((slot) => resolvePart(bot, slot, loadout));
   for (const r of resolved) {
@@ -360,7 +345,7 @@ export type LockAdvice = {
   already: boolean;
 };
 
-/** Best legal lock for this week. Stock or owned only. Does not spend scrap or change class. */
+/** Best legal lock for this week. Stock or owned only. Does not spend coins or change class. */
 export function bestLock(bot: Bot, weekQ: number): LockAdvice {
   const currentLoad: Loadout = { ...(bot.locked ?? bot.draft) };
   const current = printedStats(wearFor(bot, currentLoad), currentLoad, weekQ);
@@ -369,6 +354,7 @@ export function bestLock(bot: Bot, weekQ: number): LockAdvice {
   const weapons = cageParts(bot, "weapon");
   const armors = cageParts(bot, "armor");
   const utilities: (Part | null)[] = [null, ...cageParts(bot, "utility")];
+  const brains = cageParts(bot, "brain");
 
   let bestLoad = currentLoad;
   let bestPrinted = current;
@@ -379,12 +365,14 @@ export function bestLock(bot: Bot, weekQ: number): LockAdvice {
       for (const weapon of weapons) {
         for (const armor of armors) {
           for (const utility of utilities) {
+            for (const brain of brains) {
             const loadout: Loadout = {
               chassis: body.id,
               drive: drive.id,
               weapon: weapon.id,
               armor: armor.id,
               utility: utility?.id ?? null,
+              brain: brain.id,
             };
             const printed = printedStats(wearFor(bot, loadout), loadout, weekQ);
             const score = lockScore(printed);
@@ -392,6 +380,7 @@ export function bestLock(bot: Bot, weekQ: number): LockAdvice {
               bestScore = score;
               bestLoad = loadout;
               bestPrinted = printed;
+            }
             }
           }
         }
@@ -529,7 +518,7 @@ function snapshot(data: PitData, storeId: string): FighterSnap {
   const card = cardFor(data, storeId);
   const grades: GradeSet = card
     ? gradesOf(card)
-    : { demo: "red", close: "red", nsnu: "red", reviews: "red", ticket: "red" };
+    : { nsnu: "red", conv: "red", demoRate: "red", demoClose: "red", arch: "red", ticket: "red" };
   const weekQ = weekQuality(grades);
   const loadout = activeLoadout(bot, data.phase === "open" ? "locked" : data.phase);
   const locked = bot.locked ?? bot.draft;
@@ -559,6 +548,8 @@ function snapshot(data: PitData, storeId: string): FighterSnap {
     look: bot.look ?? "plain",
     number: bot.number ?? "",
     style: bot.style,
+    brainTier: resolvePart(bot, "brain", locked).part?.tier ?? "stock",
+    brainName: resolvePart(bot, "brain", locked).part?.name ?? "Logic Board",
   };
 }
 
@@ -691,7 +682,7 @@ function exchangeOrder(a: FighterSnap, b: FighterSnap): [FighterSnap, FighterSna
 }
 
 function emptyWear(): Record<Slot, Condition> {
-  return { chassis: "clean", drive: "clean", weapon: "clean", armor: "clean", utility: "clean" };
+  return { chassis: "clean", drive: "clean", weapon: "clean", armor: "clean", utility: "clean", brain: "clean" };
 }
 
 function planDuelWear(
@@ -1092,7 +1083,7 @@ function loadoutSeed(data: PitData, ids: string[]): string {
       const bot = botFor(data, id);
       const l = bot.locked ?? bot.draft;
       const card = cardFor(data, id);
-      return `${id}:${l.chassis}:${l.drive}:${l.weapon}:${l.armor}:${l.utility}:${card?.demoPct}:${card?.closePct}:${card?.nsnuPct}:${card?.reviews}:${card?.formerTicket}`;
+      return `${id}:${l.chassis}:${l.drive}:${l.weapon}:${l.armor}:${l.utility}:${l.brain}:${cardKey(card)}`;
     })
     .join("/");
 }
@@ -1129,7 +1120,6 @@ function drillStore(row: (typeof DRILL_ROWS)[number]): Store {
     paint: row.paint,
     garage: "night",
     seed: 0,
-    nsnuGoal: 12,
   };
 }
 
@@ -1140,19 +1130,18 @@ function drillBot(row: (typeof DRILL_ROWS)[number]): Bot {
     weapon: stockPart("weapon", row.classId, row.weapon).id,
     armor: stockPart("armor", row.classId, row.armor).id,
     utility: null,
+    brain: stockPart("brain", row.classId).id,
   };
   return {
     id: `bot-${row.id}`,
     storeId: row.id,
     name: row.bot,
     classId: row.classId,
-    scrap: 0,
     voucher: 0,
     repairSpent: 0,
     owned: [],
-    keys: { chassis: 0, drive: 0, weapon: 0, armor: 0, utility: 0 },
-    greens: { demo: 0, close: 0, nsnu: 0, reviews: 0, ticket: 0 },
-    wear: { chassis: "clean", drive: "clean", weapon: "clean", armor: "clean", utility: "clean" },
+    coins: { chassis: 0, drive: 0, weapon: 0, armor: 0, utility: 0, brain: 0 },
+    wear: emptyWear(),
     partWear: {},
     equipped: { ...gear },
     draft: { ...gear },
@@ -1168,13 +1157,12 @@ function drillCard(row: (typeof DRILL_ROWS)[number], week: number): StoreCard {
     id: `${row.id}-w${week}`,
     storeId: row.id,
     week,
-    demoPct: 75,
-    closePct: 60,
-    nsnuPct: 92,
-    prorate: 1,
-    reviews: 5,
-    crewOnClock: 4,
-    formerTicket: 350,
+    nsnu: 950,
+    conv: 60,
+    demoRate: 84,
+    demoClose: 71,
+    arch: 3.3,
+    demoTicket: 1700,
     projected: false,
   };
 }
@@ -1212,14 +1200,14 @@ function stageScrimmage(data: PitData, storeId: string): PitData {
   };
 }
 
-/** House drills only. Same fight math. Does not post a bout, wear, or scrap. */
+/** House drills only. Same fight math. Does not post a bout, wear, or coins. */
 export function scrimmageDrills(data: PitData, storeId: string, which: ClassId | "all" = "all"): ScrimmageHit[] {
   const staged = stageScrimmage(data, storeId);
   const bot = botFor(staged, storeId);
   const load = bot.locked ?? bot.draft;
   const card = cardFor(staged, storeId);
   const wear = SLOTS.map((slot) => bot.wear[slot]).join(",");
-  const buildKey = `${load.chassis}:${load.drive}:${load.weapon}:${load.armor}:${load.utility}:${wear}:${card?.demoPct}:${card?.closePct}:${card?.nsnuPct}:${card?.reviews}:${card?.formerTicket}`;
+  const buildKey = `${load.chassis}:${load.drive}:${load.weapon}:${load.armor}:${load.utility}:${load.brain}:${wear}:${cardKey(card)}`;
   return DRILL_ROWS.filter((row) => which === "all" || row.classId === which).map((row) => {
     const seed = `scrim|${data.seasonName}|w${data.week}|${storeId}|${row.id}|${buildKey}`;
     const bout = makeBout(data.week, 1, "bout", "Bay scrimmage", [storeId], [row.id]);
@@ -1465,8 +1453,8 @@ export function quoteFor(bot: Bot, slot: Slot): Quote | null {
   if (!partId) return null;
   const part = partById(partId);
   if (!part) return null;
-  const repairCost = cond === "scratched" ? 1 : cond === "bent" ? 3 : 6;
-  const weldCost = cond === "disabled" ? 2 : null;
+  const repairCost = cond === "scratched" ? REPAIR_PRICE.scratched : cond === "bent" ? REPAIR_PRICE.bent : REPAIR_PRICE.disabled;
+  const weldCost = cond === "disabled" ? REPAIR_PRICE.weld : null;
   const salvageScrap = part.tier === "pro" ? 2 : part.tier === "super" ? 4 : part.tier === "championship" ? 3 : null;
   const won = false;
   const crown = part.tier === "super" && cond === "disabled" && won;
@@ -1476,10 +1464,10 @@ export function quoteFor(bot: Bot, slot: Slot): Quote | null {
       : `Fight day loans a stock ${stockPart(slot, bot.classId).name}`;
   const line =
     cond === "disabled"
-      ? `${part.name} is dead. ${repairCost} scrap puts it back. ${weldCost} emergency-welds it to Bent for one week. Until then, ${loaner}.`
+      ? `${part.name} is dead. ${repairCost} ${slot} coins put it back. ${weldCost} emergency-welds it to Bent for one week. Until then, ${loaner}.`
       : cond === "bent"
-        ? `${part.name} is bent. Half effect until you spend ${repairCost}.`
-        : `${part.name} is scratched. It still fights. ${repairCost} scrap makes the cage forget.`;
+        ? `${part.name} is bent. Half effect until you spend ${repairCost} ${slot} coins.`
+        : `${part.name} is scratched. It still fights. ${repairCost} ${slot} coin makes the cage forget.`;
   return {
     slot,
     partId,
@@ -1560,11 +1548,7 @@ export function bestBuildId(data: PitData): { id: string; why: string } | null {
 }
 
 export function keyForStat(stat: StatKey): KeyName {
-  if (stat === "demo") return "drive";
-  if (stat === "close") return "weapon";
-  if (stat === "nsnu") return "chassis";
-  if (stat === "ticket") return "armor";
-  return "utility";
+  return metricFor(stat).slot;
 }
 
 export function canSeeLoadout(data: PitData, storeId: string): boolean {
@@ -1590,7 +1574,7 @@ export function ownsPart(bot: Bot, part: Part): boolean {
   return bot.owned.includes(part.id);
 }
 
-export const RECLASS_FEE = 6;
+export const RECLASS_FEE = 3;
 
 export function buyCheck(
   data: PitData,
@@ -1602,30 +1586,25 @@ export function buyCheck(
   if (part.tier === "championship") return { ok: false, reason: "Championship parts are never sold.", cost: 0 };
   if (part.tier === "stock") return { ok: false, reason: "Stock is already on the peg.", cost: 0 };
   if (part.classLock && part.slot !== "chassis") return { ok: false, reason: "Wrong class.", cost: 0 };
-  if (ownsPart(bot, part)) return { ok: false, reason: "Already in the cage.", cost: part.scrap };
-  const keys = bot.keys[part.key];
-  if (keys < part.keys) {
-    const src = KEY_SOURCE[part.key];
-    return {
-      ok: false,
-      reason: `Needs ${part.keys} ${part.key} key${part.keys > 1 ? "s" : ""}. You have ${keys}. Each green ${src.label} week earns one.`,
-      cost: part.scrap,
-    };
-  }
-  let cost = part.scrap;
+  if (ownsPart(bot, part)) return { ok: false, reason: "Already in the cage.", cost: part.price };
+  let cost = part.price;
   if (part.slot === "chassis" && part.classLock && part.classLock !== bot.classId && data.week > 1) {
     cost += RECLASS_FEE;
   }
-  if (bot.scrap < cost) return { ok: false, reason: `Needs ${cost} scrap. Bank has ${bot.scrap}.`, cost };
+  const have = bot.coins[part.key] ?? 0;
+  if (have < cost) {
+    const src = KEY_SOURCE[part.key];
+    return {
+      ok: false,
+      reason: `Needs ${cost} ${part.key} coins. You have ${have}. ${src.label} pays them: green 3, blue 2, orange 1.`,
+      cost,
+    };
+  }
   return { ok: true, reason: "On the peg.", cost };
 }
 
 export function statLabel(stat: StatKey): string {
-  if (stat === "demo") return "Demo %";
-  if (stat === "close") return "Closing %";
-  if (stat === "nsnu") return "NSNU-to-goal";
-  if (stat === "reviews") return "review";
-  return "former-customer";
+  return metricFor(stat).label;
 }
 
 export function defaultWeaponFamily(classId: ClassId): string {

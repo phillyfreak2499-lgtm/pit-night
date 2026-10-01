@@ -1,7 +1,7 @@
 import type { BotDecal, BotFinish, BotStyle, ClassId, KeyName, Slot, StatKey, Tier } from "./types";
 
 export const SCRAP_CAP = 18;
-export const VERSION = 4;
+export const VERSION = 5;
 
 export const CLASS_META: Record<
   ClassId,
@@ -11,21 +11,21 @@ export const CLASS_META: Record<
     label: "Striker",
     chassis: "Shrike",
     superName: "Glass Ghost",
-    blurb: "Demo and closing. Hits first. Dies if the fight gets long.",
+    blurb: "Demo Rate and Demo Close. Hits first. Dies if the fight gets long.",
     threat: "Pressures a tank early.",
   },
   tank: {
     label: "Tank",
     chassis: "Keystone",
     superName: "Anvil",
-    blurb: "Former-customer ticket and a stack of greens. Wins late.",
+    blurb: "Demo Ticket and Conv. Wins late.",
     threat: "Smothers a specialist if the claw misses.",
   },
   specialist: {
     label: "Specialist",
     chassis: "Windlass",
     superName: "Vice",
-    blurb: "Reviews and NSNU-to-goal. Grapple and Heat.",
+    blurb: "Arch Supports and NSNU. Grapple and Heat.",
     threat: "Shuts a striker down when Heat is real.",
   },
 };
@@ -108,9 +108,8 @@ export type Part = {
   job: string;
   tags: string[];
   nudge: { power: number; speed: number; armor: number; heat: number };
-  scrap: number;
-  greens: number;
-  keys: number;
+  /** Coins from this part's own jar. */
+  price: number;
 };
 
 const ZERO = { power: 0, speed: 0, armor: 0, heat: 0 };
@@ -136,43 +135,74 @@ type Family = {
   nudge: Part["nudge"];
 };
 
-const TIER_COST: Record<Tier, number> = {
+/** Coin prices. A part can earn at most 9 before the title lock (three green weeks). */
+export const TIER_PRICE: Record<Tier, number> = {
   stock: 0,
-  sport: 4,
-  pro: 7,
-  super: 12,
-  championship: 0,
-};
-/** Legacy green-week gate. Keys are the only gate now. */
-const TIER_GREENS: Record<Tier, number> = {
-  stock: 0,
-  sport: 0,
-  pro: 0,
-  super: 0,
-  championship: 0,
-};
-/**
- * The ladder. A green week earns one key for that slot, and keys are never spent.
- * Holding the keys unlocks the tier; scrap pays for the part.
- */
-export const TIER_KEYS: Record<Tier, number> = {
-  stock: 0,
-  sport: 1,
-  pro: 2,
-  super: 3,
+  sport: 3,
+  pro: 5,
+  super: 8,
   championship: 0,
 };
 
-/** Which weekly number earns which key. */
-export const KEY_SOURCE: Record<KeyName, { stat: StatKey; label: string; green: string }> = {
-  chassis: { stat: "nsnu", label: "NSNU-to-goal", green: "100% of goal" },
-  drive: { stat: "demo", label: "Demo %", green: "80%+" },
-  weapon: { stat: "close", label: "Closing %", green: "65%+" },
-  armor: { stat: "ticket", label: "Former-customer ticket", green: "$400+" },
-  utility: { stat: "reviews", label: "Named 5-stars", green: "2 per crew on the clock" },
+/** Coins a grade pays into its part's jar. */
+export const GRADE_COINS: Record<"green" | "blue" | "orange" | "red", number> = { green: 3, blue: 2, orange: 1, red: 0 };
+
+/** Repair bills, from the damaged part's own jar. */
+export const REPAIR_PRICE = { scratched: 1, bent: 2, disabled: 4, weld: 1 } as const;
+
+export type Metric = {
+  stat: StatKey;
+  slot: KeyName;
+  label: string;
+  short: string;
+  /** Lowest value for green, blue, orange. Below orange is red. */
+  bands: [number, number, number];
+  format: (n: number) => string;
+  step: number;
 };
 
-export const KEY_ORDER: KeyName[] = ["chassis", "drive", "weapon", "armor", "utility"];
+const money = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+const pct = (n: number) => `${Math.round(n)}%`;
+
+/** The six weekly numbers, the part each one feeds, and the grade bands. */
+export const METRICS: Metric[] = [
+  { stat: "nsnu", slot: "chassis", label: "NSNU", short: "NSNU", bands: [1000, 900, 800], format: money, step: 1 },
+  { stat: "conv", slot: "armor", label: "Conv %", short: "Conv", bands: [64, 56, 47], format: pct, step: 1 },
+  { stat: "demoRate", slot: "drive", label: "Demo Rate", short: "Demo", bands: [88, 80, 72], format: pct, step: 1 },
+  { stat: "demoClose", slot: "weapon", label: "Demo Close %", short: "Close", bands: [73, 70, 65], format: pct, step: 1 },
+  { stat: "arch", slot: "utility", label: "Arch Supports", short: "Arch", bands: [3.8, 3.0, 2.5], format: (n) => n.toFixed(1), step: 0.1 },
+  { stat: "ticket", slot: "brain", label: "Demo Ticket Avg", short: "Ticket", bands: [1800, 1600, 1400], format: money, step: 1 },
+];
+
+export function metricFor(stat: StatKey): Metric {
+  return METRICS.find((m) => m.stat === stat)!;
+}
+
+export function metricForSlot(slot: KeyName): Metric {
+  return METRICS.find((m) => m.slot === slot)!;
+}
+
+/** "Green 1,000+ · Blue 900–999 …" for any metric. */
+export function bandText(m: Metric) {
+  const [g, b, o] = m.bands;
+  const dec = m.step < 1;
+  const minus = (n: number) => (dec ? (n - 0.1).toFixed(1) : String(n - 1));
+  const f = (n: number) => (m.format === money ? `$${n.toLocaleString("en-US")}` : m.format === pct ? `${n}%` : dec ? n.toFixed(1) : String(n));
+  const fm = (n: string) => (m.format === money ? `$${Number(n).toLocaleString("en-US")}` : m.format === pct ? `${n}%` : n);
+  return {
+    green: `${f(g)}+`,
+    blue: `${f(b)}–${fm(minus(g))}`,
+    orange: `${f(o)}–${fm(minus(b))}`,
+    red: `under ${f(o)}`,
+  };
+}
+
+/** Which weekly number fills which part's coin jar. */
+export const KEY_SOURCE: Record<KeyName, { stat: StatKey; label: string; green: string }> = Object.fromEntries(
+  METRICS.map((m) => [m.slot, { stat: m.stat, label: m.label, green: bandText(m).green }]),
+) as Record<KeyName, { stat: StatKey; label: string; green: string }>;
+
+export const KEY_ORDER: KeyName[] = ["chassis", "drive", "weapon", "armor", "utility", "brain"];
 
 const FAMILIES: Family[] = [
   {
@@ -247,7 +277,7 @@ const FAMILIES: Family[] = [
   {
     slot: "drive",
     family: "mag",
-    stat: "demo",
+    stat: "demoRate",
     key: "drive",
     tags: ["speed"],
     nudge: nudge(0, 4, 0, 0),
@@ -269,7 +299,7 @@ const FAMILIES: Family[] = [
   {
     slot: "drive",
     family: "omni",
-    stat: "demo",
+    stat: "demoRate",
     key: "drive",
     tags: ["heat", "lateral"],
     nudge: nudge(0, 2, 0, 2),
@@ -291,7 +321,7 @@ const FAMILIES: Family[] = [
   {
     slot: "drive",
     family: "treads",
-    stat: "demo",
+    stat: "demoRate",
     key: "drive",
     tags: ["armor"],
     nudge: nudge(1, -2, 4, 0),
@@ -313,7 +343,7 @@ const FAMILIES: Family[] = [
   {
     slot: "drive",
     family: "flip",
-    stat: "demo",
+    stat: "demoRate",
     key: "drive",
     tags: ["control"],
     nudge: nudge(2, 1, 1, 0),
@@ -335,7 +365,7 @@ const FAMILIES: Family[] = [
   {
     slot: "weapon",
     family: "saw",
-    stat: "close",
+    stat: "demoClose",
     key: "weapon",
     tags: ["speed", "saw"],
     nudge: nudge(3, 3, -1, 0),
@@ -357,7 +387,7 @@ const FAMILIES: Family[] = [
   {
     slot: "weapon",
     family: "drum",
-    stat: "close",
+    stat: "demoClose",
     key: "weapon",
     tags: ["speed", "drum"],
     nudge: nudge(4, 2, -1, 0),
@@ -379,7 +409,7 @@ const FAMILIES: Family[] = [
   {
     slot: "weapon",
     family: "wedge",
-    stat: "close",
+    stat: "demoClose",
     key: "weapon",
     tags: ["control", "wedge"],
     nudge: nudge(2, -1, 3, 0),
@@ -401,7 +431,7 @@ const FAMILIES: Family[] = [
   {
     slot: "weapon",
     family: "hammer",
-    stat: "close",
+    stat: "demoClose",
     key: "weapon",
     tags: ["smash", "hammer"],
     nudge: nudge(5, -2, 1, 0),
@@ -423,7 +453,7 @@ const FAMILIES: Family[] = [
   {
     slot: "weapon",
     family: "claw",
-    stat: "close",
+    stat: "demoClose",
     key: "weapon",
     tags: ["control", "claw", "heat"],
     nudge: nudge(1, 0, 0, 5),
@@ -445,7 +475,7 @@ const FAMILIES: Family[] = [
   {
     slot: "weapon",
     family: "disc",
-    stat: "close",
+    stat: "demoClose",
     key: "weapon",
     tags: ["speed", "disc"],
     nudge: nudge(3, 4, -2, 1),
@@ -467,7 +497,7 @@ const FAMILIES: Family[] = [
   {
     slot: "armor",
     family: "plate",
-    stat: "ticket",
+    stat: "conv",
     key: "armor",
     tags: ["armor"],
     nudge: nudge(0, -1, 5, 0),
@@ -479,7 +509,7 @@ const FAMILIES: Family[] = [
       championship: "The Safe",
     },
     jobs: {
-      stock: "Flat plate. Former-customer armor starts here.",
+      stock: "Flat plate. Conversion armor starts here.",
       sport: "Thicker where the saw usually looks.",
       pro: "Plate for a ticket average that can carry it.",
       super: "A vault. They hit it. The number does not move.",
@@ -489,7 +519,7 @@ const FAMILIES: Family[] = [
   {
     slot: "armor",
     family: "skirt",
-    stat: "ticket",
+    stat: "conv",
     key: "armor",
     tags: ["armor", "wedge"],
     nudge: nudge(1, 0, 3, 0),
@@ -511,7 +541,7 @@ const FAMILIES: Family[] = [
   {
     slot: "armor",
     family: "angle",
-    stat: "ticket",
+    stat: "conv",
     key: "armor",
     tags: ["armor", "deflect"],
     nudge: nudge(0, 1, 3, 1),
@@ -533,7 +563,7 @@ const FAMILIES: Family[] = [
   {
     slot: "armor",
     family: "cage",
-    stat: "ticket",
+    stat: "conv",
     key: "armor",
     tags: ["heat", "open"],
     nudge: nudge(0, 1, -1, 3),
@@ -551,7 +581,7 @@ const FAMILIES: Family[] = [
   {
     slot: "utility",
     family: "burn",
-    stat: "reviews",
+    stat: "arch",
     key: "utility",
     tags: ["speed"],
     nudge: nudge(0, 3, -1, 1),
@@ -573,7 +603,7 @@ const FAMILIES: Family[] = [
   {
     slot: "utility",
     family: "peace",
-    stat: "reviews",
+    stat: "arch",
     key: "utility",
     tags: ["control"],
     nudge: nudge(1, 0, 2, 1),
@@ -595,7 +625,7 @@ const FAMILIES: Family[] = [
   {
     slot: "utility",
     family: "crowd",
-    stat: "reviews",
+    stat: "arch",
     key: "utility",
     tags: ["crowd"],
     nudge: nudge(1, 1, 1, 1),
@@ -607,7 +637,7 @@ const FAMILIES: Family[] = [
       championship: "Sellout",
     },
     jobs: {
-      stock: "The cage leans your way. Reviews put bodies in the seats.",
+      stock: "The cage leans your way. Arch supports put bodies in the seats.",
       sport: "Louder section. The judges hear it.",
       pro: "A magnet built from names, not noise.",
       super: "You are the house. The other bot is visiting.",
@@ -617,7 +647,7 @@ const FAMILIES: Family[] = [
   {
     slot: "utility",
     family: "weld",
-    stat: "reviews",
+    stat: "arch",
     key: "utility",
     tags: ["repair"],
     nudge: nudge(0, 0, 2, 0),
@@ -639,7 +669,7 @@ const FAMILIES: Family[] = [
   {
     slot: "utility",
     family: "scry",
-    stat: "reviews",
+    stat: "arch",
     key: "utility",
     tags: ["read", "underdog"],
     nudge: nudge(0, 0, 0, 2),
@@ -656,6 +686,50 @@ const FAMILIES: Family[] = [
       pro: "The scry a quiet store uses to pick the counter.",
       super: "Blueprint. You fight the drawing, not the rumor.",
       championship: "Title tell. You knew the lock before the bell.",
+    },
+  },
+  {
+    slot: "brain",
+    family: "logic",
+    stat: "ticket",
+    key: "brain",
+    tags: ["smart"],
+    nudge: nudge(1, 1, 2, 1),
+    names: {
+      stock: "Logic Board",
+      sport: "Sport Logic",
+      pro: "Pro Targeting Core",
+      super: "Battle Mind",
+      championship: "The Oracle — Title",
+    },
+    jobs: {
+      stock: "Reads the cage. Turns toward the other bot. That is about it.",
+      sport: "Picks a side and stays on it. Fewer wasted charges.",
+      pro: "Tracks the weapon, not the paint. Hits land where they count.",
+      super: "Plans three moves out. The other driver feels slow.",
+      championship: "Title brain. It already knows how this ends.",
+    },
+  },
+  {
+    slot: "brain",
+    family: "hunter",
+    stat: "ticket",
+    key: "brain",
+    tags: ["smart", "aggro"],
+    nudge: nudge(3, 2, -1, 0),
+    names: {
+      stock: "Hunter Chip",
+      sport: "Sport Hunter",
+      pro: "Pro Hunter",
+      super: "Apex Predator",
+      championship: "Apex — Title",
+    },
+    jobs: {
+      stock: "Points the weapon at the closest thing and goes.",
+      sport: "Smells a bent wheel from across the cage.",
+      pro: "Finds the gap in the armor and keeps hitting it.",
+      super: "Never lets go. Never backs off. Costs armor to run.",
+      championship: "Title hunter. Nothing walks out of the cage clean.",
     },
   },
 ];
@@ -679,9 +753,7 @@ function buildParts(): Part[] {
         job,
         tags: family.tags,
         nudge: family.nudge,
-        scrap: TIER_COST[tier],
-        greens: TIER_GREENS[tier],
-        keys: TIER_KEYS[tier],
+        price: TIER_PRICE[tier],
       });
     });
   }
@@ -715,9 +787,9 @@ export function stockPart(slot: Slot, classId: ClassId, family?: string): Part {
     if (hit) return hit;
   }
   const defaults: Record<ClassId, Record<Exclude<Slot, "chassis" | "utility">, string>> = {
-    striker: { drive: "mag", weapon: "saw", armor: "plate" },
-    tank: { drive: "treads", weapon: "wedge", armor: "plate" },
-    specialist: { drive: "omni", weapon: "claw", armor: "cage" },
+    striker: { drive: "mag", weapon: "saw", armor: "plate", brain: "hunter" },
+    tank: { drive: "treads", weapon: "wedge", armor: "plate", brain: "logic" },
+    specialist: { drive: "omni", weapon: "claw", armor: "cage", brain: "logic" },
   };
   if (slot === "utility") return partById("utility-scry-stock")!;
   const fam = defaults[classId][slot];
@@ -735,6 +807,7 @@ export const SLOT_LABEL: Record<Slot, string> = {
   weapon: "Weapon",
   armor: "Armor",
   utility: "Utility",
+  brain: "Brain",
 };
 
 export const GRADE_WORD: Record<string, string> = {

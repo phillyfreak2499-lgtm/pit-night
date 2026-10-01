@@ -19,7 +19,7 @@ export function PreviewPage() {
         <SectionLabel>House preview</SectionLabel>
         <h1 className="font-display text-5xl leading-none">Watch the cage first</h1>
         <p className="mt-3 max-w-2xl text-muted">
-          These are not your stores. Three house bots on a blue week, with the right weapon, then one tank that bolted on a disc. Nothing posts. No damage, no scrap, no record.
+          These are not your stores. Three house bots on a blue week, with the right weapon, then one tank that bolted on a disc. Nothing posts. No damage, no coins, no record.
         </p>
       </div>
       <div className="flex flex-wrap gap-2">

@@ -24,8 +24,8 @@ const STEPS = [
   },
   {
     kicker: "Upgrades",
-    title: "Green earns keys. Keys open parts.",
-    body: "Every green grade earns one key for that part of the bot: Demo → drive, Closing → weapon, NSNU → chassis, Ticket → armor, Reviews → utility. Keys are never spent. 1 key opens Sport, 2 open Pro, 3 open Super. Every grade also pays scrap, and scrap buys the part.",
+    title: "Six numbers. Six parts. Grades pay coins.",
+    body: "NSNU builds the chassis, Conv % the armor, Demo Rate the drive, Demo Close % the weapon, Arch Supports the utility, and Demo Ticket Avg the brain. Every Monday each number pays its part: green 3 coins, blue 2, orange 1. Sport costs 3, Pro 5, Super 8, from that part's own jar.",
   },
   {
     kicker: "The trophy",

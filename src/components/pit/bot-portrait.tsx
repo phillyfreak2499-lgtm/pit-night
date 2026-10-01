@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
+import { partById } from "@/lib/pit/catalog";
 import { botFor, canSeeLoadout, weaponFamilyOf } from "@/lib/pit/engine";
 import { usePit } from "@/lib/pit/store";
-import type { BotLook, BotStyle, ClassId, FighterSnap } from "@/lib/pit/types";
+import type { BotLook, BotStyle, ClassId, FighterSnap, Tier } from "@/lib/pit/types";
 import { drawSideBot, paintOf, shade } from "./cage-draw";
 import type { BotState } from "./cage-motion";
 
@@ -16,6 +17,7 @@ export type BotLookProps = {
   hp: number;
   style?: BotStyle;
   storeName: string;
+  brainTier?: Tier;
 };
 
 /** What a store's bot looks like to whoever is viewing. Weapons stay under the tarp until the bell. */
@@ -40,6 +42,7 @@ export function useBotLook(storeId: string): BotLookProps | null {
     hp: Math.max(10, hp),
     style: bot.style,
     storeName: store.name,
+    brainTier: see ? (partById((bot.locked ?? bot.draft).brain)?.tier ?? "stock") : "stock",
   };
 }
 
@@ -53,6 +56,7 @@ function stateFor(look: BotLookProps): BotState {
     number: look.number,
     style: look.style,
     storeName: look.storeName,
+    brainTier: look.brainTier,
   } as FighterSnap;
   return {
     bot: snap,
@@ -92,7 +96,7 @@ export function BotPortrait({
 }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const key = look
-    ? `${look.id}|${look.paint}|${look.classId}|${look.weapon}|${look.look}|${look.number}|${look.hp}|${JSON.stringify(look.style ?? {})}`
+    ? `${look.id}|${look.paint}|${look.classId}|${look.weapon}|${look.look}|${look.number}|${look.hp}|${JSON.stringify(look.style ?? {})}|${look.brainTier ?? ""}`
     : "";
 
   useEffect(() => {

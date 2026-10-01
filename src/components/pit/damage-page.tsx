@@ -5,7 +5,7 @@ import { usePit } from "@/lib/pit/store";
 import type { Condition, Slot } from "@/lib/pit/types";
 import { SectionLabel } from "./bits";
 
-const SLOTS: Slot[] = ["chassis", "drive", "weapon", "armor", "utility"];
+const SLOTS: Slot[] = ["chassis", "drive", "weapon", "armor", "utility", "brain"];
 
 const TONE: Record<Condition, string> = {
   clean: "text-ok",
@@ -58,7 +58,7 @@ export function DamagePage() {
                 <ul className="mt-3 flex flex-col gap-2">
                   {quotes.map((quote) => (
                     <li key={quote.slot} className="text-sm text-muted">
-                      {quote.partName} · {quote.repairCost} scrap{quote.weldCost ? ` · weld ${quote.weldCost}` : ""} — {quote.line}
+                      {quote.partName} · {quote.repairCost} {quote.slot} coins{quote.weldCost ? ` · weld ${quote.weldCost}` : ""} — {quote.line}
                     </li>
                   ))}
                 </ul>

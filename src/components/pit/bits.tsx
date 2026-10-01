@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { CLASS_META, SLOT_LABEL, tierWord } from "@/lib/pit/catalog";
-import { gradesOf, methodLabel, recordOf, scrapMath } from "@/lib/pit/engine";
+import { CLASS_META, METRICS, SLOT_LABEL, tierWord } from "@/lib/pit/catalog";
+import { coinMath, gradesOf, methodLabel, recordOf } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
 import type { Bout, Grade, StoreCard } from "@/lib/pit/types";
 
@@ -167,25 +167,16 @@ export function StatStrip({
 
 export function GradeRow({ card }: { card: StoreCard }) {
   const grades = gradesOf(card);
-  const scrap = scrapMath(grades);
-  const items = [
-    ["Demo", grades.demo],
-    ["Close", grades.close],
-    ["NSNU", grades.nsnu],
-    ["Reviews", grades.reviews],
-    ["Ticket", grades.ticket],
-  ] as const;
+  const coins = coinMath(grades);
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {items.map(([label, grade]) => (
-        <span key={label} className="inline-flex items-center gap-1 text-xs text-muted">
-          {label}
-          <GradeMark grade={grade} />
+      {METRICS.map((m) => (
+        <span key={m.stat} className="inline-flex items-center gap-1 text-xs text-muted">
+          {m.short}
+          <GradeMark grade={grades[m.stat]} />
         </span>
       ))}
-      <span className="text-xs text-amber">
-        {scrap.total} scrap{scrap.bonus ? ` · +${scrap.bonus} green bonus` : ""}
-      </span>
+      <span className="text-xs text-amber">{coins.total} coins</span>
     </div>
   );
 }

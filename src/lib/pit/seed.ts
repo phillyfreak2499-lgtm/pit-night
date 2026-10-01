@@ -1,14 +1,14 @@
 import { stockPart, VERSION } from "./catalog";
 import type { Bot, BotLook, ClassId, Crew, GarageLook, Loadout, PitData, Store, StoreCard, WeekMeta } from "./types";
 
-const ZERO_KEYS = { chassis: 0, drive: 0, weapon: 0, armor: 0, utility: 0 };
-const ZERO_GREENS = { demo: 0, close: 0, nsnu: 0, reviews: 0, ticket: 0 };
+const ZERO_COINS = { chassis: 0, drive: 0, weapon: 0, armor: 0, utility: 0, brain: 0 };
 const CLEAN = {
   chassis: "clean" as const,
   drive: "clean" as const,
   weapon: "clean" as const,
   armor: "clean" as const,
   utility: "clean" as const,
+  brain: "clean" as const,
 };
 
 type Row = {
@@ -28,6 +28,7 @@ type Row = {
   drive: string;
   weapon: string;
   armor: string;
+  /** NSNU $, Conv %, Demo Rate %, Demo Close %, Arch Supports, Demo Ticket $. */
   card: [number, number, number, number, number, number];
 };
 
@@ -63,7 +64,7 @@ const ROWS: Row[] = [
     drive: "treads",
     weapon: "hammer",
     armor: "skirt",
-    card: [78, 64, 109, 5, 4, 390],
+    card: [1025, 61, 83, 70, 3.4, 1700],
   },
   {
     id: "arlington",
@@ -82,7 +83,7 @@ const ROWS: Row[] = [
     drive: "mag",
     weapon: "wedge",
     armor: "plate",
-    card: [88, 73, 125, 2, 4, 410],
+    card: [1175, 68, 89, 73, 2.8, 1750],
   },
   {
     id: "rockwall",
@@ -101,7 +102,7 @@ const ROWS: Row[] = [
     drive: "omni",
     weapon: "claw",
     armor: "cage",
-    card: [74, 60, 104, 8, 4, 340],
+    card: [980, 58, 81, 69, 3.9, 1590],
   },
   {
     id: "southlake",
@@ -120,7 +121,7 @@ const ROWS: Row[] = [
     drive: "treads",
     weapon: "wedge",
     armor: "plate",
-    card: [86, 69, 122, 8, 4, 430],
+    card: [1145, 65, 88, 72, 3.6, 1790],
   },
   {
     id: "college",
@@ -139,7 +140,7 @@ const ROWS: Row[] = [
     drive: "mag",
     weapon: "saw",
     armor: "angle",
-    card: [79, 63, 98, 6, 4, 270],
+    card: [920, 60, 84, 70, 3.1, 1440],
   },
   {
     id: "hulen",
@@ -158,7 +159,7 @@ const ROWS: Row[] = [
     drive: "treads",
     weapon: "wedge",
     armor: "plate",
-    card: [72, 58, 91, 4, 4, 330],
+    card: [855, 57, 79, 68, 2.7, 1570],
   },
   {
     id: "allen",
@@ -177,7 +178,7 @@ const ROWS: Row[] = [
     drive: "treads",
     weapon: "disc",
     armor: "plate",
-    card: [91, 76, 136, 10, 5, 480],
+    card: [1280, 70, 91, 74, 4.1, 1900],
   },
   {
     id: "plano",
@@ -196,7 +197,7 @@ const ROWS: Row[] = [
     drive: "mag",
     weapon: "saw",
     armor: "plate",
-    card: [84, 71, 108, 8, 4, 240],
+    card: [1015, 66, 87, 73, 3.5, 1370],
   },
   {
     id: "temple",
@@ -215,7 +216,7 @@ const ROWS: Row[] = [
     drive: "omni",
     weapon: "claw",
     armor: "cage",
-    card: [61, 46, 118, 8, 4, 230],
+    card: [1110, 48, 73, 64, 3.0, 1350],
   },
   {
     id: "alliance",
@@ -234,7 +235,7 @@ const ROWS: Row[] = [
     drive: "omni",
     weapon: "claw",
     armor: "cage",
-    card: [70, 55, 102, 8, 4, 290],
+    card: [960, 54, 78, 67, 3.3, 1480],
   },
   {
     id: "waxahachie",
@@ -253,7 +254,7 @@ const ROWS: Row[] = [
     drive: "mag",
     weapon: "drum",
     armor: "angle",
-    card: [68, 52, 96, 4, 4, 260],
+    card: [900, 52, 77, 66, 2.6, 1420],
   },
 ];
 
@@ -264,6 +265,7 @@ function loadout(classId: ClassId, drive: string, weapon: string, armor: string)
     weapon: `weapon-${weapon}-stock`,
     armor: `armor-${armor}-stock`,
     utility: null,
+    brain: stockPart("brain", classId).id,
   };
 }
 
@@ -274,12 +276,10 @@ function botFrom(row: Row): Bot {
     storeId: row.id,
     name: row.bot,
     classId: row.classId,
-    scrap: 0,
     voucher: 0,
     repairSpent: 0,
     owned: [],
-    keys: { ...ZERO_KEYS },
-    greens: { ...ZERO_GREENS },
+    coins: { ...ZERO_COINS },
     wear: { ...CLEAN },
     partWear: {},
     equipped: { ...gear },
@@ -328,7 +328,6 @@ export function makeData(): PitData {
     paint: row.paint,
     garage: row.garage,
     seed: row.seed,
-    nsnuGoal: row.goal,
   }));
 
   const crew: Crew[] = ROWS.flatMap((row) => [
@@ -345,13 +344,12 @@ export function makeData(): PitData {
     id: `${row.id}-w1`,
     storeId: row.id,
     week: 1,
-    demoPct: row.card[0],
-    closePct: row.card[1],
-    nsnuPct: row.card[2],
-    prorate: 1,
-    reviews: row.card[3],
-    crewOnClock: row.card[4],
-    formerTicket: row.card[5],
+    nsnu: row.card[0],
+    conv: row.card[1],
+    demoRate: row.card[2],
+    demoClose: row.card[3],
+    arch: row.card[4],
+    demoTicket: row.card[5],
     projected: false,
   }));
 
