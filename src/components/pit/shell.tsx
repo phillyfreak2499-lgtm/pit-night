@@ -6,6 +6,7 @@ import { startSync, useSyncStatus } from "@/lib/pit/sync";
 import { setSoundMuted, soundMuted, subscribeSound } from "@/lib/pit/sound";
 import { formatRemain, nextLock, PERIOD_OPENS, TextInput, useNow } from "./bits";
 import { Tutorial } from "./tutorial";
+import { StreakBadge } from "./streak-badge";
 
 const NAV = [
   { to: "/", label: "Titantron", icon: Tv },
@@ -50,8 +51,8 @@ export function PitShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen text-fg">
-      <div className="md:grid md:grid-cols-[13.5rem_1fr]">
-        <aside className="hidden border-r border-line bg-deep md:sticky md:top-0 md:flex md:h-screen md:flex-col md:justify-between md:p-4">
+      <div className="shell-grid md:grid md:grid-cols-[13.5rem_1fr]">
+        <aside className="no-print hidden border-r border-line bg-deep md:sticky md:top-0 md:flex md:h-screen md:flex-col md:justify-between md:p-4">
           <div>
             <Brand />
             <nav className="mt-8 flex flex-col gap-1">
@@ -63,7 +64,7 @@ export function PitShell({ children }: { children: React.ReactNode }) {
           <PhaseBlock />
         </aside>
         <div className="min-w-0">
-          <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-line bg-deep/95 px-4 py-3 backdrop-blur md:px-6">
+          <header className="no-print sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-line bg-deep/95 px-4 py-3 backdrop-blur md:px-6">
             <div className="md:hidden">
               <Brand compact />
             </div>
@@ -114,7 +115,7 @@ export function PitShell({ children }: { children: React.ReactNode }) {
           ) : (
             <Boot />
           )}
-          <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-line bg-deep md:hidden">
+          <nav className="no-print fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-line bg-deep md:hidden">
             {NAV.filter((item) => ["/", "/map", "/week", "/broadcast", "/desk"].includes(item.to)).map((item) => (
               <NavLink key={item.to} to={item.to} label={item.label} icon={item.icon} compact />
             ))}
@@ -245,7 +246,7 @@ function SyncDot() {
 function Flash() {
   const flash = usePit((s) => s.flash);
   if (!flash) return null;
-  return <p className="border-b border-line bg-surface px-4 py-2 text-sm text-amber md:px-6">{flash}</p>;
+  return <p className="no-print border-b border-line bg-surface px-4 py-2 text-sm text-amber md:px-6">{flash}</p>;
 }
 
 function Boot() {
@@ -377,6 +378,7 @@ function PassSheet({ onClose }: { onClose: () => void }) {
                   }}
                 >
                   {member.name}
+                  <StreakBadge crewId={member.id} />
                 </button>
               ))}
             </div>

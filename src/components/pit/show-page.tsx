@@ -85,9 +85,14 @@ export function ShowPage() {
                 : "That fight day was never posted."}
           </p>
         </div>
-        <Link to="/card" className="inline-flex min-h-11 items-center text-sm text-amber">
-          Printed card
-        </Link>
+        <div className="flex flex-wrap gap-3">
+          <Link to="/watch" data-testid="open-watch-party" className="inline-flex min-h-11 items-center bg-spark px-4 font-display text-sm tracking-wide text-deep uppercase">
+            Watch party · big screen
+          </Link>
+          <Link to="/card" className="inline-flex min-h-11 items-center text-sm text-amber">
+            Printed card
+          </Link>
+        </div>
       </div>
 
       {showWeeks ? (
@@ -287,7 +292,7 @@ function SignOff({ bouts, live }: { bouts: Bout[]; live: boolean }) {
   );
 }
 
-function buildTape(data: PitData, week: number): { live: boolean; bouts: Bout[] } {
+export function buildTape(data: PitData, week: number): { live: boolean; bouts: Bout[] } {
   const posted = data.bouts.filter((b) => b.week === week && b.result).sort((a, b) => a.slot - b.slot);
   if (posted.length) return { live: true, bouts: posted };
   if (week !== data.week) return { live: false, bouts: [] };
@@ -337,14 +342,14 @@ function weekName(data: PitData, week: number) {
   return data.weeks.find((w) => w.number === week)?.name ?? `Week ${week}`;
 }
 
-function storeBot(data: PitData, id: string) {
+export function storeBot(data: PitData, id: string) {
   const store = data.stores.find((s) => s.id === id);
   const bot = data.bots.find((b) => b.storeId === id);
   if (!store) return id;
   return bot ? `${store.name} ${bot.name}` : store.name;
 }
 
-function matchup(data: PitData, bout: Bout) {
+export function matchup(data: PitData, bout: Bout) {
   if (bout.kind === "bye") return `${storeBot(data, bout.teamA[0] ?? "")} · bye, counts as a win`;
   if (bout.kind === "melee") return `${bout.teamA.length} stores battle the tie`;
   const left = bout.teamA.map((id) => storeBot(data, id)).join(" + ");
@@ -373,7 +378,7 @@ function nextFight(segments: Segment[], index: number) {
   return null;
 }
 
-function methodWord(bout: Bout) {
+export function methodWord(bout: Bout) {
   const method = bout.result?.method;
   if (bout.kind === "bye" || method === "bye") return "BYE";
   if (method === "scrimmage") return "SCRIMMAGE";

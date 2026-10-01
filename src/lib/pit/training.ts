@@ -8,7 +8,7 @@ import { central } from "./time";
  * Culture runs every single day.
  */
 
-export type JobKind = "culture" | "skill" | "care";
+export type JobKind = "culture" | "skill" | "care" | "crate";
 export type DayKey = "tue" | "wed" | "thu" | "fri" | "sat";
 
 export type Job = {
@@ -50,7 +50,63 @@ export const DAY_LABEL: Record<DayKey, string> = { tue: "Tuesday", wed: "Wednesd
 export const DAY_ORDER: DayKey[] = ["tue", "wed", "thu", "fri", "sat"];
 
 /** Coins are performance. Bolts are effort. Bolts never touch the fight except through the Full Tune-Up. */
-export const BOLTS = { job: 2, sparkCorrect: 1, pickCorrect: 2 } as const;
+export const BOLTS = { job: 2, sparkCorrect: 1, pickCorrect: 2, crate: 5 } as const;
+
+/** Perfect Sparks in a row for the streak badge. */
+export const STREAK_BADGE = 5;
+
+type CrateJob = Omit<Job, "id" | "kind">;
+
+/** Wednesday Mystery Crate: one bonus job, revealed Wednesday. Extra bolts, not part of the Tune-Up. */
+export const CRATES: CrateJob[] = [
+  {
+    title: "Five-star moment",
+    do: "Give a Client an experience worth writing about, then ask them for a Google review before they leave. Bonus if they mention you by name.",
+    proof: "The Client's first name and one line from their review.",
+  },
+  {
+    title: "Referral ask",
+    do: "Ask every Client who buys today: “Who else do you know who is living with pain like you were?” Get one name and number.",
+    proof: "The referral's first name and how they know your Client.",
+  },
+  {
+    title: "Follow-up hero",
+    do: "Make three follow-up calls to Clients from the last 30 days. Get one of them to tell you a win in their own words.",
+    proof: "The Client's first name and their win.",
+  },
+  {
+    title: "Rolex corner",
+    do: "Pick one corner of the store and make it Rolex level before noon. Ask your captain to inspect it.",
+    proof: "What you fixed and what your captain said.",
+  },
+  {
+    title: "Teach-back",
+    do: "Teach a teammate one step of the Closing Flow for five minutes, then have them teach it back to you.",
+    proof: "Who you taught and which step.",
+  },
+  {
+    title: "Good neighbor",
+    do: "Walk a thank-you note and your card to a business next door. Tell them what Good Feet does for people in pain.",
+    proof: "The business and who you talked to.",
+  },
+  {
+    title: "Before and after",
+    do: "After the Relaxer walk, ask a Client to describe how they felt walking in versus right now, in their own words.",
+    proof: "Their before and their after, in one line each.",
+  },
+  {
+    title: "Huddle hype",
+    do: "Lead tomorrow's huddle with one win from today: a Client, a teammate, or a number. Keep it under a minute.",
+    proof: "The win you are bringing to the huddle.",
+  },
+];
+
+/** The crate for a week. Shuffled by week so stores cannot guess it from the list. */
+export function crateFor(week: number): Job {
+  const order = [5, 0, 3, 7, 1, 6, 2, 4];
+  const pick = CRATES[order[(week - 1) % order.length]! % CRATES.length]!;
+  return { ...pick, id: `w${week}-crate`, kind: "crate" };
+}
 
 /** Full Tune-Up: every job and every Spark, every specialist, done by Saturday close. */
 export const TUNE_UP_BONUS = 4;

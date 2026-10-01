@@ -37,8 +37,8 @@ import {
   writeGazette,
 } from "./engine";
 import { makeData } from "./seed";
-import { BOLTS, allJobs, dayOpen, programWeek, type DayKey } from "./training";
-import { boltsOf, lockerItem } from "./week";
+import { BOLTS, STREAK_BADGE, allJobs, crateFor, dayOpen, programWeek, type DayKey } from "./training";
+import { boltsOf, lockerItem, sparkStreak } from "./week";
 import type { Bot, BotLook, BotStyle, Condition, FightResult, GarageLook, Grade, Kickoff, Loadout, PitData, Slot, StatKey, StoreCard } from "./types";
 
 const FIELD_OF: Record<StatKey, keyof StoreCard> = { nsnu: "nsnu", conv: "conv", demoRate: "demoRate", demoClose: "demoClose", arch: "arch", ticket: "demoTicket" };
@@ -804,9 +804,9 @@ export const usePit = create<PitState>()(
           return;
         }
         const plan = programWeek(week);
-        const job = plan ? [...allJobs(plan), plan.care].find((j) => j.id === jobId) : undefined;
+        const job = plan ? [...allJobs(plan), plan.care, crateFor(week)].find((j) => j.id === jobId) : undefined;
         if (!plan || !job) return;
-        const dayOf = plan.days.find((d) => d.jobs.some((j) => j.id === jobId))?.day;
+        const dayOf = job.kind === "crate" ? "wed" : plan.days.find((d) => d.jobs.some((j) => j.id === jobId))?.day;
         const closed = trainingClosed(data, week, dayOf);
         if (closed) {
           set({ flash: closed });
@@ -841,7 +841,7 @@ export const usePit = create<PitState>()(
         }
         set({
           jobLog: data.jobLog.map((e) => (e.id === entryId ? { ...e, status: "approved" } : e)),
-          flash: `${entry.crewName} is approved. +${BOLTS.job} bolts.`,
+          flash: `${entry.crewName} is approved. +${entry.jobId.endsWith("-crate") ? BOLTS.crate : BOLTS.job} bolts.`,
         });
       },
       rejectJob: (entryId) => {
@@ -861,9 +861,18 @@ export const usePit = create<PitState>()(
         }
         const id = `${week}:${day}:${who.id}`;
         if (data.sparkLog.some((e) => e.id === id)) return;
+        const sparkLog = [...data.sparkLog, { id, week, day, storeId: who.storeId, crewId: who.id, correct, total, at: Date.now() }];
+        const before = sparkStreak(data, who.id);
+        const after = sparkStreak({ sparkLog }, who.id);
+        const streakNote =
+          after.badge && !before.badge
+            ? ` ${STREAK_BADGE} perfect in a row. Streak badge earned.`
+            : after.current > 1
+              ? ` ${after.current} perfect in a row.`
+              : "";
         set({
-          sparkLog: [...data.sparkLog, { id, week, day, storeId: who.storeId, crewId: who.id, correct, total, at: Date.now() }],
-          flash: `Spark done. ${correct} of ${total}. +${correct * BOLTS.sparkCorrect} bolts.`,
+          sparkLog,
+          flash: `Spark done. ${correct} of ${total}. +${correct * BOLTS.sparkCorrect} bolts.${streakNote}`,
         });
       },
       postShout: (to, text) => {

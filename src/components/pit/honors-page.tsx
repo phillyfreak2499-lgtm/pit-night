@@ -29,6 +29,18 @@ export function HonorsPage() {
       </div>
       {drop ? <p className="mt-4 text-sm text-amber">Title drop in the champion bay: {drop.name}. Not for sale.</p> : null}
       <section className="mt-8">
+        <SectionLabel>Season recaps</SectionLabel>
+        <p className="mt-2 text-sm text-muted">One printable sheet per store: record, best fight, MVPs, and Tune-Ups. Frame it next to the trophy.</p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {data.stores.map((s) => (
+            <Link key={s.id} to="/recap/$storeId" params={{ storeId: s.id }} className="flex min-h-11 items-center justify-between border border-line bg-surface px-3 py-2 hover:border-amber">
+              <span className="font-display text-lg">{s.name}</span>
+              <span className="text-xs tracking-widest text-amber uppercase">Recap →</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+      <section className="mt-8">
         <SectionLabel>Weekly pit-crew MVP</SectionLabel>
         {data.mvps.length === 0 ? <p className="mt-2 text-sm text-muted">No names yet. A captain or the desk can put one up. It is not a win-loss.</p> : null}
         <ul className="mt-3 flex flex-col gap-2">

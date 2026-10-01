@@ -5,6 +5,7 @@ import { paintHex, usePit } from "@/lib/pit/store";
 import type { Slot } from "@/lib/pit/types";
 import { ClassTag, GradeRow, SectionLabel, StatStrip } from "./bits";
 import { BotPortrait, useBotLook } from "./bot-portrait";
+import { StreakBadge } from "./streak-badge";
 
 const SLOTS: Slot[] = ["chassis", "drive", "weapon", "armor", "utility", "brain"];
 
@@ -36,6 +37,9 @@ export function StorePage({ storeId }: { storeId: string }) {
       <p className="mt-2 font-display text-2xl leading-tight text-muted">
         Bay {bot.number} · {bot.name}
       </p>
+      <Link to="/recap/$storeId" params={{ storeId }} className="mt-1 inline-flex min-h-11 items-center text-sm text-amber">
+        Season recap →
+      </Link>
       <StoreBot storeId={storeId} />
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <ClassTag classId={bot.classId} />
@@ -90,7 +94,10 @@ export function StorePage({ storeId }: { storeId: string }) {
         <ul className="mt-2">
           {crew.map((member) => (
             <li key={member.id} className="flex justify-between border-b border-line py-2">
-              <span>{member.name}</span>
+              <span>
+                {member.name}
+                <StreakBadge crewId={member.id} />
+              </span>
               <span className="text-xs tracking-widest text-muted uppercase">{member.role}</span>
             </li>
           ))}

@@ -19,9 +19,11 @@ import { Route as HonorsRouteImport } from './routes/honors'
 import { Route as MapRouteImport } from './routes/map'
 import { Route as PreviewRouteImport } from './routes/preview'
 import { Route as RulesRouteImport } from './routes/rules'
+import { Route as WatchRouteImport } from './routes/watch'
 import { Route as WeekRouteImport } from './routes/week'
 import { Route as BoutBoutIdRouteImport } from './routes/bout.$boutId'
 import { Route as GarageStoreIdRouteImport } from './routes/garage.$storeId'
+import { Route as RecapStoreIdRouteImport } from './routes/recap.$storeId'
 import { Route as ShopStoreIdRouteImport } from './routes/shop.$storeId'
 import { Route as StoresStoreIdRouteImport } from './routes/stores.$storeId'
 
@@ -75,6 +77,11 @@ const RulesRoute = RulesRouteImport.update({
   path: '/rules',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WatchRoute = WatchRouteImport.update({
+  id: '/watch',
+  path: '/watch',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WeekRoute = WeekRouteImport.update({
   id: '/week',
   path: '/week',
@@ -88,6 +95,11 @@ const BoutBoutIdRoute = BoutBoutIdRouteImport.update({
 const GarageStoreIdRoute = GarageStoreIdRouteImport.update({
   id: '/garage/$storeId',
   path: '/garage/$storeId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RecapStoreIdRoute = RecapStoreIdRouteImport.update({
+  id: '/recap/$storeId',
+  path: '/recap/$storeId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShopStoreIdRoute = ShopStoreIdRouteImport.update({
@@ -112,9 +124,11 @@ export interface FileRoutesByFullPath {
   '/map': typeof MapRoute
   '/preview': typeof PreviewRoute
   '/rules': typeof RulesRoute
+  '/watch': typeof WatchRoute
   '/week': typeof WeekRoute
   '/bout/$boutId': typeof BoutBoutIdRoute
   '/garage/$storeId': typeof GarageStoreIdRoute
+  '/recap/$storeId': typeof RecapStoreIdRoute
   '/shop/$storeId': typeof ShopStoreIdRoute
   '/stores/$storeId': typeof StoresStoreIdRoute
 }
@@ -129,9 +143,11 @@ export interface FileRoutesByTo {
   '/map': typeof MapRoute
   '/preview': typeof PreviewRoute
   '/rules': typeof RulesRoute
+  '/watch': typeof WatchRoute
   '/week': typeof WeekRoute
   '/bout/$boutId': typeof BoutBoutIdRoute
   '/garage/$storeId': typeof GarageStoreIdRoute
+  '/recap/$storeId': typeof RecapStoreIdRoute
   '/shop/$storeId': typeof ShopStoreIdRoute
   '/stores/$storeId': typeof StoresStoreIdRoute
 }
@@ -147,9 +163,11 @@ export interface FileRoutesById {
   '/map': typeof MapRoute
   '/preview': typeof PreviewRoute
   '/rules': typeof RulesRoute
+  '/watch': typeof WatchRoute
   '/week': typeof WeekRoute
   '/bout/$boutId': typeof BoutBoutIdRoute
   '/garage/$storeId': typeof GarageStoreIdRoute
+  '/recap/$storeId': typeof RecapStoreIdRoute
   '/shop/$storeId': typeof ShopStoreIdRoute
   '/stores/$storeId': typeof StoresStoreIdRoute
 }
@@ -166,9 +184,11 @@ export interface FileRouteTypes {
     | '/map'
     | '/preview'
     | '/rules'
+    | '/watch'
     | '/week'
     | '/bout/$boutId'
     | '/garage/$storeId'
+    | '/recap/$storeId'
     | '/shop/$storeId'
     | '/stores/$storeId'
   fileRoutesByTo: FileRoutesByTo
@@ -183,9 +203,11 @@ export interface FileRouteTypes {
     | '/map'
     | '/preview'
     | '/rules'
+    | '/watch'
     | '/week'
     | '/bout/$boutId'
     | '/garage/$storeId'
+    | '/recap/$storeId'
     | '/shop/$storeId'
     | '/stores/$storeId'
   id:
@@ -200,9 +222,11 @@ export interface FileRouteTypes {
     | '/map'
     | '/preview'
     | '/rules'
+    | '/watch'
     | '/week'
     | '/bout/$boutId'
     | '/garage/$storeId'
+    | '/recap/$storeId'
     | '/shop/$storeId'
     | '/stores/$storeId'
   fileRoutesById: FileRoutesById
@@ -218,9 +242,11 @@ export interface RootRouteChildren {
   MapRoute: typeof MapRoute
   PreviewRoute: typeof PreviewRoute
   RulesRoute: typeof RulesRoute
+  WatchRoute: typeof WatchRoute
   WeekRoute: typeof WeekRoute
   BoutBoutIdRoute: typeof BoutBoutIdRoute
   GarageStoreIdRoute: typeof GarageStoreIdRoute
+  RecapStoreIdRoute: typeof RecapStoreIdRoute
   ShopStoreIdRoute: typeof ShopStoreIdRoute
   StoresStoreIdRoute: typeof StoresStoreIdRoute
 }
@@ -297,6 +323,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RulesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/watch': {
+      id: '/watch'
+      path: '/watch'
+      fullPath: '/watch'
+      preLoaderRoute: typeof WatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/week': {
       id: '/week'
       path: '/week'
@@ -316,6 +349,13 @@ declare module '@tanstack/react-router' {
       path: '/garage/$storeId'
       fullPath: '/garage/$storeId'
       preLoaderRoute: typeof GarageStoreIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/recap/$storeId': {
+      id: '/recap/$storeId'
+      path: '/recap/$storeId'
+      fullPath: '/recap/$storeId'
+      preLoaderRoute: typeof RecapStoreIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/shop/$storeId': {
@@ -346,9 +386,11 @@ const rootRouteChildren: RootRouteChildren = {
   MapRoute: MapRoute,
   PreviewRoute: PreviewRoute,
   RulesRoute: RulesRoute,
+  WatchRoute: WatchRoute,
   WeekRoute: WeekRoute,
   BoutBoutIdRoute: BoutBoutIdRoute,
   GarageStoreIdRoute: GarageStoreIdRoute,
+  RecapStoreIdRoute: RecapStoreIdRoute,
   ShopStoreIdRoute: ShopStoreIdRoute,
   StoresStoreIdRoute: StoresStoreIdRoute,
 }

@@ -11,7 +11,7 @@ import {
   type Part,
 } from "./catalog";
 import { TUNE_UP_BONUS } from "./training";
-import { tunedUp } from "./week";
+import { boltsOf, tunedUp } from "./week";
 import type {
   Bot,
   Bout,
@@ -173,6 +173,12 @@ export function rankedStores(data: PitData) {
     const rb = recordOf(data, b.id);
     if (rb.w !== ra.w) return rb.w - ra.w;
     if (ra.l !== rb.l) return ra.l - rb.l;
+    // Title Monday stakes: Pit Week bolts break a tie before NSNU.
+    if (data.week === 4) {
+      const ba = boltsOf(data, a.id).earned;
+      const bb = boltsOf(data, b.id).earned;
+      if (bb !== ba) return bb - ba;
+    }
     const na = nsnuOf(data, a.id, data.bouts.length ? weekForTie : data.week);
     const nb = nsnuOf(data, b.id, data.bouts.length ? weekForTie : data.week);
     if (nb !== na) return nb - na;

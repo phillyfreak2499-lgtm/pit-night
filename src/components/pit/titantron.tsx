@@ -82,7 +82,7 @@ export function Titantron() {
                 {featured ? featured.title : "Main event"}
               </h2>
             </div>
-            {featured?.result ? <BoutWatch bout={featured} /> : <Link to="/broadcast" className="text-sm text-amber">Monday broadcast</Link>}
+            {featured?.result ? <BoutWatch bout={featured} /> : <Link to="/watch" className="text-sm text-amber">Watch party</Link>}
           </div>
           <div className="grid gap-px bg-line md:grid-cols-2">
             <FighterCard storeId={featured?.teamA[0] ?? "plano"} facing={1} />
@@ -131,7 +131,7 @@ export function Titantron() {
       <section>
         <div className="mb-3 flex items-end justify-between">
           <h2 className="font-display text-3xl leading-none">Standings</h2>
-          <p className="text-sm text-muted">Record first. NSNU breaks a tie in the table.</p>
+          <p className="text-sm text-muted">{data.week === 4 ? "Record first. Title Monday stakes: Pit Week bolts break a tie, then NSNU." : "Record first. NSNU breaks a tie in the table."}</p>
         </div>
         <ol className="flex flex-col gap-2">
           {ranked.map((store, index) => {

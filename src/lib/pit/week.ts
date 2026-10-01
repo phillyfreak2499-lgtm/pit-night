@@ -1,4 +1,4 @@
-import { BOLTS, DAY_ORDER, allJobs, programWeek } from "./training";
+import { BOLTS, DAY_ORDER, STREAK_BADGE, allJobs, programWeek } from "./training";
 import type { Crew, PitData } from "./types";
 
 /** Specialists who count toward a bay's week: everyone not marked off. */
@@ -75,7 +75,9 @@ export function tunedUp(data: Pick<PitData, "crew" | "jobLog" | "sparkLog">, sto
 
 /** Bolts earned by a bay across the season, minus what it spent in the Bolt Locker. */
 export function boltsOf(data: Pick<PitData, "jobLog" | "sparkLog" | "picks" | "bouts" | "stores"> & Partial<Pick<PitData, "weeks">>, storeId: string) {
-  const jobs = data.jobLog.filter((e) => e.storeId === storeId && e.status === "approved").length * BOLTS.job;
+  const approved = data.jobLog.filter((e) => e.storeId === storeId && e.status === "approved");
+  const crates = approved.filter((e) => e.jobId.endsWith("-crate")).length * BOLTS.crate;
+  const jobs = approved.filter((e) => !e.jobId.endsWith("-crate")).length * BOLTS.job + crates;
   const sparks = data.sparkLog.filter((e) => e.storeId === storeId).reduce((n, e) => n + e.correct * BOLTS.sparkCorrect, 0);
   const picks =
     data.picks.filter((p) => {
@@ -87,7 +89,7 @@ export function boltsOf(data: Pick<PitData, "jobLog" | "sparkLog" | "picks" | "b
       return Boolean(bout?.result?.winnerIds.includes(p.pick));
     }).length * BOLTS.pickCorrect;
   const spent = data.stores.find((s) => s.id === storeId)?.boltsSpent ?? 0;
-  return { earned: jobs + sparks + picks, spent, balance: jobs + sparks + picks - spent, jobs, sparks, picks };
+  return { earned: jobs + sparks + picks, spent, balance: jobs + sparks + picks - spent, jobs, sparks, picks, crates };
 }
 
 /** Bolt Locker. Looks only. */
@@ -115,4 +117,28 @@ export const LOCKER: LockerItem[] = [
 
 export function lockerItem(id: string | undefined) {
   return LOCKER.find((i) => i.id === id);
+}
+
+/** Perfect Daily Sparks in a row. A skipped day does not break it; a miss does. */
+export function sparkStreak(data: Pick<PitData, "sparkLog">, crewId: string) {
+  const mine = data.sparkLog
+    .filter((e) => e.crewId === crewId)
+    .sort((a, b) => a.week - b.week || DAY_ORDER.indexOf(a.day as (typeof DAY_ORDER)[number]) - DAY_ORDER.indexOf(b.day as (typeof DAY_ORDER)[number]));
+  let current = 0;
+  let best = 0;
+  for (const e of mine) {
+    if (e.total > 0 && e.correct === e.total) {
+      current += 1;
+      best = Math.max(best, current);
+    } else current = 0;
+  }
+  return { current, best, badge: best >= STREAK_BADGE };
+}
+
+/** Everyone holding the streak badge, best first. */
+export function streakHolders(data: Pick<PitData, "sparkLog" | "crew">) {
+  return data.crew
+    .map((c) => ({ crew: c, ...sparkStreak(data, c.id) }))
+    .filter((r) => r.badge)
+    .sort((a, b) => b.best - a.best || a.crew.name.localeCompare(b.crew.name));
 }

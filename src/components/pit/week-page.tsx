@@ -1,4 +1,4 @@
-import { Check, Clock, Flame, Lock, Sparkles, Wrench } from "lucide-react";
+import { Check, Clock, Flame, Lock, Package, Sparkles, Wrench } from "lucide-react";
 import { useMemo, useState } from "react";
 import { buildCard } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
@@ -7,7 +7,9 @@ import {
   DAY_LABEL,
   DAY_ORDER,
   PROGRAM,
+  STREAK_BADGE,
   TUNE_UP_BONUS,
+  crateFor,
   dayDate,
   dayOpen,
   programWeek,
@@ -17,9 +19,10 @@ import {
   type TrainingWeek,
 } from "@/lib/pit/training";
 import type { PitData } from "@/lib/pit/types";
-import { LOCKER, boltsOf, weekProgress } from "@/lib/pit/week";
+import { LOCKER, boltsOf, sparkStreak, weekProgress } from "@/lib/pit/week";
 import { Btn, SectionLabel, TextInput, useNow } from "./bits";
 import { BotPortrait, useBotLook } from "./bot-portrait";
+import { StreakBadge } from "./streak-badge";
 
 /** Ask the shell to open the Clipboard sign-in sheet. */
 export function openClipboard() {
@@ -72,8 +75,8 @@ export function WeekPage() {
           </div>
         </div>
         <div className="grid gap-px border-t border-line bg-line text-sm sm:grid-cols-3">
-          <HowCell icon={<Check size={16} />} title="Do the jobs" body="Two a day: one culture, one skill. Write one line of proof. The captain gives the thumbs-up." />
-          <HowCell icon={<Sparkles size={16} />} title="Daily Spark" body={`Three quick questions a day. +${BOLTS.sparkCorrect} bolt per right answer.`} />
+          <HowCell icon={<Check size={16} />} title="Do the jobs" body={`Two a day: one culture, one skill. Write one line of proof. The captain gives the thumbs-up. Wednesday hides a Mystery Crate worth +${BOLTS.crate}.`} />
+          <HowCell icon={<Sparkles size={16} />} title="Daily Spark" body={`Three quick questions a day. +${BOLTS.sparkCorrect} bolt per right answer. ${STREAK_BADGE} perfect in a row earns a flame on your name.`} />
           <HowCell
             icon={<Flame size={16} />}
             title="Full Tune-Up"
@@ -203,12 +206,18 @@ function DayCard({ plan, day }: { plan: TrainingWeek; day: DayKey }) {
           {d.jobs.map((job) => (
             <JobCard key={job.id} job={job} week={plan.week} />
           ))}
+          {day === "wed" ? <JobCard job={crateFor(plan.week)} week={plan.week} /> : null}
           <SparkCard week={plan.week} day={day} questions={d.spark} done={spark} />
         </div>
       ) : (
         <div className="grid flex-1 place-items-center gap-1 p-6 text-center text-sm text-muted">
           <Lock size={20} />
           Opens {date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+          {day === "wed" ? (
+            <span className="mt-2 inline-flex items-center gap-1 text-xs tracking-widest text-spark uppercase">
+              <Package size={14} aria-hidden /> Mystery Crate inside
+            </span>
+          ) : null}
         </div>
       )}
     </article>
@@ -221,9 +230,13 @@ function JobCard({ job, week }: { job: Job; week: number }) {
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");
   const entry = me ? data.jobLog.find((e) => e.id === `${week}:${job.id}:${me.id}`) : undefined;
-  const tag = job.kind === "culture" ? "Culture" : job.kind === "care" ? "CARE" : "Skill";
+  const crate = job.kind === "crate";
+  const tag = job.kind === "culture" ? "Culture" : job.kind === "care" ? "CARE" : crate ? `Mystery Crate · +${BOLTS.crate} bolts` : "Skill";
   return (
-    <div className={`border p-2 ${entry?.status === "approved" ? "border-ok/50 bg-ok/5" : entry ? "border-warn/50" : "border-line bg-deep"}`}>
+    <div
+      className={`border p-2 ${entry?.status === "approved" ? "border-ok/50 bg-ok/5" : entry ? "border-warn/50" : crate ? "crate-glow border-spark/70 bg-spark/5" : "border-line bg-deep"}`}
+      data-testid={crate ? "mystery-crate" : undefined}
+    >
       <button type="button" className="flex w-full items-start gap-2 text-left" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
         <span
           className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center border ${entry?.status === "approved" ? "border-ok bg-ok text-deep" : entry ? "border-warn text-warn" : "border-line"}`}
@@ -232,7 +245,10 @@ function JobCard({ job, week }: { job: Job; week: number }) {
           {entry?.status === "approved" ? <Check size={14} /> : entry ? <Clock size={12} /> : null}
         </span>
         <span className="min-w-0">
-          <span className={`block text-[10px] tracking-widest uppercase ${job.kind === "culture" ? "text-amber" : "text-info"}`}>{tag}</span>
+          <span className={`flex items-center gap-1 text-[10px] tracking-widest uppercase ${crate ? "text-spark" : job.kind === "culture" ? "text-amber" : "text-info"}`}>
+            {crate ? <Package size={11} aria-hidden /> : null}
+            {tag}
+          </span>
           <span className="block font-display leading-tight">{job.title}</span>
         </span>
       </button>
@@ -278,8 +294,9 @@ function JobCard({ job, week }: { job: Job; week: number }) {
 }
 
 function SparkCard({ week, day, questions, done }: { week: number; day: DayKey; questions: Spark[]; done?: { correct: number; total: number } }) {
-  const { me } = useMe();
+  const { data, me } = useMe();
   const submitSpark = usePit((s) => s.submitSpark);
+  const streak = me ? sparkStreak(data, me.id) : null;
   const [playing, setPlaying] = useState(false);
   const [i, setI] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
@@ -290,6 +307,12 @@ function SparkCard({ week, day, questions, done }: { week: number; day: DayKey; 
       <div className="flex items-center gap-2 border border-ok/50 bg-ok/5 p-2 text-sm">
         <Sparkles size={16} className="text-ok" />
         <span className="font-display tracking-wide uppercase">Spark</span>
+        {streak && streak.current > 1 ? (
+          <span className="inline-flex items-center gap-0.5 text-xs text-spark" title="Perfect Sparks in a row">
+            <Flame size={12} aria-hidden />
+            {streak.current}
+          </span>
+        ) : null}
         <span className="ml-auto text-muted">
           {done.correct}/{done.total}
         </span>
@@ -378,7 +401,11 @@ function CaptainDesk({ data, storeId, plan }: { data: PitData; storeId: string; 
   const pending = data.jobLog.filter((e) => e.storeId === storeId && e.week === plan.week && e.status === "pending");
   const prog = weekProgress(data, storeId, plan.week);
   const allSpecialists = data.crew.filter((c) => c.storeId === storeId && c.role === "specialist");
-  const jobTitle = (id: string) => [...plan.days.flatMap((d) => d.jobs), plan.care].find((j) => j.id === id)?.title ?? id;
+  const jobTitle = (id: string) => {
+    const crate = crateFor(plan.week);
+    if (id === crate.id) return `Mystery Crate: ${crate.title}`;
+    return [...plan.days.flatMap((d) => d.jobs), plan.care].find((j) => j.id === id)?.title ?? id;
+  };
   return (
     <section className="grid gap-4 border border-line bg-surface p-4 lg:grid-cols-2">
       <div>
@@ -409,7 +436,10 @@ function CaptainDesk({ data, storeId, plan }: { data: PitData; storeId: string; 
             const p = prog.crew.find((x) => x.crew.id === c.id);
             return (
               <li key={c.id} className="flex flex-wrap items-center gap-2 border border-line bg-deep px-3 py-2 text-sm">
-                <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                <span className="min-w-0 flex-1 truncate">
+                  {c.name}
+                  <StreakBadge crewId={c.id} />
+                </span>
                 {off ? (
                   <span className="text-xs text-muted">off this week</span>
                 ) : p ? (
@@ -476,6 +506,7 @@ function ShoutWall({ data, week }: { data: PitData; week: number }) {
           <li key={s.id} className="border-b border-line px-4 py-3 last:border-b-0">
             <p className="text-sm">
               <span className="font-display text-base">{s.to}</span> <span className="text-muted">from {s.fromName}</span>
+              <StreakBadge crewId={s.fromCrewId} />
             </p>
             <p className="mt-1 text-sm">{s.text}</p>
             <p className="mt-1 text-[11px] tracking-widest uppercase" style={{ color: paint(s.storeId) }}>

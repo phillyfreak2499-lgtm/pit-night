@@ -21,6 +21,7 @@ import { canEnterBay, LockedBay } from "./bay-lock";
 import { Btn, Field, GradeRow, SectionLabel, StatStrip, TextInput } from "./bits";
 import { ScrimmagePanel } from "./scrimmage-panel";
 import { SpyPanel } from "./spy-panel";
+import { StreakBadge } from "./streak-badge";
 
 const SLOTS: Slot[] = ["chassis", "drive", "weapon", "armor", "utility", "brain"];
 
@@ -275,10 +276,16 @@ export function GaragePage({ storeId }: { storeId: string }) {
                   onBlur={(e) => renameCrew(member.id, e.target.value)}
                 />
               ) : (
-                <span className="block py-2">{member.name}</span>
+                <span className="block py-2">
+                  {member.name}
+                  <StreakBadge crewId={member.id} />
+                </span>
               )}
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs tracking-widest text-muted uppercase">{member.role}</span>
+                <span className="text-xs tracking-widest text-muted uppercase">
+                  {member.role}
+                  {captain ? <StreakBadge crewId={member.id} /> : null}
+                </span>
                 <span className="flex gap-2">
                   {captain && member.role === "specialist" && crew.filter((c) => c.role === "specialist").length > 1 ? (
                     <button type="button" className="min-h-11 text-sm text-bad" onClick={() => removeCrew(storeId, member.id)}>
