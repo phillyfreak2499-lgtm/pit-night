@@ -109,7 +109,7 @@ export function WeekPage() {
 
       <section className="grid gap-3 lg:grid-cols-5">
         {plan.days.map((d) => (
-          <DayCard key={d.day} plan={plan} day={d.day} />
+          <DayCard key={`${plan.week}-${d.day}`} plan={plan} day={d.day} />
         ))}
       </section>
 
@@ -167,8 +167,8 @@ function BayBanner({ data, storeId, week }: { data: PitData; storeId: string; we
             </span>
           ) : (
             <>
-              {prog.crew.filter((c) => c.complete).length} of {prog.crew.length} specialists finished · CARE {prog.careDone ? "done" : prog.carePending ? "waiting" : "not yet"}. Everyone finishes
-              for the Tune-Up.
+              {prog.crew.filter((c) => c.complete).length} of {prog.crew.length} specialists finished · CARE {prog.careDone ? "done" : prog.carePending ? "waiting" : "not yet"}. Everyone has to finish
+              to earn the Tune-Up.
             </>
           )}
         </p>

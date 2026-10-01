@@ -62,7 +62,7 @@ export function weekProgress(data: Pick<PitData, "crew" | "jobLog" | "sparkLog">
     crew,
     careDone,
     carePending: care?.status === "pending",
-    tuned: crew.length > 0 && crew.every((c) => c.complete) && careDone,
+    tuned: careDone && crew.every((c) => c.complete),
     done,
     total,
     pct: total ? Math.round((done / total) * 100) : 0,
@@ -74,12 +74,15 @@ export function tunedUp(data: Pick<PitData, "crew" | "jobLog" | "sparkLog">, sto
 }
 
 /** Bolts earned by a bay across the season, minus what it spent in the Bolt Locker. */
-export function boltsOf(data: Pick<PitData, "jobLog" | "sparkLog" | "picks" | "bouts" | "stores">, storeId: string) {
+export function boltsOf(data: Pick<PitData, "jobLog" | "sparkLog" | "picks" | "bouts" | "stores"> & Partial<Pick<PitData, "weeks">>, storeId: string) {
   const jobs = data.jobLog.filter((e) => e.storeId === storeId && e.status === "approved").length * BOLTS.job;
   const sparks = data.sparkLog.filter((e) => e.storeId === storeId).reduce((n, e) => n + e.correct * BOLTS.sparkCorrect, 0);
   const picks =
     data.picks.filter((p) => {
       if (p.storeId !== storeId) return false;
+      // A pick only counts if it was made before that week's lock.
+      const lockedAt = data.weeks?.find((w) => w.number === p.week)?.lockedAt;
+      if (lockedAt && p.at > lockedAt) return false;
       const bout = data.bouts.find((b) => b.id === p.boutId && b.result);
       return Boolean(bout?.result?.winnerIds.includes(p.pick));
     }).length * BOLTS.pickCorrect;

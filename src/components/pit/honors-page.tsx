@@ -71,7 +71,7 @@ function Plate({
       </div>
       <p className="mt-3 text-xs tracking-widest text-amber uppercase">{kicker}</p>
       <p className="font-display text-3xl leading-none">{title}</p>
-      <p className="mt-2 text-sm text-muted">{detail || (won ? "" : "Unclaimed. Four fight days to go.")}</p>
+      <p className="mt-2 text-sm text-muted">{detail || (won ? "" : "Unclaimed. Still up for grabs.")}</p>
     </div>
   );
   if (!href) return body;

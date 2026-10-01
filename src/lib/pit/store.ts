@@ -37,7 +37,7 @@ import {
   writeGazette,
 } from "./engine";
 import { makeData } from "./seed";
-import { BOLTS, allJobs, programWeek } from "./training";
+import { BOLTS, allJobs, dayOpen, programWeek, type DayKey } from "./training";
 import { boltsOf, lockerItem } from "./week";
 import type { Bot, BotLook, BotStyle, Condition, FightResult, GarageLook, Grade, Kickoff, Loadout, PitData, Slot, StatKey, StoreCard } from "./types";
 
@@ -108,6 +108,16 @@ function actor(data: PitData) {
   const { role, crewId } = data.session;
   if ((role !== "crew" && role !== "captain") || !crewId) return undefined;
   return data.crew.find((c) => c.id === crewId);
+}
+
+/** Why a Pit Week action is closed right now, or null when it is open. */
+function trainingClosed(data: PitData, week: number, day?: DayKey): string | null {
+  if (week < data.week) return `Week ${week} training is closed.`;
+  if (week > data.week) return `Week ${week} opens after the desk advances the league.`;
+  if (data.phase !== "open") return "Saturday lock passed. This week's training is closed.";
+  const plan = programWeek(week);
+  if (day && plan && !dayOpen(plan, day, new Date(), data.trainingOpenAll)) return "That day is not open yet.";
+  return null;
 }
 
 function isCaptainOf(data: PitData, storeId: string) {
@@ -241,6 +251,15 @@ export const SHARED_KEYS = [
 
 export type SharedDoc = Pick<PitData, (typeof SHARED_KEYS)[number]>;
 
+/** A device that starts over must take the league copy before it pushes anything. */
+function forgetSyncBase() {
+  try {
+    if (typeof localStorage !== "undefined") localStorage.removeItem("pit-night-sync-v1");
+  } catch {
+    /* storage blocked */
+  }
+}
+
 export function sharedDoc(state: PitData): SharedDoc {
   const out = {} as Record<string, unknown>;
   for (const k of SHARED_KEYS) out[k] = state[k];
@@ -297,10 +316,11 @@ export const usePit = create<PitState>()(
       setDraftPart: (storeId, slot, partId) => {
         const data = get();
         if (!isCaptainOf(data, storeId)) {
-          set({ flash: "Only the captain locks iron." });
+          set({ flash: "Only the captain can change parts." });
           return;
         }
-        if (data.phase !== "open" && !(isBoss(data) && data.phase === "locked")) {
+        const reopened = data.phase === "locked" && !data.bots.find((b) => b.storeId === storeId)?.locked;
+        if (data.phase !== "open" && !(data.phase === "locked" && (isBoss(data) || reopened))) {
           set({ flash: "The bay is frozen." });
           return;
         }
@@ -324,7 +344,7 @@ export const usePit = create<PitState>()(
           return;
         }
         if (part.classLock && part.classLock !== bot.classId && data.week === 1) {
-          set({ flash: "Shakedown class is public. Reclass after the first fight." });
+          set({ flash: "Week 1 class is locked. You can change class after the first fight (3 chassis coins)." });
           return;
         }
         let next = bot;
@@ -351,10 +371,11 @@ export const usePit = create<PitState>()(
       setDraftLoadout: (storeId, loadout) => {
         const data = get();
         if (!isCaptainOf(data, storeId)) {
-          set({ flash: "Only the captain locks iron." });
+          set({ flash: "Only the captain can change parts." });
           return;
         }
-        if (data.phase !== "open" && !(isBoss(data) && data.phase === "locked")) {
+        const reopened = data.phase === "locked" && !data.bots.find((b) => b.storeId === storeId)?.locked;
+        if (data.phase !== "open" && !(data.phase === "locked" && (isBoss(data) || reopened))) {
           set({ flash: "The bay is frozen." });
           return;
         }
@@ -426,7 +447,7 @@ export const usePit = create<PitState>()(
       updateCard: (storeId, patch) => {
         const data = get();
         if (!isCaptainOf(data, storeId)) {
-          set({ flash: "The weekly card belongs to the captain." });
+          set({ flash: "Only the desk enters the official numbers." });
           return;
         }
         if (data.phase !== "open" && !(isBoss(data) && data.phase === "locked")) {
@@ -507,10 +528,12 @@ export const usePit = create<PitState>()(
               }
             : g,
         );
+        const stillOn = new Set(card.map((b) => b.id));
         set({
           bots,
           stores,
           gazette,
+          picks: data.picks.filter((p) => p.week !== 1 || stillOn.has(p.boutId)),
           kickoff: { ...data.kickoff, paid, appliedAt: Date.now() },
           flash: `Kickoff paid. ${top.store.name} is the 1 seed with ${top.coins} coins.`,
           log: [`Week 1 seeded on Period 11. ${top.store.name} is the 1 seed.`, ...data.log.slice(0, 23)],
@@ -549,9 +572,17 @@ export const usePit = create<PitState>()(
         const part = partById(proposal.partId);
         if (!part) return;
         get().setDraftPart(proposal.storeId, part.slot, part.id);
-        set({ proposals: get().proposals.filter((p) => p.id !== id) });
+        // Keep the idea on the board if the part could not go on.
+        if (get().bots.find((b) => b.storeId === proposal.storeId)?.draft[part.slot] === part.id) {
+          set({ proposals: get().proposals.filter((p) => p.id !== id) });
+        }
       },
-      dismissProposal: (id) => set({ proposals: get().proposals.filter((p) => p.id !== id) }),
+      dismissProposal: (id) => {
+        const data = get();
+        const proposal = data.proposals.find((p) => p.id === id);
+        if (!proposal || !isCaptainOf(data, proposal.storeId)) return;
+        set({ proposals: data.proposals.filter((p) => p.id !== id) });
+      },
       buyPart: (storeId, partId) => {
         const data = get();
         if (!isCaptainOf(data, storeId)) {
@@ -593,7 +624,7 @@ export const usePit = create<PitState>()(
           return;
         }
         if (data.phase === "locked" || data.phase === "fought") {
-          set({ flash: "No torches during the bell." });
+          set({ flash: "Repairs are closed while the card is locked or running." });
           return;
         }
         const current = data.bots.find((b) => b.storeId === storeId);
@@ -732,14 +763,16 @@ export const usePit = create<PitState>()(
       },
       setPasscode: (storeId, passcode) => {
         if (!isBoss(get())) return;
-        const clean = passcode.trim().toLowerCase();
-        if (clean.length < 3) {
-          set({ flash: "Passcode needs at least 3 characters." });
+        const clean = passcode.trim();
+        if (!/^\d{4}$/.test(clean)) {
+          set({ flash: "Bay code must be 4 digits." });
           return;
         }
+        const store = get().stores.find((s) => s.id === storeId);
+        if (!store || store.passcode === clean) return;
         set({
           stores: get().stores.map((s) => (s.id === storeId ? { ...s, passcode: clean } : s)),
-          flash: "Clipboard code changed.",
+          flash: `${store.name} bay code changed.`,
         });
       },
       setPaint: (storeId, paint) => {
@@ -773,6 +806,13 @@ export const usePit = create<PitState>()(
         const plan = programWeek(week);
         const job = plan ? [...allJobs(plan), plan.care].find((j) => j.id === jobId) : undefined;
         if (!plan || !job) return;
+        const dayOf = plan.days.find((d) => d.jobs.some((j) => j.id === jobId))?.day;
+        const closed = trainingClosed(data, week, dayOf);
+        if (closed) {
+          set({ flash: closed });
+          return;
+        }
+        if (data.jobLog.some((e) => e.id === `${week}:${jobId}:${who.id}` && e.status === "approved")) return;
         if (job.kind === "care" && who.role !== "captain") {
           set({ flash: "CARE jobs belong to the captain." });
           return;
@@ -793,7 +833,12 @@ export const usePit = create<PitState>()(
       approveJob: (entryId) => {
         const data = get();
         const entry = data.jobLog.find((e) => e.id === entryId);
-        if (!entry || !isCaptainOf(data, entry.storeId)) return;
+        if (!entry || !isCaptainOf(data, entry.storeId) || entry.status !== "pending") return;
+        const lockedAt = data.weeks.find((w) => w.number === entry.week)?.lockedAt;
+        if (entry.week !== data.week || (data.phase !== "open" && !(data.phase === "locked" && lockedAt && entry.at <= lockedAt))) {
+          set({ flash: "That week is closed. Approvals had to land before the card ran." });
+          return;
+        }
         set({
           jobLog: data.jobLog.map((e) => (e.id === entryId ? { ...e, status: "approved" } : e)),
           flash: `${entry.crewName} is approved. +${BOLTS.job} bolts.`,
@@ -802,13 +847,18 @@ export const usePit = create<PitState>()(
       rejectJob: (entryId) => {
         const data = get();
         const entry = data.jobLog.find((e) => e.id === entryId);
-        if (!entry || !isCaptainOf(data, entry.storeId)) return;
+        if (!entry || !isCaptainOf(data, entry.storeId) || entry.status !== "pending") return;
         set({ jobLog: data.jobLog.filter((e) => e.id !== entryId), flash: `Sent back to ${entry.crewName}. They can try it again.` });
       },
       submitSpark: (week, day, correct, total) => {
         const data = get();
         const who = actor(data);
         if (!who) return;
+        const closed = trainingClosed(data, week, day as DayKey);
+        if (closed) {
+          set({ flash: closed });
+          return;
+        }
         const id = `${week}:${day}:${who.id}`;
         if (data.sparkLog.some((e) => e.id === id)) return;
         set({
@@ -844,6 +894,11 @@ export const usePit = create<PitState>()(
         const data = get();
         const member = data.crew.find((c) => c.id === crewId);
         if (!member || !isCaptainOf(data, member.storeId)) return;
+        const closed = trainingClosed(data, week);
+        if (closed && !isBoss(data)) {
+          set({ flash: closed });
+          return;
+        }
         set({
           crew: data.crew.map((c) => {
             if (c.id !== crewId) return c;
@@ -893,6 +948,8 @@ export const usePit = create<PitState>()(
           set({ flash: "Picks close when the bots lock Saturday." });
           return;
         }
+        const bout = buildCard(data).find((b) => b.id === boutId);
+        if (!bout || !bout.storeIds.includes(pick) || data.bouts.some((b) => b.id === boutId && b.result)) return;
         const id = `${boutId}:${who.id}`;
         set({
           picks: [...data.picks.filter((p) => p.id !== id), { id, week: data.week, boutId, storeId: who.storeId, crewId: who.id, pick, at: Date.now() }],
@@ -1074,8 +1131,9 @@ export const usePit = create<PitState>()(
         }
         set({
           phase: "locked",
+          weeks: data.weeks.map((w) => (w.number === data.week ? { ...w, lockedAt: w.lockedAt ?? Date.now() } : w)),
           bots: data.bots.map((b) => ({ ...b, locked: { ...(b.locked ?? b.draft) }, equipped: { ...(b.locked ?? b.draft) } })),
-          flash: "Locked. Eleven loadouts frozen for Monday. Enter the official numbers, then run the card.",
+          flash: "Locked. Eleven builds frozen for Monday. Click in Sunday's colors, then run the card.",
           log: [`Week ${data.week} locked.`, ...data.log.slice(0, 23)],
         });
       },
@@ -1217,10 +1275,10 @@ export const usePit = create<PitState>()(
             locked: null,
           });
         });
-        const lines = [`Week ${data.week} paid out. Green 3, blue 2, orange 1 coins per part.`];
+        const lines = [`Week ${data.week} paid out. Green 3, blue 2, orange 1, red 0 coins per part.`];
         if (last) {
           const store = data.stores.find((s) => s.id === last);
-          lines.unshift(`${store?.name ?? last} takes the last-place stipend. Repair first.`);
+          lines.unshift(`${store?.name ?? last} takes the last-place repair voucher: 3 coins for any repair.`);
         }
         if (data.week >= 4) {
           set({
@@ -1244,13 +1302,28 @@ export const usePit = create<PitState>()(
           phase: "open",
           bots,
           storeCards,
-          flash: `Week ${next} is open. ${data.week === 1 ? "The shop lights just came on." : "Cards are house projections until a captain overwrites them."}`,
+          flash: `Week ${next} is open. ${data.week === 1 ? "Coins are in the jars and the shop is open." : "Cards are house projections until the desk clicks in Sunday's colors."}`,
           log: [...lines, ...data.log].slice(0, 24),
         });
       },
       resetSeason: () => {
-        const session = { role: "public" as const, storeId: null, crewId: null };
-        set({ ...makeData(), session, flash: "Period 12 reset. Eleven stock bots. Week 1." });
+        const data = get();
+        if (!isBoss(data)) return;
+        const fresh = makeData();
+        // Keep the people and the codes. Reset the game.
+        const stores = fresh.stores.map((s) => {
+          const was = data.stores.find((w) => w.id === s.id);
+          return was ? { ...s, passcode: was.passcode, captain: was.captain } : s;
+        });
+        set({
+          ...fresh,
+          pin: data.pin,
+          stores,
+          crew: data.crew.map((c) => ({ ...c, offWeeks: [] })),
+          session: data.session,
+          tutorialSeen: data.tutorialSeen,
+          flash: "Period 12 reset. Eleven stock bots. Week 1. Codes and crews kept.",
+        });
       },
     }),
     {
@@ -1258,15 +1331,22 @@ export const usePit = create<PitState>()(
       skipHydration: true,
       version: VERSION,
       partialize: (state) => ({ ...sharedDoc(state), session: state.session, tutorialSeen: state.tutorialSeen }),
-      migrate: (persisted, version) => (version === 4 && persisted ? carryCosmetics(applyHulen(persisted as PitData)) : makeData()),
+      migrate: (persisted, version) => {
+        if (persisted && version === 4) return carryCosmetics(applyHulen(persisted as PitData));
+        // Version 5 and later saves carry forward; new fields get defaults in merge.
+        if (persisted && version >= 5) return { ...(persisted as PitData), version: VERSION };
+        forgetSyncBase();
+        return makeData();
+      },
       merge: (persisted, current) => {
         const saved = persisted as Partial<PitData> | undefined;
         if (!saved) return current;
-        if (saved.version !== VERSION) return current;
+        if (typeof saved.version !== "number" || saved.version < 5) return current;
         const fixed = applyMondays(applyHulen(saved as PitData));
         return {
           ...current,
           ...fixed,
+          version: VERSION,
           jobLog: fixed.jobLog ?? [],
           sparkLog: fixed.sparkLog ?? [],
           shouts: fixed.shouts ?? [],
@@ -1391,7 +1471,9 @@ export function applyMondays<T extends Partial<PitData>>(data: T): T {
       const next = fresh.weeks.find((row) => row.number === week.number);
       return next ? { ...week, name: next.name, blurb: next.blurb } : week;
     }),
-    gazette: data.gazette?.map((entry) => (entry.id === "g-open" ? (fresh.gazette.find((row) => row.id === "g-open") ?? entry) : entry)),
+    gazette: data.kickoff?.appliedAt
+      ? data.gazette
+      : data.gazette?.map((entry) => (entry.id === "g-open" ? (fresh.gazette.find((row) => row.id === "g-open") ?? entry) : entry)),
   };
 }
 

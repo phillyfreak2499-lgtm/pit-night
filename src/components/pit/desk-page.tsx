@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { paintHex, usePit } from "@/lib/pit/store";
+import { usePit } from "@/lib/pit/store";
 import { Btn, Field, SectionLabel, TextInput } from "./bits";
 import { ScoreInputs } from "./score-card";
 import { GradeGrid } from "./grade-grid";
@@ -80,10 +80,8 @@ function DeskLive() {
   const unlockStore = usePit((s) => s.unlockStore);
   const renameBot = usePit((s) => s.renameBot);
   const renameCaptain = usePit((s) => s.renameCaptain);
-  const updateCard = usePit((s) => s.updateCard);
   const setPasscode = usePit((s) => s.setPasscode);
   const setTagline = usePit((s) => s.setTagline);
-  const setTags = usePit((s) => s.setTags);
   const houseCall = usePit((s) => s.houseCall);
   const [call, setCall] = useState("");
   const [theme, setTheme] = useState(data.tagline);
@@ -124,12 +122,6 @@ function DeskLive() {
             Post theme
           </Btn>
         </div>
-        {data.week === 3 ? (
-          <label className="mt-3 flex min-h-11 items-center gap-2 text-sm">
-            <input type="checkbox" checked={meta?.tagsEnabled ?? false} onChange={(e) => setTags(3, e.target.checked)} />
-            Allied tag on the grudge card
-          </label>
-        ) : null}
       </section>
       <section className="border border-line p-4">
         <SectionLabel>House call</SectionLabel>
@@ -152,7 +144,6 @@ function DeskLive() {
         <div className="mt-3 flex flex-col gap-3">
           {data.stores.map((store) => {
             const bot = data.bots.find((b) => b.storeId === store.id);
-            const card = data.storeCards.find((c) => c.storeId === store.id && c.week === data.week);
             return (
               <div key={store.id} className="grid gap-2 border border-line bg-surface p-3 md:grid-cols-2">
                 <div>
@@ -164,13 +155,13 @@ function DeskLive() {
                 </div>
                 <div className="grid gap-2">
                   <Field label="Bot name">
-                    <TextInput defaultValue={bot?.name} onBlur={(e) => renameBot(store.id, e.target.value)} />
+                    <TextInput key={bot?.name} defaultValue={bot?.name} onBlur={(e) => e.target.value.trim() !== bot?.name && renameBot(store.id, e.target.value)} />
                   </Field>
                   <Field label="Captain">
-                    <TextInput defaultValue={store.captain} onBlur={(e) => renameCaptain(store.id, e.target.value)} />
+                    <TextInput key={store.captain} defaultValue={store.captain} onBlur={(e) => e.target.value.trim() !== store.captain && renameCaptain(store.id, e.target.value)} />
                   </Field>
-                  <Field label="Clipboard code">
-                    <TextInput defaultValue={store.passcode} onBlur={(e) => setPasscode(store.id, e.target.value)} />
+                  <Field label="Bay code (4 digits)">
+                    <TextInput key={store.passcode} defaultValue={store.passcode} inputMode="numeric" maxLength={4} onBlur={(e) => e.target.value.trim() !== store.passcode && setPasscode(store.id, e.target.value)} />
                   </Field>
                 </div>
               </div>
@@ -186,15 +177,10 @@ function DeskLive() {
           ))}
         </ul>
         <div className="mt-4">
-          <Btn
-            tone="ghost"
-            onClick={() => {
-              resetSeason();
-              void sendThisSeason().catch(() => undefined);
-            }}
-          >
-            Reset season
-          </Btn>
+          <ResetSeason onReset={() => {
+            resetSeason();
+            void sendThisSeason().catch(() => undefined);
+          }} />
         </div>
       </section>
     </div>
@@ -222,6 +208,42 @@ function HousePin() {
         </Btn>
       </form>
     </section>
+  );
+}
+
+function ResetSeason({ onReset }: { onReset: () => void }) {
+  const [typed, setTyped] = useState("");
+  const [open, setOpen] = useState(false);
+  if (!open) {
+    return (
+      <Btn tone="ghost" onClick={() => setOpen(true)}>
+        Reset season…
+      </Btn>
+    );
+  }
+  return (
+    <div className="flex max-w-xl flex-col gap-2 border border-bad/60 p-3">
+      <p className="text-sm text-bad">
+        This wipes every fight, coin, job, Spark and pick for all eleven stores, on every device. Bay codes, captains, crews and the house PIN are kept. Type RESET to confirm.
+      </p>
+      <TextInput value={typed} onChange={(e) => setTyped(e.target.value)} aria-label="Type RESET to confirm" placeholder="RESET" />
+      <div className="flex gap-2">
+        <Btn
+          tone="spark"
+          disabled={typed.trim().toUpperCase() !== "RESET"}
+          onClick={() => {
+            onReset();
+            setOpen(false);
+            setTyped("");
+          }}
+        >
+          Wipe the season
+        </Btn>
+        <Btn tone="ghost" onClick={() => setOpen(false)}>
+          Cancel
+        </Btn>
+      </div>
+    </div>
   );
 }
 
@@ -378,7 +400,7 @@ function SyncPanel() {
       {shared ? (
         <p className="mt-2 text-sm text-muted">
           {sync.mode === "live" ? "Live." : "Preview database (resets when the preview restarts)."} Every phone and laptop pulls the same season every few
-          seconds. Two bays saving at once both land.
+          seconds. If two stores save at the same time, both changes are kept.
           {sync.lastSync ? ` Last sync ${new Date(sync.lastSync).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" })}.` : ""}
           {sync.error ? <span className="block text-bad">{sync.error}</span> : null}
         </p>

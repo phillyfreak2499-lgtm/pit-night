@@ -54,7 +54,10 @@ export function GaragePage({ storeId }: { storeId: string }) {
   const grades = card ? gradesOf(card) : null;
   const printed = grades ? printedStats(bot, loadout, weekQuality(grades)) : null;
   const showStats = Boolean(printed && (data.phase !== "open" || see));
-  const quotes = data.phase === "inspected" || data.phase === "complete" ? quotesForBot(bot, wonThisWeek(data, storeId)) : data.quotes[storeId] ?? [];
+  // Once a part is fixed its bill goes away.
+  const quotes = (data.phase === "inspected" || data.phase === "complete" ? quotesForBot(bot, wonThisWeek(data, storeId)) : data.quotes[storeId] ?? []).filter(
+    (q) => (bot.partWear[q.partId] ?? "clean") !== "clean",
+  );
   const crew = data.crew.filter((c) => c.storeId === storeId);
   const proposals = data.proposals.filter((p) => p.storeId === storeId);
 
@@ -115,7 +118,7 @@ export function GaragePage({ storeId }: { storeId: string }) {
           </Link>
         </div>
         <KeyLadder coins={bot.coins} />
-        <p className="mt-2 text-xs text-muted">Each number pays its part&apos;s jar every Monday: green 3, blue 2, orange 1. Sport 3, Pro 5, Super 8. Repairs come out of the same jar.</p>
+        <p className="mt-2 text-xs text-muted">Each number pays its part&apos;s jar every Monday: green 3, blue 2, orange 1, red 0. Sport parts cost 3, Pro 5, Super 8. Repairs come out of the same jar.</p>
       </section>
 
       {showStats && printed ? <StatStrip {...printed.stats} /> : <p className="text-sm text-muted">Power, Speed, Armor, and Heat print when the bot locks Saturday.</p>}
@@ -193,7 +196,7 @@ export function GaragePage({ storeId }: { storeId: string }) {
               value={code}
               onChange={(e) => setCode(e.target.value)}
               placeholder="Passcode"
-              aria-label="Store passcode"
+              aria-label="Bay code"
             />
             <Btn type="submit">Enter</Btn>
           </form>
@@ -260,7 +263,7 @@ export function GaragePage({ storeId }: { storeId: string }) {
 
       <section className="border border-line p-4" data-testid="staff-editor">
         <SectionLabel>Pit crew</SectionLabel>
-        <p className="mt-2 text-sm text-muted">Names on the titantron. Not a personal record. Specialists on the clock set the review cap.</p>
+        <p className="mt-2 text-sm text-muted">Names on the titantron. Every specialist here counts toward Pit Week and the Full Tune-Up.</p>
         <ul className="mt-3 grid gap-2 sm:grid-cols-2">
           {crew.map((member) => (
             <li key={member.id} className="border border-line px-3 py-2">
@@ -377,7 +380,7 @@ function CardForm({
   return (
     <section className="border border-line bg-surface p-4">
       <SectionLabel>Weekly store card</SectionLabel>
-      <p className="mt-2 text-sm text-muted">Six numbers. Each one pays coins to one part of the bot: green 3, blue 2, orange 1.</p>
+      <p className="mt-2 text-sm text-muted">Six numbers. Each one pays coins to one part of the bot: green 3, blue 2, orange 1, red 0.</p>
       <div className="mt-3">
         <GradeRow card={card} />
       </div>

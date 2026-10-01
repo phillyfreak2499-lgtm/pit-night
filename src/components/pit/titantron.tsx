@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { CLASS_META } from "@/lib/pit/catalog";
 import { useMemo } from "react";
-import { botFor, cardFor, houseTape, rankedStores, recordOf } from "@/lib/pit/engine";
+import { botFor, buildCard, cardFor, houseTape, rankedStores, recordOf } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
 import { programWeek } from "@/lib/pit/training";
 import { tunedUp } from "@/lib/pit/week";
@@ -20,7 +20,8 @@ export function Titantron() {
   const featured =
     data.bouts.find((b) => b.week === data.week && b.title === "Main event") ??
     data.bouts.find((b) => b.week === data.week && b.kind === "final") ??
-    data.bouts.find((b) => b.week === data.week && b.kind === "bout");
+    data.bouts.find((b) => b.week === data.week && b.kind === "bout") ??
+    buildCard(data).find((b) => b.title === "Main event");
   const boss = data.session.role === "commissioner";
   const replay = featured?.result && featured.result.fighters.length === 2 ? featured.result : null;
   const house = useMemo(() => houseTape("saw-wedge")?.result ?? null, []);
@@ -59,7 +60,7 @@ export function Titantron() {
             <p className="mt-2 text-sm text-muted">
               {beforeOpen
                 ? "October 25, 2026. Build now. The first bell has not rung."
-                : "One lock per store. The bot freezes. The crew does not get a bracket."}
+                : "Each store locks one build at Saturday close. That build fights Monday."}
             </p>
           </Panel>
           <Panel className="p-4">
@@ -78,7 +79,7 @@ export function Titantron() {
             <div>
               <SectionLabel>Featured</SectionLabel>
               <h2 className="font-display text-3xl leading-none">
-                {featured ? featured.title : "Plano vs Allen"}
+                {featured ? featured.title : "Main event"}
               </h2>
             </div>
             {featured?.result ? <BoutWatch bout={featured} /> : <Link to="/broadcast" className="text-sm text-amber">Monday broadcast</Link>}
@@ -88,14 +89,14 @@ export function Titantron() {
             <FighterCard storeId={featured?.teamB[0] ?? "allen"} facing={-1} />
           </div>
           <div className="px-4 py-3 text-sm text-muted">
-            {featured?.result ? <ResultLine bout={featured} /> : "Stock iron. Allen bolted a disc to a tank. The week can be perfect and the lock can still be a ceiling fan."}
+            {featured?.result ? <ResultLine bout={featured} /> : "Card posts Monday morning. Lock your build by Saturday close."}
           </div>
         </Panel>
         <Panel className="p-4">
           <SectionLabel>The only trophy</SectionLabel>
           <h2 className="mt-1 font-display text-3xl leading-none">It hangs in a store</h2>
           <p className="mt-3 text-sm text-muted">
-            Pit crew get their names on the titantron and a weekly MVP. They do not get a personal bot, a personal bracket, or a personal record. Traffic is not a stat. Volume is not a stat. Goal, demos, closing, reviews, and the former-customer ticket are.
+            Pit crew get their names on the titantron and a weekly MVP. They do not get a personal bot, a personal bracket, or a personal record. The six numbers are the stats: NSNU, Conv %, Demo Rate, Demo Close %, Arch Supports, and Demo Ticket Avg.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link to="/broadcast" className="inline-flex min-h-11 items-center bg-amber px-4 font-display text-sm tracking-wide text-deep uppercase">
@@ -118,7 +119,7 @@ export function Titantron() {
             <div className="mt-4 border-t border-line pt-4">
               <p className="text-xs tracking-widest text-muted uppercase">Desk is live</p>
               <Link to="/desk" className="mt-2 inline-flex min-h-11 items-center bg-spark px-4 font-display text-sm tracking-wide text-deep uppercase">
-                Run the bell
+                Run the card
               </Link>
             </div>
           ) : null}
@@ -130,7 +131,7 @@ export function Titantron() {
       <section>
         <div className="mb-3 flex items-end justify-between">
           <h2 className="font-display text-3xl leading-none">Standings</h2>
-          <p className="text-sm text-muted">Record first. NSNU breaks a tie.</p>
+          <p className="text-sm text-muted">Record first. NSNU breaks a tie in the table.</p>
         </div>
         <ol className="flex flex-col gap-2">
           {ranked.map((store, index) => {

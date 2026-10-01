@@ -19,7 +19,11 @@ function keyOf(item: Json): string {
   return `j:${JSON.stringify(item)}`;
 }
 
-function mergeArray(base: Json[] | undefined, mine: Json[], theirs: Json[]): Json[] {
+/** Numbers that are running balances: both sides' changes add up instead of one winning. */
+const COUNTERS = new Set(["voucher", "repairSpent", "boltsSpent"]);
+const isCounter = (path: string[]) => COUNTERS.has(path.at(-1) ?? "") || path.at(-2) === "coins";
+
+function mergeArray(base: Json[] | undefined, mine: Json[], theirs: Json[], path: string[]): Json[] {
   const b = new Map((base ?? []).map((x) => [keyOf(x), x]));
   const m = new Map(mine.map((x) => [keyOf(x), x]));
   const t = new Map(theirs.map((x) => [keyOf(x), x]));
@@ -31,7 +35,7 @@ function mergeArray(base: Json[] | undefined, mine: Json[], theirs: Json[]): Jso
     const bi = b.get(k);
     const mi = m.get(k);
     const ti = t.get(k);
-    if (mi !== undefined && ti !== undefined) out.push(mergeValue(bi, mi, ti));
+    if (mi !== undefined && ti !== undefined) out.push(mergeValue(bi, mi, ti, [...path, k]));
     else if (mi !== undefined) {
       if (bi !== undefined && same(bi, mi)) continue; // they deleted it
       out.push(mi);
@@ -43,11 +47,12 @@ function mergeArray(base: Json[] | undefined, mine: Json[], theirs: Json[]): Jso
   return out;
 }
 
-export function mergeValue(base: Json, mine: Json, theirs: Json): Json {
+export function mergeValue(base: Json, mine: Json, theirs: Json, path: string[] = []): Json {
   if (same(mine, theirs)) return mine;
   if (base !== undefined && same(mine, base)) return theirs;
   if (base !== undefined && same(theirs, base)) return mine;
-  if (Array.isArray(mine) && Array.isArray(theirs)) return mergeArray(Array.isArray(base) ? base : undefined, mine, theirs);
+  if (typeof base === "number" && typeof mine === "number" && typeof theirs === "number" && isCounter(path)) return theirs + (mine - base);
+  if (Array.isArray(mine) && Array.isArray(theirs)) return mergeArray(Array.isArray(base) ? base : undefined, mine, theirs, path);
   if (isObj(mine) && isObj(theirs)) {
     const b = isObj(base) ? base : {};
     const out: Record<string, Json> = {};
@@ -58,7 +63,7 @@ export function mergeValue(base: Json, mine: Json, theirs: Json): Json {
       } else if (!(k in theirs)) {
         if (k in b && same(b[k], mine[k])) continue;
         out[k] = mine[k];
-      } else out[k] = mergeValue(b[k], mine[k], theirs[k]);
+      } else out[k] = mergeValue(b[k], mine[k], theirs[k], [...path, k]);
     }
     return out;
   }

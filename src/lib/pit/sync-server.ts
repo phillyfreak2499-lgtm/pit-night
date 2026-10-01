@@ -48,6 +48,12 @@ export const pushSeason = createServerFn({ method: "POST" })
         returning rev`;
       return { mode: m, ok: true, rev: Number(rows[0].rev) };
     }
+    const incoming = (JSON.parse(data.doc) as { version?: number }).version ?? 0;
+    const stored = await sql<{ rev: number; doc: string }>`select rev, doc from pit_season where id = ${ROW}`;
+    const storedVersion = stored[0] ? ((JSON.parse(stored[0].doc) as { version?: number }).version ?? 0) : 0;
+    if (incoming < storedVersion) {
+      return { mode: m, ok: false, rev: Number(stored[0]?.rev ?? 0), doc: null, error: "This device is on an older version of the site. Reload the page." };
+    }
     if (data.baseRev === 0) {
       const rows = await sql<{ rev: number }>`
         insert into pit_season (id, rev, doc) values (${ROW}, 1, ${data.doc})

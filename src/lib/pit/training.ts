@@ -1,3 +1,4 @@
+import { central } from "./time";
 /**
  * Pit Week: the four-week weekday program.
  * Every job and Spark question is drawn from the COGS training library:
@@ -58,7 +59,7 @@ export const PROGRAM: TrainingWeek[] = [
   {
     week: 1,
     theme: "Remarkable",
-    tagline: "A Remarkable Experience. Every Client. Every time.",
+    tagline: "A Remarkable Experience. Every Client. Every Time.",
     source: "Why We Sell The Way We Do · A Remarkable Experience · Building Non-Tangible Value",
     start: "2026-10-27",
     care: {
@@ -82,7 +83,7 @@ export const PROGRAM: TrainingWeek[] = [
           {
             id: "w1-tue-skill",
             kind: "skill",
-            title: "Received in 30 seconds",
+            title: "Greet within 30 seconds",
             do: "Greet every Client within 30 seconds and get them seated. Ask how they are feeling before anything about product.",
             proof: "The first thing one Client told you about their pain.",
           },
@@ -178,7 +179,7 @@ export const PROGRAM: TrainingWeek[] = [
             why: "Your presence either supports or undermines the price before you say much at all.",
           },
           {
-            q: "Which is a Specialist presence NEVER?",
+            q: "Which should a Specialist NEVER do?",
             choices: ["Strong posture", "Looking at the phone during the experience", "Warm, professional tone", "Consultative, never rushed"],
             answer: 1,
             why: "Phone use or multitasking says ‘this is just another job.’",
@@ -224,7 +225,7 @@ export const PROGRAM: TrainingWeek[] = [
           },
           {
             q: "When do store standards matter MOST, per the training?",
-            choices: ["Slow weekdays", "High-traffic and low-staffed days", "Only during visits", "Only on Saturdays"],
+            choices: ["Slow weekdays", "High-traffic and low-staffed days", "Only during manager visits", "Only on Saturdays"],
             answer: 1,
             why: "Busy and transition days are the highest-risk windows. Standards do not drop.",
           },
@@ -281,7 +282,7 @@ export const PROGRAM: TrainingWeek[] = [
       id: "w2-care",
       kind: "care",
       title: "Read the floor: green and red flags",
-      do: "Watch every demo you can this week without stopping. Log three green flags you protected and one red flag you answered with AAH: Acknowledge, Add value, Hand it back.",
+      do: "Watch every demo you can this week without stepping in unless you need to. Log three green flags you protected and one red flag you answered with AAH: Acknowledge, Add value, Hand it back.",
       proof: "Your three green flags and the AAH step-in.",
     },
     days: [
@@ -305,7 +306,7 @@ export const PROGRAM: TrainingWeek[] = [
         ],
         spark: [
           {
-            q: "The #1 silent closer of Good Feet sales is…",
+            q: "The #1 silent sale-killer at Good Feet is…",
             choices: ["“It's too expensive.”", "“I need to talk to my spouse.”", "“I'll think about it.”", "“I have insoles at home.”"],
             answer: 1,
             why: "Surface it early or lose it later.",
@@ -475,13 +476,13 @@ export const PROGRAM: TrainingWeek[] = [
             id: "w2-sat-skill",
             kind: "skill",
             title: "Self-audit",
-            do: "Rate yourself 1–5 on the Interview for Reality self-audit: question asked, tone, response to the answer, spouse handled, ownership.",
+            do: "Rate yourself 1–5 on the Interview for Reality self-audit: reality question asked, tone, response to the answer, spouse handled, ownership.",
             proof: "Your five scores and the one you will raise next week.",
           },
         ],
         spark: [
           {
-            q: "On the self-audit, a ‘5’ on Decision-maker question asked means…",
+            q: "On the self-audit, a ‘5’ on Reality question asked means…",
             choices: ["Asked it once this week", "At least one reality question in every interview", "Asked only when they mention price", "Let the manager ask"],
             answer: 1,
             why: "Every interview. That is the habit.",
@@ -535,7 +536,7 @@ export const PROGRAM: TrainingWeek[] = [
             id: "w3-tue-skill",
             kind: "skill",
             title: "Name each component's job",
-            do: "In every presentation, say what each component does for this Client: shoes carry the correction, socks protect comfort, MedMassager extends recovery.",
+            do: "In every presentation, say what each component does for this Client: shoes carry the correction, socks protect comfort, Med Massager extends recovery.",
             proof: "The component job you explained best today.",
           },
         ],
@@ -553,7 +554,7 @@ export const PROGRAM: TrainingWeek[] = [
             why: "That is how the Solution travels with the Client all day.",
           },
           {
-            q: "MedMassager's job:",
+            q: "Med Massager's job:",
             choices: ["Extend recovery beyond the fitting", "Replace the supports at night", "Fix flat feet", "Nothing, it is optional"],
             answer: 0,
             why: "It supports circulation and comfort at home so the work keeps paying off.",
@@ -659,7 +660,7 @@ export const PROGRAM: TrainingWeek[] = [
         spark: [
           {
             q: "When the investment is questioned, the FIRST move is…",
-            choices: ["Remove the MedMassager", "Reconnect to the goal", "Offer a discount", "Show cheaper supports"],
+            choices: ["Remove the Med Massager", "Reconnect to the goal", "Offer a discount", "Show cheaper supports"],
             answer: 1,
             why: "Bring them back to why they came in before you change anything.",
           },
@@ -670,7 +671,7 @@ export const PROGRAM: TrainingWeek[] = [
             why: "A partial Solution is an incomplete Solution.",
           },
           {
-            q: "Changing the Solution without a word protects only…",
+            q: "Quietly pulling pieces out of the Solution only protects…",
             choices: ["The Client", "The awkward moment", "The store", "The warranty"],
             answer: 1,
             why: "Matching the right Solution protects the Client.",
@@ -756,7 +757,7 @@ export const PROGRAM: TrainingWeek[] = [
             id: "w4-tue-skill",
             kind: "skill",
             title: "Recap the wins as yes questions",
-            do: "After the Relaxer walk, seat them at eye level and recap the wins. Get a clear verbal yes on each: “We took your pain from a [X] down to a [X]. That is real, isn't it?”",
+            do: "After the Relaxer walk, seat them at eye level and recap the wins. Get a clear verbal yes on each: “We took your pain from a [X] down to a [Y]. That is real, isn't it?”",
             proof: "The standout win, in the Client's own words.",
           },
         ],
@@ -856,10 +857,10 @@ export const PROGRAM: TrainingWeek[] = [
             why: "It moves you from what is in the Solution to the ask.",
           },
           {
-            q: "Zero-interest financing in the Close:",
-            choices: ["6 months", "Up to 18 months with no interest", "12 months at 5%", "We don't offer it"],
+            q: "How long can a Client finance with no interest?",
+            choices: ["No financing, cash only", "Up to 18 months with no interest", "12 months at 5%", "We don't offer it"],
             answer: 1,
-            why: "PayTomorrow and Care Credit: around $135 a month, as low as $80.",
+            why: "PayTomorrow and CareCredit: around $135 a month, as low as $80.",
           },
           {
             q: "After you give the price, you…",
@@ -895,8 +896,8 @@ export const PROGRAM: TrainingWeek[] = [
             why: "Soften, ask what they mean, answer, and ask again.",
           },
           {
-            q: "The Client already has Care Credit. You…",
-            choices: ["Suggest PayTomorrow instead", "Move on it immediately: “Let's put your Care Credit to work right now.”", "Ask them to think it over", "Talk about price again"],
+            q: "The Client already has CareCredit. You…",
+            choices: ["Suggest PayTomorrow instead", "Move on it immediately: “Let's put your CareCredit to work right now.”", "Ask them to think it over", "Talk about price again"],
             answer: 1,
             why: "No hesitation.",
           },
@@ -955,15 +956,13 @@ export function programWeek(week: number): TrainingWeek | undefined {
   return PROGRAM.find((w) => w.week === week);
 }
 
-/** Local calendar date for a day of a program week. */
+/** Midnight Central on a day of a program week. */
 export function dayDate(week: TrainingWeek, day: DayKey): Date {
   const [y, m, d] = week.start.split("-").map(Number) as [number, number, number];
-  const date = new Date(y, m - 1, d);
-  date.setDate(date.getDate() + DAY_ORDER.indexOf(day));
-  return date;
+  return central(y, m, d + DAY_ORDER.indexOf(day));
 }
 
-/** A day opens at midnight local time on its date, or always when the desk opens practice mode. */
+/** A day opens at midnight Central on its date, or always when the desk opens practice mode. */
 export function dayOpen(week: TrainingWeek, day: DayKey, now: Date, openAll: boolean) {
   if (openAll) return true;
   return now.getTime() >= dayDate(week, day).getTime();

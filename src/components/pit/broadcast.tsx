@@ -7,7 +7,7 @@ import { Fx, drawSide, drawTop, impactPoints, stepBots } from "./cage-draw";
 import { beatAt, buildBeats, fightDrive, lerp, type Beat, type Spot } from "./cage-motion";
 
 export function Broadcast({
-  bout,
+  bout: boutProp,
   playing: playingProp,
   speed: speedProp,
   onPlayingChange,
@@ -29,6 +29,11 @@ export function Broadcast({
   /** Scrimmage tape. The decision line must not invent a damage quote. */
   noDamage?: boolean;
 }) {
+  // Sync hands us fresh copies of the same bout; keep one object per tape so playback never restarts.
+  const tapeKey = `${boutProp.id}|${boutProp.result?.seed ?? ""}|${boutProp.result ? "r" : ""}`;
+  const keep = useRef<{ key: string; bout: Bout } | null>(null);
+  if (!keep.current || keep.current.key !== tapeKey) keep.current = { key: tapeKey, bout: boutProp };
+  const bout = keep.current.bout;
   const result = bout.result;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const topRef = useRef<HTMLCanvasElement | null>(null);

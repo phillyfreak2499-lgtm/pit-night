@@ -82,8 +82,8 @@ export function KeyLadder({
             No coins yet — that&apos;s normal.
           </span>{" "}
           <span className="text-muted">
-            Week 1 everyone fights stock. Pick any stock weapon and brain, paint the bot, and lock
-            it. Your first coins land after the first Monday fight.
+            Your first coins come from your Period 11 colors. The desk pays them before Week 1,
+            and the shop opens the moment they land. Until then, pick a stock weapon and brain and paint the bot.
           </span>
         </p>
       ) : null}

@@ -1391,7 +1391,7 @@ export function writeGazette(data: PitData, bouts: Bout[]): GazetteEntry[] {
     boutId: null,
     kicker: weekName,
     headline: `${weekName} is in the books.`,
-    body: `${data.stores.length} stores. One card. Nobody took a trophy home in their own name — the store did, or nobody did.`,
+    body: `${data.stores.length} stores. One card. Wins go to the store, not to a person.`,
   });
   for (const bout of bouts) {
     if (!bout.result) continue;
@@ -1493,10 +1493,10 @@ export function quoteFor(bot: Bot, slot: Slot): Quote | null {
   const loaner =
     slot === "utility"
       ? "the slot goes empty"
-      : `Fight day loans a stock ${stockPart(slot, bot.classId).name}`;
+      : `fight day loans a stock ${stockPart(slot, bot.classId).name}`;
   const line =
     cond === "disabled"
-      ? `${part.name} is dead. ${repairCost} ${slot} coins put it back. ${weldCost} emergency-welds it to Bent for one week. Until then, ${loaner}.`
+      ? `${part.name} is dead. ${repairCost} ${slot} coins put it back. Or ${weldCost} ${slot} coin emergency-welds it to Bent for one week. Until then, ${loaner}.`
       : cond === "bent"
         ? `${part.name} is bent. Half effect until you spend ${repairCost} ${slot} coins.`
         : `${part.name} is scratched. It still fights. ${repairCost} ${slot} coin makes the cage forget.`;
@@ -1598,7 +1598,8 @@ export function canSeeLoadout(data: PitData, storeId: string): boolean {
 export function shopOpen(data: PitData): boolean {
   if (data.phase === "complete" || data.phase === "locked" || data.phase === "fought") return false;
   if (data.week > 1) return true;
-  return data.phase === "inspected";
+  // Week 1 opens once the desk pays the Period 11 kickoff coins.
+  return data.phase === "inspected" || (data.phase === "open" && Boolean(data.kickoff?.appliedAt));
 }
 
 export function ownsPart(bot: Bot, part: Part): boolean {
@@ -1614,7 +1615,7 @@ export function buyCheck(
   part: Part,
 ): { ok: boolean; reason: string; cost: number } {
   const bot = botFor(data, storeId);
-  if (!shopOpen(data)) return { ok: false, reason: "Shop is shut until after the first Monday fight, and it shuts again once the bots lock Saturday.", cost: 0 };
+  if (!shopOpen(data)) return { ok: false, reason: data.week === 1 && !data.kickoff?.appliedAt ? "The shop opens when the desk pays the Period 11 kickoff coins." : "The shop shuts when the bots lock Saturday and reopens after the damage report.", cost: 0 };
   if (part.tier === "championship") return { ok: false, reason: "Championship parts are never sold.", cost: 0 };
   if (part.tier === "stock") return { ok: false, reason: "Stock is already on the peg.", cost: 0 };
   if (part.classLock && part.slot !== "chassis") return { ok: false, reason: "Wrong class.", cost: 0 };
@@ -1628,7 +1629,7 @@ export function buyCheck(
     const src = KEY_SOURCE[part.key];
     return {
       ok: false,
-      reason: `Needs ${cost} ${part.key} coins. You have ${have}. ${src.label} pays them: green 3, blue 2, orange 1.`,
+      reason: `Needs ${cost} ${part.key} coins. You have ${have}. ${src.label} pays them: green 3, blue 2, orange 1, red 0.`,
       cost,
     };
   }

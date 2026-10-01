@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { CLASS_META, METRICS, SLOT_LABEL, tierWord } from "@/lib/pit/catalog";
 import { coinMath, gradesOf, methodLabel, recordOf } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
+import { central, centralDay } from "@/lib/pit/time";
 import type { Bout, Grade, StoreCard } from "@/lib/pit/types";
 
 export function useNow() {
@@ -20,12 +21,10 @@ export const PERIOD_OPENS = new Date("2026-10-25T05:00:00.000Z");
 
 /** Bots lock at Saturday close. Fights run Monday morning on the official numbers. */
 export function nextLock(now: Date) {
-  const target = new Date(now);
-  const day = target.getDay();
-  const add = (6 - day + 7) % 7;
-  target.setDate(target.getDate() + add);
-  target.setHours(18, 0, 0, 0);
-  if (target.getTime() <= now.getTime()) target.setDate(target.getDate() + 7);
+  const today = centralDay(now);
+  const add = (6 - today.weekday + 7) % 7;
+  let target = central(today.y, today.m, today.d + add, 18);
+  if (target.getTime() <= now.getTime()) target = central(today.y, today.m, today.d + add + 7, 18);
   return target;
 }
 

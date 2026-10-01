@@ -307,7 +307,7 @@ export const WEEK_META: WeekMeta[] = [
   {
     number: 3,
     name: "Grudge Night",
-    blurb: "Nov 8–14. Locks Saturday at close. Fights Monday Nov 16. Seeded card again. Last-place stipend still pays. No tag.",
+    blurb: "Nov 8–14. Locks Saturday at close. Fights Monday Nov 16. The wheel turns again. The last-place repair voucher still pays.",
     tagsEnabled: false,
   },
   {

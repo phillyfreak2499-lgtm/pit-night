@@ -78,7 +78,7 @@ export type Bot = {
   voucher: number;
   repairSpent: number;
   owned: string[];
-  /** One coin jar per part. Green pays 3, blue 2, orange 1. Spent on that part only. */
+  /** One coin jar per part. Green pays 3, blue 2, orange 1, red 0. Spent on that part only. */
   coins: Record<KeyName, number>;
   wear: Record<Slot, Condition>;
   /** Condition stored on the part itself, so a swap does not move the scar. */
@@ -195,6 +195,8 @@ export type WeekMeta = {
   name: string;
   blurb: string;
   tagsEnabled: boolean;
+  /** When the desk locked this week's bots. */
+  lockedAt?: number;
 };
 
 export type Quote = {

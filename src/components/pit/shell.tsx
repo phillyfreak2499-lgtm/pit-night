@@ -70,7 +70,7 @@ export function PitShell({ children }: { children: React.ReactNode }) {
             <div className="hidden min-w-0 md:block">
               <ClockLine />
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
               <SyncDot />
               <button
                 type="button"
@@ -85,13 +85,17 @@ export function PitShell({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 data-testid="how-to-play"
-                className="min-h-11 border border-line px-2.5 font-display text-xs tracking-wide uppercase md:px-3 md:text-sm"
+                className="min-h-11 min-w-11 border border-line px-2.5 font-display text-xs tracking-wide uppercase md:px-3 md:text-sm"
                 onClick={() => {
                   showTutorial();
                   setGuide(true);
                 }}
               >
-                How to play
+                <span className="hidden sm:inline">How to play</span>
+                <span className="sm:hidden" aria-hidden>
+                  ?
+                </span>
+                <span className="sr-only sm:hidden">How to play</span>
               </button>
               <button
                 type="button"
@@ -206,6 +210,8 @@ function ClockLine() {
   );
 }
 
+const ROLE_WORD = { public: "guest", crew: "pit crew", captain: "captain", commissioner: "the desk" } as const;
+
 function SyncDot() {
   const sync = useSyncStatus();
   const shared = sync.mode === "live" || sync.mode === "preview";
@@ -299,8 +305,9 @@ function PassSheet({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <p className="mt-3 text-sm text-muted">
-          Signed in as {session.role}
-          {session.storeId ? ` · ${session.storeId}` : ""}. Specialists can propose. Captains lock. The desk runs Monday.
+          {session.role === "public" ? "Not signed in." : `Signed in as ${ROLE_WORD[session.role]}`}
+          {session.storeId ? ` · ${stores.find((st) => st.id === session.storeId)?.name ?? ""}` : ""}
+          {session.crewId && session.role !== "commissioner" ? ` · ${crew.find((c) => c.id === session.crewId)?.name ?? ""}` : ""}. Pit crew suggest parts and do Pit Week jobs. Captains lock the bot. The desk runs Monday.
         </p>
         <label className="mt-4 block text-sm text-muted">
           Store

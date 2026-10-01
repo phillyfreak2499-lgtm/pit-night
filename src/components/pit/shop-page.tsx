@@ -91,7 +91,7 @@ export function ShopPage({ storeId }: { storeId: string }) {
                       : check.ok
                         ? "Ready to buy."
                         : !coinsOk
-                          ? `${price - have} more ${SLOT_LABEL[part.key].toLowerCase()} coins. ${src.label} pays them: green 3, blue 2, orange 1.`
+                          ? `${price - have} more ${SLOT_LABEL[part.key].toLowerCase()} coins. ${src.label} pays them: green 3, blue 2, orange 1, red 0.`
                           : check.reason}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">

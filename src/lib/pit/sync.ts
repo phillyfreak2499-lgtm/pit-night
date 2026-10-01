@@ -71,11 +71,12 @@ function apply(doc: SharedDoc) {
 function readable(json: string): SharedDoc | null {
   try {
     const doc = JSON.parse(json) as SharedDoc;
-    if (doc.version !== VERSION) {
-      setStatus({ state: "mismatch", error: "The league is on a different version of the site. Reload this page." });
+    if (typeof doc.version !== "number" || doc.version > VERSION) {
+      setStatus({ state: "mismatch", error: "The league is on a newer version of the site. Reload this page." });
       return null;
     }
-    return doc;
+    // An older league copy is read as this version; the next push upgrades it.
+    return { ...doc, version: VERSION };
   } catch {
     return null;
   }

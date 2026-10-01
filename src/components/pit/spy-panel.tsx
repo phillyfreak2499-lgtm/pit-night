@@ -32,7 +32,7 @@ export function SpyPanel({ storeId }: { storeId: string }) {
       ) : (
         <p className="mt-2 text-sm text-muted">The bell already rang. Watch the tape.</p>
       )}
-      {!scry && open ? <p className="mt-3 text-sm text-amber">Utility is not a Scry. The other kits hit harder. The Scry is how you see them.</p> : null}
+      {!scry && open ? <p className="mt-3 text-sm text-amber">Put a Scry in the utility slot to scout your opponent. Other utility parts help you fight instead.</p> : null}
       <ul className="mt-3 flex flex-col gap-3">
         {foes.map((id) => {
           const foe = data.stores.find((row) => row.id === id);

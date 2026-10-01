@@ -63,7 +63,7 @@ function groupByClass(data: PitState, bouts: Bout[]) {
     bucket("striker", "Strikers"),
     bucket("tank", "Tanks"),
     bucket("specialist", "Specialists"),
-    bucket("cross", "Cross card"),
+    bucket("cross", "Mixed-class fights"),
   ].filter((g) => g.bouts.length);
 }
 
