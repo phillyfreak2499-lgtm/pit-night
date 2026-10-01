@@ -582,6 +582,8 @@ function snapshot(data: PitData, storeId: string): FighterSnap {
     brainTier: resolvePart(bot, "brain", locked).part?.tier ?? "stock",
     brainName: resolvePart(bot, "brain", locked).part?.name ?? "Logic Board",
     tuned,
+    // Unrepaired damage from earlier weeks shows on the paint.
+    scars: Object.values(bot.wear ?? {}).filter((w) => w && w !== "clean").length,
   };
 }
 

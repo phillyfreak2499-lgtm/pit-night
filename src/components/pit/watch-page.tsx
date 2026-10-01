@@ -136,7 +136,7 @@ export function WatchPage() {
           {stage === "intro" && bout ? <Intro key={bout.id} data={data} bout={bout} seen={seen} order={index + 1} total={bouts.length} /> : null}
           {stage === "fight" && bout ? (
             <div className="mx-auto w-full max-w-6xl">
-              <Broadcast key={bout.id} bout={bout} playing={!paused} speed={2} chromeless kicker={(tape ?? liveTape).live ? "Live card" : "House tape"} onComplete={next} />
+              <Broadcast key={bout.id} bout={bout} playing={!paused} speed={1.5} chromeless kicker={(tape ?? liveTape).live ? "Live card" : "House tape"} onComplete={next} />
             </div>
           ) : null}
           {stage === "result" && bout ? <Result key={bout.id} data={data} bout={bout} seen={seen} next={bouts[index + 1] ?? null} /> : null}

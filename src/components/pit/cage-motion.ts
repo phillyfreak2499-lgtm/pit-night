@@ -10,8 +10,11 @@ export type Beat =
   | { t: number; dur: number; kind: "bumper" }
   | { t: number; dur: number; kind: "intro"; side: 0 | 1 }
   | { t: number; dur: number; kind: "stats" }
+  | { t: number; dur: number; kind: "countdown" }
+  | { t: number; dur: number; kind: "clash"; index: number }
   | { t: number; dur: number; kind: "exchange"; index: number }
   | { t: number; dur: number; kind: "finisher" }
+  | { t: number; dur: number; kind: "replay" }
   | { t: number; dur: number; kind: "decision" };
 
 export type Spot = { x: number; y: number };
@@ -45,6 +48,10 @@ export type BotState = {
   flame: number;
   /** Winner on the decision beat. Fires the Bolt Locker victory effect. */
   celebrate?: boolean;
+  /** 0..1 coming up through the floor on the main-event lift. */
+  rise?: number;
+  /** Unrepaired parts from earlier weeks: dents and scrapes stay on the paint. */
+  scars?: number;
 };
 
 export type Drive = {
@@ -64,7 +71,41 @@ export type Drive = {
   focus: Spot;
   /** How tight the camera wants to be. */
   tight: number;
+  /** Damage this hit does, for the pop-up number. */
+  dmg?: number;
+  /** The hit bounced off: no damage. */
+  blocked?: boolean;
+  /** A big one: longer freeze, louder call. */
+  crit?: boolean;
+  /** Who swung. Feeds the combo counter. */
+  attacker?: string | null;
+  /** Slow-motion replay of the finishing blow. */
+  replay?: boolean;
+  /** 3, 2, 1, then 0 for FIGHT. */
+  countdown?: number | null;
+  /** Round number on screen. */
+  round?: number;
 };
+
+/** Optional staging the motion needs from outside the result. */
+export type DriveStyle = { mainEvent?: boolean };
+
+/** A share of each exchange lands early as a chip hit, so the fight trades more blows. Totals never change. */
+export function chipOf(ex: Exchange) {
+  return ex.damage >= 6 ? Math.round(ex.damage * 0.35) : 0;
+}
+
+function isDuel(result: FightResult) {
+  return result.fighters.length === 2 && result.method !== "melee" && result.method !== "bye" && result.exchanges.length > 0;
+}
+
+/** The blow that ended it, for the slow-motion replay. */
+function finalBlow(result: FightResult): "finisher" | number | null {
+  if (result.method !== "ko") return null;
+  if (result.finisher && (result.hp[result.finisher.against] ?? 1) <= 0) return "finisher";
+  const i = result.exchanges.findIndex((ex) => ex.defenderHp <= 0);
+  return i >= 0 ? i : null;
+}
 
 export const PIT = { x: 0.5, y: 0.1, w: 0.2, h: 0.09 };
 const REACH = 0.2;
@@ -77,12 +118,18 @@ export function buildBeats(result: FightResult): Beat[] {
     beats.push({ t, dur, ...beat } as Beat);
     t += dur;
   };
+  const duel = isDuel(result);
   push(5, { kind: "bumper" });
   push(6.5, { kind: "intro", side: 0 });
   if (result.fighters[1]) push(6.5, { kind: "intro", side: 1 });
   push(5.5, { kind: "stats" });
-  result.exchanges.forEach((_, index) => push(12, { kind: "exchange", index }));
-  if (result.finisher) push(7, { kind: "finisher" });
+  if (result.exchanges.length) push(4, { kind: "countdown" });
+  result.exchanges.forEach((_, index) => {
+    if (duel) push(11, { kind: "clash", index });
+    push(duel ? 13 : 12, { kind: "exchange", index });
+  });
+  if (result.finisher) push(8, { kind: "finisher" });
+  if (duel && finalBlow(result) !== null) push(7.5, { kind: "replay" });
   push(8, { kind: "decision" });
   return beats;
 }
@@ -177,6 +224,7 @@ function blank(bot: FighterSnap, spot: Spot, heading: number, hp: number): BotSt
     charging: false,
     spotlight: false,
     flame: 0,
+    scars: bot.scars ?? 0,
   };
 }
 
@@ -407,13 +455,90 @@ function exchangeState(result: FightResult, index: number, local: number, time: 
     Q1,
     local,
     time,
-    ex.damage,
+    ex.damage - (isDuel(result) ? chipOf(ex) : 0),
     ex.attackerHp,
-    beforeHp(result, ex),
+    beforeHp(result, ex) - (isDuel(result) ? chipOf(ex) : 0),
     ex.defenderHp,
     false,
   );
   return aAttacks ? { a: out.atk, b: out.def, out } : { a: out.def, b: out.atk, out };
+}
+
+const COUNTER_AT = 0.28;
+const CHIP_AT = 0.62;
+
+/**
+ * The trade before the big hit: square up and circle, the defender swings and
+ * bounces off, then the attacker lands a chip. Starts and ends on the exchange marks.
+ */
+function clashState(result: FightResult, index: number, local: number, time: number) {
+  const a = result.fighters[0]!;
+  const b = result.fighters[1]!;
+  const ex = result.exchanges[index]!;
+  const aAttacks = ex.attackerId === a.id;
+  const P0 = mark(result, aAttacks ? 0 : 1, index);
+  const Q0 = mark(result, aAttacks ? 1 : 0, index);
+  const atkBot = aAttacks ? a : b;
+  const defBot = aAttacks ? b : a;
+  const hpDef0 = beforeHp(result, ex);
+  const chip = chipOf(ex);
+  let atk: BotState;
+  let def: BotState;
+  let impact: Spot | null = null;
+  let power = 0;
+  let focus: Spot;
+  let tight = 0.3;
+  let phase: "circle" | "counter" | "chip" = "circle";
+
+  if (local < COUNTER_AT) {
+    // Circle: orbit the middle, feint once, settle back on the marks.
+    const t = local / COUNTER_AT;
+    const mid = mix(P0, Q0, 0.5);
+    const r = dist(P0, Q0) / 2;
+    const a0 = angle(mid, P0);
+    const swing = Math.sin(t * Math.PI) * 0.85 * (rand(`${result.seed}|orbit|${index}`) > 0.5 ? 1 : -1);
+    const feint = t > 0.5 && t < 0.72 ? Math.sin(((t - 0.5) / 0.22) * Math.PI) * 0.035 : 0;
+    const pa = keepIn({ x: mid.x + Math.cos(a0 + swing) * (r - feint), y: mid.y + Math.sin(a0 + swing) * (r - feint) * 0.8 });
+    const pb = keepIn({ x: mid.x - Math.cos(a0 + swing) * r, y: mid.y - Math.sin(a0 + swing) * r * 0.8 });
+    atk = blank(atkBot, pa, 0, ex.attackerHp);
+    def = blank(defBot, pb, 0, hpDef0);
+    const ja = juke(`${atkBot.id}circle${index}`, time, 0.008);
+    const jb = juke(`${defBot.id}circle${index}`, time + 0.7, 0.008);
+    atk.spot = { x: atk.spot.x + ja.x, y: atk.spot.y + ja.y };
+    def.spot = { x: def.spot.x + jb.x, y: def.spot.y + jb.y };
+    atk.charging = feint > 0.01;
+    atk.rev = 0.75;
+    def.rev = 0.65;
+    face(atk, def);
+    face(def, atk);
+    atk.roll = atk.spot.x * 34 + atk.spot.y * 21;
+    def.roll = def.spot.x * 34 + def.spot.y * 21;
+    focus = mix(atk.spot, def.spot, 0.5);
+  } else if (local < CHIP_AT) {
+    // The defender tries first. Armor holds.
+    phase = "counter";
+    const u = (local - COUNTER_AT) / (CHIP_AT - COUNTER_AT);
+    const out = strike(defBot, atkBot, Q0, P0, Q0, P0, u, time, 0, hpDef0, ex.attackerHp, ex.attackerHp, false);
+    def = out.atk;
+    atk = out.def;
+    impact = out.impact;
+    power = out.impact ? 0.3 : 0;
+    focus = out.focus;
+    tight = out.tight * 0.85;
+  } else {
+    phase = "chip";
+    const u = (local - CHIP_AT) / (1 - CHIP_AT);
+    const out = strike(atkBot, defBot, P0, Q0, P0, Q0, u, time, chip, ex.attackerHp, hpDef0, hpDef0 - chip, false);
+    atk = out.atk;
+    def = out.def;
+    impact = out.impact;
+    power = out.impact ? Math.max(0.3, out.power * 0.7) : 0;
+    focus = out.focus;
+    tight = out.tight * 0.9;
+  }
+  const A = aAttacks ? atk : def;
+  const B = aAttacks ? def : atk;
+  return { a: A, b: B, impact, power, focus, tight, phase, chip, atkBot, defBot };
 }
 
 function finisherState(result: FightResult, local: number, time: number) {
@@ -450,7 +575,7 @@ function finisherState(result: FightResult, local: number, time: number) {
   return aAttacks ? { a: out.atk, b: out.def, out } : { a: out.def, b: out.atk, out };
 }
 
-export function fightDrive(result: FightResult, beat: Beat, local: number, time: number): Drive {
+export function fightDrive(result: FightResult, beat: Beat, local: number, time: number, style: DriveStyle = {}): Drive {
   if (result.method === "melee" || result.fighters.length > 2)
     return meleeDrive(result, beat, local, time);
   const a = result.fighters[0]!;
@@ -472,6 +597,21 @@ export function fightDrive(result: FightResult, beat: Beat, local: number, time:
 
   const startA = mark(result, 0, 0);
   const startB = mark(result, 1, 0);
+
+  if (beat.kind === "bumper" && style.mainEvent) {
+    // Main event: both bots come up through the floor on the lifts.
+    const A = blank(a, startA, 0, 100);
+    const B = blank(b, startB, 0, 100);
+    A.rise = ease(clamp((local - 0.1) / 0.55, 0, 1));
+    B.rise = ease(clamp((local - 0.25) / 0.55, 0, 1));
+    face(A, B);
+    face(B, A);
+    A.heading += (1 - A.rise) * Math.PI * 2;
+    B.heading -= (1 - B.rise) * Math.PI * 2;
+    A.rev = local > 0.75 ? 1 : 0.2;
+    B.rev = A.rev;
+    return { bots: [A, B], ...noHit, focus: { x: 0.5, y: 0.55 }, tight: 0.1 };
+  }
 
   if (beat.kind === "bumper") {
     const t = ease(clamp((local - 0.15) / 0.75, 0, 1));
@@ -523,10 +663,46 @@ export function fightDrive(result: FightResult, beat: Beat, local: number, time:
     return { bots: [A, B], ...noHit, focus: mix(A.spot, B.spot, 0.5), tight: 0.2 };
   }
 
+  if (beat.kind === "countdown") {
+    const A = blank(a, startA, 0, 100);
+    const B = blank(b, startB, 0, 100);
+    face(A, B);
+    face(B, A);
+    const step = Math.floor(local * 4);
+    // Rev on every count.
+    const pulse = 1 - ((local * 4) % 1);
+    A.rev = 0.5 + pulse * 0.5;
+    B.rev = A.rev;
+    A.charging = step >= 3;
+    B.charging = step >= 3;
+    return { bots: [A, B], ...noHit, focus: mix(A.spot, B.spot, 0.5), tight: 0.15 + step * 0.08, countdown: Math.max(0, 3 - step) };
+  }
+
+  if (beat.kind === "clash") {
+    const s = clashState(result, beat.index, local, time);
+    const ex = result.exchanges[beat.index]!;
+    const counter = s.phase === "counter";
+    return {
+      bots: [s.a, s.b],
+      impact: s.impact,
+      power: s.power,
+      hitKey: s.phase === "circle" ? null : `cl-${beat.index}-${s.phase}`,
+      hitAt: counter ? COUNTER_AT + (CHIP_AT - COUNTER_AT) * HIT_AT : CHIP_AT + (1 - CHIP_AT) * HIT_AT,
+      weapon: (counter ? s.defBot : s.atkBot).weaponFamily,
+      victim: counter ? ex.attackerId : ex.defenderId,
+      focus: s.focus,
+      tight: s.tight,
+      dmg: counter ? 0 : s.chip,
+      blocked: counter || s.chip === 0,
+      attacker: counter ? ex.defenderId : ex.attackerId,
+      round: beat.index + 1,
+    };
+  }
+
   if (beat.kind === "exchange") {
     const s = exchangeState(result, beat.index, local, time);
     const ex = result.exchanges[beat.index]!;
-    // Tiny idle weave on whoever is not moving, so nobody freezes.
+    const dmg = ex.damage - chipOf(ex);
     return {
       bots: [s.a, s.b],
       impact: s.out.impact,
@@ -537,6 +713,10 @@ export function fightDrive(result: FightResult, beat: Beat, local: number, time:
       victim: ex.defenderId,
       focus: s.out.focus,
       tight: s.out.tight,
+      dmg,
+      crit: dmg >= 20 || ex.defenderHp <= 0,
+      attacker: ex.attackerId,
+      round: beat.index + 1,
     };
   }
 
@@ -552,6 +732,31 @@ export function fightDrive(result: FightResult, beat: Beat, local: number, time:
       victim: result.finisher.against,
       focus: s.out.focus,
       tight: s.out.tight,
+      dmg: result.finisher.damage,
+      crit: true,
+      attacker: result.finisher.by,
+      round: result.exchanges.length + 1,
+    };
+  }
+
+  if (beat.kind === "replay") {
+    // The blow again at a crawl: from the charge to the throw.
+    const blow = finalBlow(result);
+    const u = HIT_AT - 0.08 + clamp(local / 0.85, 0, 1) * 0.28;
+    const s = blow === "finisher" ? finisherState(result, u, time) : exchangeState(result, blow ?? 0, u, time);
+    const ex = typeof blow === "number" ? result.exchanges[blow] : undefined;
+    return {
+      bots: [s.a, s.b],
+      impact: s.out.impact,
+      power: s.out.power,
+      hitKey: "replay",
+      hitAt: (0.08 / 0.28) * 0.85,
+      weapon: blow === "finisher" ? "burn" : (ex?.attackerId === a.id ? a : b).weaponFamily,
+      victim: blow === "finisher" ? (result.finisher?.against ?? null) : (ex?.defenderId ?? null),
+      focus: s.out.focus,
+      tight: Math.max(0.85, s.out.tight),
+      crit: true,
+      replay: true,
     };
   }
 

@@ -505,3 +505,21 @@
     animation: none;
   }
 }
+
+/* Fight HUD: a bar on its last legs blinks */
+.hp-low {
+  animation: hp-low 0.45s steps(2, jump-none) infinite;
+}
+@keyframes hp-low {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.45;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hp-low {
+    animation: none;
+  }
+}

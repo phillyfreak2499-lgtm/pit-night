@@ -18,6 +18,8 @@ export type BotLookProps = {
   style?: BotStyle;
   storeName: string;
   brainTier?: Tier;
+  /** Damaged parts not yet repaired. */
+  scars?: number;
 };
 
 /** What a store's bot looks like to whoever is viewing. Weapons stay under the tarp until the bell. */
@@ -30,8 +32,10 @@ export function useBotLook(storeId: string): BotLookProps | null {
   const wear = Object.values(bot.wear);
   const hp =
     100 -
+    wear.filter((w) => w === "scratched").length * 6 -
     wear.filter((w) => w === "bent").length * 18 -
     wear.filter((w) => w === "disabled").length * 30;
+  const scars = wear.filter((w) => w && w !== "clean").length;
   return {
     id: storeId,
     paint: store.paint,
@@ -40,6 +44,7 @@ export function useBotLook(storeId: string): BotLookProps | null {
     look: bot.look,
     number: bot.number,
     hp: Math.max(10, hp),
+    scars,
     style: bot.style,
     storeName: store.name,
     brainTier: see ? (partById((bot.locked ?? bot.draft).brain)?.tier ?? "stock") : "stock",
@@ -71,6 +76,7 @@ function stateFor(look: BotLookProps): BotState {
     dead: false,
     roll: 0,
     hp: look.hp,
+    scars: look.scars ?? 0,
     charging: false,
     spotlight: false,
     flame: 0,

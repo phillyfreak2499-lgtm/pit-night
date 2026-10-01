@@ -153,6 +153,8 @@ export type FighterSnap = {
   brainName?: string;
   /** Full Tune-Up this week: every job and Spark done. */
   tuned?: boolean;
+  /** Parts still damaged going in. Drawn as dents and scrapes. */
+  scars?: number;
 };
 
 export type FightResult = {
