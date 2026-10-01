@@ -207,6 +207,10 @@ export function BotPortrait({
 }
 
 /** A cover thrown over the weapon mount. Hull, paint and number show; the weapon does not. */
+/**
+ * The weapon under a tarp until the bell. Drawn as a draped cover with
+ * tie-down straps and a red TOP SECRET stamp, so nobody mistakes it for a part.
+ */
 function drawTarp(
   ctx: CanvasRenderingContext2D,
   look: BotLookProps,
@@ -218,56 +222,109 @@ function drawTarp(
   heat: number,
 ) {
   const s = u * (look.classId === "tank" ? 1.06 : look.classId === "specialist" ? 0.94 : 1);
-  const height = look.classId === "tank" ? 0.54 : look.classId === "specialist" ? 0.46 : 0.36;
-  const flutter = Math.sin(t * 2.2) * 0.01 * (1 + heat * 2);
-  const top = -(height + 0.01) * s;
+  const height = look.classId === "tank" ? 0.5 : look.classId === "specialist" ? 0.44 : 0.38;
+  const top = -height * s;
+  const back = -0.04;
+  const front = 0.86;
+  const flutter = Math.sin(t * 2.2) * 0.008 * (1 + heat * 2);
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(facing, 1);
-  const cloth = "#45412f";
+
+  // Drop shadow so it reads as a lump on the bot, not a blade.
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.beginPath();
+  ctx.ellipse(((back + front) / 2) * s, 0, ((front - back) / 2) * s, 0.05 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // The cloth: square shoulders, a sag across the top, a ragged hem near the floor.
+  const cloth = "#3f4a3a";
   const g = ctx.createLinearGradient(0, top, 0, 0);
-  g.addColorStop(0, shade(cloth, 35));
-  g.addColorStop(0.6, cloth);
-  g.addColorStop(1, shade(cloth, -30));
+  g.addColorStop(0, shade(cloth, 40));
+  g.addColorStop(0.5, cloth);
+  g.addColorStop(1, shade(cloth, -35));
   ctx.fillStyle = g;
   ctx.beginPath();
-  ctx.moveTo(0.02 * s, -0.1 * s);
-  ctx.quadraticCurveTo(-0.02 * s, top + 0.04 * s, 0.12 * s, top);
-  ctx.quadraticCurveTo(0.4 * s, top - 0.03 * s + flutter * s, 0.62 * s, top + 0.12 * s);
-  ctx.quadraticCurveTo(0.9 * s, top + 0.3 * s, 0.94 * s, -0.005 * s);
-  for (let i = 0; i <= 7; i++) {
-    const hx = 0.94 - (i / 7) * 0.92;
-    const hy =
-      -0.005 - (i / 7) * 0.095 + (i % 2 === 0 ? 0.012 : -0.008) + Math.sin(t * 3 + i) * 0.003;
+  ctx.moveTo(back * s, -0.02 * s);
+  ctx.lineTo((back - 0.02) * s, (top * 0.55));
+  ctx.quadraticCurveTo((back - 0.01) * s, top, (back + 0.08) * s, top);
+  ctx.quadraticCurveTo(((back + front) / 2) * s, top + (0.06 + flutter) * s, (front - 0.1) * s, top + 0.01 * s);
+  ctx.quadraticCurveTo((front + 0.01) * s, top, (front + 0.02) * s, top * 0.5);
+  ctx.lineTo(front * s, -0.02 * s);
+  const hem = 9;
+  for (let i = 0; i <= hem; i++) {
+    const hx = front - (i / hem) * (front - back);
+    const hy = -0.02 + (i % 2 === 0 ? 0.012 : -0.006) + Math.sin(t * 3 + i) * 0.003;
     ctx.lineTo(hx * s, hy * s);
   }
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = "rgba(0,0,0,0.35)";
-  ctx.lineWidth = Math.max(1, s * 0.012);
-  for (const fx of [0.15, 0.42, 0.68]) {
+  ctx.strokeStyle = "rgba(0,0,0,0.55)";
+  ctx.lineWidth = Math.max(1, s * 0.01);
+  ctx.stroke();
+
+  // Folds.
+  ctx.lineWidth = Math.max(1, s * 0.01);
+  for (const [fx, dark] of [
+    [0.12, true],
+    [0.36, true],
+    [0.62, true],
+    [0.22, false],
+    [0.5, false],
+  ] as const) {
+    ctx.strokeStyle = dark ? "rgba(0,0,0,0.3)" : "rgba(255,255,255,0.09)";
     ctx.beginPath();
-    ctx.moveTo(fx * s, top + (fx > 0.6 ? 0.14 : 0.01) * s);
-    ctx.quadraticCurveTo((fx + 0.08) * s, top * 0.45, (fx + 0.04) * s, -0.04 * s);
+    ctx.moveTo(fx * s, top + 0.05 * s);
+    ctx.quadraticCurveTo((fx + 0.04) * s, top * 0.5, (fx + 0.01) * s, -0.04 * s);
     ctx.stroke();
   }
-  ctx.strokeStyle = "rgba(255,255,255,0.1)";
-  for (const fx of [0.05, 0.3, 0.55]) {
-    ctx.beginPath();
-    ctx.moveTo(fx * s, top + 0.03 * s);
-    ctx.quadraticCurveTo((fx - 0.03) * s, top * 0.5, (fx + 0.02) * s, -0.06 * s);
-    ctx.stroke();
+
+  // Two ratchet straps in the store's paint, with buckles.
+  const paint = paintOf(look.paint);
+  for (const sx of [0.06, 0.7]) {
+    ctx.fillStyle = paint;
+    ctx.fillRect(sx * s, top + 0.02 * s, 0.05 * s, -top - 0.03 * s);
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.fillRect((sx + 0.035) * s, top + 0.02 * s, 0.015 * s, -top - 0.03 * s);
+    ctx.fillStyle = "#c8c2b6";
+    ctx.fillRect((sx - 0.005) * s, top * 0.42, 0.06 * s, 0.045 * s);
   }
-  // Ratchet strap in the store's paint.
-  ctx.fillStyle = paintOf(look.paint);
-  ctx.beginPath();
-  ctx.moveTo(0.26 * s, top - 0.005 * s);
-  ctx.lineTo(0.33 * s, top + 0.0 * s);
-  ctx.lineTo(0.37 * s, -0.03 * s);
-  ctx.lineTo(0.3 * s, -0.035 * s);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = "#b8b2a6";
-  ctx.fillRect(0.3 * s, top * 0.55, 0.05 * s, 0.035 * s);
+
+  // Stamp. Un-mirror it so the words read the right way on both corners.
+  const cx = 0.38 * s;
+  const cy = top * 0.55;
+  ctx.translate(cx, cy);
+  ctx.scale(facing, 1);
+  ctx.rotate(-0.14);
+  const red = "#d6362a";
+  if (s >= 100) {
+    const fs = Math.max(7, s * 0.075);
+    ctx.font = `700 ${fs}px Oswald, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const label = "TOP SECRET";
+    const w = ctx.measureText(label).width + fs * 0.8;
+    const h = fs * 1.5;
+    ctx.fillStyle = "rgba(236,228,208,0.92)";
+    ctx.fillRect(-w / 2, -h / 2, w, h);
+    ctx.strokeStyle = red;
+    ctx.lineWidth = Math.max(1.5, fs * 0.14);
+    ctx.strokeRect(-w / 2, -h / 2, w, h);
+    ctx.fillStyle = red;
+    ctx.fillText(label, 0, fs * 0.05);
+  } else {
+    // Too small for words: a red ? in a box.
+    const fs = Math.max(8, s * 0.16);
+    ctx.font = `700 ${fs}px Oswald, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "rgba(236,228,208,0.92)";
+    ctx.fillRect(-fs * 0.45, -fs * 0.55, fs * 0.9, fs * 1.1);
+    ctx.strokeStyle = red;
+    ctx.lineWidth = Math.max(1.2, fs * 0.1);
+    ctx.strokeRect(-fs * 0.45, -fs * 0.55, fs * 0.9, fs * 1.1);
+    ctx.fillStyle = red;
+    ctx.fillText("?", 0, fs * 0.05);
+  }
   ctx.restore();
 }
