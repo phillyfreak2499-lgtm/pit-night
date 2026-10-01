@@ -90,6 +90,15 @@ export function KeyLadder({
 }) {
   return (
     <div className="border border-line bg-surface">
+      {keys && KEY_ORDER.every((k) => (keys[k] ?? 0) === 0) ? (
+        <p className="border-b border-line bg-amber/10 px-3 py-2 text-sm">
+          <span className="font-display tracking-wide text-amber uppercase">No keys yet — that&apos;s normal.</span>{" "}
+          <span className="text-muted">
+            Week 1 everyone fights stock. Pick any stock weapon, paint the bot, and lock it. Your first keys land after the
+            first Monday fight.
+          </span>
+        </p>
+      ) : null}
       <div className="hidden grid-cols-[7rem_1fr_auto] gap-3 border-b border-line px-3 py-2 text-[11px] tracking-widest text-muted uppercase sm:grid">
         <span>Part</span>
         <span>Earn a key with a green week in</span>

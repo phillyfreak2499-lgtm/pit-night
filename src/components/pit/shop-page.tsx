@@ -5,6 +5,7 @@ import { usePit } from "@/lib/pit/store";
 import type { Slot } from "@/lib/pit/types";
 import { Btn, SectionLabel } from "./bits";
 import { KeyLadder, KeyPips, UpgradeHowTo } from "./key-ladder";
+import { canEnterBay, LockedBay } from "./bay-lock";
 
 const SLOTS: Slot[] = ["chassis", "drive", "weapon", "armor", "utility"];
 
@@ -16,6 +17,7 @@ export function ShopPage({ storeId }: { storeId: string }) {
   const store = data.stores.find((s) => s.id === storeId);
   const bot = data.bots.find((b) => b.storeId === storeId);
   if (!store || !bot) return <p>No bay.</p>;
+  if (!canEnterBay(data, storeId)) return <LockedBay storeId={storeId} />;
   const see = canSeeLoadout(data, storeId) || data.session.role === "commissioner";
   const open = shopOpen(data);
   const parts = PARTS.filter(

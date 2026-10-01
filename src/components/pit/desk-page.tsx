@@ -18,7 +18,7 @@ export function DeskPage() {
       <div className="mx-auto max-w-md">
         <SectionLabel>House desk</SectionLabel>
         <h1 className="font-display text-5xl leading-none">Commissioner</h1>
-        <p className="mt-3 text-sm text-muted">Demo house PIN is 8472. This clipboard runs the season. It does not belong to a salesperson.</p>
+        <p className="mt-3 text-sm text-muted">This clipboard runs the season. It does not belong to a salesperson.</p>
         <form
           className="control-panel mt-5 border border-line"
           onSubmit={(e) => {
@@ -107,6 +107,7 @@ function DeskLive() {
           Advance week
         </Btn>
       </div>
+      <HousePin />
       <section className="border border-line p-4">
         <SectionLabel>Theme</SectionLabel>
         <div className="mt-3 flex flex-col gap-2 md:flex-row">
@@ -193,5 +194,29 @@ function DeskLive() {
         </div>
       </section>
     </div>
+  );
+}
+
+function HousePin() {
+  const setPin = usePit((s) => s.setPin);
+  const [next, setNext] = useState("");
+  return (
+    <section className="border border-line p-4">
+      <SectionLabel>House PIN</SectionLabel>
+      <p className="mt-2 text-sm text-muted">Only the desk sees this. Bay codes live in the store list below. Nothing on the public side prints a code.</p>
+      <form
+        className="mt-3 flex flex-col gap-2 sm:flex-row"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setPin(next);
+          setNext("");
+        }}
+      >
+        <TextInput value={next} onChange={(e) => setNext(e.target.value)} inputMode="numeric" type="password" placeholder="New PIN, 4 to 8 digits" aria-label="New house PIN" />
+        <Btn type="submit" tone="line">
+          Change PIN
+        </Btn>
+      </form>
+    </section>
   );
 }

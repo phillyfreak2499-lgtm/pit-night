@@ -243,6 +243,8 @@ function PassSheet({ onClose }: { onClose: () => void }) {
   const [storeId, setStoreId] = useState(stores[0]?.id ?? "plano");
   const [code, setCode] = useState("");
   const [pin, setPin] = useState("");
+  const [bad, setBad] = useState(false);
+  const [crewOpen, setCrewOpen] = useState<string | null>(null);
   const bayCrew = crew.filter((c) => c.storeId === storeId && c.role === "specialist");
 
   return (
@@ -275,43 +277,65 @@ function PassSheet({ onClose }: { onClose: () => void }) {
             ))}
           </select>
         </label>
-        <div className="mt-4">
-          <p className="text-sm text-muted">Pit crew</p>
-          <div className="mt-2 flex flex-col gap-2">
-            {bayCrew.map((member) => (
-              <button
-                key={member.id}
-                type="button"
-                className="min-h-11 border border-line px-3 text-left"
-                onClick={() => {
-                  signCrew(storeId, member.id);
-                  onClose();
-                }}
-              >
-                {member.name}
-              </button>
-            ))}
-          </div>
-        </div>
         <form
           className="mt-4 flex flex-col gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            if (signCaptain(storeId, code)) onClose();
+            const store = stores.find((row) => row.id === storeId);
+            if (store && store.passcode.toLowerCase() === code.trim().toLowerCase()) setCrewOpen(storeId);
+            else setBad(true);
           }}
         >
-          <p className="text-sm text-muted">Captain · demo code is the store name, lowercase</p>
+          <p className="text-sm text-muted">Bay code · from your captain or the desk</p>
           <TextInput
             value={code}
-            onChange={(e) => setCode(e.target.value)}
-            placeholder={storeId}
+            onChange={(e) => {
+              setCode(e.target.value);
+              setBad(false);
+            }}
+            placeholder="4-digit bay code"
+            inputMode="numeric"
+            type="password"
             autoComplete="off"
-            aria-label="Captain passcode"
+            aria-label="Bay code"
           />
-          <button type="submit" className="min-h-11 bg-amber font-display tracking-wide text-deep uppercase">
-            Take the clipboard
-          </button>
+          {bad ? <p className="text-sm text-bad">That code does not open this bay.</p> : null}
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button type="submit" className="min-h-11 border border-line font-display tracking-wide uppercase">
+              I&apos;m pit crew
+            </button>
+            <button
+              type="button"
+              className="min-h-11 bg-amber font-display tracking-wide text-deep uppercase"
+              onClick={() => {
+                if (signCaptain(storeId, code)) onClose();
+                else setBad(true);
+              }}
+            >
+              I&apos;m the captain
+            </button>
+          </div>
         </form>
+        {crewOpen === storeId ? (
+          <div className="mt-3">
+            <p className="text-sm text-muted">Who are you?</p>
+            <div className="mt-2 flex flex-col gap-2">
+              {bayCrew.map((member) => (
+                <button
+                  key={member.id}
+                  type="button"
+                  className="min-h-11 border border-line px-3 text-left"
+                  onClick={() => {
+                    signCrew(storeId, member.id);
+                    onClose();
+                  }}
+                >
+                  {member.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <form
           className="mt-4 flex flex-col gap-2 border-t border-line pt-4"
           onSubmit={(e) => {
@@ -319,11 +343,12 @@ function PassSheet({ onClose }: { onClose: () => void }) {
             if (signCommissioner(pin)) onClose();
           }}
         >
-          <p className="text-sm text-muted">Commissioner · demo house PIN 8472</p>
+          <p className="text-sm text-muted">Commissioner · house PIN</p>
           <TextInput
             value={pin}
             onChange={(e) => setPin(e.target.value)}
             inputMode="numeric"
+            type="password"
             placeholder="PIN"
             aria-label="Commissioner PIN"
           />

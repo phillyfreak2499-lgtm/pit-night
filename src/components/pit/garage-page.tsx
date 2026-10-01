@@ -16,6 +16,7 @@ import { paintHex, usePit, type PitState } from "@/lib/pit/store";
 import type { BotLook, GarageLook, Slot, StoreCard } from "@/lib/pit/types";
 import { BotPortrait, useBotLook } from "./bot-portrait";
 import { KeyLadder } from "./key-ladder";
+import { canEnterBay, LockedBay } from "./bay-lock";
 import { Btn, Field, GradeRow, SectionLabel, StatStrip, TextInput } from "./bits";
 import { ScrimmagePanel } from "./scrimmage-panel";
 import { SpyPanel } from "./spy-panel";
@@ -41,6 +42,7 @@ export function GaragePage({ storeId }: { storeId: string }) {
   const [openSlot, setOpenSlot] = useState<Slot | null>(null);
 
   if (!store) return <p>That bay does not exist.</p>;
+  if (!canEnterBay(data, storeId)) return <LockedBay storeId={storeId} />;
   const bot = data.bots.find((b) => b.storeId === storeId);
   if (!bot) return null;
   const card = cardFor(data, storeId);
@@ -177,7 +179,7 @@ export function GaragePage({ storeId }: { storeId: string }) {
       {!captain ? (
         <section className="border border-line bg-surface p-4">
           <SectionLabel>Captain clipboard</SectionLabel>
-          <p className="mt-2 text-sm text-muted">This bay's code is <span className="text-fg">{store.passcode}</span>.</p>
+          <p className="mt-2 text-sm text-muted">You are in as pit crew. Enter the bay code again to take the captain&apos;s clipboard.</p>
           <form
             className="mt-3 flex flex-col gap-2 sm:flex-row"
             onSubmit={(e) => {

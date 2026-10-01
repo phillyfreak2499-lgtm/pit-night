@@ -42,6 +42,7 @@ export type PitState = PitData & {
   signCrew: (storeId: string, crewId: string) => void;
   signCaptain: (storeId: string, passcode: string) => boolean;
   signCommissioner: (pin: string) => boolean;
+  setPin: (pin: string) => void;
   setDraftPart: (storeId: string, slot: Slot, partId: string | null) => void;
   setDraftLoadout: (storeId: string, loadout: Loadout) => void;
   lockStore: (storeId: string) => void;
@@ -153,6 +154,7 @@ function fresh(): PitState {
     signPublic: () => {},
     signCrew: () => {},
     signCaptain: () => false,
+    setPin: () => {},
     signCommissioner: () => false,
     setDraftPart: () => {},
     setDraftLoadout: () => {},
@@ -219,6 +221,15 @@ export const usePit = create<PitState>()(
           flash: `${store.captain} has ${store.name}'s clipboard.`,
         });
         return true;
+      },
+      setPin: (pin) => {
+        if (!isBoss(get())) return;
+        const clean = pin.trim();
+        if (!/^\d{4,8}$/.test(clean)) {
+          set({ flash: "House PIN is 4 to 8 digits." });
+          return;
+        }
+        set({ pin: clean, flash: "House PIN changed. Write it down." });
       },
       signCommissioner: (pin) => {
         if (pin.trim() !== get().pin) {

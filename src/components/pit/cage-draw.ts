@@ -396,20 +396,39 @@ function drawParticles(ctx: CanvasRenderingContext2D, list: Particle[]) {
 /* Side camera: the arena                                              */
 /* ------------------------------------------------------------------ */
 
+/** League emblem painted on the cage floor. Loads once; the backdrops redraw when it lands. */
+let logoVersion = 0;
+const floorLogo: HTMLImageElement | null = (() => {
+  if (typeof Image === "undefined") return null;
+  const img = new Image();
+  img.onload = () => {
+    logoVersion += 1;
+  };
+  img.src = "/league-floor-logo.png";
+  return img;
+})();
+
+function logoReady() {
+  return Boolean(floorLogo && floorLogo.complete && floorLogo.naturalWidth > 0);
+}
+
+/** Center of the floor, in arena units. */
+const LOGO = { x: 0.5, y: 0.56, w: 0.46 };
+
 const backdropCache = new WeakMap<
   CanvasRenderingContext2D,
-  { w: number; h: number; canvas: HTMLCanvasElement }
+  { w: number; h: number; v: number; canvas: HTMLCanvasElement }
 >();
 
 function backdrop(ctx: CanvasRenderingContext2D, w: number, h: number) {
   const hit = backdropCache.get(ctx);
-  if (hit && hit.w === w && hit.h === h) return hit.canvas;
+  if (hit && hit.w === w && hit.h === h && hit.v === logoVersion) return hit.canvas;
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
   const c = canvas.getContext("2d");
   if (c) paintBackdrop(c, w, h);
-  backdropCache.set(ctx, { w, h, canvas });
+  backdropCache.set(ctx, { w, h, v: logoVersion, canvas });
   return canvas;
 }
 
@@ -605,6 +624,29 @@ function paintBackdrop(c: CanvasRenderingContext2D, w: number, h: number) {
       c.fill();
     }
   }
+  // League emblem, painted on the plate in perspective.
+  if (floorLogo && logoReady()) {
+    const iw = floorLogo.naturalWidth;
+    const ih = floorLogo.naturalHeight;
+    const depth = LOGO.w * (ih / iw) * 1.3;
+    const y0 = LOGO.y - depth / 2;
+    const rows = 90;
+    c.save();
+    c.globalAlpha = 0.62;
+    for (let k = 0; k < rows; k++) {
+      const t0 = k / rows;
+      const t1 = (k + 1) / rows;
+      const a = project({ x: LOGO.x - LOGO.w / 2, y: y0 + depth * t0 }, w, h);
+      const b = project({ x: LOGO.x + LOGO.w / 2, y: y0 + depth * t0 }, w, h);
+      const d = project({ x: LOGO.x - LOGO.w / 2, y: y0 + depth * t1 }, w, h);
+      const e = project({ x: LOGO.x + LOGO.w / 2, y: y0 + depth * t1 }, w, h);
+      const left = Math.min(a.x, d.x);
+      const right = Math.max(b.x, e.x);
+      c.drawImage(floorLogo, 0, t0 * ih, iw, (t1 - t0) * ih, left, a.y, right - left, d.y - a.y + 0.6);
+    }
+    c.restore();
+  }
+
   // Scuffs, gouges and tire marks from past fights.
   for (let i = 0; i < 26; i++) {
     const a = { x: rnd(), y: rnd() };
@@ -2021,7 +2063,7 @@ function titleCard(
 
 const topCache = new WeakMap<
   CanvasRenderingContext2D,
-  { w: number; h: number; canvas: HTMLCanvasElement }
+  { w: number; h: number; v: number; canvas: HTMLCanvasElement }
 >();
 
 function topGeom(w: number, h: number) {
@@ -2035,7 +2077,7 @@ function topGeom(w: number, h: number) {
 
 function topBackdrop(ctx: CanvasRenderingContext2D, w: number, h: number) {
   const hit = topCache.get(ctx);
-  if (hit && hit.w === w && hit.h === h) return hit.canvas;
+  if (hit && hit.w === w && hit.h === h && hit.v === logoVersion) return hit.canvas;
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
@@ -2087,6 +2129,14 @@ function topBackdrop(ctx: CanvasRenderingContext2D, w: number, h: number) {
       c.moveTo(x0, y0 + (s * j) / 4);
       c.lineTo(x0 + s, y0 + (s * j) / 4);
       c.stroke();
+    }
+    if (floorLogo && logoReady()) {
+      const lw = LOGO.w * s;
+      const lh = lw * (floorLogo.naturalHeight / floorLogo.naturalWidth);
+      c.save();
+      c.globalAlpha = 0.62;
+      c.drawImage(floorLogo, x0 + LOGO.x * s - lw / 2, y0 + LOGO.y * s - lh / 2, lw, lh);
+      c.restore();
     }
     for (let i = 0; i < 30; i++) {
       c.strokeStyle = rnd() < 0.5 ? "rgba(0,0,0,0.3)" : "rgba(220,210,190,0.08)";
@@ -2183,7 +2233,7 @@ function topBackdrop(ctx: CanvasRenderingContext2D, w: number, h: number) {
     c.font = `600 ${Math.max(9, s * 0.03)}px Oswald, sans-serif`;
     c.fillText("PIT", x0 + PIT.x * s, y0 + (PIT.y + PIT.h / 2) * s + s * 0.04);
   }
-  topCache.set(ctx, { w, h, canvas });
+  topCache.set(ctx, { w, h, v: logoVersion, canvas });
   return canvas;
 }
 
