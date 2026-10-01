@@ -97,8 +97,8 @@ export function GradeGrid({
             </div>
             <div className="flex items-center justify-between gap-2 xl:flex-col xl:items-end">
               <span className="font-display text-xl leading-none text-amber">{row.coins ?? coinsFor(row.grades)}</span>
-              {aside ? aside(row) : null}
             </div>
+            {aside ? <div className="xl:col-span-8">{aside(row)}</div> : null}
           </div>
         );
       })}

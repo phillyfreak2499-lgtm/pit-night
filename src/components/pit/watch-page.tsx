@@ -1,3 +1,4 @@
+import { TaleOfTape } from "./tale-of-tape";
 import { Link } from "@tanstack/react-router";
 import { Flame, Maximize, Minimize, Package, Pause, Play, SkipForward, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -318,6 +319,7 @@ function Result({ data, bout, seen, next }: { data: PitData; bout: Bout; seen: P
       <p className="max-w-2xl text-lg text-muted">
         <ResultLine bout={bout} />
       </p>
+      <TaleOfTape bout={bout} compact />
       <p className="mt-4 text-sm tracking-widest text-muted uppercase">{next ? `Up next · ${matchup(data, next)}` : "That was the last fight"}</p>
     </div>
   );

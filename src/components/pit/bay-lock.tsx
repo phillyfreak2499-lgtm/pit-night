@@ -58,9 +58,9 @@ export function BayKeypad({
   if (!store) return null;
   const color = paintHex(store.paint);
 
-  const submit = (value = code) => {
+  const submit = async (value = code) => {
     if (!value) return;
-    if (signCaptain(storeId, value)) {
+    if (await signCaptain(storeId, value)) {
       setState("good");
       window.setTimeout(onUnlock, 380);
     } else {
@@ -141,7 +141,7 @@ export function BayKeypad({
           ))}
         </div>
         <p className="text-xs text-muted">
-          Four digits from your captain or the desk. Wrong codes do nothing but blink.
+          Use the captain code from the Desk. Crew sign in on the Clipboard with a separate crew code.
         </p>
       </div>
     </div>

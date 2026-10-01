@@ -41,7 +41,6 @@ export type Store = {
   name: string;
   region: string;
   captain: string;
-  passcode: string;
   paint: string;
   garage: GarageLook;
   seed: number;
@@ -102,6 +101,8 @@ export type StoreCard = {
   week: number;
   /** Dollars. */
   nsnu: number;
+  /** Recorded sales total; clicked colors never make projections official. */
+  nsnuOfficial?: boolean;
   /** Percent. */
   conv: number;
   /** Percent. */
@@ -155,6 +156,9 @@ export type FighterSnap = {
   tuned?: boolean;
   /** Parts still damaged going in. Drawn as dents and scrapes. */
   scars?: number;
+  /** Visible build geometry; does not change fight calculations. */
+  armorFamily?: string;
+  driveFamily?: string;
 };
 
 export type FightResult = {
@@ -258,7 +262,6 @@ export type PitData = {
   version: number;
   seasonName: string;
   tagline: string;
-  pin: string;
   week: number;
   phase: Phase;
   stores: Store[];

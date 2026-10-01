@@ -157,16 +157,15 @@ export function recordOf(data: PitData, storeId: string): { w: number; l: number
   return { w, l };
 }
 
-/** Tie-break weight: clicked colors first, then NSNU dollars. */
+/** Standings tiebreak: actual NSNU dollars only. */
 export function nsnuOf(data: PitData, storeId: string, week: number): number {
   const card = data.storeCards.find((c) => c.storeId === storeId && c.week === week);
-  if (!card) return 0;
-  // Clicked colors outrank a leftover projection number.
-  return weekQuality(gradesOf(card)) * 100000 + card.nsnu;
+  if (!card?.nsnuOfficial) return 0;
+  return Number.isFinite(card.nsnu) ? card.nsnu : 0;
 }
 
 export function rankedStores(data: PitData) {
-  const weekForTie = data.week > 1 ? data.week - 1 : 1;
+  const weekForTie = data.phase === "open" || data.phase === "locked" ? Math.max(1, data.week - 1) : data.week;
   return [...data.stores].sort((a, b) => {
     if (data.week === 1 && data.phase === "open") return a.seed - b.seed;
     const ra = recordOf(data, a.id);
@@ -571,6 +570,8 @@ function snapshot(data: PitData, storeId: string): FighterSnap {
     fit: printed.fit,
     weekQ,
     weaponFamily: weapon.part?.family ?? "none",
+    armorFamily: armor.part?.family,
+    driveFamily: drive.part?.family,
     weaponName: partById(locked.weapon)?.name ?? "Bare shaft",
     driveName: partById(locked.drive)?.name ?? "—",
     armorName: partById(locked.armor)?.name ?? "—",
@@ -1150,7 +1151,6 @@ function drillStore(row: (typeof DRILL_ROWS)[number]): Store {
     name: row.name,
     region: "House",
     captain: "The drill",
-    passcode: row.id,
     paint: row.paint,
     garage: "night",
     seed: 0,
@@ -1307,7 +1307,6 @@ function houseWorld(): PitData {
     version: 1,
     seasonName: "House preview",
     tagline: "",
-    pin: "",
     week: 1,
     phase: "locked",
     stores: rows.map(drillStore),
@@ -1623,6 +1622,7 @@ export function buyCheck(
   part: Part,
 ): { ok: boolean; reason: string; cost: number } {
   const bot = botFor(data, storeId);
+  if (data.phase === "open" && bot.locked) return { ok: false, reason: "This build is locked. Ask the Desk for a lock override.", cost: 0 };
   if (!shopOpen(data)) return { ok: false, reason: data.week === 1 && !data.kickoff?.appliedAt ? "The shop opens when the desk pays the Period 11 kickoff coins." : "The shop shuts when the bots lock Saturday and reopens after the damage report.", cost: 0 };
   if (part.tier === "championship") return { ok: false, reason: "Championship parts are never sold.", cost: 0 };
   if (part.tier === "stock") return { ok: false, reason: "Stock is already on the peg.", cost: 0 };

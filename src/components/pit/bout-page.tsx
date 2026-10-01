@@ -1,3 +1,4 @@
+import { TaleOfTape } from "./tale-of-tape";
 import { Link } from "@tanstack/react-router";
 import { usePit } from "@/lib/pit/store";
 import { ResultLine, SectionLabel, StatStrip } from "./bits";
@@ -27,6 +28,7 @@ export function BoutPage({ boutId }: { boutId: string }) {
         </h1>
       </div>
       <Broadcast bout={bout} />
+      <TaleOfTape bout={bout} />
       <div className="grid gap-3 md:grid-cols-2">
         {result.fighters
           .filter((f) => f.id !== "house")

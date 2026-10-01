@@ -1,5 +1,19 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ClipboardCheck, HelpCircle, Newspaper, Play, Radio, ScrollText, Swords, Trophy, Tv, Volume2, VolumeX, Warehouse, Wrench } from "lucide-react";
+import {
+  ClipboardCheck,
+  HelpCircle,
+  Newspaper,
+  Play,
+  Radio,
+  ScrollText,
+  Swords,
+  Trophy,
+  Tv,
+  Volume2,
+  VolumeX,
+  Warehouse,
+  Wrench,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { TUTORIAL_REV, applyHulen, usePit } from "@/lib/pit/store";
 import { startSync, useSyncStatus } from "@/lib/pit/sync";
@@ -82,7 +96,11 @@ export function PitShell({ children }: { children: React.ReactNode }) {
                 className="inline-flex min-h-11 min-w-11 items-center justify-center border border-line"
                 onClick={() => setSoundMuted(!muted)}
               >
-                {muted ? <VolumeX className="size-4" aria-hidden /> : <Volume2 className="size-4" aria-hidden />}
+                {muted ? (
+                  <VolumeX className="size-4" aria-hidden />
+                ) : (
+                  <Volume2 className="size-4" aria-hidden />
+                )}
               </button>
               <button
                 type="button"
@@ -117,7 +135,9 @@ export function PitShell({ children }: { children: React.ReactNode }) {
             <Boot />
           )}
           <nav className="no-print fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-line bg-deep md:hidden">
-            {NAV.filter((item) => ["/", "/map", "/week", "/broadcast", "/desk"].includes(item.to)).map((item) => (
+            {NAV.filter((item) =>
+              ["/", "/map", "/week", "/broadcast", "/desk"].includes(item.to),
+            ).map((item) => (
               <NavLink key={item.to} to={item.to} label={item.label} icon={item.icon} compact />
             ))}
           </nav>
@@ -152,8 +172,12 @@ function Brand({ compact = false }: { compact?: boolean }) {
         <p className="font-display text-xl leading-none tracking-wide text-fg">LEAGUE</p>
       ) : (
         <>
-          <p className="font-display text-xs tracking-[0.22em] text-amber uppercase">The Waterman</p>
-          <p className="mt-1 font-display text-xl leading-[0.9] tracking-wide text-fg">Battle Bot League</p>
+          <p className="font-display text-xs tracking-[0.22em] text-amber uppercase">
+            The Waterman
+          </p>
+          <p className="mt-1 font-display text-xl leading-[0.9] tracking-wide text-fg">
+            Battle Bot League
+          </p>
         </>
       )}
     </Link>
@@ -203,38 +227,60 @@ function ClockLine() {
   const week = usePit((s) => s.week);
   const now = useNow();
   const beforeOpen = Boolean(now && now.getTime() < PERIOD_OPENS.getTime());
-  const remain = now ? formatRemain((beforeOpen ? PERIOD_OPENS : nextLock(now)).getTime() - now.getTime()) : "—";
+  const remain = now
+    ? formatRemain((beforeOpen ? PERIOD_OPENS : nextLock(now)).getTime() - now.getTime())
+    : "—";
   return (
     <p className="truncate text-sm text-muted">
       Week {week} · {phaseLabel(phase)}
-      {phase === "open" ? (beforeOpen ? ` · Opens Oct 25 ${remain}` : ` · Saturday lock ${remain}`) : ""}
+      {phase === "open"
+        ? beforeOpen
+          ? ` · Opens Oct 25 ${remain}`
+          : ` · Saturday lock ${remain}`
+        : ""}
     </p>
   );
 }
 
-const ROLE_WORD = { public: "guest", crew: "pit crew", captain: "captain", commissioner: "the desk" } as const;
+const ROLE_WORD = {
+  public: "guest",
+  crew: "pit crew",
+  captain: "captain",
+  commissioner: "the desk",
+} as const;
 
 function SyncDot() {
   const sync = useSyncStatus();
   const shared = sync.mode === "live" || sync.mode === "preview";
   const bad = sync.state === "error" || sync.state === "mismatch";
-  const label =
-    sync.mode === "starting"
+  const label = bad
+    ? "Not syncing"
+    : sync.mode === "starting"
       ? "Connecting"
       : !shared
-        ? "This device only"
+        ? "Unavailable"
         : bad
           ? "Not syncing"
           : sync.state === "saving"
             ? "Saving"
             : "Live";
-  const color = !shared || bad ? "bg-bad" : sync.state === "saving" || sync.mode === "starting" ? "bg-amber" : "bg-ok";
+  const color =
+    !shared || bad
+      ? "bg-bad"
+      : sync.state === "saving" || sync.mode === "starting"
+        ? "bg-amber"
+        : "bg-ok";
   return (
     <Link
       to="/desk"
       hash="sync"
       data-testid="sync-dot"
-      title={sync.error || (shared ? "Every device sees the same season." : "Changes stay on this device until the league database is connected.")}
+      title={
+        sync.error ||
+        (shared
+          ? "Every device sees the same season."
+          : "League actions need a connection to the shared database.")
+      }
       className="inline-flex min-h-11 items-center gap-2 border border-line px-2.5 text-xs text-muted"
     >
       <span className={`size-2 rounded-full ${color}`} aria-hidden />
@@ -247,19 +293,27 @@ function SyncDot() {
 function Flash() {
   const flash = usePit((s) => s.flash);
   if (!flash) return null;
-  return <p className="no-print border-b border-line bg-surface px-4 py-2 text-sm text-amber md:px-6">{flash}</p>;
+  return (
+    <p className="no-print border-b border-line bg-surface px-4 py-2 text-sm text-amber md:px-6">
+      {flash}
+    </p>
+  );
 }
 
 function Boot() {
   const stores = usePit((s) => s.stores);
   return (
     <main className="px-4 py-8">
-      <p className="font-display text-xs tracking-[0.28em] text-amber uppercase">The Waterman Group</p>
+      <p className="font-display text-xs tracking-[0.28em] text-amber uppercase">
+        The Waterman Group
+      </p>
       <h1 className="mt-2 font-display text-4xl leading-[0.9] md:text-5xl">
         THE WATERMAN
         <span className="block">BATTLE BOT LEAGUE</span>
       </h1>
-      <p className="mt-3 max-w-xl text-muted">Opening the league. Eleven store doors. No personal bots.</p>
+      <p className="mt-3 max-w-xl text-muted">
+        Opening the league. Eleven store doors. No personal bots.
+      </p>
       <ul className="mt-6 grid grid-cols-2 gap-2">
         {stores.map((store) => (
           <li key={store.id} className="border border-line bg-surface px-3 py-3 text-sm">
@@ -287,7 +341,7 @@ function PassSheet({ onClose }: { onClose: () => void }) {
   const signCrew = usePit((s) => s.signCrew);
   const signCaptain = usePit((s) => s.signCaptain);
   const signCommissioner = usePit((s) => s.signCommissioner);
-  const [storeId, setStoreId] = useState(stores[0]?.id ?? "plano");
+  const [storeId, setStoreId] = useState(session.storeId ?? stores[0]?.id ?? "plano");
   const [code, setCode] = useState("");
   const [pin, setPin] = useState("");
   const [bad, setBad] = useState(false);
@@ -308,12 +362,28 @@ function PassSheet({ onClose }: { onClose: () => void }) {
         </div>
         <p className="mt-3 text-sm text-muted">
           {session.role === "public" ? "Not signed in." : `Signed in as ${ROLE_WORD[session.role]}`}
-          {session.storeId ? ` · ${stores.find((st) => st.id === session.storeId)?.name ?? ""}` : ""}
-          {session.crewId && session.role !== "commissioner" ? ` · ${crew.find((c) => c.id === session.crewId)?.name ?? ""}` : ""}. Pit crew suggest parts and do Pit Week jobs. Captains lock the bot. The desk runs Monday.
+          {session.storeId
+            ? ` · ${stores.find((st) => st.id === session.storeId)?.name ?? ""}`
+            : ""}
+          {session.crewId && session.role !== "commissioner"
+            ? ` · ${crew.find((c) => c.id === session.crewId)?.name ?? ""}`
+            : ""}
+          . Pit crew suggest parts and do Pit Week jobs. Captains lock the bot. The desk runs
+          Monday.
         </p>
-        <nav className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm md:hidden" aria-label="More pages">
-          {NAV.filter((item) => !["/", "/map", "/week", "/broadcast", "/desk"].includes(item.to)).map((item) => (
-            <Link key={item.to} to={item.to} onClick={onClose} className="inline-flex min-h-11 items-center text-amber">
+        <nav
+          className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm md:hidden"
+          aria-label="More pages"
+        >
+          {NAV.filter(
+            (item) => !["/", "/map", "/week", "/broadcast", "/desk"].includes(item.to),
+          ).map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              onClick={onClose}
+              className="inline-flex min-h-11 items-center text-amber"
+            >
               {item.label}
             </Link>
           ))}
@@ -336,19 +406,17 @@ function PassSheet({ onClose }: { onClose: () => void }) {
           className="mt-4 flex flex-col gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            const store = stores.find((row) => row.id === storeId);
-            if (store && store.passcode.toLowerCase() === code.trim().toLowerCase()) setCrewOpen(storeId);
-            else setBad(true);
+            setCrewOpen(storeId);
           }}
         >
-          <p className="text-sm text-muted">Bay code · from your captain or the desk</p>
+          <p className="text-sm text-muted">Crew bay code or Captain code · from the Desk</p>
           <TextInput
             value={code}
             onChange={(e) => {
               setCode(e.target.value);
               setBad(false);
             }}
-            placeholder="4-digit bay code"
+            placeholder="Crew or captain code"
             inputMode="numeric"
             type="password"
             autoComplete="off"
@@ -356,18 +424,21 @@ function PassSheet({ onClose }: { onClose: () => void }) {
           />
           {bad ? <p className="text-sm text-bad">That code does not open this bay.</p> : null}
           <div className="grid gap-2 sm:grid-cols-2">
-            <button type="submit" className="min-h-11 border border-line font-display tracking-wide uppercase">
+            <button
+              type="submit"
+              className="min-h-11 border border-line font-display tracking-wide uppercase"
+            >
               I&apos;m pit crew
             </button>
             <button
               type="button"
               className="min-h-11 bg-amber font-display tracking-wide text-deep uppercase"
-              onClick={() => {
-                if (signCaptain(storeId, code)) onClose();
+              onClick={async () => {
+                if (await signCaptain(storeId, code)) onClose();
                 else setBad(true);
               }}
             >
-              I&apos;m the captain
+              {session.role === "crew" ? "Switch to Captain" : "I’m the captain"}
             </button>
           </div>
         </form>
@@ -380,9 +451,9 @@ function PassSheet({ onClose }: { onClose: () => void }) {
                   key={member.id}
                   type="button"
                   className="min-h-11 border border-line px-3 text-left"
-                  onClick={() => {
-                    signCrew(storeId, member.id);
-                    onClose();
+                  onClick={async () => {
+                    if (await signCrew(storeId, member.id, code)) onClose();
+                    else setBad(true);
                   }}
                 >
                   {member.name}
@@ -394,9 +465,9 @@ function PassSheet({ onClose }: { onClose: () => void }) {
         ) : null}
         <form
           className="mt-4 flex flex-col gap-2 border-t border-line pt-4"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
-            if (signCommissioner(pin)) onClose();
+            if (await signCommissioner(pin)) onClose();
           }}
         >
           <p className="text-sm text-muted">Commissioner · house PIN</p>
@@ -408,7 +479,10 @@ function PassSheet({ onClose }: { onClose: () => void }) {
             placeholder="PIN"
             aria-label="Commissioner PIN"
           />
-          <button type="submit" className="min-h-11 border border-line font-display tracking-wide uppercase">
+          <button
+            type="submit"
+            className="min-h-11 border border-line font-display tracking-wide uppercase"
+          >
             Open the desk
           </button>
         </form>

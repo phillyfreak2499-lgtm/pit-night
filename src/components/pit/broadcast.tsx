@@ -91,7 +91,7 @@ export function Broadcast({
     const hazards = bout.week === 3 && bout.kind !== "bye";
 
     const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 600 ? 1.5 : 2);
       for (const node of [canvas, top]) {
         const rect = node.getBoundingClientRect();
         node.width = Math.max(1, Math.floor(rect.width * dpr));
@@ -241,7 +241,7 @@ export function Broadcast({
       </div>
       <div className="grid gap-px bg-line lg:grid-cols-[minmax(0,1.55fr)_minmax(190px,0.72fr)]">
         <div className="relative min-w-0 bg-deep">
-          <canvas ref={canvasRef} className="aspect-video w-full bg-deep" />
+          <canvas ref={canvasRef} aria-label="Battle arena animation" className="aspect-[4/3] w-full bg-deep sm:aspect-video" />
           <div className="pointer-events-none absolute inset-x-0 top-0 grid grid-cols-[1fr_auto_1fr] items-start gap-2 p-2 pb-6 md:gap-3 md:p-3 md:pb-8" style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.78), rgba(0,0,0,0))" }}>
             {left ? <Health name={left.botName} store={left.storeName} hp={hp[left.id] ?? 100} paint={left.paint} align="left" tuned={left.tuned} /> : <span />}
             <div className="flex min-w-[3.5rem] flex-col items-center pt-0.5 md:min-w-[5rem]">
@@ -250,10 +250,10 @@ export function Broadcast({
             </div>
             {right ? <Health name={right.botName} store={right.storeName} hp={hp[right.id] ?? 100} paint={right.paint} align="right" tuned={right.tuned} /> : <span />}
           </div>
-          <p className="absolute inset-x-0 bottom-0 bg-deep/80 px-3 py-1.5 text-xs md:py-3 md:text-base">{caption}</p>
+          <p className="absolute inset-x-0 bottom-0 bg-deep/95 px-3 py-1.5 text-xs leading-relaxed md:py-3 md:text-base">{caption}</p>
         </div>
         <div className="relative min-w-0 bg-deep lg:min-h-full">
-          <canvas ref={topRef} className="aspect-square w-full bg-deep lg:absolute lg:inset-0 lg:h-full lg:w-full" />
+          <canvas ref={topRef} aria-label="Overhead arena camera" className="aspect-square w-full bg-deep lg:absolute lg:inset-0 lg:h-full lg:w-full" />
         </div>
       </div>
       {chromeless ? null : (

@@ -6,7 +6,7 @@ import { GradeGrid } from "./grade-grid";
 import { buildCard, gradeMetric, cardValue, coinMath, gradesOf, kickoffRank } from "@/lib/pit/engine";
 import { METRICS } from "@/lib/pit/catalog";
 import type { Grade, StatKey } from "@/lib/pit/types";
-import { sendThisSeason, takeLeagueSeason, useSyncStatus } from "@/lib/pit/sync";
+import { takeLeagueSeason, useSyncStatus } from "@/lib/pit/sync";
 
 export function DeskPage() {
   const data = usePit();
@@ -160,8 +160,8 @@ function DeskLive() {
                   <Field label="Captain">
                     <TextInput key={store.captain} defaultValue={store.captain} onBlur={(e) => e.target.value.trim() !== store.captain && renameCaptain(store.id, e.target.value)} />
                   </Field>
-                  <Field label="Bay code (4 digits)">
-                    <TextInput key={store.passcode} defaultValue={store.passcode} inputMode="numeric" maxLength={4} onBlur={(e) => e.target.value.trim() !== store.passcode && setPasscode(store.id, e.target.value)} />
+                  <Field label="Change captain code (4–8 digits)">
+                    <TextInput placeholder="New captain code" type="password" inputMode="numeric" maxLength={8} onBlur={(e) => { if (e.target.value.trim()) { setPasscode(store.id, e.target.value); e.target.value = ""; } }} />
                   </Field>
                 </div>
               </div>
@@ -179,7 +179,6 @@ function DeskLive() {
         <div className="mt-4">
           <ResetSeason onReset={() => {
             resetSeason();
-            void sendThisSeason().catch(() => undefined);
           }} />
         </div>
       </section>
@@ -193,7 +192,7 @@ function HousePin() {
   return (
     <section className="border border-line p-4">
       <SectionLabel>House PIN</SectionLabel>
-      <p className="mt-2 text-sm text-muted">Only the desk sees this. Bay codes live in the store list below. Nothing on the public side prints a code.</p>
+      <p className="mt-2 text-sm text-muted">Codes are verified by the server and never displayed. Changing a code revokes existing sessions for that role. Crew and captain codes must be different.</p>
       <form
         className="mt-3 flex flex-col gap-2 sm:flex-row"
         onSubmit={(e) => {
@@ -261,7 +260,7 @@ function SundayScores() {
         <div>
           <SectionLabel>Sunday scorecard · week {data.week}</SectionLabel>
           <p className="mt-2 max-w-3xl text-sm text-muted">
-            Click each store&apos;s color for all six numbers. Green pays 3 coins, blue 2, orange 1, red 0, into that part&apos;s jar when you advance the week. Click a color again to clear it. A dashed box is the house projection until you click.
+            Click each store&apos;s color for all six numbers. Green pays 3 coins, blue 2, orange 1, red 0, into that part&apos;s jar when you advance the week. Record actual NSNU dollars as well for the standings tiebreak; this leaves your clicked colors unchanged. Click a color again to clear it. A dashed box is the house projection until you click.
           </p>
         </div>
         <p className="font-display text-2xl leading-none" data-testid="sunday-progress">
@@ -279,10 +278,13 @@ function SundayScores() {
             return [{ id: store.id, name: store.name, paint: store.paint, grades: card.grades ?? {}, fallback, coins: coinMath(gradesOf(card)).total }];
           })}
           onPick={(storeId, stat, grade) => setGrade(storeId, stat, grade)}
-          aside={(row) => (
+          aside={(row) => (<div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-2 text-xs">Official NSNU $
+              <input key={`${data.week}-${row.id}`} type="number" min="0" max="1000000" step="0.01" aria-label={`${row.name} official NSNU`} disabled={frozen} defaultValue={cards.find(c => c.store.id === row.id)?.card?.nsnuOfficial ? cards.find(c => c.store.id === row.id)?.card?.nsnu : ""} onBlur={e => { if (e.currentTarget.value !== "") data.setOfficialNsnu(row.id, Number(e.currentTarget.value)); }} className="w-24 border border-line bg-deep px-2 py-2" placeholder="Required" />
+            </label>
             <button type="button" className="min-h-9 text-xs text-muted underline-offset-2 hover:underline" onClick={() => setTyping(typing === row.id ? null : row.id)}>
               {typing === row.id ? "Hide numbers" : "Type numbers"}
-            </button>
+            </button></div>
           )}
         />
         {typing
@@ -378,71 +380,12 @@ function KickoffPanel() {
 
 function SyncPanel() {
   const sync = useSyncStatus();
-  const [busy, setBusy] = useState("");
-  const [note, setNote] = useState("");
-  const [armed, setArmed] = useState(false);
-  const shared = sync.mode === "live" || sync.mode === "preview";
-  const run = async (what: string, fn: () => Promise<void>) => {
-    setBusy(what);
-    setNote("");
-    try {
-      await fn();
-      setNote(what === "send" ? "Every device now has this season." : "This device now matches the league.");
-    } catch (err) {
-      setNote(err instanceof Error ? err.message : "That did not go through.");
-    } finally {
-      setBusy("");
-    }
-  };
-  return (
-    <section id="sync" className="border border-line p-4">
-      <SectionLabel>One season, every device</SectionLabel>
-      {shared ? (
-        <p className="mt-2 text-sm text-muted">
-          {sync.mode === "live" ? "Live." : "Preview database (resets when the preview restarts)."} Every phone and laptop pulls the same season every few
-          seconds. If two stores save at the same time, both changes are kept.
-          {sync.lastSync ? ` Last sync ${new Date(sync.lastSync).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" })}.` : ""}
-          {sync.error ? <span className="block text-bad">{sync.error}</span> : null}
-        </p>
-      ) : (
-        <div className="mt-2 text-sm text-muted">
-          <p className="text-warn">
-            {sync.mode === "starting" ? "Checking for the league database…" : "This device only. Jobs, Sparks, picks and builds stay on the phone that made them."}
-          </p>
-          <p className="mt-2">To share one season with every store, connect a database in Vercel once:</p>
-          <ol className="mt-1 list-decimal pl-5">
-            <li>Vercel → your pit-night project → Storage → Create Database → Neon (free plan is plenty).</li>
-            <li>Connect it to the project for Production. Vercel adds DATABASE_URL by itself.</li>
-            <li>Redeploy. The dot at the top turns green.</li>
-            <li>Open the Desk on the device with the real season first and press Send this season to everyone.</li>
-          </ol>
-        </div>
-      )}
-      {shared ? (
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Btn
-            tone={armed ? "spark" : "line"}
-            disabled={Boolean(busy)}
-            onClick={() => {
-              if (!armed) {
-                setArmed(true);
-                setNote("This replaces the league copy for every store. Press again to send.");
-                return;
-              }
-              setArmed(false);
-              void run("send", sendThisSeason);
-            }}
-          >
-            {busy === "send" ? "Sending…" : armed ? "Yes, replace the league copy" : "Send this season to everyone"}
-          </Btn>
-          <Btn tone="ghost" disabled={Boolean(busy)} onClick={() => void run("take", takeLeagueSeason)}>
-            {busy === "take" ? "Pulling…" : "Take the league copy"}
-          </Btn>
-        </div>
-      ) : null}
-      {note ? <p className="mt-2 text-sm text-amber">{note}</p> : null}
-    </section>
-  );
+  return <section id="sync" className="border border-line p-4">
+    <SectionLabel>One season, every device</SectionLabel>
+    <p className="mt-2 text-sm text-muted">Every action is checked by the league. Phones refresh from the shared season every few seconds. Wait for Saved before closing the page.</p>
+    {sync.error ? <p className="mt-2 text-bad">{sync.error}</p> : null}
+    <Btn tone="ghost" onClick={() => void takeLeagueSeason()}>Refresh league</Btn>
+  </section>;
 }
 
 function TrainingSwitch() {

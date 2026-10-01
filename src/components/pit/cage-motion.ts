@@ -382,6 +382,14 @@ function strike(
     power = impact ? 0.6 : 0;
   }
 
+  // The attacker settles on its suspension after contact. Pure presentation;
+  // combat damage, timing and the stored result remain unchanged.
+  if (!flameHit && local > HIT_AT && local < 0.72 && damage > 0) {
+    const settle = (local - HIT_AT) / (0.72 - HIT_AT);
+    const mass = atkBot.classId === "tank" ? 0.55 : 1;
+    atk.pitch += Math.sin(settle * Math.PI * 4) * (1 - settle) * 0.045 * mass;
+  }
+
   if (ko && local >= HIT_AT + 0.04) {
     def.dead = true;
     def.rev = 0;

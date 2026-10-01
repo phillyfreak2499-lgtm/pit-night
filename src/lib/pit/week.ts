@@ -62,7 +62,7 @@ export function weekProgress(data: Pick<PitData, "crew" | "jobLog" | "sparkLog">
     crew,
     careDone,
     carePending: care?.status === "pending",
-    tuned: careDone && crew.every((c) => c.complete),
+    tuned: careDone && crew.length > 0 && crew.every((c) => c.complete),
     done,
     total,
     pct: total ? Math.round((done / total) * 100) : 0,
