@@ -1,2 +1,9 @@
-export { pullSeason, signIn, signOut, setAccessCode, mutateSeason } from "./authoritative";
+export {
+  pullSeason,
+  signIn,
+  signOut,
+  setAccessCode,
+  getStoreCodes,
+  mutateSeason,
+} from "./authoritative";
 export type { SyncMode, PullResult } from "./authoritative";

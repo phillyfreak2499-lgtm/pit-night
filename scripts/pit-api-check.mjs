@@ -63,6 +63,7 @@ const anon = client(),
   captain = client();
 let pulled = await anon.call("pullSeason", { rev: 0 });
 assert.equal(pulled.session.role, "public");
+await assert.rejects(anon.call("getStoreCodes"));
 assert.ok(!pulled.doc.includes('"pin"') && !pulled.doc.includes('"passcode"'));
 await assert.rejects(anon.command("resetSeason", []));
 await assert.rejects(anon.command("force", [{ doc: "{}" }]));
@@ -79,6 +80,7 @@ const member = JSON.parse(pulled.doc).crew.find(
   (c) => c.storeId === "plano" && c.role === "specialist",
 );
 await crew.call("signIn", { role: "crew", storeId: "plano", crewId: member.id, code: codes.crew });
+await assert.rejects(crew.call("getStoreCodes"));
 await assert.rejects(crew.command("lockStore", ["plano"]));
 await assert.rejects(
   crew.call("signIn", { role: "captain", storeId: "plano", crewId: null, code: codes.crew }),
@@ -94,6 +96,12 @@ await captain.call("signIn", {
   crewId: null,
   code: codes.captain,
 });
+await assert.rejects(captain.call("getStoreCodes"));
+const vaultRows = await desk.call("getStoreCodes");
+assert.equal(vaultRows.length, 11);
+assert.equal(vaultRows.find((row) => row.storeId === "plano").captain, codes.captain);
+assert.equal(vaultRows.find((row) => row.storeId === "plano").crew, codes.crew);
+await assert.rejects(desk.call("getStoreCodes", undefined, "https://example.com"));
 await assert.rejects(captain.command("lockStore", ["allen"]));
 await assert.rejects(captain.command("runSaturday", []));
 await assert.rejects(captain.call("setAccessCode", { id: "desk", code: "192837" }));
@@ -149,6 +157,11 @@ assert.equal(data.phase, "locked");
 // Rotation revokes existing sessions and the old code; it never enters league JSON.
 const replacement = "392847";
 await desk.call("setAccessCode", { id: "captain:plano", code: replacement });
+assert.equal(
+  (await desk.call("getStoreCodes")).find((row) => row.storeId === "plano").captain,
+  replacement,
+);
+assert.ok(!(await anon.call("pullSeason", { rev: 0 })).doc.includes(replacement));
 await assert.rejects(captain.command("renameBot", ["plano", "REVOKED"]));
 await assert.rejects(
   captain.call("signIn", { role: "captain", storeId: "plano", crewId: null, code: codes.captain }),
@@ -182,6 +195,15 @@ if (process.env.PIT_QA_SETUP_FIGHTS === "1") {
       .filter((b) => b.kind === "bout")
       .map((b) => ({ id: b.id, stores: b.storeIds, method: b.result.method })),
   );
+}
+if (process.env.PIT_QA_SETUP_CODES === "1") {
+  const stores = JSON.parse((await anon.call("pullSeason", { rev: 0 })).doc).stores;
+  for (const [i, store] of stores.entries()) {
+    if (store.id === "plano" || store.id === "allen") continue;
+    await desk.call("setAccessCode", { id: `captain:${store.id}`, code: String(82000000 + i) });
+    await desk.call("setAccessCode", { id: `bay:${store.id}`, code: String(83000000 + i) });
+  }
+  assert.ok((await desk.call("getStoreCodes")).every((row) => row.captain && row.crew));
 }
 console.log(
   "PASS: anonymous rejection, secret-free reads, HTTP-only sessions, role/store checks, server Spark scoring, concurrent writes, duplicate claims, eligibility freeze, post-lock restrictions, and credential revocation.",

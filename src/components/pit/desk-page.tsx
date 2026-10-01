@@ -7,6 +7,7 @@ import { buildCard, gradeMetric, cardValue, coinMath, gradesOf, kickoffRank } fr
 import { METRICS } from "@/lib/pit/catalog";
 import type { Grade, StatKey } from "@/lib/pit/types";
 import { takeLeagueSeason, useSyncStatus } from "@/lib/pit/sync";
+import { DeskCodes } from "./desk-codes";
 
 export function DeskPage() {
   const data = usePit();
@@ -48,7 +49,7 @@ export function DeskPage() {
               type="password"
               autoComplete="off"
               placeholder="ENTER PIN"
-              aria-label="Commissioner PIN"
+              aria-label="Admin code"
               className="lcd h-16 text-center font-display text-3xl tracking-[0.4em] placeholder:text-base placeholder:tracking-[0.3em]"
             />
             <div className="grid grid-cols-3 gap-2">
@@ -80,7 +81,6 @@ function DeskLive() {
   const unlockStore = usePit((s) => s.unlockStore);
   const renameBot = usePit((s) => s.renameBot);
   const renameCaptain = usePit((s) => s.renameCaptain);
-  const setPasscode = usePit((s) => s.setPasscode);
   const setTagline = usePit((s) => s.setTagline);
   const houseCall = usePit((s) => s.houseCall);
   const [call, setCall] = useState("");
@@ -114,6 +114,7 @@ function DeskLive() {
       <SyncPanel />
       <TrainingSwitch />
       <HousePin />
+      <DeskCodes />
       <section className="border border-line p-4">
         <SectionLabel>Theme</SectionLabel>
         <div className="mt-3 flex flex-col gap-2 md:flex-row">
@@ -160,9 +161,6 @@ function DeskLive() {
                   <Field label="Captain">
                     <TextInput key={store.captain} defaultValue={store.captain} onBlur={(e) => e.target.value.trim() !== store.captain && renameCaptain(store.id, e.target.value)} />
                   </Field>
-                  <Field label="Change captain code (4–8 digits)">
-                    <TextInput placeholder="New captain code" type="password" inputMode="numeric" maxLength={8} onBlur={(e) => { if (e.target.value.trim()) { setPasscode(store.id, e.target.value); e.target.value = ""; } }} />
-                  </Field>
                 </div>
               </div>
             );
@@ -191,8 +189,8 @@ function HousePin() {
   const [next, setNext] = useState("");
   return (
     <section className="border border-line p-4">
-      <SectionLabel>House PIN</SectionLabel>
-      <p className="mt-2 text-sm text-muted">Codes are verified by the server and never displayed. Changing a code revokes existing sessions for that role. Crew and captain codes must be different.</p>
+      <SectionLabel>Admin code</SectionLabel>
+      <p className="mt-2 text-sm text-muted">Your one admin code opens this Desk. Changing it signs every admin session out. Store codes are managed below.</p>
       <form
         className="mt-3 flex flex-col gap-2 sm:flex-row"
         onSubmit={(e) => {
@@ -201,9 +199,9 @@ function HousePin() {
           setNext("");
         }}
       >
-        <TextInput value={next} onChange={(e) => setNext(e.target.value)} inputMode="numeric" type="password" placeholder="New PIN, 4 to 8 digits" aria-label="New house PIN" />
+        <TextInput value={next} onChange={(e) => setNext(e.target.value)} inputMode="numeric" type="password" placeholder="New admin code, 4 to 8 digits" aria-label="New admin code" />
         <Btn type="submit" tone="line">
-          Change PIN
+          Change admin code
         </Btn>
       </form>
     </section>

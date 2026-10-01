@@ -87,6 +87,12 @@ export const setAccessCode = createServerFn({ method: "POST" })
       throw new Error("Unknown credential.");
     await s.auth.changeCredential(data.id, data.code);
   });
+export const getStoreCodes = createServerFn({ method: "POST" }).handler(async () => {
+  const s = await load();
+  if ((await s.auth.session(s.data)).role !== "commissioner")
+    throw new Error("Only the Desk can view store codes.");
+  return s.auth.readStoreCodes(s.data);
+});
 export const mutateSeason = createServerFn({ method: "POST" })
   .validator((input: { name: string; args: unknown[] }) => {
     if (!input || !Object.hasOwn(commandArgs, input.name))
