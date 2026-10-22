@@ -64,8 +64,7 @@ export async function entryAllowed(request, secret, now) {
   return value?.version === 1;
 }
 export function platformPath(path) {
-  // The Monday cron route checks Vercel's CRON_SECRET itself; it never serves league pages or data.
-  return path.startsWith("/__grok/") || path === "/__app-env" || path === "/api/cron/monday";
+  return path.startsWith("/__grok/") || path === "/__app-env";
 }
 export function internalDestination(value) {
   if (

@@ -151,6 +151,30 @@ export const askRulebook = createServerFn({ method: "POST" })
     return { answer, left: Math.max(0, RULES_LIMIT_PER_DAY - used) };
   });
 
+/** Desk only: whether the key reaches the server, and one tiny real call through the site's own path. The key is never echoed. */
+export const claudeHealth = createServerFn({ method: "POST" }).handler(async () => {
+  const [{ loadSeason }, auth, { askClaude, HAIKU }] = await Promise.all([
+    import("./authoritative"),
+    import("./session.server"),
+    import("./claude.server"),
+  ]);
+  const { data } = await loadSeason();
+  if ((await auth.session(data)).role !== "commissioner") throw new Error("Only the Desk can check Claude.");
+  auth.sameOrigin();
+  const started = Date.now();
+  try {
+    const { text, model } = await askClaude({
+      feature: "rules",
+      system: "Reply with exactly the word READY and nothing else.",
+      prompt: "Status check.",
+      maxTokens: 400,
+    });
+    return { ok: text.trim().toUpperCase().startsWith("READY"), model, ms: Date.now() - started, message: "" };
+  } catch (err) {
+    return { ok: false, model: HAIKU, ms: Date.now() - started, message: err instanceof Error ? err.message : "Claude call failed." };
+  }
+});
+
 /** The Rules page and FAQ as plain text: the only source the rules Q&A may use. */
 async function rulebookText() {
   const [{ RULES }, { GROUPS }] = await Promise.all([

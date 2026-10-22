@@ -1,7 +1,3 @@
 {
-  "installCommand": "npm install --omit=dev --no-audit --no-fund",
-  "crons": [
-    { "path": "/api/cron/monday", "schedule": "0 10 * * 1" },
-    { "path": "/api/cron/monday", "schedule": "0 11 * * 1" }
-  ]
+  "installCommand": "npm install --omit=dev --no-audit --no-fund"
 }

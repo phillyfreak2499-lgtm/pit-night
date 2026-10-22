@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { askRulebook, getClaudeCopy, rulebookQuota, type CopyResult } from "@/lib/pit/claude-server";
+import { askRulebook, claudeHealth, getClaudeCopy, rulebookQuota, type CopyResult } from "@/lib/pit/claude-server";
 import { usePit } from "@/lib/pit/store";
 import { Btn, Panel, SectionLabel } from "./bits";
 
@@ -50,6 +50,41 @@ export function ClaudeCopy({
         ))
       )}
     </div>
+  );
+}
+
+/** Desk: prove the Claude key works with one tiny call through the site's server. */
+export function ClaudeCheck() {
+  const [result, setResult] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <section className="border border-line p-4" data-testid="claude-check">
+      <SectionLabel>Claude booth</SectionLabel>
+      <p className="mt-2 text-sm text-muted">
+        Fight commentary, the weekly recap, matchup hype and the captains&apos; rulebook use Claude (Haiku). Check that the key reaches the server.
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <Btn
+          tone="line"
+          disabled={busy}
+          testId="claude-health"
+          onClick={async () => {
+            setBusy(true);
+            try {
+              const h = await claudeHealth();
+              setResult(h.ok ? `Claude is working: ${h.model} answered in ${h.ms} ms.` : `Claude check failed: ${h.message || "unexpected reply"}`);
+            } catch (e) {
+              setResult(e instanceof Error ? e.message : "Claude check failed.");
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? "Asking Claude…" : "Check Claude"}
+        </Btn>
+        {result ? <p className="text-sm" aria-live="polite">{result}</p> : null}
+      </div>
+    </section>
   );
 }
 
