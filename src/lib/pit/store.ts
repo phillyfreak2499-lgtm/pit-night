@@ -271,7 +271,7 @@ function fresh(): PitState {
 }
 
 /** Bump when the tutorial changes so every device sees the new one once. */
-export const TUTORIAL_REV = 2;
+export const TUTORIAL_REV = 3;
 
 /** Everything the league shares. Session and tutorial stay on the device. */
 export const SHARED_KEYS = [
