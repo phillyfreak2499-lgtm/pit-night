@@ -3,7 +3,7 @@ import type { PitData, Session } from "./types";
 
 const id = z.string().min(1).max(120);
 const text = z.string().max(500);
-const week = z.number().int().min(1).max(4);
+const week = z.number().int().min(1).max(5);
 const slot = z.enum(["chassis", "armor", "drive", "weapon", "utility", "brain"]);
 const stat = z.enum(["nsnu", "conv", "demoRate", "demoClose", "arch", "ticket"]);
 const grade = z.enum(["green", "blue", "orange", "red"]).nullable();
@@ -67,6 +67,7 @@ export const commandArgs = {
   setTrainingOpenAll: z.tuple([z.boolean()]),
   buyLocker: z.tuple([id, id]),
   makePick: z.tuple([id, id]),
+  setRally: z.tuple([id]),
   setNumber: z.tuple([id, text]),
   renameCrew: z.tuple([id, text]),
   addCrew: z.tuple([id, text]),
@@ -105,6 +106,7 @@ const personal = new Set<Command>([
   "submitSpark",
   "postShout",
   "makePick",
+  "setRally",
 ]);
 export function authorize(data: PitData, session: Session, name: Command, args: unknown[]) {
   if (session.role === "public") throw new Error("Sign in on the Clipboard first.");

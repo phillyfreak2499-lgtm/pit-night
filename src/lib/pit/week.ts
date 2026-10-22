@@ -37,18 +37,19 @@ export function weekProgress(data: Pick<PitData, "crew" | "jobLog" | "sparkLog">
   const empty: WeekProgress = { week, crew: [], careDone: false, carePending: false, tuned: false, done: 0, total: 0, pct: 0 };
   if (!plan) return empty;
   const jobs = allJobs(plan);
+  const sparkDays = plan.days.map((d) => d.day);
   const crew = countedCrew(data, storeId, week).map((c): CrewProgress => {
     const mine = data.jobLog.filter((e) => e.week === week && e.crewId === c.id);
     const jobsDone = jobs.filter((j) => mine.some((e) => e.jobId === j.id && e.status === "approved")).length;
     const jobsPending = jobs.filter((j) => mine.some((e) => e.jobId === j.id && e.status === "pending")).length;
-    const sparksDone = DAY_ORDER.filter((d) => data.sparkLog.some((e) => e.week === week && e.day === d && e.crewId === c.id)).length;
+    const sparksDone = sparkDays.filter((d) => data.sparkLog.some((e) => e.week === week && e.day === d && e.crewId === c.id)).length;
     return {
       crew: c,
       jobsDone,
       jobsPending,
       sparksDone,
       jobsTotal: jobs.length,
-      sparksTotal: DAY_ORDER.length,
+      sparksTotal: sparkDays.length,
       complete: jobsDone === jobs.length && sparksDone === DAY_ORDER.length,
     };
   });

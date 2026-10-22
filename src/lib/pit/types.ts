@@ -1,4 +1,5 @@
 export type ClassId = "striker" | "tank" | "specialist";
+export type Conference = "metro" | "frontier";
 export type Slot = "chassis" | "drive" | "weapon" | "armor" | "utility" | "brain";
 export type Tier = "stock" | "sport" | "pro" | "super" | "championship";
 export type Grade = "green" | "blue" | "orange" | "red";
@@ -40,6 +41,7 @@ export type Store = {
   id: string;
   name: string;
   region: string;
+  conference: Conference;
   captain: string;
   paint: string;
   garage: GarageLook;
@@ -283,6 +285,8 @@ export type PitData = {
   intel: Intel[];
   /** Pit Week. */
   jobLog: JobEntry[];
+  /** Championship Week support. Rally is presentation-only and never touches fight math. */
+  rallies: Rally[];
   sparkLog: SparkEntry[];
   shouts: Shout[];
   picks: Pick[];
@@ -332,6 +336,17 @@ export type Shout = {
   fromName: string;
   to: string;
   text: string;
+  at: number;
+};
+
+export type Rally = {
+  /** One current rally choice per signed-in person during Championship Week. */
+  id: string;
+  week: number;
+  storeId: string;
+  crewId: string;
+  fromName: string;
+  targetId: string;
   at: number;
 };
 

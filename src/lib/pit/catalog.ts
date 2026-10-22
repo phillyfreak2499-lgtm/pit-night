@@ -1,7 +1,7 @@
 import type { BotDecal, BotFinish, BotStyle, ClassId, KeyName, Slot, StatKey, Tier } from "./types";
 
 export const SCRAP_CAP = 18;
-export const VERSION = 5;
+export const VERSION = 6;
 
 export const CLASS_META: Record<
   ClassId,
