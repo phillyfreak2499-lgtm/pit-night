@@ -73,7 +73,8 @@ export type RawRow = {
   store: string | null;
   store_number: string | null;
   franchise: string | null;
-  net_sales: string | null;
+  /** Sales to new customers (new ups) only; returning-customer sales are excluded. */
+  new_up_sales: string | null;
   new_ups: string | null;
   walkouts: string | null;
   demos_seen: string | null;
@@ -209,7 +210,7 @@ export function stage(
     if ((r.franchise ?? "").toUpperCase() !== m.franchise || (r.store ?? "").toUpperCase() !== m.name)
       problems.push(`${store.name}: store #${m.number} came back as "${r.store}" / ${r.franchise}, expected "${m.name}" / ${m.franchise}.`);
     const f = {
-      net: num(r.net_sales),
+      newUpSales: num(r.new_up_sales),
       ups: num(r.new_ups),
       walk: num(r.walkouts),
       seen: num(r.demos_seen),
@@ -223,6 +224,10 @@ export function stage(
     const hardMissing = missing.filter((k) => k !== "archRet");
     if (hardMissing.length) {
       problems.push(`${store.name}: missing ${hardMissing.join(", ")}.`);
+      continue;
+    }
+    if (f.ups! <= 0) {
+      problems.push(`${store.name}: no new ups recorded; NSNU cannot be computed.`);
       continue;
     }
     const traffic = f.ups! + f.walk!;
@@ -239,7 +244,8 @@ export function stage(
       continue;
     }
     const values: Record<StatKey, number> = {
-      nsnu: round2(f.net! / traffic),
+      // Owner's definition: new-customer sales only, divided by total new ups (no walkouts).
+      nsnu: round2(f.newUpSales! / f.ups!),
       conv: round2((f.sold! / traffic) * 100),
       demoRate: round2((f.seen! / traffic) * 100),
       demoClose: round2((f.sold! / f.seen!) * 100),

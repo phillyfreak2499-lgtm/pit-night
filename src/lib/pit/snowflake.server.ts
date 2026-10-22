@@ -103,11 +103,11 @@ export function weekStatement(start: string, end: string) {
   const e = isoDate(end);
   const view = "DATA_PLATFORM_DB_PROD.AI.CUSTOMER_TRAFFIC_AD_SPEND";
   const franchises = "franchise.franchise IN ('WATERMAN', 'MCDONALD')";
-  return `SELECT store, store_number, franchise, net_sales, new_ups, walkouts, demos_seen, demos_sold, demo_sales, arch_supports_sold, arch_supports_returned,
+  return `SELECT store, store_number, franchise, new_up_sales, new_ups, walkouts, demos_seen, demos_sold, demo_sales, arch_supports_sold, arch_supports_returned,
 (SELECT MAX(date) FROM SEMANTIC_VIEW(${view} DIMENSIONS dim_date.date METRICS traffic_event_summary_dt.new_ups WHERE ${franchises} AND dim_date.date >= DATE '${s}')) AS latest_date
 FROM SEMANTIC_VIEW(${view}
 DIMENSIONS stores.store, stores.store_number, franchise.franchise
-METRICS traffic_event_summary_dt.net_sales, traffic_event_summary_dt.new_ups, traffic_event_summary_dt.walkouts, traffic_event_summary_dt.demos_seen, traffic_event_summary_dt.demos_sold, traffic_event_summary_dt.demo_sales, traffic_event_summary_dt.arch_supports_sold, traffic_event_summary_dt.arch_supports_returned
+METRICS traffic_event_summary_dt.new_up_sales, traffic_event_summary_dt.new_ups, traffic_event_summary_dt.walkouts, traffic_event_summary_dt.demos_seen, traffic_event_summary_dt.demos_sold, traffic_event_summary_dt.demo_sales, traffic_event_summary_dt.arch_supports_sold, traffic_event_summary_dt.arch_supports_returned
 WHERE ${franchises} AND dim_date.date BETWEEN DATE '${s}' AND DATE '${e}')
 ORDER BY store_number`;
 }

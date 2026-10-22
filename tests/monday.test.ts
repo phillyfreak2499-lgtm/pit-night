@@ -30,7 +30,7 @@ function row(m: (typeof STORE_MAP)[number], i: number, patch: Partial<RawRow> = 
     store: m.name,
     store_number: m.number,
     franchise: m.franchise,
-    net_sales: String(15000 + i * 1111.11),
+    new_up_sales: String(15000 + i * 1111.11),
     new_ups: String(20 + i),
     walkouts: String(i % 2),
     demos_seen: String(16 + i),
@@ -181,10 +181,10 @@ test("read-back mismatch fails the job and never runs the card", async () => {
 for (const [name, reads, why] of [
   ["a missing store", [goodRead("2026-11-01", STORE_MAP.slice(1).map((m, i) => row(m, i + 1))), goodRead("2026-11-01", STORE_MAP.slice(1).map((m, i) => row(m, i + 1)))], /no Snowflake row/],
   ["a duplicate store", [goodRead("2026-11-01", [...STORE_MAP.map((m, i) => row(m, i)), row(STORE_MAP[3]!, 3)]), goodRead("2026-11-01", [...STORE_MAP.map((m, i) => row(m, i)), row(STORE_MAP[3]!, 3)])], /duplicate/],
-  ["zero traffic", [goodRead("2026-11-01", STORE_MAP.map((m, i) => row(m, i, i === 2 ? { new_ups: "0", walkouts: "0" } : {}))), goodRead("2026-11-01", STORE_MAP.map((m, i) => row(m, i, i === 2 ? { new_ups: "0", walkouts: "0" } : {})))], /no new ups or walkouts/],
+  ["zero new ups (walkouts only)", [goodRead("2026-11-01", STORE_MAP.map((m, i) => row(m, i, i === 2 ? { new_ups: "0", walkouts: "2" } : {}))), goodRead("2026-11-01", STORE_MAP.map((m, i) => row(m, i, i === 2 ? { new_ups: "0", walkouts: "2" } : {})))], /no new ups recorded; NSNU/],
   ["a null metric", [goodRead("2026-11-01", STORE_MAP.map((m, i) => row(m, i, i === 5 ? { demo_sales: null } : {}))), goodRead("2026-11-01", STORE_MAP.map((m, i) => row(m, i, i === 5 ? { demo_sales: null } : {})))], /missing demoSales/],
   ["a stale source", [goodRead("2026-10-31"), goodRead("2026-10-31")], /may not be final/],
-  ["a source still changing", [goodRead(), goodRead("2026-11-01", STORE_MAP.map((m, i) => row(m, i, i === 0 ? { net_sales: "1" } : {})))], /disagreed/],
+  ["a source still changing", [goodRead(), goodRead("2026-11-01", STORE_MAP.map((m, i) => row(m, i, i === 0 ? { new_up_sales: "1" } : {})))], /disagreed/],
   ["a renamed store number", [goodRead("2026-11-01", STORE_MAP.map((m, i) => row(m, i, i === 13 ? { store: "SHREVEPORT, LA (OLD)" } : {}))), goodRead("2026-11-01", STORE_MAP.map((m, i) => row(m, i, i === 13 ? { store: "SHREVEPORT, LA (OLD)" } : {})))], /expected "SHREVEPORT, LA"/],
 ] as const) {
   test(`Monday job blocks on ${name} and leaves the card unchanged`, async () => {
@@ -212,13 +212,14 @@ test("schedule: no card on other days, before 5 a.m. Central, for the championsh
 
 test("grading reuses the site's thresholds with >= boundaries and keeps actual NSNU dollars", () => {
   const exact = STORE_MAP.map((m, i) =>
-    row(m, i, i === 0 ? { net_sales: "20000", new_ups: "20", walkouts: "0", demos_seen: "16", demos_sold: "10", demo_sales: "14000", arch_supports_sold: "25", arch_supports_returned: "0" } : {}),
+    row(m, i, i === 0 ? { new_up_sales: "20000", new_ups: "20", walkouts: "5", demos_seen: "16", demos_sold: "10", demo_sales: "14000", arch_supports_sold: "25", arch_supports_returned: "0" } : {}),
   );
   const res = stage(goodRead("2026-11-01", exact), goodRead("2026-11-01", exact), WEEK1, league());
   assert.ok(res.ok);
   const waco = res.staged.find((s) => s.storeId === "waco")!;
-  assert.deepEqual(waco.values, { nsnu: 1000, conv: 50, demoRate: 80, demoClose: 62.5, arch: 2.5, ticket: 1400 });
-  assert.deepEqual(waco.grades, { nsnu: "green", conv: "orange", demoRate: "blue", demoClose: "red", arch: "orange", ticket: "orange" });
+  // NSNU is new-customer sales ÷ new ups only (walkouts excluded); Conv % and Demo Rate still use new ups + walkouts.
+  assert.deepEqual(waco.values, { nsnu: 1000, conv: 40, demoRate: 64, demoClose: 62.5, arch: 2.5, ticket: 1400 });
+  assert.deepEqual(waco.grades, { nsnu: "green", conv: "red", demoRate: "red", demoClose: "red", arch: "orange", ticket: "orange" });
   const card = applyScorecard(league(), res.staged).storeCards.find((c) => c.storeId === "waco" && c.week === 1)!;
   assert.equal(card.nsnu, 1000);
   assert.equal(card.nsnuOfficial, true);
