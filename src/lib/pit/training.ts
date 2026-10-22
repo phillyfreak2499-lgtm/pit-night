@@ -1,4 +1,5 @@
 import { central } from "./time";
+import { productQuestion } from "./product-quiz";
 /**
  * Pit Week: four regular-season weeks plus finalist-only Championship Prep.
  * Every job and Spark question is drawn from the COGS training library:
@@ -1072,6 +1073,13 @@ export const PROGRAM: TrainingWeek[] = [
     ],
   },
 ];
+
+for (const week of PROGRAM) {
+  for (const day of week.days) {
+    const product = productQuestion(week.week, day.day);
+    day.spark[2] = { q: product.q, choices: [...product.choices], answer: product.answer, why: product.why };
+  }
+}
 
 export function programWeek(week: number): TrainingWeek | undefined {
   return PROGRAM.find((w) => w.week === week);
