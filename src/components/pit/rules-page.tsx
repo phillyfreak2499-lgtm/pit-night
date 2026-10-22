@@ -7,7 +7,7 @@ import { RulebookQa } from "./claude-copy";
 export const RULES: { title: string; text: string }[] = [
   {
     title: "The clock",
-    text: "Monday through Saturday the store runs the floor. That whole week is the card. Saturday at close is one lock: chassis, drive, weapon, armor, utility, brain. The captain locks before the final numbers are in, so the lock is a bet on the week. Sunday the official numbers come out and the Desk clicks in each store's six colors. Monday morning the Desk runs seven fights live: every store fights and there are no byes. Monday afternoon is the damage report, the coins pay out, and the shop opens for the next week. Week 1 is different only because Period 11 colors pay the opening coins and set seeds inside Metro and Frontier.",
+    text: "Sunday through Saturday the store runs the floor. That whole week is the card. Saturday at close is one lock: chassis, drive, weapon, armor, utility, brain. The captain locks before the final numbers are in, so the lock is a bet on the week. Sunday the official numbers come out and the Desk clicks in each store's six colors. Monday morning the Desk runs seven fights live: every store fights and there are no byes. Monday afternoon is the damage report, the coins pay out, and the shop opens for the next week. Week 1 is different only because Period 11 colors pay the opening coins and set seeds inside Metro and Frontier.",
   },
   {
     title: "Crew owns the look; captain has the final call",

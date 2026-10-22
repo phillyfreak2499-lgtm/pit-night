@@ -14,7 +14,7 @@ import { gradeMetric, hashString } from "./engine";
 import type { Grade, PitData, StatKey, StoreCard } from "./types";
 
 // ---------------------------------------------------------------------------
-// Approved configuration (owner sign-off required before the scheduler is enabled)
+// Approved configuration. Owner approved the store map and Sunday-Saturday weeks on 2026-10-22.
 // ---------------------------------------------------------------------------
 
 export const SEASON = "Period 12";
@@ -42,7 +42,7 @@ export const STORE_MAP = [
   { storeId: "temple", number: "573", franchise: "WATERMAN", name: "TEMPLE, TX" },
   { storeId: "alliance", number: "533", franchise: "WATERMAN", name: "ALLIANCE (FORT WORTH), TX" },
   { storeId: "waxahachie", number: "694", franchise: "WATERMAN", name: "WAXAHACHIE, TX" },
-  // These three report under franchise MCDONALD in Snowflake. Owner confirmation required.
+  // These three report under franchise MCDONALD in Snowflake; the owner confirmed they are the league stores.
   { storeId: "tyler", number: "608", franchise: "MCDONALD", name: "TYLER, TX" },
   { storeId: "abilene", number: "700", franchise: "MCDONALD", name: "ABILENE, TX" },
   { storeId: "shreveport", number: "1492", franchise: "MCDONALD", name: "SHREVEPORT, LA" },
