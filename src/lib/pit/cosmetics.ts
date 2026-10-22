@@ -93,10 +93,10 @@ const FREE: Record<CosmeticKind, Set<string>> = {
   decal:new Set(["none"]),
   trim:new Set(["steel","black","white"]),
   eye:new Set(["green","amber"]),
-  paint:new Set(["amber","rust","bone","teal","crimson","gold","steel","mud","brass","olive","copper"]),
+  paint:new Set(["amber","rust","bone","teal","crimson","gold","steel","mud","brass","olive","copper","cobalt","sky","lime","forest","violet","magenta","cherry","graphite"]),
   topper:new Set(["none"]),
   body:new Set(),
-  look:new Set(["plain","stripe"]),
+  look:new Set(["plain","stripe","chevron","rivets"]),
 };
 
 export function earnedRewardIds(data: PitData, storeId: string) {
