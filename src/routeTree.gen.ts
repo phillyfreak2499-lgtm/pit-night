@@ -27,6 +27,7 @@ import { Route as GarageStoreIdRouteImport } from './routes/garage.$storeId'
 import { Route as RecapStoreIdRouteImport } from './routes/recap.$storeId'
 import { Route as ShopStoreIdRouteImport } from './routes/shop.$storeId'
 import { Route as StoresStoreIdRouteImport } from './routes/stores.$storeId'
+import { Route as ApiCronMondayRouteImport } from './routes/api/cron/monday'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -118,6 +119,11 @@ const StoresStoreIdRoute = StoresStoreIdRouteImport.update({
   path: '/stores/$storeId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCronMondayRoute = ApiCronMondayRouteImport.update({
+  id: '/api/cron/monday',
+  path: '/api/cron/monday',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -138,6 +144,7 @@ export interface FileRoutesByFullPath {
   '/recap/$storeId': typeof RecapStoreIdRoute
   '/shop/$storeId': typeof ShopStoreIdRoute
   '/stores/$storeId': typeof StoresStoreIdRoute
+  '/api/cron/monday': typeof ApiCronMondayRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -158,6 +165,7 @@ export interface FileRoutesByTo {
   '/recap/$storeId': typeof RecapStoreIdRoute
   '/shop/$storeId': typeof ShopStoreIdRoute
   '/stores/$storeId': typeof StoresStoreIdRoute
+  '/api/cron/monday': typeof ApiCronMondayRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -179,6 +187,7 @@ export interface FileRoutesById {
   '/recap/$storeId': typeof RecapStoreIdRoute
   '/shop/$storeId': typeof ShopStoreIdRoute
   '/stores/$storeId': typeof StoresStoreIdRoute
+  '/api/cron/monday': typeof ApiCronMondayRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -201,6 +210,7 @@ export interface FileRouteTypes {
     | '/recap/$storeId'
     | '/shop/$storeId'
     | '/stores/$storeId'
+    | '/api/cron/monday'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -221,6 +231,7 @@ export interface FileRouteTypes {
     | '/recap/$storeId'
     | '/shop/$storeId'
     | '/stores/$storeId'
+    | '/api/cron/monday'
   id:
     | '__root__'
     | '/'
@@ -241,6 +252,7 @@ export interface FileRouteTypes {
     | '/recap/$storeId'
     | '/shop/$storeId'
     | '/stores/$storeId'
+    | '/api/cron/monday'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -262,6 +274,7 @@ export interface RootRouteChildren {
   RecapStoreIdRoute: typeof RecapStoreIdRoute
   ShopStoreIdRoute: typeof ShopStoreIdRoute
   StoresStoreIdRoute: typeof StoresStoreIdRoute
+  ApiCronMondayRoute: typeof ApiCronMondayRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -392,6 +405,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StoresStoreIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/cron/monday': {
+      id: '/api/cron/monday'
+      path: '/api/cron/monday'
+      fullPath: '/api/cron/monday'
+      preLoaderRoute: typeof ApiCronMondayRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -414,6 +434,7 @@ const rootRouteChildren: RootRouteChildren = {
   RecapStoreIdRoute: RecapStoreIdRoute,
   ShopStoreIdRoute: ShopStoreIdRoute,
   StoresStoreIdRoute: StoresStoreIdRoute,
+  ApiCronMondayRoute: ApiCronMondayRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

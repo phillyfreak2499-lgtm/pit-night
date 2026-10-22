@@ -13,7 +13,8 @@ function faq(q: string, text: string, a?: React.ReactNode): Faq {
   return { q, text, a: a ?? text };
 }
 
-const GROUPS: Group[] = [
+/** Exported so the rules Q&A can answer from the same plain text. */
+export const GROUPS: Group[] = [
   {
     title: "Getting started",
     items: [
