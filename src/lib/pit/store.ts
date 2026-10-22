@@ -1762,10 +1762,15 @@ export function applyLeague14<T extends Partial<PitData>>(data: T): T {
   const oldStores = data.stores ?? [];
   const stores = fresh.stores.map((store) => {
     const old = oldStores.find((row) => row.id === store.id);
-    return old ? { ...store, ...old, conference: store.conference } : store;
+    return old ? { ...store, ...old, conference: store.conference,
+      captain: store.id === "abilene" && old.captain === "Abilene Captain" ? store.captain : old.captain,
+    } : store;
   });
   const oldCrew = data.crew ?? [];
-  const crew = [...oldCrew];
+  // Correct only the pre-launch placeholders; retain real roster edits and surviving identity IDs.
+  const abileneNames: Record<string, string> = { "Abilene Captain": "Taylor VanSickle", "Abilene Specialist 1": "Nathan Burney", "Abilene Specialist 2": "Philip Rodriguez" };
+  const crew = oldCrew.filter(c => c.storeId !== "abilene" || !["Abilene Specialist 3", "Abilene Specialist 4"].includes(c.name))
+    .map(c => c.storeId === "abilene" && abileneNames[c.name] ? { ...c, name: abileneNames[c.name]! } : c);
   for (const store of fresh.stores) {
     if (crew.some((member) => member.storeId === store.id)) continue;
     crew.push(...fresh.crew.filter((member) => member.storeId === store.id));

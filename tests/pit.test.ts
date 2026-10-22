@@ -16,6 +16,25 @@ import type { Session } from "../src/lib/pit/types.ts";
 import { styleOf } from "../src/lib/pit/catalog.ts";
 beforeEach((t) => t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-10-01T12:00:00Z") }));
 
+test("Abilene's confirmed team replaces legacy placeholders without resetting the season", () => {
+  const fresh = makeData();
+  assert.deepEqual(fresh.crew.filter(c => c.storeId === "abilene").map(c => [c.name,c.role]), [
+    ["Taylor VanSickle", "captain"], ["Nathan Burney", "specialist"], ["Philip Rodriguez", "specialist"],
+  ]);
+  const legacy = makeData();
+  legacy.stores.find(s => s.id === "abilene")!.captain = "Abilene Captain";
+  legacy.crew = legacy.crew.filter(c => c.storeId !== "abilene").concat([
+    {id:"abilene-captain",storeId:"abilene",name:"Abilene Captain",role:"captain"},
+    ...[0,1,2,3].map(i => ({id:`abilene-crew-${i}`,storeId:"abilene",name:`Abilene Specialist ${i+1}`,role:"specialist" as const})),
+  ]);
+  const updated = applyLeague14(legacy);
+  assert.equal(updated.stores.find(s => s.id === "abilene")!.captain, "Taylor VanSickle");
+  assert.deepEqual(updated.crew.filter(c => c.storeId === "abilene"), fresh.crew.filter(c => c.storeId === "abilene"));
+  assert.deepEqual(updated.bots, legacy.bots);
+  assert.deepEqual(updated.jobLog, legacy.jobLog);
+  assert.deepEqual(applyLeague14(updated), updated);
+});
+
 function championshipState() {
   const store = state("commissioner");
   for (let w = 1; w <= 4; w++) {

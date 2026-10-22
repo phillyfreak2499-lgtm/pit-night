@@ -6,7 +6,7 @@ The public league uses its own server-verified roles. The legacy template's exte
 
 PR #4 remains a draft. Do not merge or deploy production without explicit owner approval.
 
-Owner-data blocker: Abilene's captain and specialist names are unknown. Keep the obvious placeholders until the owner supplies them. Tyler stays Jeffrey Richard’s / Kasi McMillin / Yolanda Tellez / Samantha Rodriguez; Shreveport stays Amy Schexnider / Daniel Rios.
+Confirmed Abilene team: Taylor VanSickle (Store Manager / captain), Nathan Burney and Philip Rodriguez (Sales consultants / specialists). The pre-launch placeholders migrate to this roster while retaining the surviving identity IDs. Tyler stays Jeffrey Richard’s / Kasi McMillin / Yolanda Tellez / Samantha Rodriguez; Shreveport stays Amy Schexnider / Daniel Rios. No owner-data roster blocker remains.
 
 1. Back up the Neon `pit_season` row. Apply migrations using `npm run db:migrate` with the production `DATABASE_URL`. Migration 0003 preserves the season, removes the exposed PIN/passcodes, and creates hashed credentials and expiring sessions.
 2. Prepare server-only Vercel configuration, never `VITE_` variables. For an existing league, rotate codes only through the post-deployment step below, never from this preview branch:
