@@ -20,18 +20,22 @@ const card = z
     demoTicket: z.number().min(0).max(100000).optional(),
   })
   .strict();
+const body = z.enum(["shrike","raptor","stinger","viper","warhawk","keystone","juggernaut","bunker","fortress","colossus","windlass","scorpion","mantis","phantom","reaper"]);
 const style = z
   .object({
+    body: body.optional(),
+    topper: z.enum(["none","antenna","horns","mohawk","crown"]).optional(),
     trim: id.optional(),
     eye: id.optional(),
-    finish: z.enum(["factory", "chrome", "matte", "worn"]).optional(),
+    finish: z.enum(["factory","chrome","matte","worn","satin","carbon","iridescent","gold"]).optional(),
     decal: z
-      .enum(["none", "flames", "lightning", "teeth", "checker", "hazard", "camo", "arch"])
+      .enum(["none","flames","lightning","teeth","checker","hazard","camo","arch","stars","circuit","splash","champion"])
       .optional(),
     flag: z.boolean().optional(),
   })
   .strict();
 export const commandArgs = {
+  chooseStarterBody: z.tuple([id, z.enum(["striker","tank","specialist"]), body]),
   setDraftPart: z.tuple([id, slot, id.nullable()]),
   setDraftLoadout: z.tuple([id, loadout]),
   lockStore: z.tuple([id]),
@@ -101,6 +105,7 @@ const desk = new Set<Command>([
   "resetSeason",
 ]);
 const personal = new Set<Command>([
+  "chooseStarterBody",
   "propose",
   "completeJob",
   "submitSpark",
@@ -117,6 +122,8 @@ export function authorize(data: PitData, session: Session, name: Command, args: 
   if (desk.has(name)) throw new Error("Only the Desk can do that.");
   if (name === "setOfficialNsnu") throw new Error("Only the Desk records official NSNU.");
   if (personal.has(name)) {
+    if (name === "chooseStarterBody" && args[0] !== session.storeId)
+      throw new Error("This is another store's bay.");
     if (name === "propose" && args[0] !== session.storeId)
       throw new Error("This is another store's bay.");
     return;
