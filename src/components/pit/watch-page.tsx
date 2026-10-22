@@ -20,7 +20,7 @@ const INTRO_MS = 7000;
 const RESULT_MS = 6500;
 const BYE_MS = 6000;
 
-/** Monday watch party: the whole card on one screen, back to back, with a live table. */
+/** Watch party: Monday regular-season cards plus Championship Saturday. */
 export function WatchPage() {
   const data = usePit();
   const postedWeeks = useMemo(() => [...new Set(data.bouts.filter((b) => b.result).map((b) => b.week))].sort((a, b) => a - b), [data.bouts]);
@@ -187,11 +187,13 @@ function Lobby({
       <div>
         <p className="font-display text-sm tracking-[0.3em] text-amber uppercase">{tape.live ? "The card is posted" : "House tape · card not posted yet"}</p>
         <h1 className="mt-2 font-display text-6xl leading-[0.85] md:text-8xl">
-          Monday
-          <span className="block text-amber">watch party</span>
+          {week === 5 ? "Championship" : "Monday"}
+          <span className="block text-amber">{week === 5 ? "Saturday" : "watch party"}</span>
         </h1>
         <p className="mt-4 max-w-2xl text-lg text-muted">
-          Put this on the big screen. Every fight plays back to back with a walk-out, the tape, and the call. The live table updates after every fight.
+          {week === 5
+            ? "One title fight. No judges and no decision: it keeps going until one bot is knocked out. Rally support makes the room louder, never the bot stronger."
+            : "Put this on the big screen. Every fight plays back to back with a walk-out, the tape, and the call. The live table updates after every fight."}
         </p>
       </div>
       {choices.length > 1 ? (
@@ -220,6 +222,21 @@ function Lobby({
         <p className="inline-flex flex-wrap items-center gap-2 text-spark">
           <Flame size={18} aria-hidden /> Tuned up for this card (+{TUNE_UP_BONUS}): {tuned.map((s) => s.name).join(", ")}
         </p>
+      ) : null}
+      {week === 5 && tape.bouts[0] ? (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {tape.bouts[0].storeIds.map((id) => {
+            const store = data.stores.find((row) => row.id === id);
+            const supporters = (data.rallies ?? []).filter((row) => row.week === 5 && row.targetId === id);
+            const stores = new Set(supporters.map((row) => row.storeId));
+            return (
+              <div key={id} className="border border-line bg-surface p-3">
+                <span className="font-display text-xl">{store?.name}</span>
+                <span className="ml-2 text-sm text-muted">Rally: {supporters.length} people · {stores.size} stores</span>
+              </div>
+            );
+          })}
+        </div>
       ) : null}
       <div className="flex flex-wrap gap-3">
         <button
@@ -353,8 +370,8 @@ function Final({ data, seen, bouts, onAgain }: { data: PitData; seen: PitData; b
         <button type="button" onClick={onAgain} className="min-h-11 border border-line px-4 font-display uppercase">
           Back to the lobby
         </button>
-        <Link to="/week" className="inline-flex min-h-11 items-center bg-amber px-4 font-display text-deep uppercase">
-          Pit Week starts tomorrow →
+        <Link to={data.week === 5 ? "/honors" : "/week"} className="inline-flex min-h-11 items-center bg-amber px-4 font-display text-deep uppercase">
+          {data.week === 5 ? "Season honors →" : "Pit Week starts tomorrow →"}
         </Link>
       </div>
     </div>
@@ -402,7 +419,7 @@ function Ticker({ data, week }: { data: PitData; week: number }) {
     tuned.length ? `Full Tune-Up · ${tuned.join(", ")}` : "",
     ...flames.map((f) => `Spark streak · ${f.crew.name} ${f.best} perfect in a row`),
     crateDone ? `Mystery Crate · ${crate.title} opened ${crateDone} time${crateDone === 1 ? "" : "s"}` : "",
-    "Pit Week opens Tuesday · Jobs, Sparks, and a Wednesday Mystery Crate",
+    week === 5 ? "Championship Saturday · no judges · fight until knockout" : "Pit Week opens Tuesday · Jobs, Sparks, and a Wednesday Mystery Crate",
   ].filter(Boolean);
   const line = (
     <p className="flex shrink-0 items-center gap-10 px-6 text-sm">
