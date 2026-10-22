@@ -368,6 +368,8 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         const data = get();
         const championshipBlock = championshipPrepGuard(data, storeId);
         if (championshipBlock && !isBoss(data)) { set({ flash: championshipBlock }); return; }
+        const starterBlock = starterBodyGuard(data, storeId);
+        if (starterBlock && !isBoss(data)) { set({ flash: starterBlock }); return; }
         if (!isCaptainOf(data, storeId)) {
           set({ flash: "Only the captain can change parts." });
           return;
@@ -406,7 +408,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
             set({ flash: `Reclass costs ${RECLASS_FEE} chassis coins.` });
             return;
           }
-          next = { ...bot, coins: { ...bot.coins, chassis: bot.coins.chassis - RECLASS_FEE }, classId: part.classLock };
+          next = { ...bot, coins: { ...bot.coins, chassis: bot.coins.chassis - RECLASS_FEE }, classId: part.classLock, style: { ...styleOf(bot, part.classLock), body: starterBodies(part.classLock)[0]!.id } };
         }
         const draft: Loadout = { ...next.draft, [slot]: part.id };
         set({
@@ -425,6 +427,8 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         const data = get();
         const championshipBlock = championshipPrepGuard(data, storeId);
         if (championshipBlock && !isBoss(data)) { set({ flash: championshipBlock }); return; }
+        const starterBlock = starterBodyGuard(data, storeId);
+        if (starterBlock && !isBoss(data)) { set({ flash: starterBlock }); return; }
         if (!isCaptainOf(data, storeId)) {
           set({ flash: "Only the captain can change parts." });
           return;
@@ -473,6 +477,8 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         const data = get();
         const championshipBlock = championshipPrepGuard(data, storeId);
         if (championshipBlock && !isBoss(data)) { set({ flash: championshipBlock }); return; }
+        const starterBlock = starterBodyGuard(data, storeId);
+        if (starterBlock && !isBoss(data)) { set({ flash: starterBlock }); return; }
         if (!isCaptainOf(data, storeId)) {
           set({ flash: "Captain clipboard required." });
           return;
@@ -612,6 +618,8 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         const data = get();
         const championshipBlock = championshipPrepGuard(data, storeId);
         if (championshipBlock && !isBoss(data)) { set({ flash: championshipBlock }); return; }
+        const starterBlock = starterBodyGuard(data, storeId);
+        if (starterBlock && !isBoss(data)) { set({ flash: starterBlock }); return; }
         const crewOk =
           data.session.role === "crew" && data.session.storeId === storeId && data.session.crewId;
         if (!crewOk && !isCaptainOf(data, storeId)) {
@@ -658,6 +666,8 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         const data = get();
         const championshipBlock = championshipPrepGuard(data, storeId);
         if (championshipBlock && !isBoss(data)) { set({ flash: championshipBlock }); return; }
+        const starterBlock = starterBodyGuard(data, storeId);
+        if (starterBlock && !isBoss(data)) { set({ flash: starterBlock }); return; }
         if (!isCaptainOf(data, storeId)) {
           set({ flash: "The wallet answers to the captain." });
           return;
@@ -694,6 +704,8 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         const data = get();
         const championshipBlock = championshipPrepGuard(data, storeId);
         if (championshipBlock && !isBoss(data)) { set({ flash: championshipBlock }); return; }
+        const starterBlock = starterBodyGuard(data, storeId);
+        if (starterBlock && !isBoss(data)) { set({ flash: starterBlock }); return; }
         if (!isCaptainOf(data, storeId)) {
           set({ flash: "Repairs go through the captain." });
           return;
@@ -849,6 +861,11 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "Buy that paint in the Bolt Locker first." });
           return;
         }
+        const store = data.stores.find((row) => row.id === storeId);
+        if (paint !== store?.paint && !cosmeticUnlocked(data, storeId, "paint", paint)) {
+          set({ flash: "That paint is still locked." });
+          return;
+        }
         set({
           stores: data.stores.map((s) => (s.id === storeId ? { ...s, paint } : s)),
           flash: "Paint is on the bay. It does not change the fight.",
@@ -865,6 +882,10 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
       setLook: (storeId, look) => {
         const data = get();
         if (!isCaptainOf(data, storeId)) return;
+        if (!cosmeticUnlocked(data, storeId, "look", look)) {
+          set({ flash: "That stripe kit is still locked." });
+          return;
+        }
         set({ bots: patchBot(data.bots, storeId, (b) => ({ ...b, look })), flash: "Bot dressed. Still the same iron." });
       },
       completeJob: (week, jobId, note) => {
@@ -875,10 +896,9 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           return;
         }
         const championshipBlock = championshipPrepGuard(data, who.storeId);
-        if (championshipBlock) {
-          set({ flash: championshipBlock });
-          return;
-        }
+        if (championshipBlock) { set({ flash: championshipBlock }); return; }
+        const starterBlock = starterBodyGuard(data, who.storeId);
+        if (starterBlock) { set({ flash: starterBlock }); return; }
         const plan = programWeek(week);
         const job = plan ? [...allJobs(plan), plan.care, crateFor(week)].find((j) => j.id === jobId) : undefined;
         if (!plan || !job) return;
@@ -931,10 +951,9 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         const who = actor(data);
         if (!who) return;
         const championshipBlock = championshipPrepGuard(data, who.storeId);
-        if (championshipBlock) {
-          set({ flash: championshipBlock });
-          return;
-        }
+        if (championshipBlock) { set({ flash: championshipBlock }); return; }
+        const starterBlock = starterBodyGuard(data, who.storeId);
+        if (starterBlock) { set({ flash: starterBlock }); return; }
         const closed = trainingClosed(data, week, day as DayKey);
         if (closed) {
           set({ flash: closed });
@@ -1072,7 +1091,32 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
       setStyle: (storeId, patch) => {
         const data = get();
         if (!isCaptainOf(data, storeId)) return;
-        set({ bots: patchBot(data.bots, storeId, (b) => ({ ...b, style: { ...styleOf(b), ...patch } })), flash: "Bot dressed. Still the same iron." });
+        const bot = data.bots.find((row) => row.storeId === storeId);
+        if (!bot) return;
+        if (patch.body) {
+          if (data.week === 1 && bot.style?.body && patch.body !== bot.style.body) {
+            set({ flash: "Starter body is frozen through the first fight." });
+            return;
+          }
+          if (!validBodyForClass(patch.body, bot.classId) || !cosmeticUnlocked(data, storeId, "body", patch.body)) {
+            set({ flash: "That body shell is still locked." });
+            return;
+          }
+        }
+        for (const [kind, value] of Object.entries(patch)) {
+          if (value === undefined || ["flag", "walkout", "victory", "body"].includes(kind)) continue;
+          if (
+            ["finish", "decal", "trim", "eye", "topper"].includes(kind) &&
+            !cosmeticUnlocked(data, storeId, kind as "finish" | "decal" | "trim" | "eye" | "topper", String(value))
+          ) {
+            set({ flash: "Earn that cosmetic in Pit Week first." });
+            return;
+          }
+        }
+        set({
+          bots: patchBot(data.bots, storeId, (b) => ({ ...b, style: { ...styleOf(b, b.classId), ...patch } })),
+          flash: "Bot dressed. Still the same iron.",
+        });
       },
       setNumber: (storeId, number) => {
         const data = get();
