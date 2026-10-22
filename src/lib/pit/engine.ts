@@ -10,13 +10,14 @@ import {
   metricFor,
   type Part,
 } from "./catalog";
-import { TUNE_UP_BONUS } from "./training";
+import { BOLTS, TUNE_UP_BONUS } from "./training";
 import { boltsOf, tunedUp } from "./week";
 import type {
   Bot,
   Bout,
   ClassId,
   Condition,
+  Conference,
   Exchange,
   FightResult,
   FighterSnap,
@@ -122,7 +123,10 @@ export function weekQuality(grades: GradeSet): number {
 }
 
 export function cardFor(data: PitData, storeId: string, week = data.week): StoreCard | undefined {
-  return data.storeCards.find((c) => c.storeId === storeId && c.week === week);
+  // Championship Week carries the finalist's Week 4 sales card forward. There is no
+  // fifth Sunday scorecard and no free performance reset before the title fight.
+  const cardWeek = week === 5 ? 4 : week;
+  return data.storeCards.find((c) => c.storeId === storeId && c.week === cardWeek);
 }
 
 export function botFor(data: PitData, storeId: string): Bot {
@@ -164,46 +168,170 @@ export function nsnuOf(data: PitData, storeId: string, week: number): number {
   return Number.isFinite(card.nsnu) ? card.nsnu : 0;
 }
 
+export function regularSeasonRecordOf(data: PitData, storeId: string): { w: number; l: number } {
+  let w = 0;
+  let l = 0;
+  for (const bout of data.bouts) {
+    if (!bout.result || bout.week > 4 || bout.kind !== "bout") continue;
+    if (bout.result.winnerIds.includes(storeId)) w += 1;
+    if (bout.result.loserIds.includes(storeId)) l += 1;
+  }
+  return { w, l };
+}
+
+export function conferenceRecordOf(data: PitData, storeId: string): { w: number; l: number } {
+  const store = storeFor(data, storeId);
+  let w = 0;
+  let l = 0;
+  for (const bout of data.bouts) {
+    if (!bout.result || bout.week > 4 || bout.kind !== "bout" || !bout.storeIds.includes(storeId)) continue;
+    const opponentId = bout.storeIds.find((id) => id !== storeId);
+    if (!opponentId || storeFor(data, opponentId).conference !== store.conference) continue;
+    if (bout.result.winnerIds.includes(storeId)) w += 1;
+    if (bout.result.loserIds.includes(storeId)) l += 1;
+  }
+  return { w, l };
+}
+
+export function cumulativeNsnu(data: PitData, storeId: string): number {
+  return data.storeCards
+    .filter((card) => card.storeId === storeId && card.week <= 4 && card.nsnuOfficial)
+    .reduce((sum, card) => sum + (Number.isFinite(card.nsnu) ? card.nsnu : 0), 0);
+}
+
+export function greenCount(data: PitData, storeId: string): number {
+  return data.storeCards
+    .filter((card) => card.storeId === storeId && card.week <= 4)
+    .reduce((sum, card) => sum + METRICS.filter((m) => card.grades?.[m.stat] === "green").length, 0);
+}
+
+/** Earned effort through the four-week regular season. Spending cosmetics never reduces this tiebreak. */
+export function regularSeasonBolts(data: PitData, storeId: string): number {
+  const approved = data.jobLog.filter((e) => e.storeId === storeId && e.week <= 4 && e.status === "approved");
+  const jobs = approved.reduce((n, e) => n + (e.jobId.endsWith("-crate") ? BOLTS.crate : BOLTS.job), 0);
+  const sparks = data.sparkLog
+    .filter((e) => e.storeId === storeId && e.week <= 4)
+    .reduce((n, e) => n + e.correct * BOLTS.sparkCorrect, 0);
+  const picks = data.picks.filter((p) => {
+    if (p.storeId !== storeId || p.week > 4) return false;
+    const lockedAt = data.weeks.find((w) => w.number === p.week)?.lockedAt;
+    if (lockedAt && p.at > lockedAt) return false;
+    return Boolean(data.bouts.find((b) => b.id === p.boutId && b.result?.winnerIds.includes(p.pick)));
+  }).length * BOLTS.pickCorrect;
+  return jobs + sparks + picks;
+}
+
+function headToHeadWinner(data: PitData, a: string, b: string): string | null {
+  const bout = data.bouts.find(
+    (row) => row.week <= 4 && row.kind === "bout" && row.result && row.storeIds.includes(a) && row.storeIds.includes(b),
+  );
+  return bout?.result?.winnerIds.find((id) => id === a || id === b) ?? null;
+}
+
+function topRecordGroup(data: PitData, conference: Conference) {
+  const stores = data.stores.filter((store) => store.conference === conference);
+  if (!stores.length) return [];
+  const records = stores.map((store) => ({ store, rec: regularSeasonRecordOf(data, store.id) }));
+  records.sort((a, b) => b.rec.w - a.rec.w || a.rec.l - b.rec.l || a.store.seed - b.store.seed);
+  const top = records[0]!.rec;
+  return records.filter((row) => row.rec.w === top.w && row.rec.l === top.l).map((row) => row.store);
+}
+
+/** Stores still exactly tied for a conference berth after every published non-cage tiebreak. */
+export function conferenceTopTie(data: PitData, conference: Conference): Store[] {
+  let tied = topRecordGroup(data, conference);
+  if (tied.length <= 1) return tied;
+  const tryHeadToHead = () => {
+    if (tied.length !== 2) return false;
+    const winner = headToHeadWinner(data, tied[0]!.id, tied[1]!.id);
+    if (!winner) return false;
+    tied = tied.filter((store) => store.id === winner);
+    return true;
+  };
+  if (tryHeadToHead()) return tied;
+  const narrow = (score: (store: Store) => number, high = true) => {
+    if (tied.length <= 1) return;
+    const values = tied.map(score);
+    const target = high ? Math.max(...values) : Math.min(...values);
+    tied = tied.filter((store) => score(store) === target);
+    tryHeadToHead();
+  };
+  narrow((store) => conferenceRecordOf(data, store.id).w);
+  if (tied.length > 1) narrow((store) => conferenceRecordOf(data, store.id).l, false);
+  if (tied.length > 1) narrow((store) => cumulativeNsnu(data, store.id));
+  if (tied.length > 1) narrow((store) => greenCount(data, store.id));
+  if (tied.length > 1) narrow((store) => regularSeasonBolts(data, store.id));
+  return tied;
+}
+
+export function conferenceStandings(data: PitData, conference: Conference): Store[] {
+  const rows = data.stores.filter((store) => store.conference === conference);
+  const byRecord = new Map<string, Store[]>();
+  for (const store of rows) {
+    const r = regularSeasonRecordOf(data, store.id);
+    const key = String(r.w) + "-" + String(r.l);
+    byRecord.set(key, [...(byRecord.get(key) ?? []), store]);
+  }
+  const keys = [...byRecord.keys()].sort((a, b) => {
+    const [aw, al] = a.split("-").map(Number);
+    const [bw, bl] = b.split("-").map(Number);
+    return bw! - aw! || al! - bl!;
+  });
+  const out: Store[] = [];
+  for (const key of keys) {
+    const group = byRecord.get(key)!;
+    group.sort((a, b) => {
+      if (group.length === 2) {
+        const h = headToHeadWinner(data, a.id, b.id);
+        if (h) return h === a.id ? -1 : 1;
+      }
+      const ac = conferenceRecordOf(data, a.id), bc = conferenceRecordOf(data, b.id);
+      if (bc.w !== ac.w) return bc.w - ac.w;
+      if (ac.l !== bc.l) return ac.l - bc.l;
+      const nsnu = cumulativeNsnu(data, b.id) - cumulativeNsnu(data, a.id);
+      if (nsnu) return nsnu;
+      const greens = greenCount(data, b.id) - greenCount(data, a.id);
+      if (greens) return greens;
+      const bolts = regularSeasonBolts(data, b.id) - regularSeasonBolts(data, a.id);
+      if (bolts) return bolts;
+      return a.seed - b.seed || a.name.localeCompare(b.name);
+    });
+    out.push(...group);
+  }
+  return out;
+}
+
+function regularSeasonComplete(data: PitData) {
+  const played = data.bouts.filter((b) => b.week <= 4 && b.kind === "bout" && b.result).length;
+  return played >= (data.stores.length * 4) / 2;
+}
+
+export function conferenceChampion(data: PitData, conference: Conference): string | null {
+  if (!regularSeasonComplete(data)) return null;
+  const title = conference === "metro" ? "Metro Conference Tiebreaker" : "Frontier Conference Tiebreaker";
+  const cage = data.bouts.find((b) => b.week === 4 && b.title === title && b.result);
+  if (cage?.result?.winnerIds[0]) return cage.result.winnerIds[0];
+  const tied = conferenceTopTie(data, conference);
+  return tied.length === 1 ? tied[0]!.id : null;
+}
+
+export function championshipFinalists(data: PitData): string[] {
+  const metro = conferenceChampion(data, "metro");
+  const frontier = conferenceChampion(data, "frontier");
+  return metro && frontier ? [metro, frontier] : [];
+}
+
 export function rankedStores(data: PitData) {
-  const weekForTie = data.phase === "open" || data.phase === "locked" ? Math.max(1, data.week - 1) : data.week;
-  return [...data.stores].sort((a, b) => {
-    if (data.week === 1 && data.phase === "open") return a.seed - b.seed;
-    const ra = recordOf(data, a.id);
-    const rb = recordOf(data, b.id);
-    if (rb.w !== ra.w) return rb.w - ra.w;
-    if (ra.l !== rb.l) return ra.l - rb.l;
-    // Title Monday stakes: Pit Week bolts break a tie before NSNU.
-    if (data.week === 4) {
-      const ba = boltsOf(data, a.id).earned;
-      const bb = boltsOf(data, b.id).earned;
-      if (bb !== ba) return bb - ba;
-    }
-    const na = nsnuOf(data, a.id, data.bouts.length ? weekForTie : data.week);
-    const nb = nsnuOf(data, b.id, data.bouts.length ? weekForTie : data.week);
-    if (nb !== na) return nb - na;
-    return a.seed - b.seed;
+  return [...conferenceStandings(data, "metro"), ...conferenceStandings(data, "frontier")].sort((a, b) => {
+    const ra = regularSeasonRecordOf(data, a.id), rb = regularSeasonRecordOf(data, b.id);
+    return rb.w - ra.w || ra.l - rb.l || cumulativeNsnu(data, b.id) - cumulativeNsnu(data, a.id) || a.name.localeCompare(b.name);
   });
 }
 
-/** Best record is wins, then losses. The same W-L is a tie, and those stores fight. */
+/** Compatibility helper: the title field is now the two conference champions. */
 export function titleField(data: PitData) {
-  const ranked = [...data.stores].sort((a, b) => {
-    const ra = recordOf(data, a.id);
-    const rb = recordOf(data, b.id);
-    if (rb.w !== ra.w) return rb.w - ra.w;
-    if (ra.l !== rb.l) return ra.l - rb.l;
-    return a.seed - b.seed;
-  });
-  const top = ranked[0];
-  if (!top) return { leaders: [] as string[], ranked };
-  const mark = recordOf(data, top.id);
-  const leaders = ranked
-    .filter((store) => {
-      const rec = recordOf(data, store.id);
-      return rec.w === mark.w && rec.l === mark.l;
-    })
-    .map((store) => store.id);
-  return { leaders, ranked };
+  const leaders = championshipFinalists(data);
+  return { leaders, ranked: rankedStores(data) };
 }
 
 export function hashString(s: string): number {
@@ -852,6 +980,59 @@ export function simulateDuel(data: PitData, idA: string, idB: string, seed: stri
   };
 }
 
+/** Championship Saturday has no judges and no decision. Damage escalates until one bot is out. */
+export function simulateChampionshipDuel(data: PitData, idA: string, idB: string, seed: string): FightResult {
+  const a = snapshot(data, idA);
+  const b = snapshot(data, idB);
+  const rng = mulberry32(hashString(seed + "|championship"));
+  const opening = exchangeOrder(a,b);
+  const first = opening[0]!;
+  const other = first.id === a.id ? b : a;
+  const hp: Record<string,number> = { [a.id]: 100, [b.id]: 100 };
+  const exchanges: Exchange[] = [];
+  let i = 0;
+  while (hp[a.id]! > 0 && hp[b.id]! > 0 && i < 40) {
+    const attacker = i < 3 ? opening[i]! : ((i - 3) % 2 === 0 ? other : first);
+    const defender = attacker.id === a.id ? b : a;
+    const base = strikeDamage(attacker, defender, Math.min(i,2), rng);
+    const round = i + 1;
+    const mult = round <= 3 ? 1 : round === 4 ? 1.1 : round === 5 ? 1.2 : 1.35;
+    const heatPush = round >= 6 ? Math.max(0, attacker.stats.heat - defender.stats.heat) * 0.25 : 0;
+    const damage = Math.max(1, Math.round(base.damage * mult + heatPush));
+    hp[defender.id] = Math.max(0, hp[defender.id]! - damage);
+    const tags = [...base.tags, ...(round >= 6 ? ["sudden-death"] : round >= 4 ? ["overtime"] : [])];
+    const call = round >= 6
+      ? `Sudden death, round ${round}. ${base.call}`
+      : round >= 4
+        ? `Overtime, round ${round}. ${base.call}`
+        : base.call;
+    exchanges.push({ index: round, attackerId: attacker.id, defenderId: defender.id, damage, attackerHp: hp[attacker.id]!, defenderHp: hp[defender.id]!, call, tags });
+    i++;
+  }
+  if (hp[a.id]! > 0 && hp[b.id]! > 0) {
+    const defender = hp[a.id]! <= hp[b.id]! ? a : b;
+    const attacker = defender.id === a.id ? b : a;
+    const damage = hp[defender.id]!;
+    hp[defender.id] = 0;
+    exchanges.push({ index: exchanges.length + 1, attackerId: attacker.id, defenderId: defender.id, damage, attackerHp: hp[attacker.id]!, defenderHp: 0, call: `The championship cannot go to the judges. ${attacker.botName} lands the last shot.`, tags:["sudden-death"] });
+  }
+  const winner = hp[a.id]! > 0 ? a : b;
+  const loser = winner.id === a.id ? b : a;
+  const last = exchanges.at(-1)!;
+  return {
+    winnerIds:[winner.id],
+    loserIds:[loser.id],
+    method:"ko",
+    blowout: exchanges.length <= 3 || hp[winner.id]! >= 60,
+    exchanges,
+    finisher:{ by:winner.id, against:loser.id, damage:last.damage, call:last.call },
+    hp,
+    fighters:[a,b],
+    wear: planDuelWear(winner.id,loser.id,"ko",exchanges.length <= 3,rng),
+    seed,
+  };
+}
+
 export function simulateBye(data: PitData, storeId: string, seed: string): FightResult {
   const snap = snapshot(data, storeId);
   const house: FighterSnap = {
@@ -1066,21 +1247,41 @@ function seededWheel(stores: { id: string; seed: number }[], week: number): { by
   return { bye: null, pairs };
 }
 
+type SeedToken = `M${number}` | `F${number}`;
+const REGULAR_SCHEDULE: SeedToken[][][] = [
+  [["F0","F6"],["F1","F5"],["F2","F3"],["F4","M3"],["M0","M6"],["M1","M4"],["M2","M5"]],
+  [["F0","F4"],["F1","M6"],["F2","F5"],["F3","F6"],["M0","M4"],["M1","M5"],["M2","M3"]],
+  [["F0","F1"],["F2","M6"],["F3","M2"],["F4","F5"],["F6","M4"],["M0","M1"],["M3","M5"]],
+  [["F0","M0"],["F1","F2"],["F3","F4"],["F5","M1"],["F6","M5"],["M2","M4"],["M3","M6"]],
+];
+
+function conferenceSchedule(data: PitData, week: number): [string, string][] | null {
+  const metro = data.stores.filter((store) => store.conference === "metro").sort((a,b) => a.seed-b.seed || a.name.localeCompare(b.name));
+  const frontier = data.stores.filter((store) => store.conference === "frontier").sort((a,b) => a.seed-b.seed || a.name.localeCompare(b.name));
+  if (metro.length !== 7 || frontier.length !== 7 || week < 1 || week > 4) return null;
+  const resolve = (token: SeedToken) => token[0] === "M" ? metro[Number(token.slice(1))]!.id : frontier[Number(token.slice(1))]!.id;
+  return REGULAR_SCHEDULE[week-1]!.map(([a,b]) => [resolve(a!),resolve(b!)] as [string,string]);
+}
+
 export function buildCard(data: PitData): Bout[] {
   const week = data.week;
+  if (week === 5) {
+    const finalists = championshipFinalists(data);
+    return finalists.length === 2 ? [makeBout(5, 1, "final", "Waterman Championship", [finalists[0]!], [finalists[1]!])] : [];
+  }
+  const scheduled = conferenceSchedule(data, week);
+  if (scheduled) {
+    return scheduled.map(([a,b], index) => {
+      const cross = storeFor(data,a).conference !== storeFor(data,b).conference;
+      const title = index === scheduled.length - 1 ? "Main event" : cross ? "Crossover" : "Conference";
+      return makeBout(week,index+1,"bout",title,[a],[b]);
+    });
+  }
   const { bye, pairs } = seededWheel(data.stores, week);
-  const seedOf = new Map(data.stores.map((store) => [store.id, store.seed]));
-  const ordered = [...pairs].sort((a, b) => {
-    const best = (pair: [string, string]) => Math.min(seedOf.get(pair[0]) ?? 99, seedOf.get(pair[1]) ?? 99);
-    return best(b) - best(a);
-  });
   const bouts: Bout[] = [];
   if (bye) bouts.push(makeBout(week, 1, "bye", "Bye", [bye], []));
-  ordered.forEach((pair, index) => {
-    const main = index === ordered.length - 1;
-    bouts.push(makeBout(week, bouts.length + 1, "bout", main ? "Main event" : "Card", [pair[0]], [pair[1]]));
-  });
-  return bouts.map((bout, index) => ({ ...bout, slot: index + 1 }));
+  pairs.forEach((pair,index) => bouts.push(makeBout(week,bouts.length+1,"bout",index===pairs.length-1?"Main event":"Card",[pair[0]],[pair[1]])));
+  return bouts;
 }
 
 function makeBout(
@@ -1109,6 +1310,7 @@ export function simulateBout(data: PitData, bout: Bout): FightResult {
   if (bout.kind === "bye") return simulateBye(data, bout.teamA[0]!, seed);
   if (bout.kind === "tag") return simulateTag(data, bout.teamA, bout.teamB, seed);
   if (bout.kind === "melee") return simulateMelee(data, bout.teamA, seed);
+  if (data.week === 5 && bout.kind === "final" && bout.title === "Waterman Championship") return simulateChampionshipDuel(data, bout.teamA[0]!, bout.teamB[0]!, seed);
   return simulateDuel(data, bout.teamA[0]!, bout.teamB[0]!, seed);
 }
 
@@ -1360,24 +1562,24 @@ export function runSaturday(data: PitData): Bout[] {
   const card = buildCard(data);
   const played = card.map((bout) => ({ ...bout, result: simulateBout(data, bout) }));
   if (data.week !== 4) return played;
-  const staged: PitData = {
+
+  let staged: PitData = {
     ...data,
     phase: "locked",
-    bouts: [...data.bouts.filter((bout) => bout.week !== data.week), ...played],
+    bouts: [...data.bouts.filter((bout) => bout.week !== 4), ...played],
   };
-  const { leaders } = titleField(staged);
-  if (leaders.length < 2) return played;
-  const kind = leaders.length === 2 ? "final" : "melee";
-  const tie = makeBout(
-    4,
-    played.length + 1,
-    kind,
-    "Tiebreaker",
-    leaders.length === 2 ? [leaders[0]!] : leaders,
-    leaders.length === 2 ? [leaders[1]!] : [],
-  );
-  tie.result = simulateBout(staged, tie);
-  return [...played, tie];
+  const extras: Bout[] = [];
+  for (const conference of ["metro","frontier"] as const) {
+    const tied = conferenceTopTie(staged, conference);
+    if (tied.length < 2) continue;
+    const kind: Bout["kind"] = tied.length === 2 ? "final" : "melee";
+    const title = conference === "metro" ? "Metro Conference Tiebreaker" : "Frontier Conference Tiebreaker";
+    const tie = makeBout(4, played.length + extras.length + 1, kind, title, tied.length === 2 ? [tied[0]!.id] : tied.map((store) => store.id), tied.length === 2 ? [tied[1]!.id] : []);
+    tie.result = simulateBout(staged,tie);
+    extras.push(tie);
+    staged = { ...staged, bouts:[...staged.bouts,tie] };
+  }
+  return [...played,...extras];
 }
 
 export function methodLabel(method: Method): string {
@@ -1428,12 +1630,12 @@ export function writeGazette(data: PitData, bouts: Bout[]): GazetteEntry[] {
         kicker: "Melee",
         headline: wStore
           ? bout.title === "Tiebreaker"
-            ? `${wStore.name} wins the tie and takes the trophy.`
+            ? `${wStore.name} wins the cage tiebreak.`
             : `${wStore.name} is the last bot moving.`
           : "The consolation cage goes quiet.",
         body: wBot
           ? bout.title === "Tiebreaker"
-            ? `${wBot.name} walks out of a ${bout.teamA.length}-store tie. Same record going in. One store coming out.`
+            ? `${wBot.name} walks out of a ${bout.teamA.length}-store tie. Same record going in. One conference berth coming out.`
             : `${wBot.name} walks out of a ${bout.teamA.length}-store scrum. No trophy. The plate on the wall still has to mention it.`
           : "The melee did not crown a store.",
       });
@@ -1448,7 +1650,7 @@ export function writeGazette(data: PitData, bouts: Bout[]): GazetteEntry[] {
     const tag = r.winnerIds.length > 1;
     const headline =
       bout.title === "Tiebreaker"
-        ? `${w.name} wins the tie and takes the trophy.`
+        ? `${w.name} wins the cage tiebreak.`
         : tag
           ? `${r.winnerIds.map((id) => storeFor(data, id).name).join(" & ")} take the tag.`
           : `${w.name} beats ${l.name} by ${methodLabel(r.method).toLowerCase()}.`;
