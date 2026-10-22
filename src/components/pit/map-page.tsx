@@ -56,6 +56,7 @@ export function PitMap() {
                 <span className="relative mt-3 block">
                   <span className="block text-xs tracking-widest text-muted uppercase">{CLASS_META[bot.classId].label}</span>
                   <span className="block font-display text-2xl leading-tight">{store.name}</span>
+                  {store.teamName ? <span className="mt-1 block truncate text-xs text-amber" title={store.teamName}>Team {store.teamName}</span> : null}
                   <span className="mt-1 block text-sm text-fg">{bot.name}</span>
                   <span className={`mt-2 block text-xs tracking-widest uppercase ${locked ? "text-amber" : hurt ? "text-bad" : "text-muted"}`}>
                     {locked ? "Locked" : hurt ? "Damaged" : "Open"} · {rec.w}–{rec.l}

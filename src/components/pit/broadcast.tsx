@@ -244,12 +244,12 @@ export function Broadcast({
         <div className="relative min-w-0 bg-deep">
           <canvas ref={canvasRef} aria-label="Battle arena animation" className="aspect-[4/3] w-full bg-deep sm:aspect-video" />
           <div className="pointer-events-none absolute inset-x-0 top-0 grid grid-cols-[1fr_auto_1fr] items-start gap-2 p-2 pb-6 md:gap-3 md:p-3 md:pb-8" style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.78), rgba(0,0,0,0))" }}>
-            {left ? <Health name={left.botName} store={left.storeName} hp={hp[left.id] ?? 100} paint={left.paint} align="left" tuned={left.tuned} /> : <span />}
+            {left ? <Health name={left.botName} store={left.teamName ? `${left.storeName} · ${left.teamName}` : left.storeName} hp={hp[left.id] ?? 100} paint={left.paint} align="left" tuned={left.tuned} /> : <span />}
             <div className="flex min-w-[3.5rem] flex-col items-center pt-0.5 md:min-w-[5rem]">
               <span className="font-display text-base leading-none text-amber tabular-nums md:text-2xl">{clock}</span>
               {round ? <span className="mt-0.5 text-[9px] tracking-[0.2em] text-fg uppercase md:text-[11px]">{round}</span> : null}
             </div>
-            {right ? <Health name={right.botName} store={right.storeName} hp={hp[right.id] ?? 100} paint={right.paint} align="right" tuned={right.tuned} /> : <span />}
+            {right ? <Health name={right.botName} store={right.teamName ? `${right.storeName} · ${right.teamName}` : right.storeName} hp={hp[right.id] ?? 100} paint={right.paint} align="right" tuned={right.tuned} /> : <span />}
           </div>
           <p className="absolute inset-x-0 bottom-0 bg-deep/95 px-3 py-1.5 text-xs leading-relaxed md:py-3 md:text-base">{caption}</p>
         </div>

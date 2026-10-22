@@ -690,6 +690,7 @@ function snapshot(data: PitData, storeId: string): FighterSnap {
     id: storeId,
     name: store.name,
     storeName: store.name,
+    teamName: store.teamName,
     classId: bot.classId,
     paint: store.paint,
     botName: bot.name,

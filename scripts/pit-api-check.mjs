@@ -137,6 +137,14 @@ const afterDesign = JSON.parse((await captain.call("pullSeason", { rev: 0 })).do
 assert.equal(afterDesign.number, "42");
 assert.deepEqual({ ...afterDesign, style: beforeDesign.style, look: beforeDesign.look, number: beforeDesign.number }, beforeDesign);
 assert.equal(JSON.parse((await anon.call("pullSeason", { rev: 0 })).doc).cosmeticProposals.length, 0);
+await assert.rejects(crew.command("renameIdentity", ["plano", "FORGED", "FORGED"]));
+await assert.rejects(captain.command("renameIdentity", ["allen", "FORGED", "FORGED"]));
+await assert.rejects(captain.command("renameIdentity", ["plano", "", "QA Crew"]));
+await captain.command("renameIdentity", ["plano", "QA Steel Fang", "QA Pit Crew"]);
+const named = JSON.parse((await anon.call("pullSeason", { rev: 0 })).doc);
+assert.equal(named.stores.find(s => s.id === "plano").name, "Plano");
+assert.equal(named.stores.find(s => s.id === "plano").teamName, "QA Pit Crew");
+assert.equal(named.bots.find(b => b.storeId === "plano").name, "QA STEEL FANG");
 // Independent sessions race from the same server revision. Both changes must survive CAS retries.
 await Promise.all([
   desk.command("setTagline", ["QA concurrent league message"]),

@@ -52,6 +52,26 @@ test("unchanged sessions compare by identity and overlapping polls share one req
 });
 beforeEach((t) => t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-10-01T12:00:00Z") }));
 
+test("Locker identity names persist without changing the store, bot build, wear or result history", () => {
+  const league=state();const before=league.getState();
+  const bot=before.bots.find(b=>b.storeId==='plano')!;
+  const official=before.stores.find(s=>s.id==='plano')!.name;
+  league.getState().renameIdentity('plano','  Steel Fang  ','  Plano Pit Crew  ');
+  const after=league.getState();const changed=after.bots.find(b=>b.storeId==='plano')!;
+  assert.equal(changed.name,'STEEL FANG');assert.deepEqual({...changed,name:bot.name},bot);
+  assert.equal(after.stores.find(s=>s.id==='plano')!.name,official);
+  assert.equal(sharedDoc(after).stores.find(s=>s.id==='plano')!.teamName,'Plano Pit Crew');
+  assert.deepEqual(after.bouts,before.bouts);
+  const session=after.session;
+  assert.doesNotThrow(()=>authorize(after,session,'renameIdentity',['plano','X','Y']));
+  assert.throws(()=>authorize(after,session,'renameIdentity',['allen','X','Y']));
+  assert.throws(()=>authorize(after,{...session,role:'crew',crewId:after.crew.find(c=>c.storeId==='plano'&&c.role==='specialist')!.id},'renameIdentity',['plano','X','Y']));
+  assert.equal(commandArgs.renameIdentity.safeParse(['plano','','Team']).success,false);
+  assert.equal(commandArgs.renameIdentity.safeParse(['plano','X'.repeat(23),'Team']).success,false);
+  const crew=state('crew');crew.getState().renameIdentity('plano','Forbidden','Forbidden');
+  assert.notEqual(crew.getState().bots.find(b=>b.storeId==='plano')!.name,'FORBIDDEN');
+});
+
 test("Abilene's confirmed team replaces legacy placeholders without resetting the season", () => {
   const fresh = makeData();
   assert.deepEqual(fresh.crew.filter(c => c.storeId === "abilene").map(c => [c.name,c.role]), [

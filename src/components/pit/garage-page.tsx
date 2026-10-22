@@ -1,4 +1,5 @@
 import { Modal } from "./modal";
+import { LockerIdentity } from "./locker-identity";
 import { CosmeticBoard, CosmeticTheme } from "./cosmetic-board";
 import { EffectLockerPreview } from "./effect-locker-preview";
 import type { CosmeticLoadout, StickerSlot } from "@/lib/pit/types";
@@ -75,6 +76,7 @@ export function GaragePage({ storeId }: { storeId: string }) {
         <div>
           <SectionLabel>{store.region} bay</SectionLabel>
           <h1 className="font-display text-4xl leading-tight md:text-5xl">{store.name}</h1>
+          {store.teamName ? <p className="mt-1 font-display text-xl text-amber [overflow-wrap:anywhere]">Team {store.teamName}</p> : null}
           <p className="mt-2 text-muted">
             {see ? bot.name : "Bot under the tarp"} · {CLASS_META[bot.classId].label} · Captain {store.captain}
           </p>
@@ -631,6 +633,7 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
         </div>
       </div>
 
+      <LockerIdentity key={storeId} storeId={storeId} />
       {nextRewards.length ? (
         <div className="border-b border-line bg-deep/60 p-4">
           <p className="text-xs tracking-widest text-amber uppercase">Closest unlocks</p>

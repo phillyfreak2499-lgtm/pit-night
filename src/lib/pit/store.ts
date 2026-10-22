@@ -79,6 +79,7 @@ export type PitState = PitData & {
   repairSlot: (storeId: string, slot: Slot, mode: "full" | "weld" | "salvage" | "crown") => void;
   nameMvp: (storeId: string, crewId: string) => void;
   renameBot: (storeId: string, name: string) => void;
+  renameIdentity: (storeId: string, botName: string, teamName: string) => void;
   renameCaptain: (storeId: string, name: string) => void;
   setPasscode: (storeId: string, passcode: string) => void;
   setPaint: (storeId: string, paint: string) => void;
@@ -246,6 +247,7 @@ function fresh(): PitState {
     repairSlot: () => {},
     nameMvp: () => {},
     renameBot: () => {},
+    renameIdentity: () => {},
     renameCaptain: () => {},
     setPasscode: () => {},
     setPaint: () => {},
@@ -306,7 +308,7 @@ function forgetSyncBase() {
 export function sharedDoc(state: PitData): SharedDoc {
   const out = {} as Record<string, unknown>;
   for (const k of SHARED_KEYS) out[k] = state[k];
-  out.stores = state.stores.map(s => ({ id: s.id, name: s.name, region: s.region, conference: s.conference, captain: s.captain, paint: s.paint, garage: s.garage, seed: s.seed, unlocks: s.unlocks, boltsSpent: s.boltsSpent }));
+  out.stores = state.stores.map(s => ({ id: s.id, name: s.name, teamName: s.teamName, region: s.region, conference: s.conference, captain: s.captain, paint: s.paint, garage: s.garage, seed: s.seed, unlocks: s.unlocks, boltsSpent: s.boltsSpent }));
   return out as SharedDoc;
 }
 
@@ -901,6 +903,19 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         const data = get();
         if (!isBoss(data) && !isCaptainOf(data, storeId)) return;
         set({ bots: patchBot(data.bots, storeId, (b) => ({ ...b, name: clean })), flash: `Bot is now ${clean}.` });
+      },
+      renameIdentity: (storeId, botName, teamName) => {
+        const data = get();
+        if (!isBoss(data) && !isCaptainOf(data, storeId)) return;
+        const cleanBot = botName.trim().replace(/\s+/g, " ").toUpperCase();
+        const cleanTeam = teamName.trim().replace(/\s+/g, " ");
+        if (!cleanBot || cleanBot.length > 22 || !cleanTeam || cleanTeam.length > 40 || /[\u0000-\u001f\u007f]/.test(botName + teamName)) return;
+        if (!data.stores.some(s => s.id === storeId)) return;
+        set({
+          bots: patchBot(data.bots, storeId, bot => ({ ...bot, name: cleanBot })),
+          stores: data.stores.map(store => store.id === storeId ? { ...store, teamName: cleanTeam } : store),
+          flash: `Team ${cleanTeam} · bot ${cleanBot}. Names saved.`,
+        });
       },
       renameCaptain: (storeId, name) => {
         const data = get();

@@ -52,6 +52,8 @@ export type StatBlock = {
 export type Store = {
   id: string;
   name: string;
+  /** Optional crew/team alias; the official store identity stays stable. */
+  teamName?: string;
   region: string;
   conference: Conference;
   captain: string;
@@ -147,6 +149,7 @@ export type FighterSnap = {
   id: string;
   name: string;
   storeName: string;
+  teamName?: string;
   classId: ClassId;
   paint: string;
   botName: string;

@@ -26,6 +26,8 @@ Confirmed Abilene team: Taylor VanSickle (Store Manager / captain), Nathan Burne
 
 ## Availability and rewards
 
+Captains (or the Desk) can change both the bot name and team name in **Garage → Bot Locker → Your team. Your bot. → Save names**. Bot names allow 22 characters and team aliases 40. The official store name/ID remain unchanged. The team alias is public inside the gated league, and future fight snapshots carry it; posted historical bouts retain their original names. Crew cannot rename another store or bypass captain authority. Names never repair damage or alter stats, prices, ownership or rewards.
+
 Captains plan vacation before Tuesday midnight Central. Availability and roster changes freeze when Pit Week starts, or at the first training submission in accelerated practice. The Desk can record a legitimate absence afterward; the paper tape records who changed eligibility and when. An all-Off store never qualifies for Full Tune-Up. Jobs submitted before Saturday lock may be approved until the card runs; new submissions and Sparks stop at lock. Duplicate job/Spark/crate/purchase requests cannot multiply rewards.
 
 Championship Prep is finalist-only: all eight jobs and all four Tuesday–Friday Sparks for every eligible specialist, plus captain CARE. Non-finalists Rally; Rally never changes combat.
