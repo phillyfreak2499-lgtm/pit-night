@@ -182,7 +182,8 @@ export function stage(
 ): { ok: true; staged: StagedStore[]; checks: string[] } | { ok: false; problems: string[]; checks: string[] } {
   const problems: string[] = [];
   const checks: string[] = [];
-  // Finalization: the source must have loaded days after the week closed, and two reads must agree.
+  // Finalization (owner-approved 2026-10-22; Snowflake has no finalized flag): the source must have
+  // data dated after the Saturday close, and two reads STABILITY_GAP_MS apart must match.
   if (!read.latestDate || read.latestDate <= fight.end)
     problems.push(`Snowflake has no data after ${fight.end} (latest ${read.latestDate ?? "none"}); the week may not be final.`);
   else checks.push(`Freshness: data loaded through ${read.latestDate}, after the ${fight.end} close.`);
