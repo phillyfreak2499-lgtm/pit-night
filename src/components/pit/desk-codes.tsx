@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { getStoreCodes, setAccessCode } from "@/lib/pit/sync-server";
+import { getStoreCodes, rotateAllStoreCodes, setAccessCode } from "@/lib/pit/sync-server";
 import { usePit } from "@/lib/pit/store";
 import { Btn, SectionLabel, TextInput } from "./bits";
 
@@ -27,6 +27,23 @@ export function DeskCodes() {
       document.removeEventListener("visibilitychange", clear);
     };
   }, []);
+  async function rotateAll() {
+    if (!window.confirm("Rotate BOTH crew and captain codes for all stores? Existing store-role sessions will be signed out.")) return;
+    const ticket = ++request.current;
+    setBusy(true);
+    setError("");
+    try {
+      const rows = await rotateAllStoreCodes();
+      if (ticket === request.current && !document.hidden) {
+        setCodes(rows);
+        setRevealed(true);
+      }
+    } catch (e) {
+      if (ticket === request.current) setError(e instanceof Error ? e.message : "Could not rotate codes.");
+    } finally {
+      if (ticket === request.current) setBusy(false);
+    }
+  }
   async function load() {
     const ticket = ++request.current;
     setBusy(true);
@@ -49,11 +66,14 @@ export function DeskCodes() {
       <SectionLabel>Store access codes</SectionLabel>
       <p className="mt-2 text-sm text-muted">
         One admin code opens the Desk. Each store has separate captain and crew codes. This list is
-        visible only to the Desk. Changing a store code signs that role out on every device.
+        visible only to the Desk. Changing a store code signs that role out on every device. “Rotate all” creates fresh unique four-digit crew and captain codes for every store and reveals the new handoff list once.
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <Btn tone="line" disabled={busy} onClick={() => void load()}>
           {busy ? "Loading…" : codes ? "Refresh codes" : "Load store codes"}
+        </Btn>
+        <Btn tone="spark" disabled={busy} onClick={() => void rotateAll()}>
+          Rotate all 14 store codes
         </Btn>
         {codes && (
           <Btn tone="line" onClick={() => setRevealed((v) => !v)}>

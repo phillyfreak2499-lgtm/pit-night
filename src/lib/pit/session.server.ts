@@ -1,4 +1,4 @@
-import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, randomInt, scryptSync, timingSafeEqual } from "node:crypto";
 import {
   getCookie,
   setCookie,
@@ -220,4 +220,35 @@ export async function readStoreCodes(data: PitData) {
     result.push(row);
   }
   return result;
+}
+
+
+/** Commissioner-only helper: replace every store's captain + crew codes with fresh unique 4-digit codes. */
+export async function rotateStoreCodes(data: PitData) {
+  sameOrigin();
+  requireCodeVault();
+  const current = await readStoreCodes(data);
+  const used = new Set<string>();
+  for (const row of current) {
+    if (row.captain) used.add(row.captain);
+    if (row.crew) used.add(row.crew);
+  }
+  const nextCode = () => {
+    for (;;) {
+      const code = String(randomInt(1000, 10000));
+      if (!used.has(code)) {
+        used.add(code);
+        return code;
+      }
+    }
+  };
+  const rows: { storeId: string; captain: string; crew: string }[] = [];
+  for (const store of data.stores) {
+    const crew = nextCode();
+    const captain = nextCode();
+    await changeCredential(`bay:${store.id}`, crew);
+    await changeCredential(`captain:${store.id}`, captain);
+    rows.push({ storeId: store.id, captain, crew });
+  }
+  return rows;
 }
