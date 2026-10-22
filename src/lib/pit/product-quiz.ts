@@ -41,5 +41,11 @@ export const PRODUCT_QUIZ: ProductQuizQuestion[] = [
 const DAY_INDEX = { tue:0, wed:1, thu:2, fri:3, sat:4 } as const;
 export function productQuestion(week: number, day: keyof typeof DAY_INDEX): ProductQuizQuestion {
   const offset = (Math.max(1, week) - 1) * 5 + DAY_INDEX[day];
-  return PRODUCT_QUIZ[offset % PRODUCT_QUIZ.length]!;
+  const base = PRODUCT_QUIZ[offset % PRODUCT_QUIZ.length]!;
+  // Rotate choices deterministically so the correct answer is not always sitting
+  // in the same button position. The fact and explanation stay unchanged.
+  const shift = (offset * 3 + 1) % 4;
+  const choices = [...base.choices.slice(shift), ...base.choices.slice(0, shift)] as ProductQuizQuestion["choices"];
+  const answer = (base.answer - shift + 4) % 4;
+  return { ...base, choices, answer };
 }
