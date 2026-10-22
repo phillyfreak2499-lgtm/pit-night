@@ -1,5 +1,6 @@
 import { create, type StateCreator } from "zustand";
 import { persist } from "zustand/middleware";
+import { memoSnapshot, snapshotStorage } from "./snapshot-storage";
 import {
   CLASS_META,
   METRICS,
@@ -10,6 +11,7 @@ import {
   partById,
   stockPart,
   styleOf,
+  starterBodies,
 } from "./catalog";
 import {
   SLOTS,
@@ -19,6 +21,7 @@ import {
   kickoffRank,
   buyCheck,
   cardFor,
+  championshipFinalists,
   craftScore,
   equippedScry,
   foesThisWeek,
@@ -32,7 +35,6 @@ import {
   coinMath,
   shopOpen,
   spyRead,
-  titleField,
   WEAPON_FAMILIES,
   wonThisWeek,
   writeGazette,
@@ -40,14 +42,23 @@ import {
 import { makeData } from "./seed";
 import { BOLTS, STREAK_BADGE, allJobs, crateFor, dayOpen, programWeek, type DayKey } from "./training";
 import { eligibilityClosed } from "./eligibility";
+import { cosmeticUnlocked, validBodyForClass } from "./cosmetics";
 import { boltsOf, lockerItem, sparkStreak } from "./week";
+import { checkedCosmeticLoadout } from "./cosmetic-loadout";
+import { authorize } from "./commands";
+import type { BotDecal, CosmeticLoadout, StickerSlot } from "./types";
 import type { Bot, BotLook, BotStyle, Condition, FightResult, GarageLook, Grade, Kickoff, Loadout, PitData, Session, Slot, StatKey, StoreCard } from "./types";
 
 const FIELD_OF: Record<StatKey, keyof StoreCard> = { nsnu: "nsnu", conv: "conv", demoRate: "demoRate", demoClose: "demoClose", arch: "arch", ticket: "demoTicket" };
 
 export type PitState = PitData & {
   flash: string;
+  setSticker: (storeId: string, slot: StickerSlot, decal: BotDecal) => void;
+  proposeCosmetic: (storeId: string, loadout: CosmeticLoadout) => void;
+  voteCosmetic: (id: string) => void;
+  acceptCosmetic: (id: string) => void;
   signPublic: () => void;
+  chooseStarterBody: (storeId: string, classId: Bot["classId"], body: NonNullable<BotStyle["body"]>) => void;
   signCrew: (storeId: string, crewId: string, code?: string) => Promise<boolean>;
   signCaptain: (storeId: string, passcode: string) => Promise<boolean>;
   signCommissioner: (pin: string) => Promise<boolean>;
@@ -68,6 +79,7 @@ export type PitState = PitData & {
   repairSlot: (storeId: string, slot: Slot, mode: "full" | "weld" | "salvage" | "crown") => void;
   nameMvp: (storeId: string, crewId: string) => void;
   renameBot: (storeId: string, name: string) => void;
+  renameIdentity: (storeId: string, botName: string, teamName: string) => void;
   renameCaptain: (storeId: string, name: string) => void;
   setPasscode: (storeId: string, passcode: string) => void;
   setPaint: (storeId: string, paint: string) => void;
@@ -84,6 +96,7 @@ export type PitState = PitData & {
   setTrainingOpenAll: (on: boolean) => void;
   buyLocker: (storeId: string, itemId: string) => void;
   makePick: (boutId: string, pick: string) => void;
+  setRally: (targetId: string) => void;
   setNumber: (storeId: string, number: string) => void;
   renameCrew: (crewId: string, name: string) => void;
   addCrew: (storeId: string, name: string) => void;
@@ -127,6 +140,23 @@ function isCaptainOf(data: PitData, storeId: string) {
   return isBoss(data) || (data.session.role === "captain" && data.session.storeId === storeId);
 }
 
+function championshipPrepAllowed(data: PitData, storeId: string) {
+  return data.week !== 5 || championshipFinalists(data).includes(storeId);
+}
+
+function championshipPrepGuard(data: PitData, storeId: string): string | null {
+  return championshipPrepAllowed(data, storeId)
+    ? null
+    : "Championship Week bot work belongs to the two conference champions. Rally behind a finalist instead.";
+}
+
+function starterBodyGuard(data: PitData, storeId: string): string | null {
+  const bot = data.bots.find((row) => row.storeId === storeId);
+  return data.week === 1 && !bot?.style?.body
+    ? "Choose and lock your Week 1 body first."
+    : null;
+}
+
 function patchBot(bots: Bot[], storeId: string, fn: (bot: Bot) => Bot): Bot[] {
   return bots.map((bot) => (bot.storeId === storeId ? fn(bot) : bot));
 }
@@ -162,7 +192,7 @@ function payRepair(bot: Bot, slot: Slot, cost: number): Bot | null {
 
 function nextFightWeek(data: PitData): number {
   if (data.phase === "open" || data.phase === "locked") return data.week;
-  return Math.min(4, data.week + 1);
+  return Math.min(5, data.week + 1);
 }
 
 function clamp(n: number, lo: number, hi: number) {
@@ -191,7 +221,12 @@ function fresh(): PitState {
   return {
     ...makeData(),
     flash: "",
+    setSticker: () => {},
+    proposeCosmetic: () => {},
+    voteCosmetic: () => {},
+    acceptCosmetic: () => {},
     signPublic: () => {},
+    chooseStarterBody: () => {},
     signCrew: async () => false,
     signCaptain: async () => false,
     setPin: () => {},
@@ -212,6 +247,7 @@ function fresh(): PitState {
     repairSlot: () => {},
     nameMvp: () => {},
     renameBot: () => {},
+    renameIdentity: () => {},
     renameCaptain: () => {},
     setPasscode: () => {},
     setPaint: () => {},
@@ -228,6 +264,7 @@ function fresh(): PitState {
     setTrainingOpenAll: () => {},
     buyLocker: () => {},
     makePick: () => {},
+    setRally: () => {},
     setNumber: () => {},
     renameCrew: () => {},
     addCrew: () => {},
@@ -248,13 +285,13 @@ function fresh(): PitState {
 }
 
 /** Bump when the tutorial changes so every device sees the new one once. */
-export const TUTORIAL_REV = 2;
+export const TUTORIAL_REV = 3;
 
 /** Everything the league shares. Session and tutorial stay on the device. */
 export const SHARED_KEYS = [
   "version", "seasonName", "tagline", "week", "phase", "stores", "crew", "bots", "weeks", "storeCards", "bouts",
-  "gazette", "quotes", "proposals", "mvps", "honors", "craft", "log", "intel", "jobLog", "sparkLog", "shouts", "picks",
-  "trainingOpenAll", "kickoff",
+  "gazette", "quotes", "proposals", "mvps", "honors", "craft", "log", "intel", "jobLog", "rallies", "sparkLog", "shouts", "picks",
+  "trainingOpenAll", "kickoff", "cosmeticProposals",
 ] as const satisfies readonly (keyof PitData)[];
 
 export type SharedDoc = Pick<PitData, (typeof SHARED_KEYS)[number]>;
@@ -271,7 +308,7 @@ function forgetSyncBase() {
 export function sharedDoc(state: PitData): SharedDoc {
   const out = {} as Record<string, unknown>;
   for (const k of SHARED_KEYS) out[k] = state[k];
-  out.stores = state.stores.map(s => ({ id: s.id, name: s.name, region: s.region, captain: s.captain, paint: s.paint, garage: s.garage, seed: s.seed, unlocks: s.unlocks, boltsSpent: s.boltsSpent }));
+  out.stores = state.stores.map(s => ({ id: s.id, name: s.name, teamName: s.teamName, region: s.region, conference: s.conference, captain: s.captain, paint: s.paint, garage: s.garage, seed: s.seed, unlocks: s.unlocks, boltsSpent: s.boltsSpent }));
   return out as SharedDoc;
 }
 
@@ -281,6 +318,7 @@ export function clientDoc(state: PitData, session: Session): SharedDoc {
   const desk = session.role === "commissioner";
   out.intel = desk ? out.intel : out.intel.filter(i => i.from === session.storeId);
   out.proposals = desk ? out.proposals : out.proposals.filter(p => p.storeId === session.storeId);
+  out.cosmeticProposals = (out.cosmeticProposals ?? []).filter(p => desk || (session.role !== "public" && p.storeId === session.storeId));
   if (desk || ["fought", "inspected", "complete"].includes(state.phase)) return out;
   out.bots = out.bots.map(bot => {
     if (session.role !== "public" && session.storeId === bot.storeId) return bot;
@@ -292,13 +330,106 @@ export function clientDoc(state: PitData, session: Session): SharedDoc {
 
 export const pitCreator: StateCreator<PitState> = (set, get) => ({
       ...fresh(),
+      setSticker: (storeId, slot, decal) => {
+        const data = get();
+        if (!isCaptainOf(data, storeId)) return;
+        const bot = data.bots.find(b => b.storeId === storeId);
+        if (!bot) return;
+        // Merge only this slot against the latest authoritative bot, not the caller's snapshot.
+        data.setStyle(storeId, { stickers: { ...styleOf(bot).stickers!, [slot]: decal } });
+      },
+      proposeCosmetic: (storeId, input) => {
+        const data = get();
+        try { authorize(data, data.session, "proposeCosmetic", [storeId, input]); } catch { return; }
+        const who = actor(data);
+        if (!who || who.storeId !== storeId) return;
+        const loadout = checkedCosmeticLoadout(data, storeId, input);
+        if (!loadout) { set({ flash: "Use only your store's unlocked cosmetics. Starter bodies stay frozen through Week 1." }); return; }
+        const proposals = data.cosmeticProposals ?? [];
+        if (proposals.some(p => p.status === "open" && p.crewId === who.id && JSON.stringify(p.loadout) === JSON.stringify(loadout))) {
+          set({ flash: "Your crew can already vote for this look." }); return;
+        }
+        // One current proposal per person keeps the shared board bounded; edits start a fresh vote.
+        const id = `look:${who.id}:${crypto.randomUUID()}`;
+        set({ cosmeticProposals: [...proposals.filter(p => p.crewId !== who.id || p.status !== "open"),
+          { id, storeId, crewId: who.id, crewName: who.name, loadout, voters: [], at: Date.now(), status: "open" }],
+          flash: "Look proposed. One vote per person per proposal; the captain makes the final call." });
+      },
+      voteCosmetic: (id) => {
+        const data = get();
+        try { authorize(data, data.session, "voteCosmetic", [id]); } catch { return; }
+        const who = actor(data);
+        const p = data.cosmeticProposals?.find(p => p.id === id && p.status === "open");
+        if (!who || !p || p.storeId !== who.storeId || p.voters.includes(who.id)) return;
+        set({ cosmeticProposals: data.cosmeticProposals.map(row => row.id === id ? { ...row, voters: [...row.voters, who.id] } : row), flash: "Vote counted." });
+      },
+      acceptCosmetic: (id) => {
+        const data = get();
+        try { authorize(data, data.session, "acceptCosmetic", [id]); } catch { return; }
+        const p = data.cosmeticProposals?.find(p => p.id === id && p.status === "open");
+        if (!p || !isCaptainOf(data, p.storeId)) return;
+        const loadout = checkedCosmeticLoadout(data, p.storeId, p.loadout);
+        if (!loadout) { set({ flash: "This proposal no longer qualifies. Ask the crew to submit a current unlocked look." }); return; }
+        set({ stores: data.stores.map(s => s.id === p.storeId ? { ...s, paint: loadout.paint } : s),
+          bots: patchBot(data.bots, p.storeId, b => ({ ...b, style: loadout.style, look: loadout.look, number: loadout.number })),
+          cosmeticProposals: data.cosmeticProposals.map(row => row.id === id ? { ...row, status: "accepted" } : row),
+          flash: `${p.crewName}'s look accepted. Battle history and combat stats stay unchanged.` });
+      },
       signPublic: () => {},
+      chooseStarterBody: (storeId, classId, body) => {
+        const data = get();
+        const ownCrew = data.session.role === "crew" && data.session.storeId === storeId;
+        if (!isCaptainOf(data, storeId) && !ownCrew) {
+          set({ flash: "Sign in to choose this store's starter body." });
+          return;
+        }
+        const bot = data.bots.find((row) => row.storeId === storeId);
+        if (!bot) return;
+        if (data.week !== 1 || data.bouts.some((bout) => bout.week === 1 && bout.result) || bot.style?.body) {
+          set({ flash: "The Week 1 body choice is already locked." });
+          return;
+        }
+        const option = starterBodies(classId).find((row) => row.id === body);
+        if (!option) {
+          set({ flash: "That body does not belong to that fighting style." });
+          return;
+        }
+        const draft: Loadout = {
+          chassis: stockPart("chassis", classId).id,
+          drive: stockPart("drive", classId).id,
+          weapon: stockPart("weapon", classId).id,
+          armor: stockPart("armor", classId).id,
+          utility: null,
+          brain: stockPart("brain", classId).id,
+        };
+        set({
+          bots: patchBot(data.bots, storeId, (current) =>
+            syncWear({
+              ...current,
+              classId,
+              draft,
+              equipped: { ...draft },
+              locked: null,
+              style: { ...styleOf(current, classId), body },
+            }),
+          ),
+          flash: `${option.label} selected. ${CLASS_META[classId].label} body is locked through Week 1.`,
+          log: [
+            `${data.stores.find((row) => row.id === storeId)?.name ?? storeId} chose ${option.label} (${CLASS_META[classId].label}) for Week 1.`,
+            ...data.log.slice(0, 23),
+          ],
+        });
+      },
       signCrew: async () => false,
       signCaptain: async () => false,
       signCommissioner: async () => false,
       setPin: () => {},
       setDraftPart: (storeId, slot, partId) => {
         const data = get();
+        const championshipBlock = championshipPrepGuard(data, storeId);
+        if (championshipBlock && !isBoss(data)) { set({ flash: championshipBlock }); return; }
+        const starterBlock = starterBodyGuard(data, storeId);
+        if (starterBlock && !isBoss(data)) { set({ flash: starterBlock }); return; }
         if (!isCaptainOf(data, storeId)) {
           set({ flash: "Only the captain can change parts." });
           return;
@@ -337,7 +468,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
             set({ flash: `Reclass costs ${RECLASS_FEE} chassis coins.` });
             return;
           }
-          next = { ...bot, coins: { ...bot.coins, chassis: bot.coins.chassis - RECLASS_FEE }, classId: part.classLock };
+          next = { ...bot, coins: { ...bot.coins, chassis: bot.coins.chassis - RECLASS_FEE }, classId: part.classLock, style: { ...styleOf(bot, part.classLock), body: starterBodies(part.classLock)[0]!.id } };
         }
         const draft: Loadout = { ...next.draft, [slot]: part.id };
         set({
@@ -354,6 +485,10 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
       },
       setDraftLoadout: (storeId, loadout) => {
         const data = get();
+        const championshipBlock = championshipPrepGuard(data, storeId);
+        if (championshipBlock && !isBoss(data)) { set({ flash: championshipBlock }); return; }
+        const starterBlock = starterBodyGuard(data, storeId);
+        if (starterBlock && !isBoss(data)) { set({ flash: starterBlock }); return; }
         if (!isCaptainOf(data, storeId)) {
           set({ flash: "Only the captain can change parts." });
           return;
@@ -400,6 +535,10 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
       },
       lockStore: (storeId) => {
         const data = get();
+        const championshipBlock = championshipPrepGuard(data, storeId);
+        if (championshipBlock && !isBoss(data)) { set({ flash: championshipBlock }); return; }
+        const starterBlock = starterBodyGuard(data, storeId);
+        if (starterBlock && !isBoss(data)) { set({ flash: starterBlock }); return; }
         if (!isCaptainOf(data, storeId)) {
           set({ flash: "Captain clipboard required." });
           return;
@@ -493,7 +632,12 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: `Finish the colors first: ${missing.map((r) => r.store.name).join(", ")}.` });
           return;
         }
-        const seedOf = new Map(ranked.map((r) => [r.store.id, r.seed]));
+        const seedOf = new Map<string, number>();
+        for (const conference of ["metro","frontier"] as const) {
+          ranked
+            .filter((row) => row.store.conference === conference)
+            .forEach((row, index) => seedOf.set(row.store.id, index + 1));
+        }
         const paid: Kickoff["paid"] = {};
         const bots = data.bots.map((bot) => {
           const row = ranked.find((r) => r.store.id === bot.storeId);
@@ -507,14 +651,15 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         const stores = data.stores.map((s) => ({ ...s, seed: seedOf.get(s.id) ?? s.seed }));
         const card = buildCard({ ...data, stores, week: 1 });
         const name = (id: string | undefined) => stores.find((s) => s.id === id)?.name ?? "TBD";
-        const bye = card.find((b) => b.kind === "bye");
         const main = card.filter((b) => b.kind === "bout").at(-1);
+        const metroTop = ranked.filter((row) => row.store.conference === "metro").sort((a,b) => (seedOf.get(a.store.id) ?? 99) - (seedOf.get(b.store.id) ?? 99))[0]!;
+        const frontierTop = ranked.filter((row) => row.store.conference === "frontier").sort((a,b) => (seedOf.get(a.store.id) ?? 99) - (seedOf.get(b.store.id) ?? 99))[0]!;
         const top = ranked[0]!;
         const gazette = data.gazette.map((g) =>
           g.id === "g-open"
             ? {
                 ...g,
-                body: `Period 12 opens October 25. Eleven stores, seeded on Period 11. The first card runs Monday morning, November 2: five fights and a bye. ${name(bye?.teamA[0])} earned the top seed and the first bye, and a bye counts as a win. The main event is ${name(main?.teamA[0])} against ${name(main?.teamB[0])}.`,
+                body: `Period 12 opens October 25. Fourteen stores, two conferences, seven fights every Monday and no byes. Metro #1 is ${metroTop.store.name}; Frontier #1 is ${frontierTop.store.name}. The first main event is ${name(main?.teamA[0])} against ${name(main?.teamB[0])}.`,
               }
             : g,
         );
@@ -525,12 +670,16 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           gazette,
           picks: data.picks.filter((p) => p.week !== 1 || stillOn.has(p.boutId)),
           kickoff: { ...data.kickoff, paid, appliedAt: Date.now() },
-          flash: `Kickoff paid. ${top.store.name} is the 1 seed with ${top.coins} coins.`,
-          log: [`Week 1 seeded on Period 11. ${top.store.name} is the 1 seed.`, ...data.log.slice(0, 23)],
+          flash: `Kickoff paid. Metro and Frontier seeds are set from Period 11 colors.`,
+          log: [`Week 1 seeded inside both conferences from Period 11.`, ...data.log.slice(0, 23)],
         });
       },
       propose: (storeId, partId, note) => {
         const data = get();
+        const championshipBlock = championshipPrepGuard(data, storeId);
+        if (championshipBlock && !isBoss(data)) { set({ flash: championshipBlock }); return; }
+        const starterBlock = starterBodyGuard(data, storeId);
+        if (starterBlock && !isBoss(data)) { set({ flash: starterBlock }); return; }
         const crewOk =
           data.session.role === "crew" && data.session.storeId === storeId && data.session.crewId;
         if (!crewOk && !isCaptainOf(data, storeId)) {
@@ -575,6 +724,10 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
       },
       buyPart: (storeId, partId) => {
         const data = get();
+        const championshipBlock = championshipPrepGuard(data, storeId);
+        if (championshipBlock && !isBoss(data)) { set({ flash: championshipBlock }); return; }
+        const starterBlock = starterBodyGuard(data, storeId);
+        if (starterBlock && !isBoss(data)) { set({ flash: starterBlock }); return; }
         if (!isCaptainOf(data, storeId)) {
           set({ flash: "The wallet answers to the captain." });
           return;
@@ -591,11 +744,15 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
             const classChange = Boolean(part.classLock && part.classLock !== bot.classId);
             const draft = { ...bot.draft, [part.slot]: part.id };
             const owned = bot.owned.includes(part.id) ? bot.owned : [...bot.owned, part.id];
+            const nextClass = part.classLock ?? bot.classId;
             return syncWear({
               ...bot,
               coins: { ...bot.coins, [part.key]: (bot.coins[part.key] ?? 0) - check.cost },
               owned,
-              classId: part.classLock ?? bot.classId,
+              classId: nextClass,
+              style: classChange
+                ? { ...styleOf(bot, nextClass), body: starterBodies(nextClass)[0]!.id }
+                : bot.style,
               draft,
               equipped: { ...draft },
               locked: null,
@@ -609,6 +766,10 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
       },
       repairSlot: (storeId, slot, mode) => {
         const data = get();
+        const championshipBlock = championshipPrepGuard(data, storeId);
+        if (championshipBlock && !isBoss(data)) { set({ flash: championshipBlock }); return; }
+        const starterBlock = starterBodyGuard(data, storeId);
+        if (starterBlock && !isBoss(data)) { set({ flash: starterBlock }); return; }
         if (!isCaptainOf(data, storeId)) {
           set({ flash: "Repairs go through the captain." });
           return;
@@ -743,6 +904,19 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         if (!isBoss(data) && !isCaptainOf(data, storeId)) return;
         set({ bots: patchBot(data.bots, storeId, (b) => ({ ...b, name: clean })), flash: `Bot is now ${clean}.` });
       },
+      renameIdentity: (storeId, botName, teamName) => {
+        const data = get();
+        if (!isBoss(data) && !isCaptainOf(data, storeId)) return;
+        const cleanBot = botName.trim().replace(/\s+/g, " ").toUpperCase();
+        const cleanTeam = teamName.trim().replace(/\s+/g, " ");
+        if (!cleanBot || cleanBot.length > 22 || !cleanTeam || cleanTeam.length > 40 || /[\u0000-\u001f\u007f]/.test(botName + teamName)) return;
+        if (!data.stores.some(s => s.id === storeId)) return;
+        set({
+          bots: patchBot(data.bots, storeId, bot => ({ ...bot, name: cleanBot })),
+          stores: data.stores.map(store => store.id === storeId ? { ...store, teamName: cleanTeam } : store),
+          flash: `Team ${cleanTeam} · bot ${cleanBot}. Names saved.`,
+        });
+      },
       renameCaptain: (storeId, name) => {
         const data = get();
         if (!isCaptainOf(data, storeId)) return;
@@ -764,6 +938,11 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "Buy that paint in the Bolt Locker first." });
           return;
         }
+        const store = data.stores.find((row) => row.id === storeId);
+        if (paint !== store?.paint && !cosmeticUnlocked(data, storeId, "paint", paint)) {
+          set({ flash: "That paint is still locked." });
+          return;
+        }
         set({
           stores: data.stores.map((s) => (s.id === storeId ? { ...s, paint } : s)),
           flash: "Paint is on the bay. It does not change the fight.",
@@ -780,6 +959,10 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
       setLook: (storeId, look) => {
         const data = get();
         if (!isCaptainOf(data, storeId)) return;
+        if (!cosmeticUnlocked(data, storeId, "look", look)) {
+          set({ flash: "That stripe kit is still locked." });
+          return;
+        }
         set({ bots: patchBot(data.bots, storeId, (b) => ({ ...b, look })), flash: "Bot dressed. Still the same iron." });
       },
       completeJob: (week, jobId, note) => {
@@ -789,6 +972,10 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "Sign in on the Clipboard with your bay code first." });
           return;
         }
+        const championshipBlock = championshipPrepGuard(data, who.storeId);
+        if (championshipBlock) { set({ flash: championshipBlock }); return; }
+        const starterBlock = starterBodyGuard(data, who.storeId);
+        if (starterBlock) { set({ flash: starterBlock }); return; }
         const plan = programWeek(week);
         const job = plan ? [...allJobs(plan), plan.care, crateFor(week)].find((j) => j.id === jobId) : undefined;
         if (!plan || !job) return;
@@ -840,6 +1027,10 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         const data = get();
         const who = actor(data);
         if (!who) return;
+        const championshipBlock = championshipPrepGuard(data, who.storeId);
+        if (championshipBlock) { set({ flash: championshipBlock }); return; }
+        const starterBlock = starterBodyGuard(data, who.storeId);
+        if (starterBlock) { set({ flash: starterBlock }); return; }
         const closed = trainingClosed(data, week, day as DayKey);
         if (closed) {
           set({ flash: closed });
@@ -951,10 +1142,64 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           picks: [...data.picks.filter((p) => p.id !== id), { id, week: data.week, boutId, storeId: who.storeId, crewId: who.id, pick, at: Date.now() }],
         });
       },
+      setRally: (targetId) => {
+        const data = get();
+        const who = actor(data);
+        if (!who) {
+          set({ flash: "Sign in on the Clipboard to rally behind a finalist." });
+          return;
+        }
+        if (data.week !== 5 || !["open","locked"].includes(data.phase)) {
+          set({ flash: "Rally opens after the Week 4 conference champions are set." });
+          return;
+        }
+        const finalists = championshipFinalists(data);
+        if (finalists.includes(who.storeId)) {
+          set({ flash: "Finalist stores prepare their own bot. The rest of the league handles Rally." });
+          return;
+        }
+        if (!finalists.includes(targetId)) return;
+        const id = `rally:${who.id}`;
+        set({
+          rallies: [...(data.rallies ?? []).filter((r) => r.id !== id), { id, week: 5, storeId: who.storeId, crewId: who.id, fromName: who.name, targetId, at: Date.now() }],
+          flash: `${who.name} is rallying behind ${data.stores.find((row) => row.id === targetId)?.name ?? targetId}. Crowd only — no fight bonus.`,
+        });
+      },
       setStyle: (storeId, patch) => {
         const data = get();
         if (!isCaptainOf(data, storeId)) return;
-        set({ bots: patchBot(data.bots, storeId, (b) => ({ ...b, style: { ...styleOf(b), ...patch } })), flash: "Bot dressed. Still the same iron." });
+        const bot = data.bots.find((row) => row.storeId === storeId);
+        if (!bot) return;
+        const current = styleOf(bot, bot.classId);
+        const next = styleOf({ classId: bot.classId, style: { ...current, ...patch, stickers: patch.stickers ?? (patch.decal !== undefined ? { ...current.stickers!, hood: patch.decal } : current.stickers) } });
+        const store = data.stores.find(s => s.id === storeId);
+        if (!store || !checkedCosmeticLoadout(data, storeId, { paint: store.paint, look: bot.look, number: bot.number, style: next })) {
+          set({ flash: "Earn or purchase that cosmetic before equipping it." }); return;
+        }
+        if (patch.body) {
+          if (data.week === 1 && bot.style?.body && patch.body !== bot.style.body) {
+            set({ flash: "Starter body is frozen through the first fight." });
+            return;
+          }
+          if (!validBodyForClass(patch.body, bot.classId) || !cosmeticUnlocked(data, storeId, "body", patch.body)) {
+            set({ flash: "That body shell is still locked." });
+            return;
+          }
+        }
+        for (const [kind, value] of Object.entries(patch)) {
+          if (value === undefined || ["flag", "walkout", "victory", "body"].includes(kind)) continue;
+          if (
+            ["finish", "decal", "trim", "eye", "topper"].includes(kind) &&
+            !cosmeticUnlocked(data, storeId, kind as "finish" | "decal" | "trim" | "eye" | "topper", String(value))
+          ) {
+            set({ flash: "Earn that cosmetic in Pit Week first." });
+            return;
+          }
+        }
+        set({
+          bots: patchBot(data.bots, storeId, (b) => ({ ...b, style: next })),
+          flash: "Bot dressed. Still the same iron.",
+        });
       },
       setNumber: (storeId, number) => {
         const data = get();
@@ -1127,11 +1372,19 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "The bots are already locked this week." });
           return;
         }
+        const finalists = championshipFinalists(data);
+        const championship = data.week === 5;
         set({
           phase: "locked",
           weeks: data.weeks.map((w) => (w.number === data.week ? { ...w, lockedAt: w.lockedAt ?? Date.now() } : w)),
-          bots: data.bots.map((b) => ({ ...b, locked: { ...(b.locked ?? b.draft) }, equipped: { ...(b.locked ?? b.draft) } })),
-          flash: "Locked. Eleven builds frozen for Monday. Click in Sunday's colors, then run the card.",
+          bots: data.bots.map((b) =>
+            championship && !finalists.includes(b.storeId)
+              ? { ...b, locked: null }
+              : { ...b, locked: { ...(b.locked ?? b.draft) }, equipped: { ...(b.locked ?? b.draft) } },
+          ),
+          flash: championship
+            ? "Championship builds frozen. Saturday ends only with a knockout."
+            : `Locked. ${data.stores.length} builds frozen for Monday. Click in Sunday's colors, then run the card.`,
           log: [`Week ${data.week} locked.`, ...data.log.slice(0, 23)],
         });
       },
@@ -1145,16 +1398,17 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "This card already ran." });
           return;
         }
-        const unrecorded = data.stores.filter(s => !data.storeCards.find(c => c.storeId === s.id && c.week === data.week)?.nsnuOfficial);
+        const unrecorded = data.week === 5 ? [] : data.stores.filter(s => !data.storeCards.find(c => c.storeId === s.id && c.week === data.week)?.nsnuOfficial);
         if (unrecorded.length) {
           set({ flash: `Record official Sunday NSNU for the tiebreak first: ${unrecorded.map(s => s.name).join(", ")}.` });
           return;
         }
-        const lockedBots = data.bots.map((b) => ({
-          ...b,
-          locked: { ...(b.locked ?? b.draft) },
-          equipped: { ...(b.locked ?? b.draft) },
-        }));
+        const finalists = championshipFinalists(data);
+        const lockedBots = data.bots.map((b) =>
+          data.week === 5 && !finalists.includes(b.storeId)
+            ? { ...b, locked: null }
+            : { ...b, locked: { ...(b.locked ?? b.draft) }, equipped: { ...(b.locked ?? b.draft) } },
+        );
         const staged: PitData = { ...data, phase: "locked", bots: lockedBots };
         const bouts = playCard(staged);
         const gazette = [...writeGazette(staged, bouts), ...data.gazette.filter((g) => g.week !== data.week || g.kicker === "House call")];
@@ -1163,31 +1417,31 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           ...data.stores.map((s) => ({ week: data.week, storeId: s.id, score: craftScore({ ...staged, bouts }, s.id) })),
         ];
         let honors = data.honors;
-        if (data.week === 4) {
-          const field = titleField({ ...staged, bouts });
-          const tie = bouts.find((b) => b.title === "Tiebreaker");
-          const belt = tie?.result?.winnerIds[0] ?? field.leaders[0] ?? null;
-          const plate =
-            tie?.kind === "final"
-              ? (tie.result?.loserIds[0] ?? null)
-              : tie?.kind === "melee"
-                ? (tie.result?.meleeOrder?.[1] ?? null)
-                : (field.ranked.find((store) => store.id !== belt)?.id ?? null);
-          const best = [...craft].sort((a, b) => b.score - a.score)[0];
-          const why = best ? bestBuildId({ ...staged, bouts })?.why ?? "" : "";
-          const bestStore = best?.storeId ?? null;
+        if (data.week === 5) {
+          const final = bouts.find((bout) => bout.title === "Waterman Championship" && bout.result);
+          const belt = final?.result?.winnerIds[0] ?? null;
+          const plate = final?.result?.loserIds[0] ?? null;
+          const best = [...craft].filter((row) => row.week <= 4).sort((a,b) => b.score-a.score)[0];
+          const bestStore = best?.storeId ?? data.honors.bestBuild;
           honors = {
             pitBelt: belt,
             plate,
+            bestBuild: bestStore ?? null,
+            bestBuildWhy: bestStore ? (data.honors.bestBuildWhy || craftWhy(staged,bestStore,"")) : "",
+            titleDrop: belt ? titlePart(lockedBots.find((bot) => bot.storeId === belt)?.classId ?? "striker") : null,
+          };
+        } else if (data.week === 4) {
+          const best = [...craft].filter((row) => row.week <= 4).sort((a,b) => b.score-a.score)[0];
+          const bestStore = best?.storeId ?? null;
+          honors = {
+            ...data.honors,
             bestBuild: bestStore,
-            bestBuildWhy: best && bestStore ? craftWhy(staged, bestStore, why) : why,
-            titleDrop: belt ? titlePart(lockedBots.find((b) => b.storeId === belt)?.classId ?? "striker") : null,
+            bestBuildWhy: bestStore ? craftWhy(staged,bestStore,bestBuildId(staged)?.why ?? "") : "",
           };
         }
         const bots = lockedBots.map((bot) => {
-          if (data.week !== 4 || honors.pitBelt !== bot.storeId || !honors.titleDrop) return bot;
-          if (bot.owned.includes(honors.titleDrop)) return bot;
-          return { ...bot, owned: [...bot.owned, honors.titleDrop] };
+          if (data.week !== 5 || honors.pitBelt !== bot.storeId || !honors.titleDrop) return bot;
+          return bot.owned.includes(honors.titleDrop) ? bot : { ...bot, owned: [...bot.owned, honors.titleDrop] };
         });
         set({
           phase: "fought",
@@ -1196,7 +1450,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           gazette,
           craft,
           honors,
-          flash: data.week === 4 ? "Title Monday is in the books." : "Monday card is live. Watch it before you drop damage.",
+          flash: data.week === 5 ? "Championship Saturday is in the books." : data.week === 4 ? "Regular season complete. Conference champions are set for Saturday." : "Monday card is live. Watch it before you drop damage.",
           log: [`Week ${data.week} fought.`, ...data.log.slice(0, 23)],
         });
       },
@@ -1251,6 +1505,14 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "Drop the damage report before you advance." });
           return;
         }
+        if (data.week === 5) {
+          set({
+            phase: "complete",
+            flash: "Season closed. The Waterman Champion is on the wall.",
+            log: ["Championship Saturday complete.", ...data.log].slice(0, 24),
+          });
+          return;
+        }
         const last = lastPlaceId(data);
         const bots = data.bots.map((bot) => {
           const card = cardFor(data, bot.storeId);
@@ -1283,29 +1545,22 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           const store = data.stores.find((s) => s.id === last);
           lines.unshift(`${store?.name ?? last} takes the last-place repair voucher: 3 coins for any repair.`);
         }
-        if (data.week >= 4) {
-          set({
-            phase: "complete",
-            bots,
-            flash: "Season closed. The trophy stays where it was hung.",
-            log: [...lines, ...data.log].slice(0, 24),
-          });
-          return;
-        }
         const next = data.week + 1;
         const existing = new Set(data.storeCards.filter((c) => c.week === next).map((c) => c.storeId));
-        const storeCards = [
-          ...data.storeCards,
-          ...data.storeCards
-            .filter((c) => c.week === data.week && !existing.has(c.storeId))
-            .map((c) => projectCard(c, next)),
-        ];
+        const storeCards = next === 5
+          ? data.storeCards
+          : [
+              ...data.storeCards,
+              ...data.storeCards
+                .filter((c) => c.week === data.week && !existing.has(c.storeId))
+                .map((c) => projectCard(c, next)),
+            ];
         set({
           week: next,
           phase: "open",
           bots,
           storeCards,
-          flash: `Week ${next} is open. ${data.week === 1 ? "Coins are in the jars and the shop is open." : "Cards are house projections until the desk clicks in Sunday's colors."}`,
+          flash: next === 5 ? "Championship Week is open. Only the two conference champions can work on their bots; everyone else can Rally." : `Week ${next} is open. ${data.week === 1 ? "Coins are in the jars and the shop is open." : "Cards are house projections until the desk clicks in Sunday's colors."}`,
           log: [...lines, ...data.log].slice(0, 24),
         });
       },
@@ -1324,7 +1579,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           crew: data.crew.map((c) => ({ ...c, offWeeks: [] })),
           session: data.session,
           tutorialSeen: data.tutorialSeen,
-          flash: "Period 12 reset. Eleven stock bots. Week 1. Codes and crews kept.",
+          flash: "Period 12 reset. Fourteen stock bots. Week 1. Codes and crews kept.",
         });
       },
     });
@@ -1517,15 +1772,70 @@ export function applyHulen<T extends Partial<PitData>>(data: T): T {
   };
 }
 
+/** Adds the 14-store conference format to an existing live Period 12 row without wiping work already entered. */
+export function applyLeague14<T extends Partial<PitData>>(data: T): T {
+  const fresh = makeData();
+  const oldStores = data.stores ?? [];
+  const stores = fresh.stores.map((store) => {
+    const old = oldStores.find((row) => row.id === store.id);
+    return old ? { ...store, ...old, conference: store.conference,
+      captain: store.id === "abilene" && old.captain === "Abilene Captain" ? store.captain : old.captain,
+    } : store;
+  });
+  const oldCrew = data.crew ?? [];
+  // Correct only the pre-launch placeholders; retain real roster edits and surviving identity IDs.
+  const abileneNames: Record<string, string> = { "Abilene Captain": "Taylor VanSickle", "Abilene Specialist 1": "Nathan Burney", "Abilene Specialist 2": "Philip Rodriguez" };
+  const crew = oldCrew.filter(c => c.storeId !== "abilene" || !["Abilene Specialist 3", "Abilene Specialist 4"].includes(c.name))
+    .map(c => c.storeId === "abilene" && abileneNames[c.name] ? { ...c, name: abileneNames[c.name]! } : c);
+  for (const store of fresh.stores) {
+    if (crew.some((member) => member.storeId === store.id)) continue;
+    crew.push(...fresh.crew.filter((member) => member.storeId === store.id));
+  }
+  const oldBots = data.bots ?? [];
+  const bots = fresh.bots.map((bot) => {
+    const old = oldBots.find((row) => row.storeId === bot.storeId) ?? bot;
+    // Preserve the one-time starter choice: migration must not invent a body for an unchosen bot.
+    return old.style ? { ...old, style: { ...old.style, stickers: styleOf(old).stickers } } : old;
+  });
+  const oldCards = data.storeCards ?? [];
+  const storeCards = [
+    ...oldCards,
+    ...fresh.storeCards.filter((card) => !oldCards.some((row) => row.storeId === card.storeId && row.week === card.week)),
+  ];
+  const weeks = fresh.weeks.map((week) => {
+    const old = data.weeks?.find((row) => row.number === week.number);
+    return old ? { ...week, lockedAt: old.lockedAt } : week;
+  });
+  const oldTagline = data.tagline ?? "";
+  const tagline = !oldTagline || oldTagline.includes("Eleven stores")
+    ? fresh.tagline
+    : oldTagline;
+  return {
+    ...data,
+    version: VERSION,
+    tagline,
+    stores,
+    crew,
+    bots,
+    storeCards,
+    weeks,
+    rallies: data.rallies ?? [],
+    cosmeticProposals: data.cosmeticProposals ?? [],
+  } as T;
+}
+
 export function paintHex(id: string) {
   return PAINT[id] ?? PAINT.amber;
 };
 
+const persistedSnapshot = memoSnapshot((state: PitState) => ({ ...sharedDoc(state), tutorialSeen: state.tutorialSeen }), [...SHARED_KEYS, "tutorialSeen"]);
+const browserStorage = snapshotStorage<ReturnType<typeof persistedSnapshot>>(() => localStorage);
 export const usePit = create<PitState>()(persist(pitCreator, {
+      storage: browserStorage,
       name: "pit-night-storewars-v1",
       skipHydration: true,
       version: VERSION,
-      partialize: (state) => ({ ...sharedDoc(state), tutorialSeen: state.tutorialSeen }),
+      partialize: persistedSnapshot,
       migrate: (persisted, version) => {
         if (persisted && version === 4) return carryCosmetics(applyHulen(persisted as PitData));
         // Version 5 and later saves carry forward; new fields get defaults in merge.
@@ -1537,7 +1847,7 @@ export const usePit = create<PitState>()(persist(pitCreator, {
         const saved = persisted as Partial<PitData> | undefined;
         if (!saved) return current;
         if (typeof saved.version !== "number" || saved.version < 5) return current;
-        const fixed = applyMondays(applyHulen(saved as PitData));
+        const fixed = applyLeague14(applyMondays(applyHulen(saved as PitData)));
         return {
           ...current,
           ...sharedDoc(fixed),
@@ -1547,6 +1857,7 @@ export const usePit = create<PitState>()(persist(pitCreator, {
           version: VERSION,
           jobLog: fixed.jobLog ?? [],
           sparkLog: fixed.sparkLog ?? [],
+          rallies: fixed.rallies ?? [],
           shouts: fixed.shouts ?? [],
           picks: fixed.picks ?? [],
           trainingOpenAll: fixed.trainingOpenAll ?? false,

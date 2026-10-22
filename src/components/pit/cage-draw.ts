@@ -1,5 +1,6 @@
 import { EYES, PAINT, TRIM, styleOf } from "@/lib/pit/catalog";
-import type { ClassId } from "@/lib/pit/types";
+import { armorEdges, deckHardware } from "./material-detail";
+import type { BotBody, ClassId } from "@/lib/pit/types";
 import { PIT, clamp, ease, hash, lerp, type BotState, type Drive, type Spot } from "./cage-motion";
 
 /* ------------------------------------------------------------------ */
@@ -1105,62 +1106,86 @@ type Frame = {
   treads: boolean;
 };
 
-function frameOf(classId: ClassId): Frame {
+function frameOf(classId: ClassId, body?: BotBody): Frame {
+  const id = body ?? (classId === "tank" ? "keystone" : classId === "specialist" ? "windlass" : "shrike");
   if (classId === "tank") {
+    if (id === "juggernaut") return {
+      hull:[[-0.52,-0.18],[-0.52,-0.43],[-0.36,-0.56],[0.23,-0.56],[0.5,-0.42],[0.5,-0.18]],
+      deck:-0.56, front:0.5, height:0.56,
+      wheels:[-0.4,-0.2,0,0.2,0.4].map(x=>({x,r:0.075})), treads:true,
+    };
+    if (id === "bunker") return {
+      hull:[[-0.48,-0.18],[-0.48,-0.38],[-0.34,-0.46],[0.32,-0.46],[0.48,-0.32],[0.48,-0.18]],
+      deck:-0.46, front:0.48, height:0.46,
+      wheels:[-0.36,-0.18,0,0.18,0.36].map(x=>({x,r:0.072})), treads:true,
+    };
+    if (id === "fortress") return {
+      hull:[[-0.5,-0.18],[-0.5,-0.46],[-0.38,-0.58],[-0.08,-0.62],[0.28,-0.57],[0.5,-0.4],[0.5,-0.18]],
+      deck:-0.62, front:0.5, height:0.62,
+      wheels:[-0.38,-0.19,0,0.19,0.38].map(x=>({x,r:0.078})), treads:true,
+    };
+    if (id === "colossus") return {
+      hull:[[-0.54,-0.2],[-0.54,-0.48],[-0.42,-0.63],[0.12,-0.65],[0.38,-0.57],[0.54,-0.38],[0.54,-0.2]],
+      deck:-0.65, front:0.54, height:0.65,
+      wheels:[-0.42,-0.21,0,0.21,0.42].map(x=>({x,r:0.08})), treads:true,
+    };
     return {
-      hull: [
-        [-0.46, -0.2],
-        [-0.46, -0.46],
-        [-0.3, -0.52],
-        [0.3, -0.52],
-        [0.46, -0.4],
-        [0.46, -0.2],
-      ],
-      deck: -0.52,
-      front: 0.46,
-      height: 0.52,
-      wheels: [-0.36, -0.18, 0, 0.18, 0.36].map((x) => ({ x, r: 0.075 })),
-      treads: true,
+      hull:[[-0.46,-0.2],[-0.46,-0.46],[-0.3,-0.52],[0.3,-0.52],[0.46,-0.4],[0.46,-0.2]],
+      deck:-0.52, front:0.46, height:0.52,
+      wheels:[-0.36,-0.18,0,0.18,0.36].map(x=>({x,r:0.075})), treads:true,
     };
   }
   if (classId === "specialist") {
+    if (id === "scorpion") return {
+      hull:[[-0.44,-0.1],[-0.44,-0.38],[-0.3,-0.48],[0.08,-0.48],[0.28,-0.39],[0.46,-0.18],[0.46,-0.1]],
+      deck:-0.48, front:0.46, height:0.48,
+      wheels:[{x:-0.27,r:0.115},{x:0.22,r:0.115}], treads:false,
+    };
+    if (id === "mantis") return {
+      hull:[[-0.4,-0.1],[-0.4,-0.35],[-0.22,-0.43],[0.06,-0.43],[0.2,-0.55],[0.36,-0.48],[0.42,-0.14],[0.42,-0.1]],
+      deck:-0.55, front:0.42, height:0.55,
+      wheels:[{x:-0.24,r:0.11},{x:0.21,r:0.11}], treads:false,
+    };
+    if (id === "phantom") return {
+      hull:[[-0.45,-0.09],[-0.45,-0.31],[-0.28,-0.38],[0.16,-0.38],[0.46,-0.16],[0.46,-0.09]],
+      deck:-0.38, front:0.46, height:0.38,
+      wheels:[{x:-0.28,r:0.105},{x:0.22,r:0.105}], treads:false,
+    };
+    if (id === "reaper") return {
+      hull:[[-0.46,-0.1],[-0.46,-0.4],[-0.3,-0.51],[0.02,-0.51],[0.22,-0.58],[0.47,-0.2],[0.47,-0.1]],
+      deck:-0.58, front:0.47, height:0.58,
+      wheels:[{x:-0.27,r:0.118},{x:0.22,r:0.118}], treads:false,
+    };
     return {
-      hull: [
-        [-0.4, -0.11],
-        [-0.4, -0.38],
-        [-0.28, -0.44],
-        [0.1, -0.44],
-        [0.32, -0.34],
-        [0.4, -0.16],
-        [0.4, -0.11],
-      ],
-      deck: -0.44,
-      front: 0.4,
-      height: 0.44,
-      wheels: [
-        { x: -0.25, r: 0.12 },
-        { x: 0.2, r: 0.12 },
-      ],
-      treads: false,
+      hull:[[-0.4,-0.11],[-0.4,-0.38],[-0.28,-0.44],[0.1,-0.44],[0.32,-0.34],[0.4,-0.16],[0.4,-0.11]],
+      deck:-0.44, front:0.4, height:0.44,
+      wheels:[{x:-0.25,r:0.12},{x:0.2,r:0.12}], treads:false,
     };
   }
+  if (id === "raptor") return {
+    hull:[[-0.48,-0.09],[-0.48,-0.32],[-0.34,-0.39],[0.08,-0.39],[0.52,-0.1]],
+    deck:-0.39, front:0.52, height:0.39,
+    wheels:[{x:-0.28,r:0.125},{x:0.18,r:0.125}], treads:false,
+  };
+  if (id === "stinger") return {
+    hull:[[-0.43,-0.08],[-0.43,-0.27],[-0.28,-0.31],[0.1,-0.31],[0.49,-0.08]],
+    deck:-0.31, front:0.49, height:0.31,
+    wheels:[{x:-0.25,r:0.115},{x:0.17,r:0.115}], treads:false,
+  };
+  if (id === "viper") return {
+    hull:[[-0.49,-0.08],[-0.49,-0.3],[-0.32,-0.36],[0.14,-0.36],[0.54,-0.09]],
+    deck:-0.36, front:0.54, height:0.36,
+    wheels:[{x:-0.28,r:0.12},{x:0.19,r:0.12}], treads:false,
+  };
+  if (id === "warhawk") return {
+    hull:[[-0.5,-0.09],[-0.5,-0.36],[-0.34,-0.43],[-0.04,-0.46],[0.16,-0.39],[0.55,-0.1]],
+    deck:-0.46, front:0.55, height:0.46,
+    wheels:[{x:-0.29,r:0.125},{x:0.2,r:0.125}], treads:false,
+  };
   return {
-    hull: [
-      [-0.46, -0.1],
-      [-0.46, -0.3],
-      [-0.36, -0.34],
-      [0.08, -0.34],
-      [0.44, -0.13],
-      [0.44, -0.1],
-    ],
-    deck: -0.34,
-    front: 0.44,
-    height: 0.34,
-    wheels: [
-      { x: -0.27, r: 0.13 },
-      { x: 0.17, r: 0.13 },
-    ],
-    treads: false,
+    hull:[[-0.46,-0.1],[-0.46,-0.3],[-0.36,-0.34],[0.08,-0.34],[0.44,-0.13],[0.44,-0.1]],
+    deck:-0.34, front:0.44, height:0.34,
+    wheels:[{x:-0.27,r:0.13},{x:0.17,r:0.13}], treads:false,
   };
 }
 
@@ -1196,7 +1221,9 @@ function drawWheel(
     ctx.stroke();
   }
   // Hub.
-  ctx.fillStyle = "#77736b";
+  const rim = ctx.createLinearGradient(x-r,y-r,x+r,y+r);
+  rim.addColorStop(0,"#eff4f8");rim.addColorStop(0.2,"#788896");rim.addColorStop(0.5,"#253440");rim.addColorStop(0.8,"#a7b8c5");rim.addColorStop(1,"#17212b");
+  ctx.fillStyle = rim;
   ctx.beginPath();
   ctx.arc(x, y, r * 0.45, 0, Math.PI * 2);
   ctx.fill();
@@ -1224,6 +1251,19 @@ function bolt(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
   ctx.fill();
 }
 
+/** Locker preview uses the broadcast particle primitives, with no fight state or rewards. */
+export function drawCosmeticEffect(ctx: CanvasRenderingContext2D, fx: Fx, effect: string, x: number, y: number, size: number, w: number, h: number, dt: number, paint: string) {
+  if (effect === "walkout-pyro") for (let i = fx.tick("preview-pyro", 26, dt); i > 0; i--) {
+    fx.pyro(x - size * 0.8, y, size); fx.pyro(x + size * 0.8, y, size);
+  }
+  if (effect === "walkout-sparks") for (let i = fx.tick("preview-sparks", 70, dt); i > 0; i--) fx.sparkRain(x, h * 0.04, size, y);
+  if (effect === "walkout-smoke") for (let i = fx.tick("preview-smoke", 9, dt); i > 0; i--) fx.stageSmoke(x, y, size);
+  if (effect === "victory-confetti") for (let i = fx.tick("preview-confetti", 10, dt); i > 0; i--) fx.confetti(x, h * 0.1, size, [paint, "#f3efe6", "#f0a202"], y);
+  if (effect === "victory-fireworks") for (let i = fx.tick("preview-fireworks", 1.6, dt); i > 0; i--) fx.firework(w * (0.25 + Math.random() * 0.5), h * 0.18, size, paint);
+  fx.step(dt);
+  drawParticles(ctx, fx.side);
+}
+
 export function drawSideBot(
   ctx: CanvasRenderingContext2D,
   s: BotState,
@@ -1234,7 +1274,8 @@ export function drawSideBot(
   spin: number,
   facing: number,
 ) {
-  const baseFrame = frameOf(s.bot.classId);
+  const style = styleOf(s.bot, s.bot.classId);
+  const baseFrame = frameOf(s.bot.classId, style.body);
   const f = s.bot.driveFamily ? { ...baseFrame, treads: s.bot.driveFamily === "treads" } : baseFrame;
   const paint = paintOf(s.bot.paint);
   const scale = u * (s.bot.classId === "tank" ? 1.06 : s.bot.classId === "specialist" ? 0.94 : 1);
@@ -1282,7 +1323,6 @@ export function drawSideBot(
 
   const u2 = scale;
   const dark = shade(paint, -80);
-  const style = styleOf(s.bot);
   const trim = TRIM[style.trim] ?? TRIM.steel!;
   const eye = EYES[style.eye] ?? EYES.green!;
   const hub = style.trim === "steel" ? shade(paint, -40) : trim;
@@ -1335,6 +1375,26 @@ export function drawSideBot(
   } else if (style.finish === "matte") {
     hg.addColorStop(0, shade(paint, 12));
     hg.addColorStop(1, shade(paint, -35));
+  } else if (style.finish === "satin") {
+    hg.addColorStop(0, shade(paint, 45));
+    hg.addColorStop(0.5, paint);
+    hg.addColorStop(1, shade(paint, -45));
+  } else if (style.finish === "carbon") {
+    hg.addColorStop(0, "#454a50");
+    hg.addColorStop(0.35, "#171b20");
+    hg.addColorStop(0.65, "#343a40");
+    hg.addColorStop(1, "#0b0d10");
+  } else if (style.finish === "iridescent") {
+    hg.addColorStop(0, "#6ee7ff");
+    hg.addColorStop(0.3, paint);
+    hg.addColorStop(0.6, "#cf65ff");
+    hg.addColorStop(1, "#ff8fc7");
+  } else if (style.finish === "gold") {
+    hg.addColorStop(0, "#fff1a8");
+    hg.addColorStop(0.22, "#d7a922");
+    hg.addColorStop(0.5, "#fff0a0");
+    hg.addColorStop(0.78, "#9d6b0b");
+    hg.addColorStop(1, "#4f3100");
   } else {
     hg.addColorStop(0, shade(paint, 70));
     hg.addColorStop(0.18, shade(paint, 25));
@@ -1349,6 +1409,7 @@ export function drawSideBot(
   ctx.stroke();
 
   // Extruded deck: the roof catches the overhead rig, while the near face stays painted.
+  armorEdges(ctx, f.hull, u2, style.finish === "matte");
   ctx.save();
   const depth = 0.075 * u2;
   const roof = f.hull.filter(([, py]) => py < -f.height * 0.55);
@@ -1533,11 +1594,17 @@ export function drawSideBot(
     }
     ctx.restore();
   }
-  if (style.decal !== "none") {
+  {
     ctx.save();
     poly(ctx, f.hull, u2);
     ctx.clip();
-    drawDecal(ctx, style.decal, f, u2, paint, s.bot.id, facing);
+    const stickers = style.stickers!;
+    const b = hullBounds(f);
+    const mid = (b.top + b.bottom) / 2;
+    // Only the camera-facing armor is visible. Hood and rear sit in separate regions.
+    stickerBadge(ctx, stickers[facing < 0 ? "left" : "right"], -0.04 * u2, mid * u2 + 0.025 * u2, 0.42 * u2, 0.16 * u2, paint, s.bot.id);
+    stickerBadge(ctx, stickers.hood, 0.13 * u2, (b.top + 0.045) * u2, 0.3 * u2, 0.085 * u2, paint, s.bot.id);
+    stickerBadge(ctx, stickers.rear, (b.minX + 0.09) * u2, mid * u2, 0.14 * u2, 0.17 * u2, paint, s.bot.id);
     ctx.restore();
   }
 
@@ -1661,6 +1728,7 @@ export function drawSideBot(
 
   if (style.flag && !s.flipped)
     drawFlag(ctx, f, u2, top, trim, paint, s.bot.storeName ?? "", time, s.charging, facing);
+  if (!s.flipped) drawTopper(ctx, style.topper, top, u2, trim, eye);
 
   // Status LED.
   const blink = s.dead ? 0 : Math.sin(time * 6 + hash(s.bot.id)) > 0 ? 1 : 0.35;
@@ -1721,6 +1789,18 @@ function drawWear(ctx: CanvasRenderingContext2D, f: Frame, u: number, top: numbe
     const x = lerp(b.minX, b.maxX, r()) * u;
     ctx.fillRect(x, top, u * 0.02, u * 0.012);
   }
+  ctx.restore();
+}
+
+/** Draws the actual decal art inside a bounded physical sticker region. */
+function stickerBadge(ctx: CanvasRenderingContext2D, decal: string, x: number, y: number, w: number, h: number, paint: string, id: string) {
+  if (decal === "none") return;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(w, h);
+  ctx.beginPath(); ctx.rect(-0.5, -0.5, 1, 1); ctx.clip();
+  const frame: Frame = { hull: [[-0.5,-0.5],[0.5,-0.5],[0.5,0.5],[-0.5,0.5]], deck: -0.5, front: 0.5, height: 1, wheels: [], treads: false };
+  drawDecal(ctx, decal, frame, 1, paint, id, 1);
   ctx.restore();
 }
 
@@ -1897,7 +1977,118 @@ function drawDecal(
     ctx.closePath();
     ctx.fill();
     ctx.restore();
+  } else if (decal === "stars") {
+    ctx.fillStyle = "#fff4a8";
+    ctx.strokeStyle = "#7a5b00";
+    ctx.lineWidth = Math.max(1, u * 0.006);
+    for (const [sx,sy,rr] of [[0.28,0.3,0.055],[0.48,0.58,0.04],[0.68,0.35,0.048]] as const) {
+      ctx.save();
+      ctx.translate(X(sx),Y(sy));
+      ctx.beginPath();
+      for (let i=0;i<10;i++) {
+        const a=-Math.PI/2+i*Math.PI/5;
+        const r=(i%2===0?rr:rr*0.42)*u;
+        const px=Math.cos(a)*r, py=Math.sin(a)*r;
+        i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+      }
+      ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+    }
+  } else if (decal === "circuit") {
+    ctx.strokeStyle = "#52f6df";
+    ctx.lineWidth = Math.max(1, u * 0.012);
+    for (let i=0;i<4;i++) {
+      const yy=0.24+i*0.14;
+      ctx.beginPath();
+      ctx.moveTo(X(0.12),Y(yy));
+      ctx.lineTo(X(0.38+i*0.06),Y(yy));
+      ctx.lineTo(X(0.5+i*0.04),Y(yy+0.08));
+      ctx.lineTo(X(0.82),Y(yy+0.08));
+      ctx.stroke();
+      ctx.fillStyle="#52f6df";
+      ctx.beginPath(); ctx.arc(X(0.82),Y(yy+0.08),u*0.015,0,Math.PI*2); ctx.fill();
+    }
+  } else if (decal === "splash") {
+    const r = seeded(hash(`${id}splash`));
+    const tones=["#ff4fa3","#00b7ff","#a8ff2a","#ffe35a"];
+    for(let i=0;i<18;i++){
+      ctx.fillStyle=tones[i%tones.length]!;
+      ctx.globalAlpha=0.82;
+      ctx.beginPath();
+      ctx.arc(X(r()),Y(r()),u*(0.012+r()*0.035),0,Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  } else if (decal === "champion") {
+    const cx=X(0.45), cy=Y(0.45), r=Math.min(u*0.095,h*u*0.4);
+    ctx.fillStyle="#f6cd46"; ctx.strokeStyle="#563700"; ctx.lineWidth=Math.max(1,u*0.008);
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle="#241700";
+    ctx.font=`700 ${Math.max(8,r*0.9)}px Oswald, sans-serif`;
+    ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("W",cx,cy+r*0.06);
   }
+}
+
+function drawTopper(
+  ctx: CanvasRenderingContext2D,
+  topper: string | undefined,
+  top: number,
+  u: number,
+  trim: string,
+  eye: string,
+) {
+  if (!topper || topper === "none") return;
+  ctx.save();
+  ctx.lineCap = "round";
+  if (topper === "antenna") {
+    ctx.strokeStyle = "#b8c2cc";
+    ctx.lineWidth = Math.max(1.2, u * 0.009);
+    ctx.beginPath();
+    ctx.moveTo(-u * 0.08, top);
+    ctx.quadraticCurveTo(-u * 0.1, top - u * 0.28, -u * 0.02, top - u * 0.42);
+    ctx.stroke();
+    ctx.fillStyle = eye;
+    ctx.beginPath();
+    ctx.arc(-u * 0.02, top - u * 0.42, u * 0.025, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (topper === "horns") {
+    ctx.fillStyle = trim;
+    for (const x of [-0.18, 0.12]) {
+      ctx.beginPath();
+      ctx.moveTo((x - 0.04) * u, top + u * 0.01);
+      ctx.lineTo(x * u, top - u * 0.22);
+      ctx.lineTo((x + 0.05) * u, top + u * 0.01);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else if (topper === "mohawk") {
+    ctx.fillStyle = trim;
+    for (let i = 0; i < 5; i++) {
+      const x = (-0.22 + i * 0.09) * u;
+      const h = (0.13 + (i % 2) * 0.055) * u;
+      ctx.beginPath();
+      ctx.moveTo(x - u * 0.025, top);
+      ctx.lineTo(x, top - h);
+      ctx.lineTo(x + u * 0.025, top);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else if (topper === "crown") {
+    ctx.fillStyle = "#f6cd46";
+    ctx.strokeStyle = "#6b4600";
+    ctx.lineWidth = Math.max(1, u * 0.006);
+    ctx.beginPath();
+    ctx.moveTo(-u * 0.18, top);
+    ctx.lineTo(-u * 0.15, top - u * 0.2);
+    ctx.lineTo(-u * 0.06, top - u * 0.1);
+    ctx.lineTo(0, top - u * 0.24);
+    ctx.lineTo(u * 0.07, top - u * 0.1);
+    ctx.lineTo(u * 0.16, top - u * 0.2);
+    ctx.lineTo(u * 0.18, top);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function drawFlag(
@@ -3005,7 +3196,51 @@ export function drawTop(
   ctx.restore();
 }
 
-function drawTopBot(
+function traceTopHull(
+  ctx: CanvasRenderingContext2D,
+  classId: ClassId,
+  body: BotBody | undefined,
+  len: number,
+  wid: number,
+) {
+  const id = body ?? (classId === "tank" ? "keystone" : classId === "specialist" ? "windlass" : "shrike");
+  ctx.beginPath();
+  if (classId === "striker") {
+    if (id === "stinger") {
+      ctx.moveTo(-len*0.5,-wid*0.34); ctx.lineTo(len*0.18,-wid*0.34); ctx.lineTo(len*0.56,0);
+      ctx.lineTo(len*0.18,wid*0.34); ctx.lineTo(-len*0.5,wid*0.34);
+    } else if (id === "raptor" || id === "warhawk") {
+      ctx.moveTo(-len*0.5,-wid*0.5); ctx.lineTo(len*0.1,-wid*0.5); ctx.lineTo(len*0.58,-wid*0.22);
+      ctx.lineTo(len*0.58,wid*0.22); ctx.lineTo(len*0.1,wid*0.5); ctx.lineTo(-len*0.5,wid*0.5);
+    } else {
+      ctx.moveTo(-len*0.5,-wid*0.45); ctx.lineTo(len*0.25,-wid*0.45); ctx.lineTo(len*0.5,-wid*0.3);
+      ctx.lineTo(len*0.5,wid*0.3); ctx.lineTo(len*0.25,wid*0.45); ctx.lineTo(-len*0.5,wid*0.45);
+    }
+  } else if (classId === "tank") {
+    if (id === "bunker") {
+      ctx.roundRect(-len*0.52,-wid*0.38,len*1.04,wid*0.76,Math.max(3,wid*0.12));
+    } else if (id === "juggernaut" || id === "colossus") {
+      ctx.moveTo(-len*0.52,-wid*0.52); ctx.lineTo(len*0.3,-wid*0.52); ctx.lineTo(len*0.55,-wid*0.35);
+      ctx.lineTo(len*0.55,wid*0.35); ctx.lineTo(len*0.3,wid*0.52); ctx.lineTo(-len*0.52,wid*0.52);
+    } else {
+      ctx.roundRect(-len*0.5,-wid*0.45,len,wid*0.9,2);
+    }
+  } else {
+    if (id === "scorpion") {
+      ctx.moveTo(-len*0.5,-wid*0.42); ctx.lineTo(len*0.12,-wid*0.5); ctx.lineTo(len*0.52,-wid*0.32);
+      ctx.lineTo(len*0.52,wid*0.32); ctx.lineTo(len*0.12,wid*0.5); ctx.lineTo(-len*0.5,wid*0.42);
+    } else if (id === "mantis" || id === "reaper") {
+      ctx.moveTo(-len*0.48,-wid*0.44); ctx.lineTo(-len*0.05,-wid*0.34); ctx.lineTo(len*0.22,-wid*0.52);
+      ctx.lineTo(len*0.5,-wid*0.28); ctx.lineTo(len*0.5,wid*0.28); ctx.lineTo(len*0.22,wid*0.52);
+      ctx.lineTo(-len*0.05,wid*0.34); ctx.lineTo(-len*0.48,wid*0.44);
+    } else {
+      ctx.roundRect(-len*0.5,-wid*0.45,len,wid*0.9,4);
+    }
+  }
+  ctx.closePath();
+}
+
+export function drawTopBot(
   ctx: CanvasRenderingContext2D,
   s: BotState,
   at: { x: number; y: number },
@@ -3014,6 +3249,7 @@ function drawTopBot(
   time: number,
 ) {
   const paint = paintOf(s.bot.paint);
+  const style = styleOf(s.bot, s.bot.classId);
   const tank = s.bot.classId === "tank";
   const spec = s.bot.classId === "specialist";
   const len = cage * (tank ? 0.165 : spec ? 0.135 : 0.15);
@@ -3096,24 +3332,18 @@ function drawTopBot(
 
   // Hull.
   const hg = ctx.createLinearGradient(0, -wid * 0.5, 0, wid * 0.5);
-  hg.addColorStop(0, shade(paint, 55));
-  hg.addColorStop(0.5, paint);
-  hg.addColorStop(1, shade(paint, -60));
-  ctx.fillStyle = hg;
-  ctx.beginPath();
-  if (s.bot.classId === "striker") {
-    ctx.moveTo(-len * 0.5, -wid * 0.45);
-    ctx.lineTo(len * 0.25, -wid * 0.45);
-    ctx.lineTo(len * 0.5, -wid * 0.3);
-    ctx.lineTo(len * 0.5, wid * 0.3);
-    ctx.lineTo(len * 0.25, wid * 0.45);
-    ctx.lineTo(-len * 0.5, wid * 0.45);
+  if (style.finish === "chrome") {
+    hg.addColorStop(0,"#f4f8fc");hg.addColorStop(0.24,"#7892a6");hg.addColorStop(0.42,"#e3edf4");hg.addColorStop(0.5,"#263846");hg.addColorStop(1,"#8299aa");
+  } else if (style.finish === "gold") {
+    hg.addColorStop(0,"#fff0b3");hg.addColorStop(0.3,"#b98218");hg.addColorStop(0.48,"#ffe299");hg.addColorStop(1,"#68400b");
   } else {
-    ctx.roundRect(-len * 0.5, -wid * 0.45, len, wid * 0.9, tank ? 2 : 4);
+    hg.addColorStop(0, shade(paint, style.finish === "matte" ? 24 : 65));
+    hg.addColorStop(0.4, paint);
+    hg.addColorStop(1, shade(paint, -70));
   }
-  ctx.closePath();
+  ctx.fillStyle = hg;
+  traceTopHull(ctx, s.bot.classId, style.body, len, wid);
   ctx.fill();
-  const style = styleOf(s.bot);
   ctx.strokeStyle = style.trim === "steel" ? "rgba(0,0,0,0.7)" : (TRIM[style.trim] ?? "#000");
   ctx.lineWidth = style.trim === "steel" ? 1 : Math.max(1.5, cage * 0.005);
   ctx.stroke();
@@ -3151,6 +3381,16 @@ function drawTopBot(
     ctx.fillStyle = "#f3efe6";
     ctx.fillRect(-len * 0.5, -wid * 0.05, len * 0.9, wid * 0.1);
   }
+  ctx.save();
+  traceTopHull(ctx, s.bot.classId, style.body, len, wid);
+  ctx.clip();
+  const stickers = style.stickers!;
+  deckHardware(ctx, len, wid, s.scars ?? 0, hash(s.bot.id));
+  stickerBadge(ctx, stickers.left, -len * 0.08, -wid * 0.36, len * 0.42, wid * 0.18, paint, s.bot.id);
+  stickerBadge(ctx, stickers.right, -len * 0.08, wid * 0.36, len * 0.42, wid * 0.18, paint, s.bot.id);
+  stickerBadge(ctx, stickers.hood, len * 0.12, 0, len * 0.32, wid * 0.44, paint, s.bot.id);
+  stickerBadge(ctx, stickers.rear, -len * 0.39, 0, len * 0.16, wid * 0.5, paint, s.bot.id);
+  ctx.restore();
   // LED.
   const blink = s.dead ? 0 : Math.sin(time * 6 + hash(s.bot.id)) > 0 ? 1 : 0.35;
   ctx.fillStyle = s.dead

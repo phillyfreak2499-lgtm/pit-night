@@ -1,3 +1,4 @@
+import { Modal } from "./modal";
 import { Link } from "@tanstack/react-router";
 import { Lock, LockOpen } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -159,15 +160,7 @@ export function BayKeypadDialog({
   onClose: () => void;
 }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 p-3 backdrop-blur-sm md:items-center"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Bay keypad"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
+    <Modal title="Bay keypad" onClose={onClose}>
       <div className="page-in flex w-full max-w-sm flex-col items-end gap-2">
         <button
           type="button"
@@ -178,7 +171,7 @@ export function BayKeypadDialog({
         </button>
         <BayKeypad storeId={storeId} onUnlock={onUnlock} onCancel={onClose} />
       </div>
-    </div>
+    </Modal>
   );
 }
 

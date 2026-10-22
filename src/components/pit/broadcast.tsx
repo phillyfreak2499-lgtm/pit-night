@@ -1,3 +1,4 @@
+import { createFrameLoop } from "@/lib/pit/frame-loop";
 import { useEffect, useRef, useState } from "react";
 import { PAINT } from "@/lib/pit/catalog";
 import { methodLabel } from "@/lib/pit/engine";
@@ -79,8 +80,11 @@ export function Broadcast({
     const fx = fxRef.current;
     const trails = trailsRef.current;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let raf = 0;
-    let last = performance.now();
+    let loop: ReturnType<typeof createFrameLoop> | undefined;
+    let visible = true;
+    if (lastSeek.current !== seek) {
+      lastSeek.current = seek; timeRef.current = endingAt(beats, total); doneRef.current = false; fx.clear(); trails.clear();
+    }
     let shook = 0;
     // Hit-stop: the tape holds for a beat when steel meets steel.
     let freeze = 0;
@@ -99,15 +103,14 @@ export function Broadcast({
       }
       fx.clear();
       fx.cam.ready = false;
+      loop?.invalidate();
     };
     resize();
     const observer = new ResizeObserver(resize);
     observer.observe(canvas);
     observer.observe(top);
 
-    const frame = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
+    const frame = (_now: number, dt: number) => {
       const before = timeRef.current;
       if (playing && freeze <= 0) timeRef.current = Math.min(total, timeRef.current + dt * speed);
       if (freeze > 0) freeze -= dt;
@@ -200,7 +203,7 @@ export function Broadcast({
       const bars = hpFor(result, beat, local);
       if (beat.kind === "replay") for (const f of result.fighters) bars[f.id] = result.hp[f.id] ?? bars[f.id] ?? 100;
       else for (const b of drive.bots) bars[b.bot.id] = Math.round(b.hp);
-      setHp(bars);
+      setHp(previous => Object.keys(bars).length === Object.keys(previous).length && Object.entries(bars).every(([id, value]) => previous[id] === value) ? previous : bars);
       setRound(drive.round ? `Round ${drive.round}` : beat.kind === "countdown" ? "Get ready" : beat.kind === "replay" ? "Replay" : "");
       const secs = Math.floor(time);
       setClock(`${Math.floor(secs / 60)}:${(secs % 60).toString().padStart(2, "0")}`);
@@ -208,24 +211,22 @@ export function Broadcast({
         doneRef.current = true;
         onCompleteRef.current?.();
       }
-      raf = requestAnimationFrame(frame);
+      return playing && time < total - 0.02;
     };
-    raf = requestAnimationFrame(frame);
+    loop = createFrameLoop(frame);
+    const visibility = () => loop?.setVisible(visible && !document.hidden);
+    const intersection = new IntersectionObserver(rows => { visible = rows.some(row => row.isIntersecting); visibility(); });
+    intersection.observe(canvas.closest("[data-testid=broadcast]") ?? canvas);
+    document.addEventListener("visibilitychange", visibility);
+    visibility();
     return () => {
-      cancelAnimationFrame(raf);
+      loop?.dispose();
+      intersection.disconnect();
+      document.removeEventListener("visibilitychange", visibility);
       observer.disconnect();
     };
-  }, [bout, playing, result, speed, noDamage]);
+  }, [bout, playing, result, speed, noDamage, seek]);
 
-  useEffect(() => {
-    if (!result) return;
-    if (lastSeek.current === seek) return;
-    lastSeek.current = seek;
-    const beats = buildBeats(result);
-    const total = beats.reduce((m, b) => Math.max(m, b.t + b.dur), 0);
-    timeRef.current = endingAt(beats, total);
-    doneRef.current = false;
-  }, [result, seek]);
 
   if (!result) return null;
   const left = result.fighters[0];
@@ -243,12 +244,12 @@ export function Broadcast({
         <div className="relative min-w-0 bg-deep">
           <canvas ref={canvasRef} aria-label="Battle arena animation" className="aspect-[4/3] w-full bg-deep sm:aspect-video" />
           <div className="pointer-events-none absolute inset-x-0 top-0 grid grid-cols-[1fr_auto_1fr] items-start gap-2 p-2 pb-6 md:gap-3 md:p-3 md:pb-8" style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.78), rgba(0,0,0,0))" }}>
-            {left ? <Health name={left.botName} store={left.storeName} hp={hp[left.id] ?? 100} paint={left.paint} align="left" tuned={left.tuned} /> : <span />}
+            {left ? <Health name={left.botName} store={left.teamName ? `${left.storeName} · ${left.teamName}` : left.storeName} hp={hp[left.id] ?? 100} paint={left.paint} align="left" tuned={left.tuned} /> : <span />}
             <div className="flex min-w-[3.5rem] flex-col items-center pt-0.5 md:min-w-[5rem]">
               <span className="font-display text-base leading-none text-amber tabular-nums md:text-2xl">{clock}</span>
               {round ? <span className="mt-0.5 text-[9px] tracking-[0.2em] text-fg uppercase md:text-[11px]">{round}</span> : null}
             </div>
-            {right ? <Health name={right.botName} store={right.storeName} hp={hp[right.id] ?? 100} paint={right.paint} align="right" tuned={right.tuned} /> : <span />}
+            {right ? <Health name={right.botName} store={right.teamName ? `${right.storeName} · ${right.teamName}` : right.storeName} hp={hp[right.id] ?? 100} paint={right.paint} align="right" tuned={right.tuned} /> : <span />}
           </div>
           <p className="absolute inset-x-0 bottom-0 bg-deep/95 px-3 py-1.5 text-xs leading-relaxed md:py-3 md:text-base">{caption}</p>
         </div>
@@ -348,7 +349,7 @@ function Health({
 
 function captionFor(result: FightResult, bout: Bout, beat: Beat, noDamage: boolean) {
   if (beat.kind === "bumper" && bout.kind === "bye") return "Bye. It counts as a win. The bot does not take damage.";
-  if (beat.kind === "bumper") return noDamage ? "Bay scrimmage. The house drill. Nothing posts." : `${bout.title}. Eleven stores. This cage holds ${bout.kind === "melee" ? "the tie" : "two"}.`;
+  if (beat.kind === "bumper") return noDamage ? "Bay scrimmage. The house drill. Nothing posts." : `${bout.title}. Fourteen stores. This cage holds ${bout.kind === "melee" ? "the tie" : "two"}.`;
   if (beat.kind === "intro") {
     const f = result.fighters[beat.side];
     if (!f) return "";

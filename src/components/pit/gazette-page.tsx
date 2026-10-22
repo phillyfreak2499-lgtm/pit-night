@@ -17,7 +17,7 @@ export function GazettePage() {
       <div className="newsprint mt-6 px-4 py-5 md:px-8 md:py-7">
         <div className="flex items-center justify-between text-[10px] tracking-[0.2em] text-(--ink-soft) uppercase md:text-xs">
           <span>Period 12 · Week {week}</span>
-          <span className="hidden sm:inline">Oct 25 – Nov 21, 2026</span>
+          <span className="hidden sm:inline">Oct 25 – Nov 28, 2026</span>
           <span>Price: one bolt</span>
         </div>
         <div className="rule-double mt-2" />

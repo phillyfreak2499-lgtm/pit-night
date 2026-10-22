@@ -1,7 +1,12 @@
+import { Modal } from "./modal";
+import { LockerIdentity } from "./locker-identity";
+import { CosmeticBoard, CosmeticTheme } from "./cosmetic-board";
+import { EffectLockerPreview } from "./effect-locker-preview";
+import type { CosmeticLoadout, StickerSlot } from "@/lib/pit/types";
 import { BuildLockBanner } from "./build-lock-banner";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { CLASS_META, DECALS, EYES, FINISHES, LOCKER_PAINTS, PAINT, partById, partsFor, SLOT_LABEL, styleOf, TRIM } from "@/lib/pit/catalog";
+import { createContext, useContext, useState } from "react";
+import { BODY_STYLES, CLASS_META, DECALS, EYES, FINISHES, PAINT, TOPPERS, partById, partsFor, SLOT_LABEL, styleOf, TRIM } from "@/lib/pit/catalog";
 import {
   buyCheck,
   canSeeLoadout,
@@ -14,6 +19,7 @@ import {
   wonThisWeek,
 } from "@/lib/pit/engine";
 import { paintHex, usePit, type PitState } from "@/lib/pit/store";
+import { cosmeticProgress, cosmeticUnlocked, rewardFor, type CosmeticKind } from "@/lib/pit/cosmetics";
 import type { BotLook, GarageLook, Slot, StoreCard } from "@/lib/pit/types";
 import { BotPortrait, useBotLook } from "./bot-portrait";
 import { KeyLadder } from "./key-ladder";
@@ -70,6 +76,7 @@ export function GaragePage({ storeId }: { storeId: string }) {
         <div>
           <SectionLabel>{store.region} bay</SectionLabel>
           <h1 className="font-display text-4xl leading-tight md:text-5xl">{store.name}</h1>
+          {store.teamName ? <p className="mt-1 font-display text-xl text-amber [overflow-wrap:anywhere]">Team {store.teamName}</p> : null}
           <p className="mt-2 text-muted">
             {see ? bot.name : "Bot under the tarp"} · {CLASS_META[bot.classId].label} · Captain {store.captain}
           </p>
@@ -100,11 +107,11 @@ export function GaragePage({ storeId }: { storeId: string }) {
         </div>
       </section>
 
-      {captain ? (
-        <DecoratePanel storeId={storeId} />
-      ) : (
-        <p className="text-sm text-muted">Decoration is on the door. It does not change the fight. The captain dresses the bay.</p>
-      )}
+      <CosmeticTheme storeId={storeId} />
+      <WearSummary storeId={storeId} />
+      <CosmeticBoard storeId={storeId} captain={captain} />
+      <DecoratePanel key={storeId} storeId={storeId} proposalMode={!captain} />
+      <EffectLockerPreview storeId={storeId} canBuy={captain} />
 
       <section className="grid gap-3 md:grid-cols-4">
         <Meter label="Coins" value={`${Object.values(bot.coins).reduce((a, b) => a + b, 0)}`} hint="Across all six jars. Each jar only buys its own part." />
@@ -462,147 +469,314 @@ function lookLabel(look: BotLook) {
 function GarageBot({ storeId }: { storeId: string }) {
   const look = useBotLook(storeId);
   return (
-    <span data-bot-hover className="block h-36 w-60 shrink-0 md:h-44 md:w-80">
+    <span data-bot-hover className="block h-36 w-40 max-w-full shrink md:h-44 md:w-80">
       <BotPortrait look={look} facing={-1} className="h-full w-full" />
     </span>
   );
 }
 
-function Swatch({ color, active, label, onClick, glow }: { color: string; active: boolean; label: string; onClick: () => void; glow?: boolean }) {
-  return (
+const OwnedOnly = createContext(false);
+
+function Swatch({
+  color,
+  active,
+  label,
+  onClick,
+  glow,
+  disabled = false,
+  title,
+}: {
+  color: string;
+  active: boolean;
+  label: string;
+  onClick: () => void;
+  glow?: boolean;
+  disabled?: boolean;
+  title?: string;
+}) {
+  const ownedOnly = useContext(OwnedOnly);
+  const [inspect, setInspect] = useState(false);
+  if (disabled && ownedOnly) return null;
+  return (<>
     <button
       type="button"
       aria-label={label}
       aria-pressed={active}
-      title={label}
-      className={`relative min-h-11 min-w-11 border-2 transition-transform hover:scale-105 ${active ? "border-amber" : "border-line"}`}
-      style={{ background: color, boxShadow: glow ? `0 0 12px ${color}` : undefined }}
-      onClick={onClick}
+      data-locked={disabled || undefined}
+      title={title ?? label}
+      className={`relative min-h-11 min-w-11 border-2 transition-transform ${disabled ? "cursor-help opacity-70" : "hover:scale-105"} ${active ? "border-amber" : "border-line"}`}
+      style={{ background: color, boxShadow: glow && !disabled ? `0 0 12px ${color}` : undefined }}
+      onClick={() => disabled ? setInspect(true) : onClick()}
     >
       {active ? <span className="absolute inset-0 grid place-items-center font-display text-lg text-deep mix-blend-difference">✓</span> : null}
+      {disabled ? <span className="absolute inset-0 grid place-items-center bg-deep/55 font-display text-[9px] tracking-widest text-fg">LOCK</span> : null}
     </button>
-  );
+    {inspect ? <Modal title="Unlock requirement" onClose={() => setInspect(false)}><div className="w-full max-w-sm border border-line bg-surface p-5"><h3 className="font-display text-2xl">Unlock requirement</h3><p className="mt-3 leading-relaxed text-muted">{title}</p><p className="mt-3 text-xs text-amber">Keep building your crew’s progress. Locked cosmetics cannot be equipped.</p><button type="button" className="mt-4 min-h-11 border border-line px-4" onClick={() => setInspect(false)}>Close</button></div></Modal> : null}
+    </>);
+
 }
 
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
+function Chip({
+  active,
+  onClick,
+  children,
+  disabled = false,
+  title,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  disabled?: boolean;
+  title?: string;
+}) {
+  const ownedOnly = useContext(OwnedOnly);
+  const [inspect, setInspect] = useState(false);
+  if (disabled && ownedOnly) return null;
+  return (<>
     <button
       type="button"
       aria-pressed={active}
-      className={`min-h-11 border px-3 font-display text-sm tracking-wide uppercase transition-colors ${active ? "border-amber bg-amber/10 text-amber" : "border-line hover:border-muted"}`}
-      onClick={onClick}
+      data-locked={disabled || undefined}
+      title={title}
+      className={`min-h-11 border px-3 font-display text-sm tracking-wide uppercase transition-colors ${disabled ? "cursor-help border-line text-muted opacity-70" : active ? "border-amber bg-amber/10 text-amber" : "border-line hover:border-muted"}`}
+      onClick={() => disabled ? setInspect(true) : onClick()}
     >
       {children}
     </button>
-  );
+    {inspect ? <Modal title="Unlock requirement" onClose={() => setInspect(false)}><div className="w-full max-w-sm border border-line bg-surface p-5"><h3 className="font-display text-2xl">Unlock requirement</h3><p className="mt-3 leading-relaxed text-muted">{title}</p><p className="mt-3 text-xs text-amber">Keep building your crew’s progress. Locked cosmetics cannot be equipped.</p><button type="button" className="mt-4 min-h-11 border border-line px-4" onClick={() => setInspect(false)}>Close</button></div></Modal> : null}
+    </>);
+
 }
 
 function Group({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-xs tracking-widest text-muted uppercase">{label}</p>
-      <div className="mt-2 flex flex-wrap gap-2">{children}</div>
-    </div>
-  );
+  return <details className="border border-line bg-deep/35" open={undefined}>
+    <summary className="min-h-12 cursor-pointer px-3 py-3 font-display text-sm tracking-widest text-fg uppercase">{label}</summary>
+    <div className="flex flex-wrap gap-2 border-t border-line p-3">{children}</div>
+  </details>;
 }
 
-function DecoratePanel({ storeId }: { storeId: string }) {
+function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMode: boolean }) {
   const data = usePit();
-  const setPaint = usePit((s) => s.setPaint);
-  const setGarage = usePit((s) => s.setGarage);
-  const setLook = usePit((s) => s.setLook);
-  const setNumber = usePit((s) => s.setNumber);
-  const setStyle = usePit((s) => s.setStyle);
-  const store = data.stores.find((s) => s.id === storeId)!;
-  const bot = data.bots.find((b) => b.storeId === storeId)!;
-  const style = styleOf(bot);
-  const look = useBotLook(storeId);
+  const activeStore = data.stores.find(row => row.id === storeId)!;
+  const activeBot = data.bots.find(row => row.storeId === storeId)!;
+  const [ownedOnly, setOwnedOnly] = useState(false);
+  const [draft, setDraft] = useState<CosmeticLoadout | null>(null);
+  const [camera, setCamera] = useState<"left" | "right" | "top">("left");
+  const live = { paint: activeStore.paint, look: activeBot.look, number: activeBot.number, style: styleOf(activeBot, activeBot.classId) };
+  const current = proposalMode ? (draft ?? live) : live;
+  const store = { ...activeStore, paint: current.paint };
+  const bot = { ...activeBot, look: current.look, number: current.number, style: current.style };
+  const style = styleOf(bot, bot.classId);
+  const baseLook = useBotLook(storeId);
+  const look = baseLook ? { ...baseLook, paint: current.paint, look: current.look, number: current.number, style } : null;
+  const setPaint = (_: string, paint: string) => proposalMode ? setDraft({ ...current, paint }) : data.setPaint(storeId, paint);
+  const setLook = (_: string, look: BotLook) => proposalMode ? setDraft({ ...current, look }) : data.setLook(storeId, look);
+  const setNumber = (_: string, number: string) => proposalMode ? setDraft({ ...current, number }) : data.setNumber(storeId, number);
+  const setStyle = (_: string, patch: Partial<typeof style>) => proposalMode ? setDraft({ ...current, style: { ...style, ...patch } }) : data.setStyle(storeId, patch);
+  const setGarage = data.setGarage;
+  const progress = cosmeticProgress(data, storeId);
+  const earnedCount = progress.filter((row) => row.earned).length;
+  const nextRewards = progress
+    .filter((row) => !row.earned)
+    .sort((a, b) => b.current / b.target - a.current / a.target || a.target - b.target)
+    .slice(0, 6);
+  const unlocked = (kind: CosmeticKind, value: string) => cosmeticUnlocked(data, storeId, kind, value);
+  const lockTitle = (kind: CosmeticKind, value: string) => {
+    if (kind === "body") {
+      if (["viper", "fortress", "phantom"].includes(value)) return "Earn one Full Tune-Up";
+      if (["warhawk", "colossus", "reaper"].includes(value)) return "Reach Championship Saturday";
+      if (data.week === 1) return "Starter shell is locked after your first choice until Week 1 ends";
+      return "Starter shell";
+    }
+    const reward = rewardFor(kind, value);
+    if (!reward) return "Locked";
+    const row = progress.find((item) => item.reward.id === reward.id);
+    return row
+      ? `${reward.requirement} · ${Math.min(row.current, row.target)}/${row.target}`
+      : reward.requirement;
+  };
   const pick = <T,>(list: readonly T[]) => list[Math.floor(Math.random() * list.length)]!;
+  const availablePaint = Object.keys(PAINT).filter((key) => unlocked("paint", key));
+  const availableFinish = FINISHES.filter((row) => unlocked("finish", row.id));
+  const availableDecal = DECALS.filter((row) => unlocked("decal", row.id));
+  const availableTrim = Object.keys(TRIM).filter((key) => unlocked("trim", key));
+  const availableEye = Object.keys(EYES).filter((key) => unlocked("eye", key));
+  const availableTopper = TOPPERS.filter((row) => unlocked("topper", row.id));
   const surprise = () => {
-    setPaint(storeId, pick(Object.keys(PAINT).filter((key) => !LOCKER_PAINTS[key] || (store.unlocks ?? []).includes(LOCKER_PAINTS[key]!))));
+    if (proposalMode) {
+      setDraft({ ...current, paint: pick(availablePaint), look: pick(LOOKS).id, style: { ...style, finish: pick(availableFinish).id, trim: pick(availableTrim), eye: pick(availableEye), topper: pick(availableTopper).id, stickers: { left: pick(availableDecal).id, right: pick(availableDecal).id, hood: pick(availableDecal).id, rear: pick(availableDecal).id } } });
+      return;
+    }
+    if (availablePaint.length) setPaint(storeId, pick(availablePaint));
     setLook(storeId, pick(LOOKS).id);
     setStyle(storeId, {
-      finish: pick(FINISHES).id,
-      decal: pick(DECALS).id,
-      trim: pick(Object.keys(TRIM)),
-      eye: pick(Object.keys(EYES)),
+      finish: pick(availableFinish).id,
+      decal: pick(availableDecal).id,
+      trim: pick(availableTrim),
+      eye: pick(availableEye),
+      topper: pick(availableTopper).id,
       flag: Math.random() > 0.4,
     });
   };
 
-  return (
+  return (<OwnedOnly.Provider value={ownedOnly}>
     <section className="border border-line bg-surface">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
         <div>
-          <SectionLabel>Paint shop</SectionLabel>
-          <p className="text-sm text-muted">Looks only. None of this changes Power, Speed, Armor, or Heat.</p>
+          <SectionLabel>Bot Locker · {proposalMode ? "draft a crew proposal" : "earn the look"}</SectionLabel>
+          <p className="text-sm text-muted">Jobs, Sparks, Mystery Crates, picks and wins unlock more looks. Cosmetics never change Power, Speed, Armor, Heat, HP or fight odds.</p>
         </div>
-        <Btn tone="line" onClick={surprise}>
-          Surprise me
-        </Btn>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted">{earnedCount}/{progress.length} achievement unlocks</span>
+          <Btn tone="line" onClick={surprise}>Surprise me</Btn>
+          {proposalMode ? <Btn onClick={() => data.proposeCosmetic(storeId, current)}>Submit look for voting</Btn> : null}
+        </div>
       </div>
+
+      <LockerIdentity key={storeId} storeId={storeId} />
+      {nextRewards.length ? (
+        <div className="border-b border-line bg-deep/60 p-4">
+          <p className="text-xs tracking-widest text-amber uppercase">Closest unlocks</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {nextRewards.map(({ reward, current, target }) => {
+              const pct = Math.min(100, Math.round((current / target) * 100));
+              return (
+                <div key={reward.id} className="border border-line bg-surface p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-display text-lg">{reward.label}</span>
+                    <span className="text-xs text-muted">{Math.min(current, target)}/{target}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted">{reward.requirement}</p>
+                  <span className="mt-2 block h-1.5 bg-deep">
+                    <span className="block h-full bg-amber" style={{ width: `${pct}%` }} />
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
       <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <div className="lg:sticky lg:top-4 lg:self-start">
-          <div data-bot-hover className={`relative h-64 overflow-hidden border border-line md:h-72 ${garageClass(store.garage)}`}>
+          <div data-bot-hover tabIndex={0} aria-label="Bot preview; focus to rev" className={`relative h-64 overflow-hidden border border-line md:h-72 ${garageClass(store.garage)}`}>
             <div className="absolute inset-0 bg-deep/55" />
-            <BotPortrait look={look ? { ...look, weapon: look.weapon === "hidden" ? "none" : look.weapon } : null} facing={-1} zoom={0.74} className="relative h-full w-full" />
+            <BotPortrait look={look ? { ...look, weapon: look.weapon === "hidden" ? "none" : look.weapon } : null} facing={camera === "right" ? 1 : -1} camera={camera === "top" ? "top" : "side"} zoom={0.74} className="relative h-full w-full" />
           </div>
-          <p className="mt-2 text-xs text-muted">Hover the preview to rev it.</p>
+          <p className="mt-2 text-xs text-muted">Hover or focus the preview to rev it. Open a category; tap any locked item to see its requirement.</p>
+          <div className="mt-2 flex flex-wrap gap-2">{(["left", "right", "top"] as const).map(view => <Chip key={view} active={camera === view} onClick={() => setCamera(view)}>{view} view</Chip>)}</div>
         </div>
-        <div className="flex flex-col gap-4">
+
+        <div className="flex flex-col gap-3">
+          <div className="border border-line bg-deep p-3"><p className="text-xs tracking-widest text-amber uppercase">Current look</p><p className="mt-1 text-sm">{style.body} · {store.paint} · {style.finish} · #{bot.number || "—"}</p><p className="mt-1 text-xs text-muted">{style.trim} trim · {style.eye} visor · {style.topper ?? "none"} topper</p></div>
+          <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm"><input type="checkbox" checked={ownedOnly} onChange={e => setOwnedOnly(e.target.checked)} className="h-5 w-5 accent-amber"/>Show owned / unlocked items only</label>
+          <Group label="Body shell">
+            {BODY_STYLES.filter((row) => row.classId === bot.classId).map((row) => {
+              const open = unlocked("body", row.id);
+              return (
+                <Chip
+                  key={row.id}
+                  active={style.body === row.id}
+                  disabled={!open}
+                  title={open ? row.note : lockTitle("body", row.id)}
+                  onClick={() => setStyle(storeId, { body: row.id })}
+                >
+                  {row.label}{!open ? " 🔒" : ""}
+                </Chip>
+              );
+            })}
+          </Group>
+
           <Group label="Paint">
-            {Object.keys(PAINT)
-              .filter((key) => !LOCKER_PAINTS[key] || (store.unlocks ?? []).includes(LOCKER_PAINTS[key]!))
-              .map((key) => (
-                <Swatch key={key} color={paintHex(key)} active={store.paint === key} label={`${key} paint`} onClick={() => setPaint(storeId, key)} />
-              ))}
+            {Object.keys(PAINT).map((key) => {
+              const open = unlocked("paint", key);
+              return (
+                <Swatch
+                  key={key}
+                  color={paintHex(key)}
+                  active={store.paint === key}
+                  label={`${key} paint`}
+                  disabled={!open}
+                  title={open ? `${key} paint` : lockTitle("paint", key)}
+                  onClick={() => setPaint(storeId, key)}
+                />
+              );
+            })}
           </Group>
+
           <Group label="Finish">
-            {FINISHES.map((row) => (
-              <Chip key={row.id} active={style.finish === row.id} onClick={() => setStyle(storeId, { finish: row.id })}>
-                {row.label}
-              </Chip>
-            ))}
+            {FINISHES.map((row) => {
+              const open = unlocked("finish", row.id);
+              return (
+                <Chip key={row.id} active={style.finish === row.id} disabled={!open} title={open ? row.note : lockTitle("finish", row.id)} onClick={() => setStyle(storeId, { finish: row.id })}>
+                  {row.label}{!open ? " 🔒" : ""}
+                </Chip>
+              );
+            })}
           </Group>
-          <Group label="Decal">
-            {DECALS.map((row) => (
-              <Chip key={row.id} active={style.decal === row.id} onClick={() => setStyle(storeId, { decal: row.id })}>
-                {row.label}
-              </Chip>
-            ))}
-          </Group>
-          <Group label="Stripes">
+
+          {([['left','Left armor'],['right','Right armor'],['hood','Top / hood'],['rear','Rear panel']] as [StickerSlot,string][]).map(([slot,label]) => (
+            <Group key={slot} label={label + ' sticker'}>
+              {DECALS.map(row => {
+                const open = unlocked('decal', row.id);
+                return <Chip key={row.id} active={style.stickers?.[slot] === row.id} disabled={!open} title={open ? row.label : lockTitle('decal',row.id)} onClick={() => proposalMode ? setStyle(storeId, { stickers: { ...style.stickers!, [slot]: row.id } }) : data.setSticker(storeId, slot, row.id)}>{row.label}{!open ? ' 🔒' : ''}</Chip>;
+              })}
+            </Group>
+          ))}
+
+          <Group label="Stripes & panels">
             {LOOKS.map((row) => (
               <Chip key={row.id} active={bot.look === row.id} onClick={() => setLook(storeId, row.id)}>
                 {row.label}
               </Chip>
             ))}
           </Group>
+
           <Group label="Trim">
-            {Object.entries(TRIM).map(([key, hex]) => (
-              <Swatch key={key} color={hex} active={style.trim === key} label={`${key} trim`} onClick={() => setStyle(storeId, { trim: key })} />
-            ))}
+            {Object.entries(TRIM).map(([key, hex]) => {
+              const open = unlocked("trim", key);
+              return (
+                <Swatch key={key} color={hex} active={style.trim === key} label={`${key} trim`} disabled={!open} title={open ? `${key} trim` : lockTitle("trim", key)} onClick={() => setStyle(storeId, { trim: key })} />
+              );
+            })}
           </Group>
-          <Group label="Eye">
-            {Object.entries(EYES).map(([key, hex]) => (
-              <Swatch key={key} color={hex} glow active={style.eye === key} label={`${key} eye`} onClick={() => setStyle(storeId, { eye: key })} />
-            ))}
+
+          <Group label="Eyes / visor">
+            {Object.entries(EYES).map(([key, hex]) => {
+              const open = unlocked("eye", key);
+              return (
+                <Swatch key={key} color={hex} glow active={style.eye === key} label={`${key} eye`} disabled={!open} title={open ? `${key} visor` : lockTitle("eye", key)} onClick={() => setStyle(storeId, { eye: key })} />
+              );
+            })}
           </Group>
+
+          <Group label="Topper">
+            {TOPPERS.map((row) => {
+              const open = unlocked("topper", row.id);
+              return (
+                <Chip key={row.id} active={(style.topper ?? "none") === row.id} disabled={!open} title={open ? row.label : lockTitle("topper", row.id)} onClick={() => setStyle(storeId, { topper: row.id })}>
+                  {row.label}{!open ? " 🔒" : ""}
+                </Chip>
+              );
+            })}
+          </Group>
+
           <Group label="Flag">
-            <Chip active={style.flag} onClick={() => setStyle(storeId, { flag: true })}>
-              Flag up
-            </Chip>
-            <Chip active={!style.flag} onClick={() => setStyle(storeId, { flag: false })}>
-              No flag
-            </Chip>
+            <Chip active={style.flag} onClick={() => setStyle(storeId, { flag: true })}>Flag up</Chip>
+            <Chip active={!style.flag} onClick={() => setStyle(storeId, { flag: false })}>No flag</Chip>
           </Group>
-          <Group label="Garage floor">
+
+          {!proposalMode ? <Group label="Garage floor">
             {GARAGES.map((row) => (
-              <Chip key={row.id} active={store.garage === row.id} onClick={() => setGarage(storeId, row.id)}>
-                {row.label}
-              </Chip>
+              <Chip key={row.id} active={store.garage === row.id} onClick={() => setGarage(storeId, row.id)}>{row.label}</Chip>
             ))}
-          </Group>
+          </Group> : null}
+
+          {(["walkout", "victory"] as const).map(kind => <Group key={kind} label={kind}>
+            <Chip active={!style[kind]} onClick={() => setStyle(storeId, { [kind]: "" })}>None</Chip>
+            {(activeStore.unlocks ?? []).filter(id => id.startsWith(kind + '-')).map(id => <Chip key={id} active={style[kind] === id} onClick={() => setStyle(storeId, { [kind]: id })}>{id.replace(kind + '-', '')}</Chip>)}
+          </Group>)}
+
           <div className="max-w-xs">
             <Field label="Bay number">
               <TextInput value={bot.number} aria-label="Bay number" maxLength={3} onChange={(e) => setNumber(storeId, e.target.value)} />
@@ -611,5 +785,18 @@ function DecoratePanel({ storeId }: { storeId: string }) {
         </div>
       </div>
     </section>
-  );
+  </OwnedOnly.Provider>);
+}
+
+function WearSummary({ storeId }: { storeId: string }) {
+  const bot = usePit(s => s.bots.find(b => b.storeId === storeId))!;
+  const wear = Object.values(bot.wear);
+  const scratched = wear.filter(w => w === 'scratched').length;
+  const bent = wear.filter(w => w === 'bent').length;
+  const disabled = wear.filter(w => w === 'disabled').length;
+  return <section className="border border-line bg-surface p-4" data-testid="wear-summary">
+    <SectionLabel>{disabled || bent > 1 ? 'Heavily damaged' : scratched || bent ? 'Battle-worn' : 'Clean'}</SectionLabel>
+    <p className="mt-2 text-sm">{scratched} scratched · {bent} bent · {disabled} disabled</p>
+    <p className="mt-1 text-sm text-muted">Battle history stays on the bot until repaired. Paint, stickers and crew proposals never erase damage. The Garage preview shows your unrepaired wear.</p>
+  </section>;
 }

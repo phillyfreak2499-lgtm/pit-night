@@ -19,7 +19,7 @@ const GROUPS: Group[] = [
     items: [
       faq(
         "What is the Waterman Battle Bot League?",
-        "A four-week competition for Period 12 (October 25 to November 21). Each of the eleven Good Feet stores has one robot. The store's weekly sales numbers build it, and every Monday morning the robots fight. The best record after four Mondays takes the trophy home to the store.",
+        "Fourteen Good Feet stores play a four-week regular season in Metro and Frontier conferences. Every store fights all four Mondays. After Week 4, the #1 store in each conference advances to Championship Saturday on November 28. That title fight continues until knockout.",
       ),
       faq(
         "How do I sign in?",
@@ -97,7 +97,7 @@ const GROUPS: Group[] = [
       ),
       faq(
         "What do parts cost?",
-        "Sport 3 coins, Pro 5, Super 8, paid from that part's own jar. A store that stays green on one number all month can bring a Super part to Title Monday.",
+        "Sport 3 coins, Pro 5, Super 8, paid from that part's own jar. Season-earned parts and coins carry forward if your store reaches Championship Week.",
       ),
       faq(
         "When is the shop open?",
@@ -109,7 +109,7 @@ const GROUPS: Group[] = [
       ),
       faq(
         "Does paint or a decal change the fight?",
-        "No. Paint, finish, decals, trim, eye color, the flag, and the bay number are just for looks.",
+        "No. Body shells, paint, finish, four sticker slots, trim, visor, flag, toppers, walkouts, victory effects and bay numbers are just for looks. Crew can draft unlocked looks and vote in the Garage. Each person gets one vote per proposal; the captain chooses which proposal to apply. Weekly themes highlight categories without waiving unlocks or Bolt prices. Battle history stays until repaired.",
       ),
       faq(
         "What does a Scry do?",
@@ -126,7 +126,7 @@ const GROUPS: Group[] = [
     items: [
       faq(
         "When do the bots lock?",
-        "Saturday at close (6 pm Central). Whatever is on the bot at the lock is what fights Monday.",
+        "Regular-season bots lock Saturday at close (6 pm Central). Championship Week finalists prep Tuesday through Friday and the Desk freezes the two title builds Friday close for Saturday.",
       ),
       faq(
         "How does a fight work?",
@@ -137,8 +137,8 @@ const GROUPS: Group[] = [
         "Your six numbers set how strong the bot is that week. Your build decides how well it fights: the parts you bought, whether they're repaired, and whether your weapon matches up well. The Full Tune-Up adds a little on top. A great week with a bad build can still lose.",
       ),
       faq(
-        "What's a bye?",
-        "Eleven stores means one store sits out each week. A bye counts as a win and the bot takes no damage. Week 1's bye goes to the top seed from Period 11, and the bye moves down the seeds each week after.",
+        "Are there byes?",
+        "No. Fourteen stores means seven fights every regular-season Monday, so every store fights all four weeks.",
       ),
       faq(
         "Where can we watch?",
@@ -151,15 +151,32 @@ const GROUPS: Group[] = [
     ],
   },
   {
+    title: "Championship Week",
+    items: [
+      faq(
+        "Who can work on a bot in Week 5?",
+        "Only the Metro Champion and Frontier Champion. They keep the parts, coins, upgrades, damage and bot identity they earned through the season. There are no free repairs or donated upgrades. Their own Tuesday-through-Friday Championship Prep and season-earned resources are the only ways to get ready.",
+      ),
+      faq(
+        "What is Rally?",
+        "Anyone signed in from a non-finalist store can Rally behind either conference champion. Rally adds crowd support, banners and championship presentation only. It can never change Power, Speed, Armor, Heat, HP, damage, repairs, coins, parts or fight odds.",
+      ),
+      faq(
+        "How does the Championship fight end?",
+        "There are no judges and no decision. Rounds 1 through 3 use normal fight damage, then overtime gets more dangerous. The fight continues until one bot is knocked out.",
+      ),
+    ],
+  },
+  {
     title: "Standings and the trophy",
     items: [
       faq(
         "How are the standings ranked?",
-        "By record first. Ties in the table are broken by actual NSNU dollars recorded by the Desk. On Title Monday (the Week 4 fight card), Bolts earned in Pit Week break ties first, then NSNU.",
+        "Conference berths use record first, then head-to-head when applicable, conference record, cumulative Period 12 NSNU, total green grades, and Bolts earned through Week 4. If the championship berth is still tied, the tied stores settle it in the cage.",
       ),
       faq(
         "What if stores tie for first?",
-        "They settle it in the cage. Two tied stores fight each other; three or more go in one free-for-all, and the last bot moving wins.",
+        "Only an unresolved tie for a conference championship berth goes to the cage. Two tied stores fight; three or more use a free-for-all. The winner becomes that conference's finalist.",
       ),
       faq(
         "What do people win?",

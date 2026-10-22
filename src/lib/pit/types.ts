@@ -1,4 +1,5 @@
 export type ClassId = "striker" | "tank" | "specialist";
+export type Conference = "metro" | "frontier";
 export type Slot = "chassis" | "drive" | "weapon" | "armor" | "utility" | "brain";
 export type Tier = "stock" | "sport" | "pro" | "super" | "championship";
 export type Grade = "green" | "blue" | "orange" | "red";
@@ -12,18 +13,30 @@ export type BoutKind = "bout" | "bye" | "tag" | "semi" | "final" | "melee";
 export type Method = "ko" | "dump" | "decision" | "melee" | "scrimmage" | "bye";
 export type GarageLook = "hazard" | "concrete" | "night" | "bone" | "checker";
 export type BotLook = "plain" | "stripe" | "chevron" | "rivets";
-export type BotFinish = "factory" | "chrome" | "matte" | "worn";
-export type BotDecal = "none" | "flames" | "lightning" | "teeth" | "checker" | "hazard" | "camo" | "arch";
+export type BotFinish = "factory" | "chrome" | "matte" | "worn" | "satin" | "carbon" | "iridescent" | "gold";
+export type BotDecal = "none" | "flames" | "lightning" | "teeth" | "checker" | "hazard" | "camo" | "arch" | "stars" | "circuit" | "splash" | "champion";
+export type BotTopper = "none" | "antenna" | "horns" | "mohawk" | "crown";
+export type StickerSlot = "left" | "right" | "hood" | "rear";
+export type StickerSlots = Record<StickerSlot, BotDecal>;
+export type BotBody =
+  | "shrike" | "raptor" | "stinger" | "viper" | "warhawk"
+  | "keystone" | "juggernaut" | "bunker" | "fortress" | "colossus"
+  | "windlass" | "scorpion" | "mantis" | "phantom" | "reaper";
 
 /** Cosmetics only. None of it touches Power, Speed, Armor, or Heat. */
 export type BotStyle = {
+  /** Visual shell only. Combat class remains classId. */
+  body?: BotBody;
   finish: BotFinish;
   decal: BotDecal;
+  /** Absent on legacy saves: decal migrates to hood. Explicit none remains empty. */
+  stickers?: StickerSlots;
   /** Key into TRIM. Edges, rims, and the flag. */
   trim: string;
   /** Key into EYES. The visor light. */
   eye: string;
   flag: boolean;
+  topper?: BotTopper;
   /** Bolt Locker unlocks. Shown on fight day. */
   walkout?: string;
   victory?: string;
@@ -39,7 +52,10 @@ export type StatBlock = {
 export type Store = {
   id: string;
   name: string;
+  /** Optional crew/team alias; the official store identity stays stable. */
+  teamName?: string;
   region: string;
+  conference: Conference;
   captain: string;
   paint: string;
   garage: GarageLook;
@@ -133,6 +149,7 @@ export type FighterSnap = {
   id: string;
   name: string;
   storeName: string;
+  teamName?: string;
   classId: ClassId;
   paint: string;
   botName: string;
@@ -226,6 +243,13 @@ export type Proposal = {
   note: string;
 };
 
+export type CosmeticLoadout = { paint: string; look: BotLook; number: string; style: BotStyle };
+export type CosmeticProposal = {
+  id: string; storeId: string; crewId: string; crewName: string;
+  loadout: CosmeticLoadout; voters: string[]; at: number;
+  status: "open" | "accepted";
+};
+
 export type Mvp = {
   week: number;
   storeId: string;
@@ -273,6 +297,7 @@ export type PitData = {
   gazette: GazetteEntry[];
   quotes: Record<string, Quote[]>;
   proposals: Proposal[];
+  cosmeticProposals: CosmeticProposal[];
   mvps: Mvp[];
   honors: Honors;
   craft: { week: number; storeId: string; score: number }[];
@@ -283,6 +308,8 @@ export type PitData = {
   intel: Intel[];
   /** Pit Week. */
   jobLog: JobEntry[];
+  /** Championship Week support. Rally is presentation-only and never touches fight math. */
+  rallies: Rally[];
   sparkLog: SparkEntry[];
   shouts: Shout[];
   picks: Pick[];
@@ -332,6 +359,17 @@ export type Shout = {
   fromName: string;
   to: string;
   text: string;
+  at: number;
+};
+
+export type Rally = {
+  /** One current rally choice per signed-in person during Championship Week. */
+  id: string;
+  week: number;
+  storeId: string;
+  crewId: string;
+  fromName: string;
+  targetId: string;
   at: number;
 };
 

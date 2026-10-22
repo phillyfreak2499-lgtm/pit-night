@@ -34,6 +34,7 @@ export function StorePage({ storeId }: { storeId: string }) {
       <div className="h-2" style={{ background: paintHex(store.paint) }} />
       <SectionLabel>{store.region}</SectionLabel>
       <h1 className="font-display text-4xl leading-tight md:text-5xl">{store.name}</h1>
+      {store.teamName ? <p className="mt-1 break-words font-display text-xl text-amber">Team {store.teamName}</p> : null}
       <p className="mt-2 font-display text-2xl leading-tight text-muted">
         Bay {bot.number} · {bot.name}
       </p>

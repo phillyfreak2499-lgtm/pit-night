@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Flame, Package, Printer, Trophy, Wrench } from "lucide-react";
 import { CLASS_META } from "@/lib/pit/catalog";
-import { botFor, rankedStores, recordOf } from "@/lib/pit/engine";
+import { botFor, conferenceStandings, regularSeasonRecordOf } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
 import type { Bout, PitData } from "@/lib/pit/types";
 import { boltsOf, sparkStreak } from "@/lib/pit/week";
@@ -62,8 +62,8 @@ export function RecapPage({ storeId }: { storeId: string }) {
     );
   }
   const bot = botFor(data, storeId);
-  const rec = recordOf(data, storeId);
-  const place = rankedStores(data).findIndex((s) => s.id === storeId) + 1;
+  const rec = regularSeasonRecordOf(data, storeId);
+  const place = conferenceStandings(data, store.conference).findIndex((row) => row.id === storeId) + 1;
   const rows = weekRows(data, storeId);
   const best = bestFight(rows, storeId);
   const tuneUps = rows.filter((r) => r.tuned).length;
@@ -129,7 +129,7 @@ export function RecapPage({ storeId }: { storeId: string }) {
                 </p>
               </div>
               <div>
-                <p className="text-[11px] tracking-widest text-muted uppercase">{done ? "Final place" : "Place now"}</p>
+                <p className="text-[11px] tracking-widest text-muted uppercase">{done || data.week === 5 ? "Conference finish" : "Conference place"}</p>
                 <p className="font-display text-6xl leading-none">{ordinal(place)}</p>
               </div>
               <div>
@@ -241,7 +241,7 @@ export function RecapPage({ storeId }: { storeId: string }) {
           </ul>
         </section>
         <footer className="border-t border-line px-5 py-3 text-xs text-muted md:px-8">
-          Oct 25 – Nov 21, 2026 · Eleven Good Feet stores · One trophy · The store is the bot.
+          Oct 25 – Nov 28, 2026 · Fourteen Good Feet stores · Two conferences · One trophy · The store is the bot.
         </footer>
       </article>
     </div>

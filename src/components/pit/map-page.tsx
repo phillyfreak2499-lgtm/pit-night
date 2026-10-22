@@ -14,7 +14,7 @@ export function PitMap() {
   return (
     <div className="mx-auto max-w-6xl" data-testid="pit-map">
       <SectionLabel>The pit map</SectionLabel>
-      <h1 className="mt-1 font-display text-5xl leading-none">Eleven doors</h1>
+      <h1 className="mt-1 font-display text-5xl leading-none">Fourteen doors</h1>
       <p className="mt-3 max-w-2xl text-muted">
         One bay, one bot, one Saturday lock. Click your door and punch in the bay code. The people inside are pit crew. They do not have bots of their own.
       </p>
@@ -56,6 +56,7 @@ export function PitMap() {
                 <span className="relative mt-3 block">
                   <span className="block text-xs tracking-widest text-muted uppercase">{CLASS_META[bot.classId].label}</span>
                   <span className="block font-display text-2xl leading-tight">{store.name}</span>
+                  {store.teamName ? <span className="mt-1 block truncate text-xs text-amber" title={store.teamName}>Team {store.teamName}</span> : null}
                   <span className="mt-1 block text-sm text-fg">{bot.name}</span>
                   <span className={`mt-2 block text-xs tracking-widest uppercase ${locked ? "text-amber" : hurt ? "text-bad" : "text-muted"}`}>
                     {locked ? "Locked" : hurt ? "Damaged" : "Open"} · {rec.w}–{rec.l}

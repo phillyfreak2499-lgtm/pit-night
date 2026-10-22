@@ -1,7 +1,7 @@
-import type { BotDecal, BotFinish, BotStyle, ClassId, KeyName, Slot, StatKey, Tier } from "./types";
+import type { BotBody, BotDecal, BotFinish, BotStyle, BotTopper, ClassId, KeyName, Slot, StatKey, Tier } from "./types";
 
 export const SCRAP_CAP = 18;
-export const VERSION = 5;
+export const VERSION = 6;
 
 export const CLASS_META: Record<
   ClassId,
@@ -50,6 +50,11 @@ export const PAINT: Record<string, string> = {
   magenta: "#cf4f93",
   cherry: "#c0283f",
   graphite: "#6b6f78",
+  obsidian: "#17191d",
+  electric: "#00b7ff",
+  hotpink: "#ff4fa3",
+  toxic: "#a8ff2a",
+  pearl: "#f0e8dc",
   neon: "#39ff6a",
   candy: "#e3123f",
   ice: "#bfe8ff",
@@ -61,20 +66,28 @@ export const LOCKER_PAINTS: Record<string, string> = { neon: "paint-neon", candy
 
 export const FINISHES: { id: BotFinish; label: string; note: string }[] = [
   { id: "factory", label: "Factory", note: "Clean gloss." },
-  { id: "chrome", label: "Chrome", note: "Mirror bands." },
   { id: "matte", label: "Matte", note: "Flat, no shine." },
+  { id: "satin", label: "Satin", note: "Soft sheen under arena lights." },
+  { id: "chrome", label: "Chrome", note: "Mirror bands." },
+  { id: "carbon", label: "Carbon", note: "Dark woven race finish." },
+  { id: "iridescent", label: "Iridescent", note: "Color shifts under the lights." },
   { id: "worn", label: "Battle-worn", note: "Scratches and rust." },
+  { id: "gold", label: "Champion Gold", note: "Reserved for the Waterman Champion." },
 ];
 
 export const DECALS: { id: BotDecal; label: string }[] = [
   { id: "none", label: "None" },
-  { id: "flames", label: "Flames" },
-  { id: "lightning", label: "Lightning" },
-  { id: "teeth", label: "Shark teeth" },
-  { id: "checker", label: "Race checks" },
   { id: "hazard", label: "Hazard stripes" },
-  { id: "camo", label: "Camo" },
   { id: "arch", label: "Arch badge" },
+  { id: "checker", label: "Race checks" },
+  { id: "lightning", label: "Lightning" },
+  { id: "flames", label: "Flames" },
+  { id: "teeth", label: "Shark teeth" },
+  { id: "camo", label: "Camo" },
+  { id: "stars", label: "Victory stars" },
+  { id: "circuit", label: "Circuit board" },
+  { id: "splash", label: "Paint splash" },
+  { id: "champion", label: "Champion crest" },
 ];
 
 export const TRIM: Record<string, string> = {
@@ -97,10 +110,50 @@ export const EYES: Record<string, string> = {
   purple: "#b46bff",
 };
 
-export const DEFAULT_STYLE: BotStyle = { finish: "factory", decal: "none", trim: "steel", eye: "green", flag: false };
+export const DEFAULT_STYLE: BotStyle = { finish: "factory", decal: "none", trim: "steel", eye: "green", flag: false, topper: "none" };
 
-export function styleOf(source: { style?: Partial<BotStyle> } | null | undefined): BotStyle {
-  return { ...DEFAULT_STYLE, ...(source?.style ?? {}) };
+export function defaultBody(classId: ClassId): BotBody {
+  return classId === "tank" ? "keystone" : classId === "specialist" ? "windlass" : "shrike";
+}
+
+export type BodyStyle = { id: BotBody; classId: ClassId; label: string; starter: boolean; note: string };
+export const BODY_STYLES: BodyStyle[] = [
+  { id: "shrike", classId: "striker", label: "Shrike", starter: true, note: "Low race-bot wedge profile." },
+  { id: "raptor", classId: "striker", label: "Raptor", starter: true, note: "Long nose, exposed shoulders." },
+  { id: "stinger", classId: "striker", label: "Stinger", starter: true, note: "Narrow, angular and mean." },
+  { id: "viper", classId: "striker", label: "Viper", starter: false, note: "Full Tune-Up reward shell." },
+  { id: "warhawk", classId: "striker", label: "Warhawk", starter: false, note: "Conference Champion shell." },
+  { id: "keystone", classId: "tank", label: "Keystone", starter: true, note: "Classic armored block." },
+  { id: "juggernaut", classId: "tank", label: "Juggernaut", starter: true, note: "Wide shoulders and heavy stance." },
+  { id: "bunker", classId: "tank", label: "Bunker", starter: true, note: "Low enclosed armor shell." },
+  { id: "fortress", classId: "tank", label: "Fortress", starter: false, note: "Full Tune-Up reward shell." },
+  { id: "colossus", classId: "tank", label: "Colossus", starter: false, note: "Conference Champion shell." },
+  { id: "windlass", classId: "specialist", label: "Windlass", starter: true, note: "Industrial grappler profile." },
+  { id: "scorpion", classId: "specialist", label: "Scorpion", starter: true, note: "Forward pincers and raised deck." },
+  { id: "mantis", classId: "specialist", label: "Mantis", starter: true, note: "Tall front arms and cut waist." },
+  { id: "phantom", classId: "specialist", label: "Phantom", starter: false, note: "Full Tune-Up reward shell." },
+  { id: "reaper", classId: "specialist", label: "Reaper", starter: false, note: "Conference Champion shell." },
+];
+
+export const TOPPERS: { id: BotTopper; label: string }[] = [
+  { id: "none", label: "None" },
+  { id: "antenna", label: "Whip antenna" },
+  { id: "horns", label: "Pit horns" },
+  { id: "mohawk", label: "Steel mohawk" },
+  { id: "crown", label: "Champion crown" },
+];
+
+export function bodyStyle(id: string | undefined) {
+  return BODY_STYLES.find((row) => row.id === id);
+}
+export function starterBodies(classId?: ClassId) {
+  return BODY_STYLES.filter((row) => row.starter && (!classId || row.classId === classId));
+}
+export function styleOf(source: ({ style?: Partial<BotStyle>; classId?: ClassId } | null | undefined), classId?: ClassId): BotStyle {
+  const cls = classId ?? source?.classId ?? "striker";
+  const style = { ...DEFAULT_STYLE, body: source?.style?.body ?? defaultBody(cls), ...(source?.style ?? {}) };
+  const stickers = { left: "none" as const, right: "none" as const, hood: style.decal, rear: "none" as const, ...style.stickers };
+  return { ...style, decal: stickers.hood, stickers };
 }
 
 export type Part = {
@@ -278,7 +331,7 @@ const FAMILIES: Family[] = [
       sport: "Tighter drum on the winch. Heat comes up cleaner.",
       pro: "A Windlass that does not miss the second grab.",
       super: "The grip gets mean. Strikers hate this shape.",
-      championship: "Title vice. Salvage or a Title Monday drop. Never a price tag.",
+      championship: "Title vice. Salvage or a Championship Saturday drop. Never a price tag.",
     },
   },
   {

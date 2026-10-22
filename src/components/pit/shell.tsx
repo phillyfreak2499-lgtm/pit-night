@@ -1,3 +1,4 @@
+import { Modal } from "./modal";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   ClipboardCheck,
@@ -14,7 +15,8 @@ import {
   Warehouse,
   Wrench,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
+const StarterBodyPicker = lazy(() => import("./starter-body-picker"));
 import { TUTORIAL_REV, applyHulen, usePit } from "@/lib/pit/store";
 import { startSync, useSyncStatus } from "@/lib/pit/sync";
 import { setSoundMuted, soundMuted, subscribeSound } from "@/lib/pit/sound";
@@ -46,6 +48,7 @@ export function PitShell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("pit:open-clipboard", open);
   }, []);
   const [guide, setGuide] = useState(false);
+  const [more, setMore] = useState(false);
   const tutorialSeen = usePit((s) => s.tutorialSeen);
   const dismissTutorial = usePit((s) => s.dismissTutorial);
   const showTutorial = usePit((s) => s.showTutorial);
@@ -136,14 +139,17 @@ export function PitShell({ children }: { children: React.ReactNode }) {
           )}
           <nav className="no-print fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-line bg-deep md:hidden">
             {NAV.filter((item) =>
-              ["/", "/map", "/week", "/broadcast", "/desk"].includes(item.to),
+              ["/", "/map", "/week", "/broadcast"].includes(item.to),
             ).map((item) => (
               <NavLink key={item.to} to={item.to} label={item.label} icon={item.icon} compact />
             ))}
+            <button type="button" aria-haspopup="dialog" aria-expanded={more} onClick={() => setMore(true)} className={`min-h-16 font-display text-xs uppercase ${!["/", "/map", "/week", "/broadcast"].includes(pathname) ? "text-amber" : "text-muted"}`}>☰<span className="block">More</span></button>
           </nav>
         </div>
       </div>
+      {more ? <Modal title="More pages" onClose={() => setMore(false)}><div className="max-h-[85vh] w-full max-w-lg overflow-auto border border-line bg-surface p-4"><div className="flex items-center justify-between"><h2 className="font-display text-3xl">More from the Pit</h2><button type="button" className="min-h-11 px-3" onClick={() => setMore(false)}>Close</button></div><nav aria-label="All pages" className="mt-3 grid grid-cols-2 gap-2">{NAV.map(item => <Link key={item.to} to={item.to} aria-current={pathname === item.to ? "page" : undefined} onClick={() => setMore(false)} className={`flex min-h-12 items-center gap-2 border p-3 ${pathname === item.to ? "border-amber text-amber" : "border-line"}`}><item.icon size={18}/>{item.label}</Link>)}</nav></div></Modal> : null}
       {passOpen ? <PassSheet onClose={() => setPassOpen(false)} /> : null}
+      {ready ? <StarterBodyGate /> : null}
       {ready && (tutorialSeen !== TUTORIAL_REV || guide) ? (
         <Tutorial
           onClose={() => {
@@ -312,7 +318,7 @@ function Boot() {
         <span className="block">BATTLE BOT LEAGUE</span>
       </h1>
       <p className="mt-3 max-w-xl text-muted">
-        Opening the league. Eleven store doors. No personal bots.
+        Opening the league. Fourteen store doors. No personal bots.
       </p>
       <ul className="mt-6 grid grid-cols-2 gap-2">
         {stores.map((store) => (
@@ -333,6 +339,16 @@ function phaseLabel(phase: string) {
   return "Season closed";
 }
 
+function StarterBodyGate() {
+  const session = usePit((state) => state.session);
+  const week = usePit((state) => state.week);
+  const bots = usePit((state) => state.bots);
+  if (week !== 1 || !session.storeId || !["crew", "captain"].includes(session.role)) return null;
+  const bot = bots.find((row) => row.storeId === session.storeId);
+  if (!bot || bot.style?.body) return null;
+  return <Suspense fallback={<p role="status" className="fixed inset-0 z-50 bg-deep p-8">Opening your starter bay…</p>}><StarterBodyPicker storeId={session.storeId} onDone={() => {}} /></Suspense>;
+}
+
 function PassSheet({ onClose }: { onClose: () => void }) {
   const stores = usePit((s) => s.stores);
   const crew = usePit((s) => s.crew);
@@ -349,7 +365,7 @@ function PassSheet({ onClose }: { onClose: () => void }) {
   const bayCrew = crew.filter((c) => c.storeId === storeId && c.role === "specialist");
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-deep/80 p-3 md:items-center">
+    <Modal title="Clipboard — who is in the pit" onClose={onClose}>
       <div className="max-h-[90vh] w-full max-w-lg overflow-auto border border-line bg-surface p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -497,6 +513,6 @@ function PassSheet({ onClose }: { onClose: () => void }) {
           Sign out to the public side
         </button>
       </div>
-    </div>
+    </Modal>
   );
 }

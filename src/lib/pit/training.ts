@@ -1,6 +1,7 @@
 import { central } from "./time";
+import { productQuestion } from "./product-quiz";
 /**
- * Pit Week: the four-week weekday program.
+ * Pit Week: four regular-season weeks plus finalist-only Championship Prep.
  * Every job and Spark question is drawn from the COGS training library:
  * Why We Sell The Way We Do, A Remarkable Experience, Building Non-Tangible Value,
  * Interview for Reality, Building a Complete Solution, Peace of Mind 3,
@@ -1006,7 +1007,79 @@ export const PROGRAM: TrainingWeek[] = [
       },
     ],
   },
+
+  {
+    week: 5,
+    theme: "Championship Prep",
+    tagline: "Earn the right to arrive ready.",
+    source: "Championship Week · field execution",
+    start: "2026-11-24",
+    care: {
+      id: "w5-care",
+      kind: "care",
+      title: "Captain's final inspection",
+      do: "Run the final huddle: confirm every specialist's prep work, review the locked bot plan, and name the one standard the team will carry into Saturday.",
+      proof: "The standard you named and how the team will show it.",
+    },
+    days: [
+      {
+        day: "tue",
+        jobs: [
+          { id: "w5-tue-culture", kind: "culture", title: "Raise the standard", do: "Open the day by naming one behavior your team will do at championship level for every Client.", proof: "The behavior and one time you saw it happen." },
+          { id: "w5-tue-skill", kind: "skill", title: "Three clean hand-offs", do: "Complete three smooth hand-offs from Analysis into the test walk without breaking the Client's momentum.", proof: "What made the cleanest hand-off work." },
+        ],
+        spark: [
+          { q: "What makes Championship Prep count?", choices: ["Being a finalist", "The finalist store doing the work", "Other stores donating Bolts", "A free repair"], answer: 1, why: "The finalists earn their own preparation. Nothing is gifted." },
+          { q: "What can another store add to a finalist's bot?", choices: ["Coins", "Repairs", "Nothing that changes combat", "A Super part"], answer: 2, why: "Rally support changes the show, never the fight." },
+          { q: "What happens to the build earned during the season?", choices: ["It resets", "It carries into Championship Week", "It becomes stock", "The other conference chooses it"], answer: 1, why: "The season-earned bot is the bot the finalist prepares." },
+        ],
+      },
+      {
+        day: "wed",
+        jobs: [
+          { id: "w5-wed-culture", kind: "culture", title: "Championship shout-out", do: "Catch a teammate doing something Remarkable for a Client and post a specific shout-out.", proof: "Who you recognized and what they did." },
+          { id: "w5-wed-skill", kind: "skill", title: "Objection reps", do: "Run three fast role-plays on common Client hesitations. Answer the concern, reconnect to the goal, and ask again.", proof: "The hesitation that needed the most work and your improved response." },
+        ],
+        spark: [
+          { q: "An objection should lead to…", choices: ["A discount first", "A calm answer and another clear ask", "Ending the conversation", "Changing the subject"], answer: 1, why: "Answer the concern and keep serving the Client." },
+          { q: "The Wednesday Mystery Crate affects combat?", choices: ["Yes, +5 Power", "Yes, free armor", "No, it earns Bolts for looks only", "Only in the championship"], answer: 2, why: "Bolts remain presentation-only." },
+          { q: "A rally vote can change Saturday's damage?", choices: ["Yes", "No"], answer: 1, why: "Support can make the arena louder, not the bot stronger." },
+        ],
+      },
+      {
+        day: "thu",
+        jobs: [
+          { id: "w5-thu-culture", kind: "culture", title: "Client follow-through", do: "Follow up with three recent Clients and ask what has improved since their visit.", proof: "One Client win in their own words." },
+          { id: "w5-thu-skill", kind: "skill", title: "Complete Solution rep", do: "On three presentations, connect every recommended piece back to what the Client said they wanted to change.", proof: "One connection that made the value clearer." },
+        ],
+        spark: [
+          { q: "What should the recommendation connect back to?", choices: ["The store goal", "What the Client said they want to change", "The bot build", "The scoreboard"], answer: 1, why: "The Client's goal gives the Solution meaning." },
+          { q: "Can a finalist spend coins it earned during Weeks 1–4?", choices: ["Yes", "No"], answer: 0, why: "Season-earned resources carry into Championship Week." },
+          { q: "Does Championship Week give free repairs?", choices: ["Yes", "No"], answer: 1, why: "Finalists must prepare with what they earned and the work they complete." },
+        ],
+      },
+      {
+        day: "fri",
+        jobs: [
+          { id: "w5-fri-culture", kind: "culture", title: "Bring somebody with you", do: "Help one teammate sharpen something before Saturday: a role-play, a hand-off, a presentation, or a follow-up.", proof: "Who you helped and what got better." },
+          { id: "w5-fri-skill", kind: "skill", title: "Finish with the ask", do: "On your next three qualified presentations, make the recommendation clearly and finish with a direct ask.", proof: "Which ask sounded most natural and why." },
+        ],
+        spark: [
+          { q: "Championship Saturday ends when…", choices: ["Round 3 ends", "A judge picks a winner", "One bot is knocked out", "The crowd votes"], answer: 2, why: "No judges. The title fight continues until knockout." },
+          { q: "Who can earn the Championship Tune-Up?", choices: ["Every store", "Only the two conference finalists", "Only the Desk", "Whichever side has more rally votes"], answer: 1, why: "Only finalist work can prepare a championship bot." },
+          { q: "What is the purpose of Rally?", choices: ["Transfer coins", "Increase Power", "Let the rest of the league choose a side and amplify the show", "Repair damage"], answer: 2, why: "Rally belongs to the atmosphere, not combat math." },
+        ],
+      },
+    ],
+  },
 ];
+
+for (const week of PROGRAM) {
+  for (const day of week.days) {
+    const product = productQuestion(week.week, day.day);
+    day.spark[2] = { q: product.q, choices: [...product.choices], answer: product.answer, why: product.why };
+  }
+}
 
 export function programWeek(week: number): TrainingWeek | undefined {
   return PROGRAM.find((w) => w.week === week);

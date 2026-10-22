@@ -1,7 +1,9 @@
+import { EffectLockerPreview } from "./effect-locker-preview";
+import { CosmeticTheme } from "./cosmetic-board";
 import { submitDailySpark } from "@/lib/pit/sync";
 import { Check, Clock, Flame, Lock, Package, Sparkles, Wrench } from "lucide-react";
 import { useMemo, useState } from "react";
-import { buildCard } from "@/lib/pit/engine";
+import { buildCard, championshipFinalists } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
 import {
   BOLTS,
@@ -40,13 +42,16 @@ function useMe() {
 export function WeekPage() {
   const { data, me, role, storeId: myStore } = useMe();
   const boss = role === "commissioner";
-  const current = Math.min(4, Math.max(1, data.week));
+  const current = Math.min(5, Math.max(1, data.week));
   const [weekPick, setWeekPick] = useState(current);
   const [viewStore, setViewStore] = useState<string>(myStore ?? data.stores[0]?.id ?? "plano");
   const plan = programWeek(weekPick) ?? PROGRAM[0]!;
   const storeId = boss ? viewStore : (myStore ?? null);
   const store = data.stores.find((s) => s.id === storeId);
   const captain = boss || (role === "captain" && myStore === storeId);
+  const finalists = championshipFinalists(data);
+  const championship = plan.week === 5;
+  const canPrep = !championship || boss || Boolean(storeId && finalists.includes(storeId));
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6" data-testid="pit-week">
@@ -54,7 +59,7 @@ export function WeekPage() {
         <div className="hazard h-2" />
         <div className="flex flex-wrap items-end justify-between gap-4 px-4 py-5 md:px-6">
           <div className="max-w-2xl">
-            <SectionLabel>Pit Week · Tuesday to Saturday</SectionLabel>
+            <SectionLabel>{championship ? "Championship Prep · Tuesday to Friday" : "Pit Week · Tuesday to Saturday"}</SectionLabel>
             <h1 className="glow-text mt-1 font-display text-5xl leading-none">
               Week {plan.week}: {plan.theme}
             </h1>
@@ -81,7 +86,7 @@ export function WeekPage() {
           <HowCell
             icon={<Flame size={16} />}
             title="Full Tune-Up"
-            body={`Every specialist finishes everything by Saturday close and the captain does CARE: +${TUNE_UP_BONUS} Power, Speed, Armor, and Heat for Monday.`}
+            body={championship ? `Finalist specialists finish all eight jobs and four Sparks, plus captain CARE: +${TUNE_UP_BONUS} Power, Speed, Armor, and Heat for Saturday.` : `Every specialist finishes everything by Saturday close and the captain does CARE: +${TUNE_UP_BONUS} Power, Speed, Armor, and Heat for Monday.`}
           />
         </div>
       </header>
@@ -111,14 +116,21 @@ export function WeekPage() {
         <BayBanner data={data} storeId={store.id} week={plan.week} />
       )}
 
-      <section className="grid gap-3 lg:grid-cols-5">
-        {plan.days.map((d) => (
-          <DayCard key={`${plan.week}-${d.day}`} plan={plan} day={d.day} />
-        ))}
-      </section>
+      {championship && data.week === 5 && !canPrep ? (
+        <RallyPanel data={data} />
+      ) : (
+        <>
+          <section className={`grid gap-3 ${plan.days.length === 4 ? "lg:grid-cols-4" : "lg:grid-cols-5"}`}>
+            {plan.days.map((d) => (
+              <DayCard key={`${plan.week}-${d.day}`} plan={plan} day={d.day} />
+            ))}
+          </section>
+          {store && captain ? <CaptainDesk data={data} storeId={store.id} plan={plan} /> : null}
+          {store && role === "captain" && !boss ? <CareCard plan={plan} /> : null}
+        </>
+      )}
 
-      {store && captain ? <CaptainDesk data={data} storeId={store.id} plan={plan} /> : null}
-      {store && role === "captain" && !boss ? <CareCard plan={plan} /> : null}
+      {championship && data.week === 5 && canPrep ? <RallyPanel data={data} /> : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <ShoutWall data={data} week={plan.week} />
@@ -126,7 +138,8 @@ export function WeekPage() {
       </div>
 
       <LeagueBoard data={data} week={plan.week} />
-      {store ? <BoltLocker data={data} storeId={store.id} canBuy={captain} /> : null}
+      {store ? <CosmeticTheme storeId={store.id} /> : null}
+      {store && canPrep ? <BoltLocker data={data} storeId={store.id} canBuy={captain} /> : null}
       {me ? null : <p className="text-center text-xs text-muted">Pit Week counts for the bay, not for one person. Names show on the wall and the titantron.</p>}
     </div>
   );
@@ -167,7 +180,7 @@ function BayBanner({ data, storeId, week }: { data: PitData; storeId: string; we
         <p className="mt-2 text-sm text-muted">
           {prog.tuned ? (
             <span className="font-display tracking-wide text-amber uppercase">
-              Full Tune-Up locked in · +{TUNE_UP_BONUS} all stats Monday
+              Full Tune-Up locked in · +{TUNE_UP_BONUS} all stats {week === 5 ? "Saturday" : "Monday"}
             </span>
           ) : (
             <>
@@ -531,9 +544,9 @@ function PickEm({ data }: { data: PitData }) {
   return (
     <section className="border border-line bg-surface">
       <div className="border-b border-line px-4 py-3">
-        <SectionLabel>Monday pick&apos;em · week {data.week}</SectionLabel>
+        <SectionLabel>{data.week === 5 ? "Championship pick" : `Monday pick’em · week ${data.week}`}</SectionLabel>
         <p className="text-sm text-muted">
-          Call Monday&apos;s winners. +{BOLTS.pickCorrect} bolts for every right call. Picks close when the bots lock Saturday.
+          {data.week === 5 ? <>Call the Waterman Champion. +{BOLTS.pickCorrect} bolts for a right call. The pick never affects the fight.</> : <>Call Monday&apos;s winners. +{BOLTS.pickCorrect} bolts for every right call. Picks close when the bots lock Saturday.</>}
         </p>
       </div>
       <ul>
@@ -573,15 +586,69 @@ function PickEm({ data }: { data: PitData }) {
   );
 }
 
+function RallyPanel({ data }: { data: PitData }) {
+  const { me } = useMe();
+  const setRally = usePit((state) => state.setRally);
+  const finalists = championshipFinalists(data);
+  if (finalists.length !== 2) {
+    return (
+      <section className="border border-line bg-surface p-4">
+        <SectionLabel>Championship Rally</SectionLabel>
+        <p className="mt-2 text-sm text-muted">Rally opens when both conference champions are official.</p>
+      </section>
+    );
+  }
+  const canRally = Boolean(me && !finalists.includes(me.storeId) && data.week === 5);
+  const myChoice = me ? data.rallies?.find((row) => row.crewId === me.id && row.week === 5)?.targetId : undefined;
+  return (
+    <section className="border border-spark/60 bg-surface p-4">
+      <SectionLabel>Rally behind a finalist · crowd only</SectionLabel>
+      <p className="mt-2 max-w-3xl text-sm text-muted">
+        The other 12 stores can choose either side. Rally adds banners, crowd energy and championship presentation only.
+        It never changes Power, Speed, Armor, Heat, HP, damage, repairs, coins, parts or fight odds.
+      </p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {finalists.map((id) => {
+          const store = data.stores.find((row) => row.id === id)!;
+          const supporters = (data.rallies ?? []).filter((row) => row.week === 5 && row.targetId === id);
+          const supportStores = [...new Set(
+            supporters
+              .map((row) => data.stores.find((storeRow) => storeRow.id === row.storeId)?.name)
+              .filter((name): name is string => Boolean(name)),
+          )];
+          return (
+            <div key={id} className="border border-line bg-deep p-4">
+              <p className="font-display text-3xl" style={{ color: paintHex(store.paint) }}>{store.name}</p>
+              <p className="mt-1 text-sm text-muted">{supporters.length} people rallying · {supportStores.length} stores represented</p>
+              {supportStores.length ? <p className="mt-2 text-xs text-muted">Support: {supportStores.join(" · ")}</p> : null}
+              {canRally ? (
+                <Btn className="mt-3 w-full" tone={myChoice === id ? "line" : "spark"} onClick={() => setRally(id)}>
+                  {myChoice === id ? "Your rally pick" : `Rally behind ${store.name}`}
+                </Btn>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+      {!me ? <button type="button" className="mt-3 text-sm text-amber" onClick={openClipboard}>Sign in to choose a side →</button> : null}
+      {me && finalists.includes(me.storeId) ? (
+        <p className="mt-3 text-sm text-amber">Your store is fighting for the title. Your job is Championship Prep; the rest of the league handles Rally.</p>
+      ) : null}
+    </section>
+  );
+}
+
 function LeagueBoard({ data, week }: { data: PitData; week: number }) {
+  const finalists = championshipFinalists(data);
   const rows = data.stores
+    .filter((store) => week !== 5 || finalists.includes(store.id))
     .map((s) => ({ store: s, prog: weekProgress(data, s.id, week), bolts: boltsOf(data, s.id).earned }))
     .sort((a, b) => b.prog.pct - a.prog.pct || b.bolts - a.bolts);
   return (
     <section className="border border-line bg-surface">
       <div className="border-b border-line px-4 py-3">
         <SectionLabel>League board · week {week}</SectionLabel>
-        <p className="text-sm text-muted">Who is putting in the work. Tuned bays get the edge Monday.</p>
+        <p className="text-sm text-muted">{week === 5 ? "Only the two finalists can earn Championship Prep. Rally never changes these numbers." : "Who is putting in the work. Tuned bays get the edge Monday."}</p>
       </div>
       <ol className="grid gap-px bg-line sm:grid-cols-2 lg:grid-cols-3">
         {rows.map(({ store, prog, bolts }, i) => (
@@ -629,6 +696,7 @@ function BoltLocker({ data, storeId, canBuy }: { data: PitData; storeId: string;
           {bolts.balance} <span className="text-sm text-muted">bolts</span>
         </p>
       </div>
+      <EffectLockerPreview storeId={storeId} canBuy={false} />
       <ul className="grid gap-px bg-line sm:grid-cols-2 lg:grid-cols-3">
         {LOCKER.map((item) => {
           const have = owned.has(item.id);
@@ -650,7 +718,7 @@ function BoltLocker({ data, storeId, canBuy }: { data: PitData; storeId: string;
                     tone={equipped ? "line" : "amber"}
                     onClick={() => {
                       if (item.kind === "paint") setPaint(storeId, item.id.replace("paint-", ""));
-                      else if (item.kind === "walkout") setStyle(storeId, { walkout: equipped ? undefined : item.id });
+                      else if (item.kind === "walkout") setStyle(storeId, { walkout: equipped ? "" : item.id });
                       else setStyle(storeId, { victory: equipped ? undefined : item.id });
                     }}
                   >

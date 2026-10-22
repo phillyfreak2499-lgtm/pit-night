@@ -14,7 +14,7 @@ export const Route = createRootRoute({
       { title: APP_NAME },
       {
         name: "description",
-        content: "The Waterman Battle Bot League. Period 12, October 25 through November 21, with fights every Monday morning. Eleven Good Feet stores. One trophy.",
+        content: "The Waterman Battle Bot League. Period 12, October 25 through November 28, 2026. Four regular-season Mondays and Championship Saturday. Fourteen Good Feet stores. Two conferences. One trophy.",
       },
       { name: "theme-color", content: "#0e0d0b" },
     ],

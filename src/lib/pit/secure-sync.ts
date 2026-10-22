@@ -1,3 +1,4 @@
+import { sameSession, singleFlight } from "./sync-policy";
 import { useSyncExternalStore } from "react";
 import { commandArgs, type Command } from "./commands";
 import { usePit, type PitState } from "./store";
@@ -30,7 +31,8 @@ function apply(doc: string | null, next: number, session: Session) {
   // An older poll response cannot overwrite a just-completed command.
   if (next < rev) return;
   rev = next;
-  usePit.setState({ ...(doc ? JSON.parse(doc) : {}), session });
+  if (doc) usePit.setState({ ...JSON.parse(doc), session });
+  else if (!sameSession(session, usePit.getState().session)) usePit.setState({ session });
 }
 function enqueue(task: () => Promise<void>) {
   pending++;
@@ -77,12 +79,12 @@ async function login(
   });
   return ok;
 }
-async function poll() {
+const poll = singleFlight(async () => {
   if (pending) return;
   try {
     let res = await pullSeason({ data: { rev } });
     if (pending) return;
-    if (!res.doc && JSON.stringify(res.session) !== JSON.stringify(usePit.getState().session))
+    if (!res.doc && !sameSession(res.session, usePit.getState().session))
       res = await pullSeason({ data: { rev: 0 } });
     if (pending) return;
     apply(res.doc, res.rev, res.session);
@@ -93,7 +95,7 @@ async function poll() {
       error: err instanceof Error ? err.message : "Could not reach the league.",
     });
   }
-}
+});
 /** Only verified server responses update the league. No local document upload or merge. */
 export function startSync() {
   if (started || typeof window === "undefined") return;
