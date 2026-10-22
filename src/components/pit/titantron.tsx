@@ -1,17 +1,16 @@
 import { Link } from "@tanstack/react-router";
 import { CLASS_META } from "@/lib/pit/catalog";
 import { useMemo } from "react";
-import { botFor, buildCard, cardFor, houseTape, rankedStores, recordOf } from "@/lib/pit/engine";
+import { botFor, buildCard, championshipFinalists, conferenceStandings, houseTape, regularSeasonRecordOf } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
 import { programWeek } from "@/lib/pit/training";
 import { tunedUp } from "@/lib/pit/week";
 import { ArenaHero } from "./arena-hero";
 import { BotPortrait, useBotLook } from "./bot-portrait";
-import { BoutWatch, ClassTag, formatRemain, GradeRow, nextLock, Panel, PERIOD_OPENS, ResultLine, SectionLabel, useNow } from "./bits";
+import { BoutWatch, ClassTag, formatRemain, nextLock, Panel, PERIOD_OPENS, ResultLine, SectionLabel, useNow } from "./bits";
 
 export function Titantron() {
   const data = usePit();
-  const ranked = rankedStores(data);
   const weekMeta = data.weeks.find((w) => w.number === data.week);
   const now = useNow();
   const beforeOpen = !now || now.getTime() < PERIOD_OPENS.getTime();
@@ -21,7 +20,7 @@ export function Titantron() {
     data.bouts.find((b) => b.week === data.week && b.title === "Main event") ??
     data.bouts.find((b) => b.week === data.week && b.kind === "final") ??
     data.bouts.find((b) => b.week === data.week && b.kind === "bout") ??
-    buildCard(data).find((b) => b.title === "Main event");
+    buildCard(data).find((b) => b.kind === "final" || b.title === "Main event");
   const boss = data.session.role === "commissioner";
   const replay = featured?.result && featured.result.fighters.length === 2 ? featured.result : null;
   const house = useMemo(() => houseTape("saw-wedge")?.result ?? null, []);
@@ -55,12 +54,12 @@ export function Titantron() {
             <p className="mt-2 text-sm text-muted">{weekMeta?.blurb}</p>
           </Panel>
           <Panel className="p-4">
-            <p className="text-xs tracking-widest text-muted uppercase">{beforeOpen ? "Opens Oct 25" : "Saturday lock"}</p>
+            <p className="text-xs tracking-widest text-muted uppercase">{beforeOpen ? "Opens Oct 25" : data.week === 5 ? "Friday title lock" : "Saturday lock"}</p>
             <p className="font-display text-4xl leading-none text-amber tabular-nums">{data.phase === "open" || beforeOpen ? remain : phaseWord(data.phase)}</p>
             <p className="mt-2 text-sm text-muted">
               {beforeOpen
                 ? "October 25, 2026. Build now. The first bell has not rung."
-                : "Each store locks one build at Saturday close. That build fights Monday."}
+                : data.week === 5 ? "Only the two finalists prep this week. Friday close freezes the title builds for Saturday." : "Each store locks one build at Saturday close. That build fights Monday."}
             </p>
           </Panel>
           <Panel className="p-4">
@@ -89,7 +88,7 @@ export function Titantron() {
             <FighterCard storeId={featured?.teamB[0] ?? "allen"} facing={-1} />
           </div>
           <div className="px-4 py-3 text-sm text-muted">
-            {featured?.result ? <ResultLine bout={featured} /> : "Card posts Monday morning. Lock your build by Saturday close."}
+            {featured?.result ? <ResultLine bout={featured} /> : data.week === 5 ? "Championship Saturday. Finalists lock Friday; the title fight runs until knockout." : "Card posts Monday morning. Lock your build by Saturday close."}
           </div>
         </Panel>
         <Panel className="p-4">
@@ -100,13 +99,13 @@ export function Titantron() {
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link to="/broadcast" className="inline-flex min-h-11 items-center bg-amber px-4 font-display text-sm tracking-wide text-deep uppercase">
-              Monday broadcast
+              {data.week === 5 ? "Championship broadcast" : "Monday broadcast"}
             </Link>
             <Link to="/preview" className="inline-flex min-h-11 items-center border border-line px-4 font-display text-sm tracking-wide uppercase">
               Watch a house fight
             </Link>
             <Link to="/map" className="inline-flex min-h-11 items-center border border-line px-4 font-display text-sm tracking-wide uppercase">
-              Eleven doors
+              Fourteen doors
             </Link>
             <Link to="/rules" className="inline-flex min-h-11 items-center border border-line px-4 font-display text-sm tracking-wide uppercase">
               How it works
@@ -129,49 +128,48 @@ export function Titantron() {
       <PitWeekCallout />
 
       <section>
-        <div className="mb-3 flex items-end justify-between">
-          <h2 className="font-display text-3xl leading-none">Standings</h2>
-          <p className="text-sm text-muted">{data.week === 4 ? "Record first. Title Monday stakes: Pit Week bolts break a tie, then NSNU." : "Record first. NSNU breaks a tie in the table."}</p>
+        <div className="mb-3">
+          <h2 className="font-display text-3xl leading-none">Conference standings</h2>
+          <p className="mt-1 text-sm text-muted">
+            Record · head-to-head when applicable · conference record · cumulative NSNU · green grades · Bolts earned.
+            A still-unresolved championship berth tie goes to the cage.
+          </p>
         </div>
-        <ol className="flex flex-col gap-2">
-          {ranked.map((store, index) => {
-            const bot = botFor(data, store.id);
-            const card = cardFor(data, store.id);
-            const rec = recordOf(data, store.id);
-            return (
-              <li key={store.id}>
-                <Link
-                  to="/stores/$storeId"
-                  params={{ storeId: store.id }}
-                  data-bot-hover
-                  className="lift grid grid-cols-[auto_1fr_auto] items-center gap-3 border border-line bg-surface px-3 py-3 sm:grid-cols-[auto_1fr_auto_auto]"
-                >
-                  <span className={`w-8 text-center font-display text-3xl leading-none ${index === 0 ? "text-amber" : "text-muted"}`}>{index + 1}</span>
-                  <span className="min-w-0">
-                    <span className="flex items-center gap-2">
-                      <span className="h-8 w-1.5" style={{ background: paintHex(store.paint) }} />
-                      <span>
-                        <span className="block font-display text-xl leading-tight tracking-wide">{store.name}</span>
-                        <span className="text-sm text-muted">
-                          {bot.name} · {CLASS_META[bot.classId].label}
+        <div className="grid gap-4 lg:grid-cols-2">
+          {(["metro", "frontier"] as const).map((conference) => (
+            <div key={conference} className="border border-line bg-surface">
+              <div className="border-b border-line px-3 py-2 font-display text-xl text-amber uppercase">
+                {conference} Conference
+              </div>
+              <ol>
+                {conferenceStandings(data, conference).map((store, index) => {
+                  const bot = botFor(data, store.id);
+                  const rec = regularSeasonRecordOf(data, store.id);
+                  const finalist = data.week === 5 && championshipFinalists(data).includes(store.id);
+                  return (
+                    <li key={store.id}>
+                      <Link
+                        to="/stores/$storeId"
+                        params={{ storeId: store.id }}
+                        data-bot-hover
+                        className={`grid grid-cols-[auto_1fr_auto] items-center gap-3 border-b border-line px-3 py-2 last:border-b-0 ${finalist ? "bg-amber/10" : ""}`}
+                      >
+                        <span className="w-6 font-display text-xl text-muted">{index + 1}</span>
+                        <span className="min-w-0">
+                          <span className="block font-display">{store.name}</span>
+                          <span className="block text-xs text-muted">
+                            {bot.name}{finalist ? " · CONFERENCE CHAMPION" : ""}
+                          </span>
                         </span>
-                      </span>
-                    </span>
-                    {card ? (
-                      <span className="mt-2 block">
-                        <GradeRow card={card} />
-                      </span>
-                    ) : null}
-                  </span>
-                  <StandingBot storeId={store.id} />
-                  <span className="font-display text-2xl">
-                    {rec.w}–{rec.l}
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ol>
+                        <span className="font-display text-xl">{rec.w}–{rec.l}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          ))}
+        </div>
       </section>
 
       {gazette ? (
@@ -224,23 +222,23 @@ function StandingBot({ storeId }: { storeId: string }) {
 
 function PitWeekCallout() {
   const data = usePit();
-  const plan = programWeek(Math.min(4, Math.max(1, data.week)));
+  const plan = programWeek(Math.min(5, Math.max(1, data.week)));
   if (!plan) return null;
   const tuned = data.stores.filter((s) => tunedUp(data, s.id, plan.week)).length;
   return (
     <Link to="/week" className="lift group grid gap-3 border border-amber/60 bg-surface p-4 md:grid-cols-[1fr_auto] md:items-center">
       <span>
-        <span className="block font-display text-xs tracking-[0.22em] text-amber uppercase">Pit Week · Tuesday to Saturday</span>
+        <span className="block font-display text-xs tracking-[0.22em] text-amber uppercase">{plan.week === 5 ? "Championship Prep · finalists only" : "Pit Week · Tuesday to Saturday"}</span>
         <span className="mt-1 block font-display text-3xl leading-none">
           Week {plan.week}: {plan.theme}
         </span>
         <span className="mt-1 block text-sm text-muted">
-          Two jobs and a Daily Spark every day. Finish the whole week as a crew and your bot fights Monday with a Full Tune-Up: +4 to every stat.
+          {plan.week === 5 ? "The two conference champions earn their own Saturday preparation Tuesday through Friday. Everybody else can Rally without changing the fight." : "Two jobs and a Daily Spark every day. Finish the whole week as a crew and your bot fights Monday with a Full Tune-Up: +4 to every stat."}
         </span>
       </span>
       <span className="flex items-center gap-3 font-display">
-        <span className="text-sm text-muted">{tuned} of {data.stores.length} bays tuned</span>
-        <span className="bg-amber px-4 py-2 text-sm tracking-wide text-deep uppercase">Open Pit Week</span>
+        <span className="text-sm text-muted">{plan.week === 5 ? `${tuned} finalists tuned` : `${tuned} of ${data.stores.length} bays tuned`}</span>
+        <span className="bg-amber px-4 py-2 text-sm tracking-wide text-deep uppercase">{plan.week === 5 ? "Open Championship Week" : "Open Pit Week"}</span>
       </span>
     </Link>
   );
