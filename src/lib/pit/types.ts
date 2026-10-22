@@ -13,11 +13,18 @@ export type BoutKind = "bout" | "bye" | "tag" | "semi" | "final" | "melee";
 export type Method = "ko" | "dump" | "decision" | "melee" | "scrimmage" | "bye";
 export type GarageLook = "hazard" | "concrete" | "night" | "bone" | "checker";
 export type BotLook = "plain" | "stripe" | "chevron" | "rivets";
-export type BotFinish = "factory" | "chrome" | "matte" | "worn";
-export type BotDecal = "none" | "flames" | "lightning" | "teeth" | "checker" | "hazard" | "camo" | "arch";
+export type BotFinish = "factory" | "chrome" | "matte" | "worn" | "satin" | "carbon" | "iridescent" | "gold";
+export type BotDecal = "none" | "flames" | "lightning" | "teeth" | "checker" | "hazard" | "camo" | "arch" | "stars" | "circuit" | "splash" | "champion";
+export type BotTopper = "none" | "antenna" | "horns" | "mohawk" | "crown";
+export type BotBody =
+  | "shrike" | "raptor" | "stinger" | "viper" | "warhawk"
+  | "keystone" | "juggernaut" | "bunker" | "fortress" | "colossus"
+  | "windlass" | "scorpion" | "mantis" | "phantom" | "reaper";
 
 /** Cosmetics only. None of it touches Power, Speed, Armor, or Heat. */
 export type BotStyle = {
+  /** Visual shell only. Combat class remains classId. */
+  body?: BotBody;
   finish: BotFinish;
   decal: BotDecal;
   /** Key into TRIM. Edges, rims, and the flag. */
@@ -25,6 +32,7 @@ export type BotStyle = {
   /** Key into EYES. The visor light. */
   eye: string;
   flag: boolean;
+  topper?: BotTopper;
   /** Bolt Locker unlocks. Shown on fight day. */
   walkout?: string;
   victory?: string;
