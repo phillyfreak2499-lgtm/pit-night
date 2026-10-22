@@ -54,6 +54,10 @@ async function load() {
   const data = { ...s.store.sharedDoc(merged), tutorialSeen: false, session: s.auth.publicSession };
   return { ...s, row, data };
 }
+/** Server-only: the normalized season for other server functions (Claude copy, the Monday job). */
+export async function loadSeason() {
+  return load();
+}
 export const pullSeason = createServerFn({ method: "POST" })
   .validator(z.object({ rev: z.number().int() }))
   .handler(async ({ data: input }): Promise<PullResult> => {

@@ -1,9 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import { CLASS_META } from "@/lib/pit/catalog";
 import { botFor } from "@/lib/pit/engine";
+import { upcomingMatchups } from "@/lib/pit/claude-copy";
 import { usePit, type PitState } from "@/lib/pit/store";
 import type { Bout, ClassId } from "@/lib/pit/types";
 import { BoutWatch, Panel, ResultLine, SectionLabel } from "./bits";
+import { ClaudeCopy } from "./claude-copy";
 
 export function CardPage() {
   const data = usePit();
@@ -24,6 +26,9 @@ export function CardPage() {
         <p className="mt-6 border border-line bg-surface p-4">
           The card is not printed yet. Captains lock Saturday at close. Sunday the desk clicks in the official colors. Monday morning the desk hits Run the card.
         </p>
+      ) : null}
+      {bouts.length === 0 ? (
+        <UpcomingHype />
       ) : groups ? (
         <div className="mt-6 flex flex-col gap-6">
           {groups.map((group) => (
@@ -45,6 +50,33 @@ export function CardPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/** The matchups this week will run, with the booth's hype. Records and classes only; builds stay hidden. */
+function UpcomingHype() {
+  const data = usePit();
+  const matchups = upcomingMatchups(data);
+  if (!matchups.length) return null;
+  const name = (id: string) => {
+    const store = data.stores.find((s) => s.id === id);
+    return store ? store.teamName || store.name : id;
+  };
+  return (
+    <section className="mt-6 flex flex-col gap-3" data-testid="upcoming-hype">
+      <h2 className="font-display text-2xl">On the card</h2>
+      {matchups.map((bout) => (
+        <Panel key={bout.id} className="p-4">
+          <p className="text-xs tracking-widest text-amber uppercase">
+            {bout.slot}. {bout.title}
+          </p>
+          <h3 className="font-display text-2xl leading-tight">
+            {bout.teamA.map(name).join(" + ")} vs {bout.teamB.map(name).join(" + ")}
+          </h3>
+          <ClaudeCopy kind="hype" id={bout.id} label="Fight-card preview" className="mt-3" />
+        </Panel>
+      ))}
+    </section>
   );
 }
 

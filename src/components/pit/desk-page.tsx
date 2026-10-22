@@ -8,6 +8,7 @@ import { METRICS } from "@/lib/pit/catalog";
 import type { Grade, StatKey } from "@/lib/pit/types";
 import { takeLeagueSeason, useSyncStatus } from "@/lib/pit/sync";
 import { DeskCodes } from "./desk-codes";
+import { ClaudeCheck } from "./claude-copy";
 
 export function DeskPage() {
   const data = usePit();
@@ -111,6 +112,7 @@ function DeskLive() {
         </Btn>
       </div>
       <KickoffPanel />
+      <ClaudeCheck />
       <SyncPanel />
       <TrainingSwitch />
       <HousePin />

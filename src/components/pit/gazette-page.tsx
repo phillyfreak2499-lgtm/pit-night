@@ -1,10 +1,20 @@
 import { Link } from "@tanstack/react-router";
 import { usePit } from "@/lib/pit/store";
 import { SectionLabel } from "./bits";
+import { ClaudeCopy } from "./claude-copy";
 
 export function GazettePage() {
   const gazette = usePit((s) => s.gazette);
   const week = usePit((s) => s.week);
+  const phase = usePit((s) => s.phase);
+  const bouts = usePit((s) => s.bouts);
+  // The latest week whose whole card is posted gets the league recap.
+  const recapWeek = [5, 4, 3, 2, 1].find(
+    (w) =>
+      (w < week || ["fought", "inspected", "complete"].includes(phase)) &&
+      bouts.some((b) => b.week === w) &&
+      bouts.filter((b) => b.week === w).every((b) => b.result),
+  );
   const [lead, ...rest] = gazette;
   return (
     <div className="mx-auto max-w-4xl">
@@ -13,6 +23,10 @@ export function GazettePage() {
       <p className="mt-3 text-muted">
         Store versus store. No personal records in the column inches.
       </p>
+
+      {recapWeek ? (
+        <ClaudeCopy kind="recap" id={String(recapWeek)} label={`Week ${recapWeek} league recap`} className="mt-6" />
+      ) : null}
 
       <div className="newsprint mt-6 px-4 py-5 md:px-8 md:py-7">
         <div className="flex items-center justify-between text-[10px] tracking-[0.2em] text-(--ink-soft) uppercase md:text-xs">
