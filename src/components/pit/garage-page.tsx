@@ -1,7 +1,7 @@
 import { BuildLockBanner } from "./build-lock-banner";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { BODY_STYLES, CLASS_META, DECALS, EYES, FINISHES, LOCKER_PAINTS, PAINT, TOPPERS, partById, partsFor, SLOT_LABEL, styleOf, TRIM } from "@/lib/pit/catalog";
+import { BODY_STYLES, CLASS_META, DECALS, EYES, FINISHES, PAINT, TOPPERS, partById, partsFor, SLOT_LABEL, styleOf, TRIM } from "@/lib/pit/catalog";
 import {
   buyCheck,
   canSeeLoadout,
