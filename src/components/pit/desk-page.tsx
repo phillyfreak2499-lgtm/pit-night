@@ -3,7 +3,7 @@ import { usePit } from "@/lib/pit/store";
 import { Btn, Field, SectionLabel, TextInput } from "./bits";
 import { ScoreInputs } from "./score-card";
 import { GradeGrid } from "./grade-grid";
-import { buildCard, gradeMetric, cardValue, coinMath, gradesOf, kickoffRank } from "@/lib/pit/engine";
+import { buildCard, championshipFinalists, gradeMetric, cardValue, coinMath, gradesOf, kickoffRank } from "@/lib/pit/engine";
 import { METRICS } from "@/lib/pit/catalog";
 import type { Grade, StatKey } from "@/lib/pit/types";
 import { takeLeagueSeason, useSyncStatus } from "@/lib/pit/sync";
@@ -98,10 +98,10 @@ function DeskLive() {
       </div>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <Btn testId="lock-friday" onClick={lockFriday}>
-          Lock the bots (Sat close)
+          {data.week === 5 ? "Lock finalists (Fri close)" : "Lock the bots (Sat close)"}
         </Btn>
         <Btn testId="run-saturday" tone="spark" onClick={runSaturday}>
-          Run the card (Monday)
+          {data.week === 5 ? "Run Championship (Sat)" : "Run the card (Monday)"}
         </Btn>
         <Btn testId="drop-damage" tone="line" onClick={dropDamage}>
           Drop damage
@@ -139,9 +139,9 @@ function DeskLive() {
           </Btn>
         </div>
       </section>
-      <SundayScores />
+      {data.week <= 4 ? <SundayScores /> : <ChampionshipDesk />}
       <section>
-        <SectionLabel>Eleven stores</SectionLabel>
+        <SectionLabel>{data.stores.length} stores</SectionLabel>
         <div className="mt-3 flex flex-col gap-3">
           {data.stores.map((store) => {
             const bot = data.bots.find((b) => b.storeId === store.id);
@@ -221,7 +221,7 @@ function ResetSeason({ onReset }: { onReset: () => void }) {
   return (
     <div className="flex max-w-xl flex-col gap-2 border border-bad/60 p-3">
       <p className="text-sm text-bad">
-        This wipes every fight, coin, job, Spark and pick for all eleven stores, on every device. Bay codes, captains, crews and the house PIN are kept. Type RESET to confirm.
+        This wipes every fight, coin, job, Spark and pick for all fourteen stores, on every device. Store codes, captains, crews and the house PIN are kept. Type RESET to confirm.
       </p>
       <TextInput value={typed} onChange={(e) => setTyped(e.target.value)} aria-label="Type RESET to confirm" placeholder="RESET" />
       <div className="flex gap-2">
@@ -243,6 +243,26 @@ function ResetSeason({ onReset }: { onReset: () => void }) {
     </div>
   );
 }
+function ChampionshipDesk() {
+  const data = usePit();
+  const finalists = championshipFinalists(data);
+  const names = finalists.map((id) => data.stores.find((store) => store.id === id)?.name ?? id);
+  return (
+    <section className="border border-amber/60 bg-surface p-4">
+      <SectionLabel>Championship Saturday · November 28</SectionLabel>
+      <h2 className="mt-1 font-display text-3xl">
+        {names.length === 2 ? names.join(" vs ") : "Conference champions pending"}
+      </h2>
+      <p className="mt-2 max-w-3xl text-sm text-muted">
+        There is no fifth Sunday sales scorecard. The finalists carry their Week 4 sales card,
+        season-earned parts, coins and damage into Championship Week. Only those two stores can
+        prepare their bots. Rally support changes presentation only.
+      </p>
+      <p className="mt-2 text-sm text-amber">Saturday has no judges and no decision. Run it until knockout.</p>
+    </section>
+  );
+}
+
 
 function SundayScores() {
   const data = usePit();
@@ -320,7 +340,7 @@ function KickoffPanel() {
         <div>
           <SectionLabel>Week 1 kickoff · Period 11</SectionLabel>
           <p className="mt-2 max-w-3xl text-sm text-muted">
-            Click each store&apos;s Period 11 colors. They pay the first coins, so every bay has something to spend in week 1, and they set the week 1 seeds. The top seed takes the bye; 2 fights 11, 3 fights 10, and so on.
+            Click each store&apos;s Period 11 colors. They pay the opening coins and set seeds inside Metro and Frontier. Week 1 has seven fights and no byes; every store fights.
             {data.kickoff.appliedAt ? " Already paid. Fix a color and press it again; it only pays the difference." : ""}
           </p>
         </div>
@@ -357,8 +377,8 @@ function KickoffPanel() {
           <ul className="mt-2 flex flex-col gap-1 text-sm">
             {preview.map((b) => (
               <li key={b.id} className="border border-line px-2 py-1">
-                <span className="mr-2 text-xs tracking-widest text-muted uppercase">{b.kind === "bye" ? "Bye" : b.title}</span>
-                {b.kind === "bye" ? name(b.teamA[0]) : `${name(b.teamA[0])} vs ${name(b.teamB[0])}`}
+                <span className="mr-2 text-xs tracking-widest text-muted uppercase">{b.title}</span>
+                {`${name(b.teamA[0])} vs ${name(b.teamB[0])}`}
               </li>
             ))}
           </ul>
