@@ -10,6 +10,8 @@ export function DeskCodes() {
   const [revealed, setRevealed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [confirmRotation, setConfirmRotation] = useState(false);
+  const [notice, setNotice] = useState("");
   const request = useRef(0);
   useEffect(() => {
     const tracker = request;
@@ -19,6 +21,8 @@ export function DeskCodes() {
         setCodes(null);
         setRevealed(false);
         setBusy(false);
+        setConfirmRotation(false);
+        setNotice("");
       }
     };
     document.addEventListener("visibilitychange", clear);
@@ -28,15 +32,20 @@ export function DeskCodes() {
     };
   }, []);
   async function rotateAll() {
-    if (!window.confirm("Rotate BOTH crew and captain codes for all stores? Existing store-role sessions will be signed out.")) return;
+    setConfirmRotation(false);
     const ticket = ++request.current;
     setBusy(true);
     setError("");
+    setNotice("");
     try {
       const rows = await rotateAllStoreCodes();
       if (ticket === request.current && !document.hidden) {
+        if (rows.length !== stores.length || stores.some((store) => !rows.some((row) => row.storeId === store.id && row.crew && row.captain))) {
+          throw new Error("The returned list is incomplete. Refresh codes before distributing them.");
+        }
         setCodes(rows);
         setRevealed(true);
+        setNotice(`Saved new crew and captain codes for all ${rows.length} stores. The previous store codes no longer work.`);
       }
     } catch (e) {
       if (ticket === request.current) setError(e instanceof Error ? e.message : "Could not rotate codes.");
@@ -72,7 +81,7 @@ export function DeskCodes() {
         <Btn tone="line" disabled={busy} onClick={() => void load()}>
           {busy ? "Loading…" : codes ? "Refresh codes" : "Load store codes"}
         </Btn>
-        <Btn tone="spark" disabled={busy} onClick={() => void rotateAll()}>
+        <Btn tone="spark" disabled={busy || confirmRotation} onClick={() => { setConfirmRotation(true); setNotice(""); setError(""); }}>
           Rotate all 14 store codes
         </Btn>
         {codes && (
@@ -94,6 +103,17 @@ export function DeskCodes() {
           </Btn>
         )}
       </div>
+      {confirmRotation && (
+        <div className="mt-3 border border-amber bg-surface-2 p-4" role="group" aria-label="Confirm store code rotation">
+          <p className="font-display text-lg">Replace all {stores.length * 2} store access codes?</p>
+          <p className="mt-2 text-sm text-muted">This replaces both crew and captain codes for every store and signs out existing store-role sessions. Your Desk code stays the same. Distribute only the new list after the Saved message appears.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Btn tone="spark" disabled={busy} onClick={() => void rotateAll()}>Confirm rotation</Btn>
+            <Btn tone="line" onClick={() => setConfirmRotation(false)}>Cancel rotation</Btn>
+          </div>
+        </div>
+      )}
+      {notice && <p role="status" className="mt-3 text-sm text-spark">{notice}</p>}
       {error && (
         <p role="alert" className="mt-3 text-sm text-bad">
           {error}

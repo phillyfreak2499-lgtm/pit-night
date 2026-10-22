@@ -231,6 +231,18 @@ assert.equal(rotated.length, 14);
 assert.equal(new Set(rotated.flatMap(r => [r.crew,r.captain])).size, 28);
 assert.ok(rotated.every(r => /^\d{4}$/.test(r.crew) && /^\d{4}$/.test(r.captain)));
 assert.equal((await crew.call("pullSeason", { rev: 0 })).session.role, "public");
+assert.deepEqual(await desk.call("getStoreCodes"), rotated);
+const rotatedLeague = JSON.parse((await desk.call("pullSeason", { rev: 0 })).doc);
+for (const row of rotated) {
+  const visitor = client();
+  const specialist = rotatedLeague.crew.find(c => c.storeId === row.storeId && c.role === "specialist");
+  assert.ok(specialist, `Missing specialist for ${row.storeId}`);
+  await visitor.call("signIn", { role: "crew", storeId: row.storeId, crewId: specialist.id, code: row.crew });
+  assert.equal((await visitor.call("pullSeason", { rev: 0 })).session.role, "crew");
+  await assert.rejects(visitor.call("signIn", { role: "captain", storeId: row.storeId, crewId: null, code: row.crew }));
+  await visitor.call("signIn", { role: "captain", storeId: row.storeId, crewId: null, code: row.captain });
+  assert.equal((await visitor.call("pullSeason", { rev: 0 })).session.role, "captain");
+}
 for (const row of vaultRows) {
   if (row.captain) await desk.call("setAccessCode", { id: `captain:${row.storeId}`, code: row.captain });
   if (row.crew) await desk.call("setAccessCode", { id: `bay:${row.storeId}`, code: row.crew });
