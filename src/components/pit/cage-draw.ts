@@ -1248,6 +1248,19 @@ function bolt(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
   ctx.fill();
 }
 
+/** Locker preview uses the broadcast particle primitives, with no fight state or rewards. */
+export function drawCosmeticEffect(ctx: CanvasRenderingContext2D, fx: Fx, effect: string, x: number, y: number, size: number, w: number, h: number, dt: number, paint: string) {
+  if (effect === "walkout-pyro") for (let i = fx.tick("preview-pyro", 26, dt); i > 0; i--) {
+    fx.pyro(x - size * 0.8, y, size); fx.pyro(x + size * 0.8, y, size);
+  }
+  if (effect === "walkout-sparks") for (let i = fx.tick("preview-sparks", 70, dt); i > 0; i--) fx.sparkRain(x, h * 0.04, size, y);
+  if (effect === "walkout-smoke") for (let i = fx.tick("preview-smoke", 9, dt); i > 0; i--) fx.stageSmoke(x, y, size);
+  if (effect === "victory-confetti") for (let i = fx.tick("preview-confetti", 10, dt); i > 0; i--) fx.confetti(x, h * 0.1, size, [paint, "#f3efe6", "#f0a202"], y);
+  if (effect === "victory-fireworks") for (let i = fx.tick("preview-fireworks", 1.6, dt); i > 0; i--) fx.firework(w * (0.25 + Math.random() * 0.5), h * 0.18, size, paint);
+  fx.step(dt);
+  drawParticles(ctx, fx.side);
+}
+
 export function drawSideBot(
   ctx: CanvasRenderingContext2D,
   s: BotState,
@@ -1577,11 +1590,17 @@ export function drawSideBot(
     }
     ctx.restore();
   }
-  if (style.decal !== "none") {
+  {
     ctx.save();
     poly(ctx, f.hull, u2);
     ctx.clip();
-    drawDecal(ctx, style.decal, f, u2, paint, s.bot.id, facing);
+    const stickers = style.stickers!;
+    const b = hullBounds(f);
+    const mid = (b.top + b.bottom) / 2;
+    // Only the camera-facing armor is visible. Hood and rear sit in separate regions.
+    stickerBadge(ctx, stickers[facing < 0 ? "left" : "right"], -0.04 * u2, mid * u2 + 0.025 * u2, 0.42 * u2, 0.16 * u2, paint, s.bot.id);
+    stickerBadge(ctx, stickers.hood, 0.13 * u2, (b.top + 0.045) * u2, 0.3 * u2, 0.085 * u2, paint, s.bot.id);
+    stickerBadge(ctx, stickers.rear, (b.minX + 0.09) * u2, mid * u2, 0.14 * u2, 0.17 * u2, paint, s.bot.id);
     ctx.restore();
   }
 
@@ -1766,6 +1785,18 @@ function drawWear(ctx: CanvasRenderingContext2D, f: Frame, u: number, top: numbe
     const x = lerp(b.minX, b.maxX, r()) * u;
     ctx.fillRect(x, top, u * 0.02, u * 0.012);
   }
+  ctx.restore();
+}
+
+/** Draws the actual decal art inside a bounded physical sticker region. */
+function stickerBadge(ctx: CanvasRenderingContext2D, decal: string, x: number, y: number, w: number, h: number, paint: string, id: string) {
+  if (decal === "none") return;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(w, h);
+  ctx.beginPath(); ctx.rect(-0.5, -0.5, 1, 1); ctx.clip();
+  const frame: Frame = { hull: [[-0.5,-0.5],[0.5,-0.5],[0.5,0.5],[-0.5,0.5]], deck: -0.5, front: 0.5, height: 1, wheels: [], treads: false };
+  drawDecal(ctx, decal, frame, 1, paint, id, 1);
   ctx.restore();
 }
 
@@ -3205,7 +3236,7 @@ function traceTopHull(
   ctx.closePath();
 }
 
-function drawTopBot(
+export function drawTopBot(
   ctx: CanvasRenderingContext2D,
   s: BotState,
   at: { x: number; y: number },
@@ -3340,6 +3371,15 @@ function drawTopBot(
     ctx.fillStyle = "#f3efe6";
     ctx.fillRect(-len * 0.5, -wid * 0.05, len * 0.9, wid * 0.1);
   }
+  ctx.save();
+  traceTopHull(ctx, s.bot.classId, style.body, len, wid);
+  ctx.clip();
+  const stickers = style.stickers!;
+  stickerBadge(ctx, stickers.left, -len * 0.08, -wid * 0.36, len * 0.42, wid * 0.18, paint, s.bot.id);
+  stickerBadge(ctx, stickers.right, -len * 0.08, wid * 0.36, len * 0.42, wid * 0.18, paint, s.bot.id);
+  stickerBadge(ctx, stickers.hood, len * 0.12, 0, len * 0.32, wid * 0.44, paint, s.bot.id);
+  stickerBadge(ctx, stickers.rear, -len * 0.39, 0, len * 0.16, wid * 0.5, paint, s.bot.id);
+  ctx.restore();
   // LED.
   const blink = s.dead ? 0 : Math.sin(time * 6 + hash(s.bot.id)) > 0 ? 1 : 0.35;
   ctx.fillStyle = s.dead

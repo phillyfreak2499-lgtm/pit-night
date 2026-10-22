@@ -109,7 +109,7 @@ const GROUPS: Group[] = [
       ),
       faq(
         "Does paint or a decal change the fight?",
-        "No. Paint, finish, decals, trim, eye color, the flag, and the bay number are just for looks.",
+        "No. Body shells, paint, finish, four sticker slots, trim, visor, flag, toppers, walkouts, victory effects and bay numbers are just for looks. Crew can draft unlocked looks and vote in the Garage. Each person gets one vote per proposal; the captain chooses which proposal to apply. Weekly themes highlight categories without waiving unlocks or Bolt prices. Battle history stays until repaired.",
       ),
       faq(
         "What does a Scry do?",

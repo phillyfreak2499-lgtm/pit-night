@@ -3,7 +3,7 @@ import { partById } from "@/lib/pit/catalog";
 import { botFor, canSeeLoadout, weaponFamilyOf } from "@/lib/pit/engine";
 import { usePit } from "@/lib/pit/store";
 import type { BotLook, BotStyle, ClassId, FighterSnap, Tier } from "@/lib/pit/types";
-import { drawSideBot, paintOf, shade } from "./cage-draw";
+import { drawSideBot, drawTopBot, drawCosmeticEffect, Fx, paintOf, shade } from "./cage-draw";
 import type { BotState } from "./cage-motion";
 
 export type BotLookProps = {
@@ -99,16 +99,20 @@ export function BotPortrait({
   className = "",
   floor = true,
   zoom = 1,
+  effect = "",
+  camera = "side",
 }: {
   look: BotLookProps | null;
   facing?: 1 | -1;
   className?: string;
   floor?: boolean;
   zoom?: number;
+  effect?: string;
+  camera?: "side" | "top";
 }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const key = look
-    ? `${look.id}|${look.paint}|${look.classId}|${look.weapon}|${look.look}|${look.number}|${look.hp}|${JSON.stringify(look.style ?? {})}|${look.brainTier ?? ""}`
+    ? `${look.id}|${look.paint}|${look.classId}|${look.weapon}|${look.look}|${look.number}|${look.hp}|${look.scars ?? 0}|${JSON.stringify(look.style ?? {})}|${look.brainTier ?? ""}`
     : "";
 
   useEffect(() => {
@@ -118,6 +122,7 @@ export function BotPortrait({
     if (!ctx) return;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const state = stateFor(look);
+    const fx = new Fx();
     const host = (canvas.closest("[data-bot-hover]") as HTMLElement | null) ?? canvas;
     let hot = false;
     let heat = 0;
@@ -189,7 +194,9 @@ export function BotPortrait({
                 ? 24
                 : 0;
         if (!reduced) spin += rate * state.rev * dt;
-        drawSideBot(ctx, state, gx, gy, u, reduced ? 0 : t, spin, facing);
+        if (camera === "top") drawTopBot(ctx, state, { x: w / 2, y: h / 2 }, Math.min(w, h) * 4 * zoom, spin, reduced ? 0 : t);
+        else drawSideBot(ctx, state, gx, gy, u, reduced ? 0 : t, spin, facing);
+        if (effect && !reduced) drawCosmeticEffect(ctx, fx, effect, gx, gy, u * 0.65, w, h, dt, paintOf(look.paint));
         if (look.weapon === "hidden") drawTarp(ctx, look, gx, gy, u, facing, t, heat);
       }
       raf = requestAnimationFrame(draw);
@@ -206,7 +213,7 @@ export function BotPortrait({
     };
     // `key` captures every field of `look` that changes the picture.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, facing, floor, zoom]);
+  }, [key, facing, floor, zoom, effect, camera]);
 
   if (!look) return null;
   return <canvas ref={ref} aria-hidden className={`block ${className}`} />;

@@ -1,3 +1,6 @@
+import { CosmeticBoard, CosmeticTheme } from "./cosmetic-board";
+import { EffectLockerPreview } from "./effect-locker-preview";
+import type { CosmeticLoadout, StickerSlot } from "@/lib/pit/types";
 import { BuildLockBanner } from "./build-lock-banner";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -101,11 +104,11 @@ export function GaragePage({ storeId }: { storeId: string }) {
         </div>
       </section>
 
-      {captain ? (
-        <DecoratePanel storeId={storeId} />
-      ) : (
-        <p className="text-sm text-muted">Decoration is on the door. It does not change the fight. The captain dresses the bay.</p>
-      )}
+      <CosmeticTheme storeId={storeId} />
+      <WearSummary storeId={storeId} />
+      <CosmeticBoard storeId={storeId} captain={captain} />
+      <DecoratePanel key={storeId} storeId={storeId} proposalMode={!captain} />
+      <EffectLockerPreview storeId={storeId} canBuy={captain} />
 
       <section className="grid gap-3 md:grid-cols-4">
         <Meter label="Coins" value={`${Object.values(bot.coins).reduce((a, b) => a + b, 0)}`} hint="Across all six jars. Each jar only buys its own part." />
@@ -463,7 +466,7 @@ function lookLabel(look: BotLook) {
 function GarageBot({ storeId }: { storeId: string }) {
   const look = useBotLook(storeId);
   return (
-    <span data-bot-hover className="block h-36 w-60 shrink-0 md:h-44 md:w-80">
+    <span data-bot-hover className="block h-36 w-40 max-w-full shrink md:h-44 md:w-80">
       <BotPortrait look={look} facing={-1} className="h-full w-full" />
     </span>
   );
@@ -539,17 +542,24 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function DecoratePanel({ storeId }: { storeId: string }) {
+function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMode: boolean }) {
   const data = usePit();
-  const setPaint = usePit((state) => state.setPaint);
-  const setGarage = usePit((state) => state.setGarage);
-  const setLook = usePit((state) => state.setLook);
-  const setNumber = usePit((state) => state.setNumber);
-  const setStyle = usePit((state) => state.setStyle);
-  const store = data.stores.find((row) => row.id === storeId)!;
-  const bot = data.bots.find((row) => row.storeId === storeId)!;
+  const activeStore = data.stores.find(row => row.id === storeId)!;
+  const activeBot = data.bots.find(row => row.storeId === storeId)!;
+  const [draft, setDraft] = useState<CosmeticLoadout | null>(null);
+  const [camera, setCamera] = useState<"left" | "right" | "top">("left");
+  const live = { paint: activeStore.paint, look: activeBot.look, number: activeBot.number, style: styleOf(activeBot, activeBot.classId) };
+  const current = proposalMode ? (draft ?? live) : live;
+  const store = { ...activeStore, paint: current.paint };
+  const bot = { ...activeBot, look: current.look, number: current.number, style: current.style };
   const style = styleOf(bot, bot.classId);
-  const look = useBotLook(storeId);
+  const baseLook = useBotLook(storeId);
+  const look = baseLook ? { ...baseLook, paint: current.paint, look: current.look, number: current.number, style } : null;
+  const setPaint = (_: string, paint: string) => proposalMode ? setDraft({ ...current, paint }) : data.setPaint(storeId, paint);
+  const setLook = (_: string, look: BotLook) => proposalMode ? setDraft({ ...current, look }) : data.setLook(storeId, look);
+  const setNumber = (_: string, number: string) => proposalMode ? setDraft({ ...current, number }) : data.setNumber(storeId, number);
+  const setStyle = (_: string, patch: Partial<typeof style>) => proposalMode ? setDraft({ ...current, style: { ...style, ...patch } }) : data.setStyle(storeId, patch);
+  const setGarage = data.setGarage;
   const progress = cosmeticProgress(data, storeId);
   const earnedCount = progress.filter((row) => row.earned).length;
   const nextRewards = progress
@@ -579,6 +589,10 @@ function DecoratePanel({ storeId }: { storeId: string }) {
   const availableEye = Object.keys(EYES).filter((key) => unlocked("eye", key));
   const availableTopper = TOPPERS.filter((row) => unlocked("topper", row.id));
   const surprise = () => {
+    if (proposalMode) {
+      setDraft({ ...current, paint: pick(availablePaint), look: pick(LOOKS).id, style: { ...style, finish: pick(availableFinish).id, trim: pick(availableTrim), eye: pick(availableEye), topper: pick(availableTopper).id, stickers: { left: pick(availableDecal).id, right: pick(availableDecal).id, hood: pick(availableDecal).id, rear: pick(availableDecal).id } } });
+      return;
+    }
     if (availablePaint.length) setPaint(storeId, pick(availablePaint));
     setLook(storeId, pick(LOOKS).id);
     setStyle(storeId, {
@@ -595,12 +609,13 @@ function DecoratePanel({ storeId }: { storeId: string }) {
     <section className="border border-line bg-surface">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
         <div>
-          <SectionLabel>Bot Locker · earn the look</SectionLabel>
+          <SectionLabel>Bot Locker · {proposalMode ? "draft a crew proposal" : "earn the look"}</SectionLabel>
           <p className="text-sm text-muted">Jobs, Sparks, Mystery Crates, picks and wins unlock more looks. Cosmetics never change Power, Speed, Armor, Heat, HP or fight odds.</p>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted">{earnedCount}/{progress.length} achievement unlocks</span>
           <Btn tone="line" onClick={surprise}>Surprise me</Btn>
+          {proposalMode ? <Btn onClick={() => data.proposeCosmetic(storeId, current)}>Submit look for voting</Btn> : null}
         </div>
       </div>
 
@@ -631,9 +646,10 @@ function DecoratePanel({ storeId }: { storeId: string }) {
         <div className="lg:sticky lg:top-4 lg:self-start">
           <div data-bot-hover className={`relative h-64 overflow-hidden border border-line md:h-72 ${garageClass(store.garage)}`}>
             <div className="absolute inset-0 bg-deep/55" />
-            <BotPortrait look={look ? { ...look, weapon: look.weapon === "hidden" ? "none" : look.weapon } : null} facing={-1} zoom={0.74} className="relative h-full w-full" />
+            <BotPortrait look={look ? { ...look, weapon: look.weapon === "hidden" ? "none" : look.weapon } : null} facing={camera === "right" ? 1 : -1} camera={camera === "top" ? "top" : "side"} zoom={0.74} className="relative h-full w-full" />
           </div>
           <p className="mt-2 text-xs text-muted">Hover the preview to rev it. Locked items show the exact achievement needed.</p>
+          <div className="mt-2 flex flex-wrap gap-2">{(["left", "right", "top"] as const).map(view => <Chip key={view} active={camera === view} onClick={() => setCamera(view)}>{view} view</Chip>)}</div>
         </div>
 
         <div className="flex flex-col gap-4">
@@ -682,16 +698,14 @@ function DecoratePanel({ storeId }: { storeId: string }) {
             })}
           </Group>
 
-          <Group label="Decal">
-            {DECALS.map((row) => {
-              const open = unlocked("decal", row.id);
-              return (
-                <Chip key={row.id} active={style.decal === row.id} disabled={!open} title={open ? row.label : lockTitle("decal", row.id)} onClick={() => setStyle(storeId, { decal: row.id })}>
-                  {row.label}{!open ? " 🔒" : ""}
-                </Chip>
-              );
-            })}
-          </Group>
+          {([['left','Left armor'],['right','Right armor'],['hood','Top / hood'],['rear','Rear panel']] as [StickerSlot,string][]).map(([slot,label]) => (
+            <Group key={slot} label={label + ' sticker'}>
+              {DECALS.map(row => {
+                const open = unlocked('decal', row.id);
+                return <Chip key={row.id} active={style.stickers?.[slot] === row.id} disabled={!open} title={open ? row.label : lockTitle('decal',row.id)} onClick={() => proposalMode ? setStyle(storeId, { stickers: { ...style.stickers!, [slot]: row.id } }) : data.setSticker(storeId, slot, row.id)}>{row.label}{!open ? ' 🔒' : ''}</Chip>;
+              })}
+            </Group>
+          ))}
 
           <Group label="Stripes & panels">
             {LOOKS.map((row) => (
@@ -735,11 +749,16 @@ function DecoratePanel({ storeId }: { storeId: string }) {
             <Chip active={!style.flag} onClick={() => setStyle(storeId, { flag: false })}>No flag</Chip>
           </Group>
 
-          <Group label="Garage floor">
+          {!proposalMode ? <Group label="Garage floor">
             {GARAGES.map((row) => (
               <Chip key={row.id} active={store.garage === row.id} onClick={() => setGarage(storeId, row.id)}>{row.label}</Chip>
             ))}
-          </Group>
+          </Group> : null}
+
+          {(["walkout", "victory"] as const).map(kind => <Group key={kind} label={kind}>
+            <Chip active={!style[kind]} onClick={() => setStyle(storeId, { [kind]: "" })}>None</Chip>
+            {(activeStore.unlocks ?? []).filter(id => id.startsWith(kind + '-')).map(id => <Chip key={id} active={style[kind] === id} onClick={() => setStyle(storeId, { [kind]: id })}>{id.replace(kind + '-', '')}</Chip>)}
+          </Group>)}
 
           <div className="max-w-xs">
             <Field label="Bay number">
@@ -750,4 +769,17 @@ function DecoratePanel({ storeId }: { storeId: string }) {
       </div>
     </section>
   );
+}
+
+function WearSummary({ storeId }: { storeId: string }) {
+  const bot = usePit(s => s.bots.find(b => b.storeId === storeId))!;
+  const wear = Object.values(bot.wear);
+  const scratched = wear.filter(w => w === 'scratched').length;
+  const bent = wear.filter(w => w === 'bent').length;
+  const disabled = wear.filter(w => w === 'disabled').length;
+  return <section className="border border-line bg-surface p-4" data-testid="wear-summary">
+    <SectionLabel>{disabled || bent > 1 ? 'Heavily damaged' : scratched || bent ? 'Battle-worn' : 'Clean'}</SectionLabel>
+    <p className="mt-2 text-sm">{scratched} scratched · {bent} bent · {disabled} disabled</p>
+    <p className="mt-1 text-sm text-muted">Battle history stays on the bot until repaired. Paint, stickers and crew proposals never erase damage. The Garage preview shows your unrepaired wear.</p>
+  </section>;
 }

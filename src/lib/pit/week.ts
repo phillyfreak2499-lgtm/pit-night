@@ -1,5 +1,6 @@
 import { BOLTS, DAY_ORDER, STREAK_BADGE, allJobs, programWeek } from "./training";
 import type { Crew, PitData } from "./types";
+import { championshipFinalists } from "./engine";
 
 /** Specialists who count toward a bay's week: everyone not marked off. */
 export function countedCrew(data: Pick<PitData, "crew">, storeId: string, week: number): Crew[] {
@@ -32,10 +33,11 @@ export type WeekProgress = {
   pct: number;
 };
 
-export function weekProgress(data: Pick<PitData, "crew" | "jobLog" | "sparkLog">, storeId: string, week: number): WeekProgress {
+export function weekProgress(data: PitData, storeId: string, week: number): WeekProgress {
   const plan = programWeek(week);
   const empty: WeekProgress = { week, crew: [], careDone: false, carePending: false, tuned: false, done: 0, total: 0, pct: 0 };
   if (!plan) return empty;
+  if (week === 5 && !championshipFinalists(data).includes(storeId)) return empty;
   const jobs = allJobs(plan);
   const sparkDays = plan.days.map((d) => d.day);
   const crew = countedCrew(data, storeId, week).map((c): CrewProgress => {
@@ -50,7 +52,7 @@ export function weekProgress(data: Pick<PitData, "crew" | "jobLog" | "sparkLog">
       sparksDone,
       jobsTotal: jobs.length,
       sparksTotal: sparkDays.length,
-      complete: jobsDone === jobs.length && sparksDone === DAY_ORDER.length,
+      complete: jobsDone === jobs.length && sparksDone === sparkDays.length,
     };
   });
   const cap = captainOf(data, storeId);
@@ -70,7 +72,7 @@ export function weekProgress(data: Pick<PitData, "crew" | "jobLog" | "sparkLog">
   };
 }
 
-export function tunedUp(data: Pick<PitData, "crew" | "jobLog" | "sparkLog">, storeId: string, week: number) {
+export function tunedUp(data: PitData, storeId: string, week: number) {
   return weekProgress(data, storeId, week).tuned;
 }
 

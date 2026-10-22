@@ -21,6 +21,7 @@ const card = z
   })
   .strict();
 const body = z.enum(["shrike","raptor","stinger","viper","warhawk","keystone","juggernaut","bunker","fortress","colossus","windlass","scorpion","mantis","phantom","reaper"]);
+const decal = z.enum(["none","flames","lightning","teeth","checker","hazard","camo","arch","stars","circuit","splash","champion"]);
 const style = z
   .object({
     body: body.optional(),
@@ -32,9 +33,20 @@ const style = z
       .enum(["none","flames","lightning","teeth","checker","hazard","camo","arch","stars","circuit","splash","champion"])
       .optional(),
     flag: z.boolean().optional(),
+    stickers: z.object({ left: decal, right: decal, hood: decal, rear: decal }).strict().optional(),
+    walkout: z.enum(["", "walkout-pyro", "walkout-smoke", "walkout-sparks"]).optional(),
+    victory: z.enum(["", "victory-confetti", "victory-fireworks"]).optional(),
   })
   .strict();
+export const cosmeticLoadoutSchema = z.object({
+  paint: id, look: z.enum(["plain", "stripe", "chevron", "rivets"]),
+  number: z.string().max(3), style: style.required({ finish: true, decal: true, trim: true, eye: true, flag: true }),
+}).strict();
 export const commandArgs = {
+  setSticker: z.tuple([id, z.enum(["left", "right", "hood", "rear"]), decal]),
+  proposeCosmetic: z.tuple([id, cosmeticLoadoutSchema]),
+  voteCosmetic: z.tuple([id]),
+  acceptCosmetic: z.tuple([id]),
   chooseStarterBody: z.tuple([id, z.enum(["striker","tank","specialist"]), body]),
   setDraftPart: z.tuple([id, slot, id.nullable()]),
   setDraftLoadout: z.tuple([id, loadout]),
@@ -105,6 +117,7 @@ const desk = new Set<Command>([
   "resetSeason",
 ]);
 const personal = new Set<Command>([
+  "proposeCosmetic", "voteCosmetic",
   "chooseStarterBody",
   "propose",
   "completeJob",
@@ -122,6 +135,10 @@ export function authorize(data: PitData, session: Session, name: Command, args: 
   if (desk.has(name)) throw new Error("Only the Desk can do that.");
   if (name === "setOfficialNsnu") throw new Error("Only the Desk records official NSNU.");
   if (personal.has(name)) {
+    if (name === "proposeCosmetic" && args[0] !== session.storeId)
+      throw new Error("This is another store's bay.");
+    if (name === "voteCosmetic" && data.cosmeticProposals?.find(p => p.id === args[0] && p.status === "open")?.storeId !== session.storeId)
+      throw new Error("This is another store's proposal or voting has closed.");
     if (name === "chooseStarterBody" && args[0] !== session.storeId)
       throw new Error("This is another store's bay.");
     if (name === "propose" && args[0] !== session.storeId)
@@ -130,6 +147,7 @@ export function authorize(data: PitData, session: Session, name: Command, args: 
   }
   if (session.role !== "captain") throw new Error("Only a captain can do that.");
   let storeId = args[0];
+  if (name === "acceptCosmetic") storeId = data.cosmeticProposals?.find(p => p.id === args[0])?.storeId;
   if (["approveJob", "rejectJob"].includes(name))
     storeId = data.jobLog.find((e) => e.id === args[0])?.storeId;
   if (["acceptProposal", "dismissProposal"].includes(name))

@@ -348,7 +348,7 @@ function Health({
 
 function captionFor(result: FightResult, bout: Bout, beat: Beat, noDamage: boolean) {
   if (beat.kind === "bumper" && bout.kind === "bye") return "Bye. It counts as a win. The bot does not take damage.";
-  if (beat.kind === "bumper") return noDamage ? "Bay scrimmage. The house drill. Nothing posts." : `${bout.title}. Eleven stores. This cage holds ${bout.kind === "melee" ? "the tie" : "two"}.`;
+  if (beat.kind === "bumper") return noDamage ? "Bay scrimmage. The house drill. Nothing posts." : `${bout.title}. Fourteen stores. This cage holds ${bout.kind === "melee" ? "the tie" : "two"}.`;
   if (beat.kind === "intro") {
     const f = result.fighters[beat.side];
     if (!f) return "";

@@ -1,3 +1,5 @@
+import { EffectLockerPreview } from "./effect-locker-preview";
+import { CosmeticTheme } from "./cosmetic-board";
 import { submitDailySpark } from "@/lib/pit/sync";
 import { Check, Clock, Flame, Lock, Package, Sparkles, Wrench } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -136,6 +138,7 @@ export function WeekPage() {
       </div>
 
       <LeagueBoard data={data} week={plan.week} />
+      {store ? <CosmeticTheme storeId={store.id} /> : null}
       {store && canPrep ? <BoltLocker data={data} storeId={store.id} canBuy={captain} /> : null}
       {me ? null : <p className="text-center text-xs text-muted">Pit Week counts for the bay, not for one person. Names show on the wall and the titantron.</p>}
     </div>
@@ -693,6 +696,7 @@ function BoltLocker({ data, storeId, canBuy }: { data: PitData; storeId: string;
           {bolts.balance} <span className="text-sm text-muted">bolts</span>
         </p>
       </div>
+      <EffectLockerPreview storeId={storeId} canBuy={false} />
       <ul className="grid gap-px bg-line sm:grid-cols-2 lg:grid-cols-3">
         {LOCKER.map((item) => {
           const have = owned.has(item.id);
@@ -714,7 +718,7 @@ function BoltLocker({ data, storeId, canBuy }: { data: PitData; storeId: string;
                     tone={equipped ? "line" : "amber"}
                     onClick={() => {
                       if (item.kind === "paint") setPaint(storeId, item.id.replace("paint-", ""));
-                      else if (item.kind === "walkout") setStyle(storeId, { walkout: equipped ? undefined : item.id });
+                      else if (item.kind === "walkout") setStyle(storeId, { walkout: equipped ? "" : item.id });
                       else setStyle(storeId, { victory: equipped ? undefined : item.id });
                     }}
                   >

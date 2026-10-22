@@ -151,7 +151,9 @@ export function starterBodies(classId?: ClassId) {
 }
 export function styleOf(source: ({ style?: Partial<BotStyle>; classId?: ClassId } | null | undefined), classId?: ClassId): BotStyle {
   const cls = classId ?? source?.classId ?? "striker";
-  return { ...DEFAULT_STYLE, body: source?.style?.body ?? defaultBody(cls), ...(source?.style ?? {}) };
+  const style = { ...DEFAULT_STYLE, body: source?.style?.body ?? defaultBody(cls), ...(source?.style ?? {}) };
+  const stickers = { left: "none" as const, right: "none" as const, hood: style.decal, rear: "none" as const, ...style.stickers };
+  return { ...style, decal: stickers.hood, stickers };
 }
 
 export type Part = {
@@ -329,7 +331,7 @@ const FAMILIES: Family[] = [
       sport: "Tighter drum on the winch. Heat comes up cleaner.",
       pro: "A Windlass that does not miss the second grab.",
       super: "The grip gets mean. Strikers hate this shape.",
-      championship: "Title vice. Salvage or a Title Monday drop. Never a price tag.",
+      championship: "Title vice. Salvage or a Championship Saturday drop. Never a price tag.",
     },
   },
   {

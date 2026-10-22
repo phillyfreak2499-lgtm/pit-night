@@ -43,12 +43,19 @@ import { BOLTS, STREAK_BADGE, allJobs, crateFor, dayOpen, programWeek, type DayK
 import { eligibilityClosed } from "./eligibility";
 import { cosmeticUnlocked, validBodyForClass } from "./cosmetics";
 import { boltsOf, lockerItem, sparkStreak } from "./week";
+import { checkedCosmeticLoadout } from "./cosmetic-loadout";
+import { authorize } from "./commands";
+import type { BotDecal, CosmeticLoadout, StickerSlot } from "./types";
 import type { Bot, BotLook, BotStyle, Condition, FightResult, GarageLook, Grade, Kickoff, Loadout, PitData, Session, Slot, StatKey, StoreCard } from "./types";
 
 const FIELD_OF: Record<StatKey, keyof StoreCard> = { nsnu: "nsnu", conv: "conv", demoRate: "demoRate", demoClose: "demoClose", arch: "arch", ticket: "demoTicket" };
 
 export type PitState = PitData & {
   flash: string;
+  setSticker: (storeId: string, slot: StickerSlot, decal: BotDecal) => void;
+  proposeCosmetic: (storeId: string, loadout: CosmeticLoadout) => void;
+  voteCosmetic: (id: string) => void;
+  acceptCosmetic: (id: string) => void;
   signPublic: () => void;
   chooseStarterBody: (storeId: string, classId: Bot["classId"], body: NonNullable<BotStyle["body"]>) => void;
   signCrew: (storeId: string, crewId: string, code?: string) => Promise<boolean>;
@@ -212,6 +219,10 @@ function fresh(): PitState {
   return {
     ...makeData(),
     flash: "",
+    setSticker: () => {},
+    proposeCosmetic: () => {},
+    voteCosmetic: () => {},
+    acceptCosmetic: () => {},
     signPublic: () => {},
     chooseStarterBody: () => {},
     signCrew: async () => false,
@@ -277,7 +288,7 @@ export const TUTORIAL_REV = 3;
 export const SHARED_KEYS = [
   "version", "seasonName", "tagline", "week", "phase", "stores", "crew", "bots", "weeks", "storeCards", "bouts",
   "gazette", "quotes", "proposals", "mvps", "honors", "craft", "log", "intel", "jobLog", "rallies", "sparkLog", "shouts", "picks",
-  "trainingOpenAll", "kickoff",
+  "trainingOpenAll", "kickoff", "cosmeticProposals",
 ] as const satisfies readonly (keyof PitData)[];
 
 export type SharedDoc = Pick<PitData, (typeof SHARED_KEYS)[number]>;
@@ -304,6 +315,7 @@ export function clientDoc(state: PitData, session: Session): SharedDoc {
   const desk = session.role === "commissioner";
   out.intel = desk ? out.intel : out.intel.filter(i => i.from === session.storeId);
   out.proposals = desk ? out.proposals : out.proposals.filter(p => p.storeId === session.storeId);
+  out.cosmeticProposals = (out.cosmeticProposals ?? []).filter(p => desk || (session.role !== "public" && p.storeId === session.storeId));
   if (desk || ["fought", "inspected", "complete"].includes(state.phase)) return out;
   out.bots = out.bots.map(bot => {
     if (session.role !== "public" && session.storeId === bot.storeId) return bot;
@@ -315,6 +327,51 @@ export function clientDoc(state: PitData, session: Session): SharedDoc {
 
 export const pitCreator: StateCreator<PitState> = (set, get) => ({
       ...fresh(),
+      setSticker: (storeId, slot, decal) => {
+        const data = get();
+        if (!isCaptainOf(data, storeId)) return;
+        const bot = data.bots.find(b => b.storeId === storeId);
+        if (!bot) return;
+        // Merge only this slot against the latest authoritative bot, not the caller's snapshot.
+        data.setStyle(storeId, { stickers: { ...styleOf(bot).stickers!, [slot]: decal } });
+      },
+      proposeCosmetic: (storeId, input) => {
+        const data = get();
+        try { authorize(data, data.session, "proposeCosmetic", [storeId, input]); } catch { return; }
+        const who = actor(data);
+        if (!who || who.storeId !== storeId) return;
+        const loadout = checkedCosmeticLoadout(data, storeId, input);
+        if (!loadout) { set({ flash: "Use only your store's unlocked cosmetics. Starter bodies stay frozen through Week 1." }); return; }
+        const proposals = data.cosmeticProposals ?? [];
+        if (proposals.some(p => p.status === "open" && p.crewId === who.id && JSON.stringify(p.loadout) === JSON.stringify(loadout))) {
+          set({ flash: "Your crew can already vote for this look." }); return;
+        }
+        // One current proposal per person keeps the shared board bounded; edits start a fresh vote.
+        const id = `look:${who.id}:${crypto.randomUUID()}`;
+        set({ cosmeticProposals: [...proposals.filter(p => p.crewId !== who.id || p.status !== "open"),
+          { id, storeId, crewId: who.id, crewName: who.name, loadout, voters: [], at: Date.now(), status: "open" }],
+          flash: "Look proposed. One vote per person per proposal; the captain makes the final call." });
+      },
+      voteCosmetic: (id) => {
+        const data = get();
+        try { authorize(data, data.session, "voteCosmetic", [id]); } catch { return; }
+        const who = actor(data);
+        const p = data.cosmeticProposals?.find(p => p.id === id && p.status === "open");
+        if (!who || !p || p.storeId !== who.storeId || p.voters.includes(who.id)) return;
+        set({ cosmeticProposals: data.cosmeticProposals.map(row => row.id === id ? { ...row, voters: [...row.voters, who.id] } : row), flash: "Vote counted." });
+      },
+      acceptCosmetic: (id) => {
+        const data = get();
+        try { authorize(data, data.session, "acceptCosmetic", [id]); } catch { return; }
+        const p = data.cosmeticProposals?.find(p => p.id === id && p.status === "open");
+        if (!p || !isCaptainOf(data, p.storeId)) return;
+        const loadout = checkedCosmeticLoadout(data, p.storeId, p.loadout);
+        if (!loadout) { set({ flash: "This proposal no longer qualifies. Ask the crew to submit a current unlocked look." }); return; }
+        set({ stores: data.stores.map(s => s.id === p.storeId ? { ...s, paint: loadout.paint } : s),
+          bots: patchBot(data.bots, p.storeId, b => ({ ...b, style: loadout.style, look: loadout.look, number: loadout.number })),
+          cosmeticProposals: data.cosmeticProposals.map(row => row.id === id ? { ...row, status: "accepted" } : row),
+          flash: `${p.crewName}'s look accepted. Battle history and combat stats stay unchanged.` });
+      },
       signPublic: () => {},
       chooseStarterBody: (storeId, classId, body) => {
         const data = get();
@@ -1097,6 +1154,12 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         if (!isCaptainOf(data, storeId)) return;
         const bot = data.bots.find((row) => row.storeId === storeId);
         if (!bot) return;
+        const current = styleOf(bot, bot.classId);
+        const next = styleOf({ classId: bot.classId, style: { ...current, ...patch, stickers: patch.stickers ?? (patch.decal !== undefined ? { ...current.stickers!, hood: patch.decal } : current.stickers) } });
+        const store = data.stores.find(s => s.id === storeId);
+        if (!store || !checkedCosmeticLoadout(data, storeId, { paint: store.paint, look: bot.look, number: bot.number, style: next })) {
+          set({ flash: "Earn or purchase that cosmetic before equipping it." }); return;
+        }
         if (patch.body) {
           if (data.week === 1 && bot.style?.body && patch.body !== bot.style.body) {
             set({ flash: "Starter body is frozen through the first fight." });
@@ -1118,7 +1181,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           }
         }
         set({
-          bots: patchBot(data.bots, storeId, (b) => ({ ...b, style: { ...styleOf(b, b.classId), ...patch } })),
+          bots: patchBot(data.bots, storeId, (b) => ({ ...b, style: next })),
           flash: "Bot dressed. Still the same iron.",
         });
       },
@@ -1708,7 +1771,11 @@ export function applyLeague14<T extends Partial<PitData>>(data: T): T {
     crew.push(...fresh.crew.filter((member) => member.storeId === store.id));
   }
   const oldBots = data.bots ?? [];
-  const bots = fresh.bots.map((bot) => oldBots.find((row) => row.storeId === bot.storeId) ?? bot);
+  const bots = fresh.bots.map((bot) => {
+    const old = oldBots.find((row) => row.storeId === bot.storeId) ?? bot;
+    // Preserve the one-time starter choice: migration must not invent a body for an unchosen bot.
+    return old.style ? { ...old, style: { ...old.style, stickers: styleOf(old).stickers } } : old;
+  });
   const oldCards = data.storeCards ?? [];
   const storeCards = [
     ...oldCards,
@@ -1732,6 +1799,7 @@ export function applyLeague14<T extends Partial<PitData>>(data: T): T {
     storeCards,
     weeks,
     rallies: data.rallies ?? [],
+    cosmeticProposals: data.cosmeticProposals ?? [],
   } as T;
 }
 

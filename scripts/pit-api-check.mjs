@@ -98,7 +98,7 @@ await captain.call("signIn", {
 });
 await assert.rejects(captain.call("getStoreCodes"));
 const vaultRows = await desk.call("getStoreCodes");
-assert.equal(vaultRows.length, 11);
+assert.equal(vaultRows.length, 14);
 assert.equal(vaultRows.find((row) => row.storeId === "plano").captain, codes.captain);
 assert.equal(vaultRows.find((row) => row.storeId === "plano").crew, codes.crew);
 await assert.rejects(desk.call("getStoreCodes", undefined, "https://example.com"));
@@ -107,6 +107,33 @@ await assert.rejects(captain.command("runSaturday", []));
 await assert.rejects(captain.call("setAccessCode", { id: "desk", code: "192837" }));
 await assert.rejects(crew.command("submitSpark", [1, "tue", 3, 3]));
 await assert.rejects(desk.command("houseCall", ["Cross-origin write"], "https://example.com"));
+await crew.command("chooseStarterBody", ["plano", "striker", "shrike"]);
+// Crew design commands cross the same authenticated/CAS boundary as all league work.
+const ownData = JSON.parse((await crew.call("pullSeason", { rev: 0 })).doc);
+const ownBot = ownData.bots.find(b => b.storeId === "plano");
+const proposedLook = { paint: "amber", look: "stripe", number: "42", style: {
+  ...ownBot.style, stickers: { left: "none", right: "none", hood: "none", rear: "none" },
+} };
+await assert.rejects(anon.command("proposeCosmetic", ["plano", proposedLook]));
+await assert.rejects(crew.command("proposeCosmetic", ["allen", proposedLook]));
+await crew.command("proposeCosmetic", ["plano", proposedLook]);
+let board = JSON.parse((await captain.call("pullSeason", { rev: 0 })).doc).cosmeticProposals;
+assert.equal(board.length, 1);
+assert.equal(board[0].crewId, member.id);
+const designId = board[0].id;
+await assert.rejects(crew.command("acceptCosmetic", [designId]));
+await assert.rejects(crew.command("voteCosmetic", [designId], "https://example.com"));
+await Promise.all([crew.command("voteCosmetic", [designId]), crew.command("voteCosmetic", [designId])]);
+await captain.command("voteCosmetic", [designId]);
+board = JSON.parse((await captain.call("pullSeason", { rev: 0 })).doc).cosmeticProposals;
+assert.equal(board[0].voters.length, 2);
+const beforeDesign = JSON.parse((await captain.call("pullSeason", { rev: 0 })).doc).bots.find(b => b.storeId === "plano");
+assert.equal(beforeDesign.number, ownBot.number);
+await captain.command("acceptCosmetic", [designId]);
+const afterDesign = JSON.parse((await captain.call("pullSeason", { rev: 0 })).doc).bots.find(b => b.storeId === "plano");
+assert.equal(afterDesign.number, "42");
+assert.deepEqual({ ...afterDesign, style: beforeDesign.style, look: beforeDesign.look, number: beforeDesign.number }, beforeDesign);
+assert.equal(JSON.parse((await anon.call("pullSeason", { rev: 0 })).doc).cosmeticProposals.length, 0);
 // Independent sessions race from the same server revision. Both changes must survive CAS retries.
 await Promise.all([
   desk.command("setTagline", ["QA concurrent league message"]),
@@ -134,7 +161,7 @@ await crew.command("submitSpark", [1, "tue", [1, 0, 0]]);
 data = JSON.parse((await anon.call("pullSeason", { rev: 0 })).doc);
 assert.equal(data.sparkLog.length, 1);
 assert.equal(data.sparkLog[0].total, 3);
-assert.equal(data.sparkLog[0].correct, 2);
+assert.equal(data.sparkLog[0].correct, 1); // Current Week 1 Tue key: [1, 2, 3].
 await crew.command("completeJob", [1, "w1-crate", "QA helped a neighbor"]);
 data = JSON.parse((await anon.call("pullSeason", { rev: 0 })).doc);
 await captain.command("approveJob", [data.jobLog.find((e) => e.jobId === "w1-crate").id]);
@@ -148,6 +175,16 @@ assert.equal(
   data.stores.find((s) => s.id === "plano").unlocks.filter((id) => id === "paint-neon").length,
   1,
 );
+await crew.command("completeJob", [1, "w1-tue-skill", "Second approved job unlocks hazard stickers"]);
+data = JSON.parse((await captain.call("pullSeason", { rev: 0 })).doc);
+await captain.command("approveJob", [data.jobLog.find(e => e.jobId === "w1-tue-skill").id]);
+await Promise.all([
+  captain.command("setSticker", ["plano", "left", "hazard"]),
+  captain.command("setSticker", ["plano", "right", "arch"]),
+]);
+const stickerBot = JSON.parse((await captain.call("pullSeason", { rev: 0 })).doc).bots.find(b => b.storeId === "plano");
+assert.equal(stickerBot.style.stickers.left, "hazard");
+assert.equal(stickerBot.style.stickers.right, "arch");
 await desk.command("lockFriday", []);
 await crew.command("submitSpark", [1, "wed", [0, 0, 0]]);
 await captain.command("setDraftPart", ["plano", "utility", null]);
@@ -173,6 +210,20 @@ await captain.call("signIn", {
   code: replacement,
 });
 await desk.call("setAccessCode", { id: "captain:plano", code: codes.captain });
+// Bulk rotation is tested ONLY here, against the disposable loopback database.
+await assert.rejects(anon.call("rotateAllStoreCodes"));
+await assert.rejects(crew.call("rotateAllStoreCodes"));
+await assert.rejects(captain.call("rotateAllStoreCodes"));
+await assert.rejects(desk.call("rotateAllStoreCodes", undefined, "https://example.com"));
+const rotated = await desk.call("rotateAllStoreCodes");
+assert.equal(rotated.length, 14);
+assert.equal(new Set(rotated.flatMap(r => [r.crew,r.captain])).size, 28);
+assert.ok(rotated.every(r => /^\d{4}$/.test(r.crew) && /^\d{4}$/.test(r.captain)));
+assert.equal((await crew.call("pullSeason", { rev: 0 })).session.role, "public");
+for (const row of vaultRows) {
+  if (row.captain) await desk.call("setAccessCode", { id: `captain:${row.storeId}`, code: row.captain });
+  if (row.crew) await desk.call("setAccessCode", { id: `bay:${row.storeId}`, code: row.crew });
+}
 await desk.command("resetSeason", []);
 if (process.env.PIT_QA_SETUP_FIGHTS === "1") {
   data = JSON.parse((await anon.call("pullSeason", { rev: 0 })).doc);

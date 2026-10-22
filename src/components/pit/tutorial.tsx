@@ -11,7 +11,7 @@ const STEPS = [
   {
     kicker: "Sign in",
     title: "Tap Clipboard. Pick your store. Enter the bay code.",
-    body: "Your captain or the desk gives you the four-digit bay code. Choose I'm pit crew and tap your name, or I'm the captain. Pit crew can suggest parts and do Pit Week. The captain locks the bot and approves jobs.",
+    body: "Your captain or the desk gives you the four-digit bay code. Choose I'm pit crew and tap your name, or I'm the captain. Pit crew can suggest parts, draft unlocked cosmetic looks, vote for crew designs and do Pit Week. The captain accepts the final look. The captain locks the bot and approves jobs.",
   },
   {
     kicker: "Pit Week",
@@ -21,7 +21,7 @@ const STEPS = [
   {
     kicker: "Full Tune-Up",
     title: "Everyone finishes, the bot gets +4.",
-    body: "If every specialist finishes all ten jobs and all five Sparks, and the captain finishes CARE, by Saturday close, your bot gets +4 Power, Speed, Armor, and Heat for Monday. One person short and nobody gets it, so pull each other along. Captains can mark someone off for vacation.",
+    body: "If every specialist finishes all ten jobs and all five Sparks, and the captain finishes CARE, by Saturday close, your bot gets +4 Power, Speed, Armor, and Heat for Monday. One person short and nobody gets it, so pull each other along. Championship Prep has eight jobs and four Sparks (Tuesday–Friday), plus captain CARE, for finalists only. Other stores Rally. Captains plan vacation before Tuesday.",
   },
   {
     kicker: "The numbers",

@@ -16,6 +16,8 @@ export type BotLook = "plain" | "stripe" | "chevron" | "rivets";
 export type BotFinish = "factory" | "chrome" | "matte" | "worn" | "satin" | "carbon" | "iridescent" | "gold";
 export type BotDecal = "none" | "flames" | "lightning" | "teeth" | "checker" | "hazard" | "camo" | "arch" | "stars" | "circuit" | "splash" | "champion";
 export type BotTopper = "none" | "antenna" | "horns" | "mohawk" | "crown";
+export type StickerSlot = "left" | "right" | "hood" | "rear";
+export type StickerSlots = Record<StickerSlot, BotDecal>;
 export type BotBody =
   | "shrike" | "raptor" | "stinger" | "viper" | "warhawk"
   | "keystone" | "juggernaut" | "bunker" | "fortress" | "colossus"
@@ -27,6 +29,8 @@ export type BotStyle = {
   body?: BotBody;
   finish: BotFinish;
   decal: BotDecal;
+  /** Absent on legacy saves: decal migrates to hood. Explicit none remains empty. */
+  stickers?: StickerSlots;
   /** Key into TRIM. Edges, rims, and the flag. */
   trim: string;
   /** Key into EYES. The visor light. */
@@ -236,6 +240,13 @@ export type Proposal = {
   note: string;
 };
 
+export type CosmeticLoadout = { paint: string; look: BotLook; number: string; style: BotStyle };
+export type CosmeticProposal = {
+  id: string; storeId: string; crewId: string; crewName: string;
+  loadout: CosmeticLoadout; voters: string[]; at: number;
+  status: "open" | "accepted";
+};
+
 export type Mvp = {
   week: number;
   storeId: string;
@@ -283,6 +294,7 @@ export type PitData = {
   gazette: GazetteEntry[];
   quotes: Record<string, Quote[]>;
   proposals: Proposal[];
+  cosmeticProposals: CosmeticProposal[];
   mvps: Mvp[];
   honors: Honors;
   craft: { week: number; storeId: string; score: number }[];

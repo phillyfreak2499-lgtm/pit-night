@@ -22,6 +22,9 @@ export function RulesPage() {
       <Rule title="The clock">
         Monday through Saturday the store runs the floor. That whole week is the card. Saturday at close is one lock: chassis, drive, weapon, armor, utility, brain. The captain locks before the final numbers are in, so the lock is a bet on the week. Sunday the official numbers come out and the Desk clicks in each store's six colors. Monday morning the Desk runs seven fights live: every store fights and there are no byes. Monday afternoon is the damage report, the coins pay out, and the shop opens for the next week. Week 1 is different only because Period 11 colors pay the opening coins and set seeds inside Metro and Frontier.
       </Rule>
+      <Rule title="Crew owns the look; captain has the final call">
+        In the Garage, specialists propose only cosmetics their store has unlocked. Each person may keep one current proposal and vote once on each open proposal. Votes never equip a look: the captain accepts it. Left armor, right armor, top/hood and rear panel each have their own sticker. Weekly themes are Identity, Attitude, Showmanship, Battle Ready and Championship; all achievement requirements and Bolt prices still apply. Cosmetic changes never repair wear or change combat stats. Rehearse walkouts and victory effects before buying.
+      </Rule>
       <Rule title="What scores">
         Six numbers, graded green, blue, orange, or red. NSNU: green $1,000+, blue $900–$999, orange $800–$899. Conv %: green 64%+, blue 56–63%, orange 47–55%. Demo Rate: green 88%+, blue 80–87%, orange 72–79%. Demo Close %: green 73%+, blue 70–72%, orange 65–69%. Arch Supports: green 3.8+, blue 3.0–3.7, orange 2.5–2.9. Demo Ticket Avg: green $1,800+, blue $1,600–$1,799, orange $1,400–$1,599. Anything under orange is red. The better the week, the higher the bot's rating going into the fight.
       </Rule>
