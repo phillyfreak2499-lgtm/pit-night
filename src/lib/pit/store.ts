@@ -10,6 +10,7 @@ import {
   partById,
   stockPart,
   styleOf,
+  starterBodies,
 } from "./catalog";
 import {
   SLOTS,
@@ -40,6 +41,7 @@ import {
 import { makeData } from "./seed";
 import { BOLTS, STREAK_BADGE, allJobs, crateFor, dayOpen, programWeek, type DayKey } from "./training";
 import { eligibilityClosed } from "./eligibility";
+import { cosmeticUnlocked, validBodyForClass } from "./cosmetics";
 import { boltsOf, lockerItem, sparkStreak } from "./week";
 import type { Bot, BotLook, BotStyle, Condition, FightResult, GarageLook, Grade, Kickoff, Loadout, PitData, Session, Slot, StatKey, StoreCard } from "./types";
 
@@ -48,6 +50,7 @@ const FIELD_OF: Record<StatKey, keyof StoreCard> = { nsnu: "nsnu", conv: "conv",
 export type PitState = PitData & {
   flash: string;
   signPublic: () => void;
+  chooseStarterBody: (storeId: string, classId: Bot["classId"], body: NonNullable<BotStyle["body"]>) => void;
   signCrew: (storeId: string, crewId: string, code?: string) => Promise<boolean>;
   signCaptain: (storeId: string, passcode: string) => Promise<boolean>;
   signCommissioner: (pin: string) => Promise<boolean>;
@@ -138,6 +141,13 @@ function championshipPrepGuard(data: PitData, storeId: string): string | null {
     : "Championship Week bot work belongs to the two conference champions. Rally behind a finalist instead.";
 }
 
+function starterBodyGuard(data: PitData, storeId: string): string | null {
+  const bot = data.bots.find((row) => row.storeId === storeId);
+  return data.week === 1 && !bot?.style?.body
+    ? "Choose and lock your Week 1 body first."
+    : null;
+}
+
 function patchBot(bots: Bot[], storeId: string, fn: (bot: Bot) => Bot): Bot[] {
   return bots.map((bot) => (bot.storeId === storeId ? fn(bot) : bot));
 }
@@ -203,6 +213,7 @@ function fresh(): PitState {
     ...makeData(),
     flash: "",
     signPublic: () => {},
+    chooseStarterBody: () => {},
     signCrew: async () => false,
     signCaptain: async () => false,
     setPin: () => {},
@@ -305,6 +316,50 @@ export function clientDoc(state: PitData, session: Session): SharedDoc {
 export const pitCreator: StateCreator<PitState> = (set, get) => ({
       ...fresh(),
       signPublic: () => {},
+      chooseStarterBody: (storeId, classId, body) => {
+        const data = get();
+        const ownCrew = data.session.role === "crew" && data.session.storeId === storeId;
+        if (!isCaptainOf(data, storeId) && !ownCrew) {
+          set({ flash: "Sign in to choose this store's starter body." });
+          return;
+        }
+        const bot = data.bots.find((row) => row.storeId === storeId);
+        if (!bot) return;
+        if (data.week !== 1 || data.bouts.some((bout) => bout.week === 1 && bout.result) || bot.style?.body) {
+          set({ flash: "The Week 1 body choice is already locked." });
+          return;
+        }
+        const option = starterBodies(classId).find((row) => row.id === body);
+        if (!option) {
+          set({ flash: "That body does not belong to that fighting style." });
+          return;
+        }
+        const draft: Loadout = {
+          chassis: stockPart("chassis", classId).id,
+          drive: stockPart("drive", classId).id,
+          weapon: stockPart("weapon", classId).id,
+          armor: stockPart("armor", classId).id,
+          utility: null,
+          brain: stockPart("brain", classId).id,
+        };
+        set({
+          bots: patchBot(data.bots, storeId, (current) =>
+            syncWear({
+              ...current,
+              classId,
+              draft,
+              equipped: { ...draft },
+              locked: null,
+              style: { ...styleOf(current, classId), body },
+            }),
+          ),
+          flash: `${option.label} selected. ${CLASS_META[classId].label} body is locked through Week 1.`,
+          log: [
+            `${data.stores.find((row) => row.id === storeId)?.name ?? storeId} chose ${option.label} (${CLASS_META[classId].label}) for Week 1.`,
+            ...data.log.slice(0, 23),
+          ],
+        });
+      },
       signCrew: async () => false,
       signCaptain: async () => false,
       signCommissioner: async () => false,
