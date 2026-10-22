@@ -147,6 +147,7 @@ export function PitShell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
       {passOpen ? <PassSheet onClose={() => setPassOpen(false)} /> : null}
+      {ready ? <StarterBodyGate /> : null}
       {ready && (tutorialSeen !== TUTORIAL_REV || guide) ? (
         <Tutorial
           onClose={() => {
@@ -336,6 +337,16 @@ function phaseLabel(phase: string) {
   return "Season closed";
 }
 
+function StarterBodyGate() {
+  const session = usePit((state) => state.session);
+  const week = usePit((state) => state.week);
+  const bots = usePit((state) => state.bots);
+  if (week !== 1 || !session.storeId || !["crew", "captain"].includes(session.role)) return null;
+  const bot = bots.find((row) => row.storeId === session.storeId);
+  if (!bot || bot.style?.body) return null;
+  return <StarterBodyPicker storeId={session.storeId} onDone={() => {}} />;
+}
+
 function StarterBodyPicker({ storeId, onDone }: { storeId: string; onDone: () => void }) {
   const data = usePit();
   const chooseStarterBody = usePit((state) => state.chooseStarterBody);
@@ -438,13 +449,7 @@ function PassSheet({ onClose }: { onClose: () => void }) {
   const [pin, setPin] = useState("");
   const [bad, setBad] = useState(false);
   const [crewOpen, setCrewOpen] = useState<string | null>(null);
-  const [bodyStore, setBodyStore] = useState<string | null>(null);
   const bayCrew = crew.filter((c) => c.storeId === storeId && c.role === "specialist");
-  const needsStarterBody = (id: string) => {
-    const data = usePit.getState();
-    return data.week === 1 && !data.bots.find((bot) => bot.storeId === id)?.style?.body;
-  };
-  if (bodyStore) return <StarterBodyPicker storeId={bodyStore} onDone={onClose} />;
 
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-deep/80 p-3 md:items-center">
@@ -532,10 +537,8 @@ function PassSheet({ onClose }: { onClose: () => void }) {
               type="button"
               className="min-h-11 bg-amber font-display tracking-wide text-deep uppercase"
               onClick={async () => {
-                if (await signCaptain(storeId, code)) {
-                  if (needsStarterBody(storeId)) setBodyStore(storeId);
-                  else onClose();
-                } else setBad(true);
+                if (await signCaptain(storeId, code)) onClose();
+                else setBad(true);
               }}
             >
               {session.role === "crew" ? "Switch to Captain" : "I’m the captain"}
@@ -552,10 +555,8 @@ function PassSheet({ onClose }: { onClose: () => void }) {
                   type="button"
                   className="min-h-11 border border-line px-3 text-left"
                   onClick={async () => {
-                    if (await signCrew(storeId, member.id, code)) {
-                      if (needsStarterBody(storeId)) setBodyStore(storeId);
-                      else onClose();
-                    } else setBad(true);
+                    if (await signCrew(storeId, member.id, code)) onClose();
+                    else setBad(true);
                   }}
                 >
                   {member.name}
