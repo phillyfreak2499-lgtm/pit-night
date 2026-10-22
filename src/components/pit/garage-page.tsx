@@ -1,7 +1,7 @@
 import { BuildLockBanner } from "./build-lock-banner";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { CLASS_META, DECALS, EYES, FINISHES, LOCKER_PAINTS, PAINT, partById, partsFor, SLOT_LABEL, styleOf, TRIM } from "@/lib/pit/catalog";
+import { BODY_STYLES, CLASS_META, DECALS, EYES, FINISHES, LOCKER_PAINTS, PAINT, TOPPERS, partById, partsFor, SLOT_LABEL, styleOf, TRIM } from "@/lib/pit/catalog";
 import {
   buyCheck,
   canSeeLoadout,
@@ -14,6 +14,7 @@ import {
   wonThisWeek,
 } from "@/lib/pit/engine";
 import { paintHex, usePit, type PitState } from "@/lib/pit/store";
+import { cosmeticProgress, cosmeticUnlocked, rewardFor, type CosmeticKind } from "@/lib/pit/cosmetics";
 import type { BotLook, GarageLook, Slot, StoreCard } from "@/lib/pit/types";
 import { BotPortrait, useBotLook } from "./bot-portrait";
 import { KeyLadder } from "./key-ladder";
@@ -468,28 +469,60 @@ function GarageBot({ storeId }: { storeId: string }) {
   );
 }
 
-function Swatch({ color, active, label, onClick, glow }: { color: string; active: boolean; label: string; onClick: () => void; glow?: boolean }) {
+function Swatch({
+  color,
+  active,
+  label,
+  onClick,
+  glow,
+  disabled = false,
+  title,
+}: {
+  color: string;
+  active: boolean;
+  label: string;
+  onClick: () => void;
+  glow?: boolean;
+  disabled?: boolean;
+  title?: string;
+}) {
   return (
     <button
       type="button"
       aria-label={label}
       aria-pressed={active}
-      title={label}
-      className={`relative min-h-11 min-w-11 border-2 transition-transform hover:scale-105 ${active ? "border-amber" : "border-line"}`}
-      style={{ background: color, boxShadow: glow ? `0 0 12px ${color}` : undefined }}
+      disabled={disabled}
+      title={title ?? label}
+      className={`relative min-h-11 min-w-11 border-2 transition-transform ${disabled ? "cursor-not-allowed opacity-35" : "hover:scale-105"} ${active ? "border-amber" : "border-line"}`}
+      style={{ background: color, boxShadow: glow && !disabled ? `0 0 12px ${color}` : undefined }}
       onClick={onClick}
     >
       {active ? <span className="absolute inset-0 grid place-items-center font-display text-lg text-deep mix-blend-difference">✓</span> : null}
+      {disabled ? <span className="absolute inset-0 grid place-items-center bg-deep/55 font-display text-[9px] tracking-widest text-fg">LOCK</span> : null}
     </button>
   );
 }
 
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function Chip({
+  active,
+  onClick,
+  children,
+  disabled = false,
+  title,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  disabled?: boolean;
+  title?: string;
+}) {
   return (
     <button
       type="button"
       aria-pressed={active}
-      className={`min-h-11 border px-3 font-display text-sm tracking-wide uppercase transition-colors ${active ? "border-amber bg-amber/10 text-amber" : "border-line hover:border-muted"}`}
+      disabled={disabled}
+      title={title}
+      className={`min-h-11 border px-3 font-display text-sm tracking-wide uppercase transition-colors ${disabled ? "cursor-not-allowed border-line text-muted opacity-40" : active ? "border-amber bg-amber/10 text-amber" : "border-line hover:border-muted"}`}
       onClick={onClick}
     >
       {children}
@@ -508,24 +541,52 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
 
 function DecoratePanel({ storeId }: { storeId: string }) {
   const data = usePit();
-  const setPaint = usePit((s) => s.setPaint);
-  const setGarage = usePit((s) => s.setGarage);
-  const setLook = usePit((s) => s.setLook);
-  const setNumber = usePit((s) => s.setNumber);
-  const setStyle = usePit((s) => s.setStyle);
-  const store = data.stores.find((s) => s.id === storeId)!;
-  const bot = data.bots.find((b) => b.storeId === storeId)!;
-  const style = styleOf(bot);
+  const setPaint = usePit((state) => state.setPaint);
+  const setGarage = usePit((state) => state.setGarage);
+  const setLook = usePit((state) => state.setLook);
+  const setNumber = usePit((state) => state.setNumber);
+  const setStyle = usePit((state) => state.setStyle);
+  const store = data.stores.find((row) => row.id === storeId)!;
+  const bot = data.bots.find((row) => row.storeId === storeId)!;
+  const style = styleOf(bot, bot.classId);
   const look = useBotLook(storeId);
+  const progress = cosmeticProgress(data, storeId);
+  const earnedCount = progress.filter((row) => row.earned).length;
+  const nextRewards = progress
+    .filter((row) => !row.earned)
+    .sort((a, b) => b.current / b.target - a.current / a.target || a.target - b.target)
+    .slice(0, 6);
+  const unlocked = (kind: CosmeticKind, value: string) => cosmeticUnlocked(data, storeId, kind, value);
+  const lockTitle = (kind: CosmeticKind, value: string) => {
+    if (kind === "body") {
+      if (["viper", "fortress", "phantom"].includes(value)) return "Earn one Full Tune-Up";
+      if (["warhawk", "colossus", "reaper"].includes(value)) return "Reach Championship Saturday";
+      if (data.week === 1) return "Starter shell is locked after your first choice until Week 1 ends";
+      return "Starter shell";
+    }
+    const reward = rewardFor(kind, value);
+    if (!reward) return "Locked";
+    const row = progress.find((item) => item.reward.id === reward.id);
+    return row
+      ? `${reward.requirement} · ${Math.min(row.current, row.target)}/${row.target}`
+      : reward.requirement;
+  };
   const pick = <T,>(list: readonly T[]) => list[Math.floor(Math.random() * list.length)]!;
+  const availablePaint = Object.keys(PAINT).filter((key) => unlocked("paint", key));
+  const availableFinish = FINISHES.filter((row) => unlocked("finish", row.id));
+  const availableDecal = DECALS.filter((row) => unlocked("decal", row.id));
+  const availableTrim = Object.keys(TRIM).filter((key) => unlocked("trim", key));
+  const availableEye = Object.keys(EYES).filter((key) => unlocked("eye", key));
+  const availableTopper = TOPPERS.filter((row) => unlocked("topper", row.id));
   const surprise = () => {
-    setPaint(storeId, pick(Object.keys(PAINT).filter((key) => !LOCKER_PAINTS[key] || (store.unlocks ?? []).includes(LOCKER_PAINTS[key]!))));
+    if (availablePaint.length) setPaint(storeId, pick(availablePaint));
     setLook(storeId, pick(LOOKS).id);
     setStyle(storeId, {
-      finish: pick(FINISHES).id,
-      decal: pick(DECALS).id,
-      trim: pick(Object.keys(TRIM)),
-      eye: pick(Object.keys(EYES)),
+      finish: pick(availableFinish).id,
+      decal: pick(availableDecal).id,
+      trim: pick(availableTrim),
+      eye: pick(availableEye),
+      topper: pick(availableTopper).id,
       flag: Math.random() > 0.4,
     });
   };
@@ -534,75 +595,152 @@ function DecoratePanel({ storeId }: { storeId: string }) {
     <section className="border border-line bg-surface">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
         <div>
-          <SectionLabel>Paint shop</SectionLabel>
-          <p className="text-sm text-muted">Looks only. None of this changes Power, Speed, Armor, or Heat.</p>
+          <SectionLabel>Bot Locker · earn the look</SectionLabel>
+          <p className="text-sm text-muted">Jobs, Sparks, Mystery Crates, picks and wins unlock more looks. Cosmetics never change Power, Speed, Armor, Heat, HP or fight odds.</p>
         </div>
-        <Btn tone="line" onClick={surprise}>
-          Surprise me
-        </Btn>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted">{earnedCount}/{progress.length} achievement unlocks</span>
+          <Btn tone="line" onClick={surprise}>Surprise me</Btn>
+        </div>
       </div>
+
+      {nextRewards.length ? (
+        <div className="border-b border-line bg-deep/60 p-4">
+          <p className="text-xs tracking-widest text-amber uppercase">Closest unlocks</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {nextRewards.map(({ reward, current, target }) => {
+              const pct = Math.min(100, Math.round((current / target) * 100));
+              return (
+                <div key={reward.id} className="border border-line bg-surface p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-display text-lg">{reward.label}</span>
+                    <span className="text-xs text-muted">{Math.min(current, target)}/{target}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted">{reward.requirement}</p>
+                  <span className="mt-2 block h-1.5 bg-deep">
+                    <span className="block h-full bg-amber" style={{ width: `${pct}%` }} />
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
       <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <div className="lg:sticky lg:top-4 lg:self-start">
           <div data-bot-hover className={`relative h-64 overflow-hidden border border-line md:h-72 ${garageClass(store.garage)}`}>
             <div className="absolute inset-0 bg-deep/55" />
             <BotPortrait look={look ? { ...look, weapon: look.weapon === "hidden" ? "none" : look.weapon } : null} facing={-1} zoom={0.74} className="relative h-full w-full" />
           </div>
-          <p className="mt-2 text-xs text-muted">Hover the preview to rev it.</p>
+          <p className="mt-2 text-xs text-muted">Hover the preview to rev it. Locked items show the exact achievement needed.</p>
         </div>
+
         <div className="flex flex-col gap-4">
+          <Group label="Body shell">
+            {BODY_STYLES.filter((row) => row.classId === bot.classId).map((row) => {
+              const open = unlocked("body", row.id);
+              return (
+                <Chip
+                  key={row.id}
+                  active={style.body === row.id}
+                  disabled={!open}
+                  title={open ? row.note : lockTitle("body", row.id)}
+                  onClick={() => setStyle(storeId, { body: row.id })}
+                >
+                  {row.label}{!open ? " 🔒" : ""}
+                </Chip>
+              );
+            })}
+          </Group>
+
           <Group label="Paint">
-            {Object.keys(PAINT)
-              .filter((key) => !LOCKER_PAINTS[key] || (store.unlocks ?? []).includes(LOCKER_PAINTS[key]!))
-              .map((key) => (
-                <Swatch key={key} color={paintHex(key)} active={store.paint === key} label={`${key} paint`} onClick={() => setPaint(storeId, key)} />
-              ))}
+            {Object.keys(PAINT).map((key) => {
+              const open = unlocked("paint", key);
+              return (
+                <Swatch
+                  key={key}
+                  color={paintHex(key)}
+                  active={store.paint === key}
+                  label={`${key} paint`}
+                  disabled={!open}
+                  title={open ? `${key} paint` : lockTitle("paint", key)}
+                  onClick={() => setPaint(storeId, key)}
+                />
+              );
+            })}
           </Group>
+
           <Group label="Finish">
-            {FINISHES.map((row) => (
-              <Chip key={row.id} active={style.finish === row.id} onClick={() => setStyle(storeId, { finish: row.id })}>
-                {row.label}
-              </Chip>
-            ))}
+            {FINISHES.map((row) => {
+              const open = unlocked("finish", row.id);
+              return (
+                <Chip key={row.id} active={style.finish === row.id} disabled={!open} title={open ? row.note : lockTitle("finish", row.id)} onClick={() => setStyle(storeId, { finish: row.id })}>
+                  {row.label}{!open ? " 🔒" : ""}
+                </Chip>
+              );
+            })}
           </Group>
+
           <Group label="Decal">
-            {DECALS.map((row) => (
-              <Chip key={row.id} active={style.decal === row.id} onClick={() => setStyle(storeId, { decal: row.id })}>
-                {row.label}
-              </Chip>
-            ))}
+            {DECALS.map((row) => {
+              const open = unlocked("decal", row.id);
+              return (
+                <Chip key={row.id} active={style.decal === row.id} disabled={!open} title={open ? row.label : lockTitle("decal", row.id)} onClick={() => setStyle(storeId, { decal: row.id })}>
+                  {row.label}{!open ? " 🔒" : ""}
+                </Chip>
+              );
+            })}
           </Group>
-          <Group label="Stripes">
+
+          <Group label="Stripes & panels">
             {LOOKS.map((row) => (
               <Chip key={row.id} active={bot.look === row.id} onClick={() => setLook(storeId, row.id)}>
                 {row.label}
               </Chip>
             ))}
           </Group>
+
           <Group label="Trim">
-            {Object.entries(TRIM).map(([key, hex]) => (
-              <Swatch key={key} color={hex} active={style.trim === key} label={`${key} trim`} onClick={() => setStyle(storeId, { trim: key })} />
-            ))}
+            {Object.entries(TRIM).map(([key, hex]) => {
+              const open = unlocked("trim", key);
+              return (
+                <Swatch key={key} color={hex} active={style.trim === key} label={`${key} trim`} disabled={!open} title={open ? `${key} trim` : lockTitle("trim", key)} onClick={() => setStyle(storeId, { trim: key })} />
+              );
+            })}
           </Group>
-          <Group label="Eye">
-            {Object.entries(EYES).map(([key, hex]) => (
-              <Swatch key={key} color={hex} glow active={style.eye === key} label={`${key} eye`} onClick={() => setStyle(storeId, { eye: key })} />
-            ))}
+
+          <Group label="Eyes / visor">
+            {Object.entries(EYES).map(([key, hex]) => {
+              const open = unlocked("eye", key);
+              return (
+                <Swatch key={key} color={hex} glow active={style.eye === key} label={`${key} eye`} disabled={!open} title={open ? `${key} visor` : lockTitle("eye", key)} onClick={() => setStyle(storeId, { eye: key })} />
+              );
+            })}
           </Group>
+
+          <Group label="Topper">
+            {TOPPERS.map((row) => {
+              const open = unlocked("topper", row.id);
+              return (
+                <Chip key={row.id} active={(style.topper ?? "none") === row.id} disabled={!open} title={open ? row.label : lockTitle("topper", row.id)} onClick={() => setStyle(storeId, { topper: row.id })}>
+                  {row.label}{!open ? " 🔒" : ""}
+                </Chip>
+              );
+            })}
+          </Group>
+
           <Group label="Flag">
-            <Chip active={style.flag} onClick={() => setStyle(storeId, { flag: true })}>
-              Flag up
-            </Chip>
-            <Chip active={!style.flag} onClick={() => setStyle(storeId, { flag: false })}>
-              No flag
-            </Chip>
+            <Chip active={style.flag} onClick={() => setStyle(storeId, { flag: true })}>Flag up</Chip>
+            <Chip active={!style.flag} onClick={() => setStyle(storeId, { flag: false })}>No flag</Chip>
           </Group>
+
           <Group label="Garage floor">
             {GARAGES.map((row) => (
-              <Chip key={row.id} active={store.garage === row.id} onClick={() => setGarage(storeId, row.id)}>
-                {row.label}
-              </Chip>
+              <Chip key={row.id} active={store.garage === row.id} onClick={() => setGarage(storeId, row.id)}>{row.label}</Chip>
             ))}
           </Group>
+
           <div className="max-w-xs">
             <Field label="Bay number">
               <TextInput value={bot.number} aria-label="Bay number" maxLength={3} onChange={(e) => setNumber(storeId, e.target.value)} />
