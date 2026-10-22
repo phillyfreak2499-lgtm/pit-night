@@ -1705,6 +1705,7 @@ export function drawSideBot(
 
   if (style.flag && !s.flipped)
     drawFlag(ctx, f, u2, top, trim, paint, s.bot.storeName ?? "", time, s.charging, facing);
+  if (!s.flipped) drawTopper(ctx, style.topper, top, u2, trim, eye);
 
   // Status LED.
   const blink = s.dead ? 0 : Math.sin(time * 6 + hash(s.bot.id)) > 0 ? 1 : 0.35;
@@ -1941,7 +1942,118 @@ function drawDecal(
     ctx.closePath();
     ctx.fill();
     ctx.restore();
+  } else if (decal === "stars") {
+    ctx.fillStyle = "#fff4a8";
+    ctx.strokeStyle = "#7a5b00";
+    ctx.lineWidth = Math.max(1, u * 0.006);
+    for (const [sx,sy,rr] of [[0.28,0.3,0.055],[0.48,0.58,0.04],[0.68,0.35,0.048]] as const) {
+      ctx.save();
+      ctx.translate(X(sx),Y(sy));
+      ctx.beginPath();
+      for (let i=0;i<10;i++) {
+        const a=-Math.PI/2+i*Math.PI/5;
+        const r=(i%2===0?rr:rr*0.42)*u;
+        const px=Math.cos(a)*r, py=Math.sin(a)*r;
+        i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+      }
+      ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+    }
+  } else if (decal === "circuit") {
+    ctx.strokeStyle = "#52f6df";
+    ctx.lineWidth = Math.max(1, u * 0.012);
+    for (let i=0;i<4;i++) {
+      const yy=0.24+i*0.14;
+      ctx.beginPath();
+      ctx.moveTo(X(0.12),Y(yy));
+      ctx.lineTo(X(0.38+i*0.06),Y(yy));
+      ctx.lineTo(X(0.5+i*0.04),Y(yy+0.08));
+      ctx.lineTo(X(0.82),Y(yy+0.08));
+      ctx.stroke();
+      ctx.fillStyle="#52f6df";
+      ctx.beginPath(); ctx.arc(X(0.82),Y(yy+0.08),u*0.015,0,Math.PI*2); ctx.fill();
+    }
+  } else if (decal === "splash") {
+    const r = seeded(hash(`${id}splash`));
+    const tones=["#ff4fa3","#00b7ff","#a8ff2a","#ffe35a"];
+    for(let i=0;i<18;i++){
+      ctx.fillStyle=tones[i%tones.length]!;
+      ctx.globalAlpha=0.82;
+      ctx.beginPath();
+      ctx.arc(X(r()),Y(r()),u*(0.012+r()*0.035),0,Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  } else if (decal === "champion") {
+    const cx=X(0.45), cy=Y(0.45), r=Math.min(u*0.095,h*u*0.4);
+    ctx.fillStyle="#f6cd46"; ctx.strokeStyle="#563700"; ctx.lineWidth=Math.max(1,u*0.008);
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle="#241700";
+    ctx.font=`700 ${Math.max(8,r*0.9)}px Oswald, sans-serif`;
+    ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("W",cx,cy+r*0.06);
   }
+}
+
+function drawTopper(
+  ctx: CanvasRenderingContext2D,
+  topper: string | undefined,
+  top: number,
+  u: number,
+  trim: string,
+  eye: string,
+) {
+  if (!topper || topper === "none") return;
+  ctx.save();
+  ctx.lineCap = "round";
+  if (topper === "antenna") {
+    ctx.strokeStyle = "#b8c2cc";
+    ctx.lineWidth = Math.max(1.2, u * 0.009);
+    ctx.beginPath();
+    ctx.moveTo(-u * 0.08, top);
+    ctx.quadraticCurveTo(-u * 0.1, top - u * 0.28, -u * 0.02, top - u * 0.42);
+    ctx.stroke();
+    ctx.fillStyle = eye;
+    ctx.beginPath();
+    ctx.arc(-u * 0.02, top - u * 0.42, u * 0.025, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (topper === "horns") {
+    ctx.fillStyle = trim;
+    for (const x of [-0.18, 0.12]) {
+      ctx.beginPath();
+      ctx.moveTo((x - 0.04) * u, top + u * 0.01);
+      ctx.lineTo(x * u, top - u * 0.22);
+      ctx.lineTo((x + 0.05) * u, top + u * 0.01);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else if (topper === "mohawk") {
+    ctx.fillStyle = trim;
+    for (let i = 0; i < 5; i++) {
+      const x = (-0.22 + i * 0.09) * u;
+      const h = (0.13 + (i % 2) * 0.055) * u;
+      ctx.beginPath();
+      ctx.moveTo(x - u * 0.025, top);
+      ctx.lineTo(x, top - h);
+      ctx.lineTo(x + u * 0.025, top);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else if (topper === "crown") {
+    ctx.fillStyle = "#f6cd46";
+    ctx.strokeStyle = "#6b4600";
+    ctx.lineWidth = Math.max(1, u * 0.006);
+    ctx.beginPath();
+    ctx.moveTo(-u * 0.18, top);
+    ctx.lineTo(-u * 0.15, top - u * 0.2);
+    ctx.lineTo(-u * 0.06, top - u * 0.1);
+    ctx.lineTo(0, top - u * 0.24);
+    ctx.lineTo(u * 0.07, top - u * 0.1);
+    ctx.lineTo(u * 0.16, top - u * 0.2);
+    ctx.lineTo(u * 0.18, top);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function drawFlag(
