@@ -5,8 +5,8 @@ import { SectionLabel } from "./bits";
 const STEPS = [
   {
     kicker: "Period 12",
-    title: "Eleven stores. Four fight days.",
-    body: "October 25 through November 21. Every store has one robot, and your store's sales numbers build it. Fights run Monday mornings: Nov 2, 9, 16, and 23. Best record after four Mondays takes the trophy home to the store.",
+    title: "Fourteen stores. Two conferences. Four fight Mondays.",
+    body: "Regular season runs October 25 through November 23. Every store fights all four Mondays: seven fights per card, no byes. Metro and Frontier each send one conference champion to Championship Saturday, November 28.",
   },
   {
     kicker: "Sign in",
@@ -36,12 +36,12 @@ const STEPS = [
   {
     kicker: "Monday morning",
     title: "Three rounds, live. Then the damage report.",
-    body: "Sunday the desk enters every store's colors. Monday the whole card plays: five fights and a bye, and the bye counts as a win. Each fight is three rounds of trading hits, with a slow-motion replay on a knockout. Put the Watch Party on the big screen for the huddle.",
+    body: "Sunday the Desk enters every store's six colors. Monday the whole card plays: seven fights and no byes. Regular-season fights are three rounds, with a slow-motion replay on a knockout. Put the Watch Party on the big screen for the huddle.",
   },
   {
     kicker: "The trophy",
-    title: "Best record wins. Ties fight for it.",
-    body: "After four Mondays the best record takes the trophy. If stores tie for first, they settle it in the cage. On Title Monday, Bolts earned break ties in the standings before NSNU. Every store gets a printable season recap to hang on the wall. Questions? The FAQ has answers.",
+    title: "Win your conference. Then survive Championship Saturday.",
+    body: "After four Mondays, Metro and Frontier each crown one champion using record, head-to-head when applicable, conference record, cumulative NSNU, green grades, then Bolts earned. A still-unresolved berth tie goes to the cage. In Week 5 only the two finalists can prepare their bots; everybody else can Rally behind either side. Saturday has no judges: the Waterman Championship continues until knockout.",
   },
 ];
 
