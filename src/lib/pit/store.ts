@@ -684,11 +684,15 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
             const classChange = Boolean(part.classLock && part.classLock !== bot.classId);
             const draft = { ...bot.draft, [part.slot]: part.id };
             const owned = bot.owned.includes(part.id) ? bot.owned : [...bot.owned, part.id];
+            const nextClass = part.classLock ?? bot.classId;
             return syncWear({
               ...bot,
               coins: { ...bot.coins, [part.key]: (bot.coins[part.key] ?? 0) - check.cost },
               owned,
-              classId: part.classLock ?? bot.classId,
+              classId: nextClass,
+              style: classChange
+                ? { ...styleOf(bot, nextClass), body: starterBodies(nextClass)[0]!.id }
+                : bot.style,
               draft,
               equipped: { ...draft },
               locked: null,
