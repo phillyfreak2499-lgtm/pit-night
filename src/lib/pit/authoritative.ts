@@ -8,6 +8,7 @@ export type PullResult = {
   doc: string | null;
   session: import("./types").Session;
 };
+const SCHEMA_TAG = "14-store-abilene-proposals-v1";
 async function services() {
   const [db, store, auth, vanilla] = await Promise.all([
     import("@/lib/db"),
@@ -32,7 +33,7 @@ async function load() {
   const seed = s.vanilla.createStore(s.store.pitCreator).getState();
   await s.sql`insert into pit_season (id, rev, doc) values ('main', 1, ${JSON.stringify(s.store.sharedDoc(seed))}) on conflict (id) do nothing`;
   let row = (
-    await s.sql<{ rev: number; doc: string }>`select rev, doc from pit_season where id = 'main'`
+    await s.sql<{ rev: number; doc: string; schema_tag: string }>`select rev, doc, schema_tag from pit_season where id = 'main'`
   )[0]!;
   // Normalize the persisted season before it can override the new 14-store seed.
   // This is intentionally additive: existing stores, work logs, builds, and results survive.
@@ -40,14 +41,15 @@ async function load() {
   const normalized = s.store.applyLeague14(s.store.applyMondays(s.store.applyHulen(parsed)));
   const merged = { ...seed, ...s.store.sharedDoc(normalized) };
   const normalizedDoc = JSON.stringify(s.store.sharedDoc(merged));
-  if (normalizedDoc !== row.doc) {
+  if (normalizedDoc !== row.doc || row.schema_tag !== SCHEMA_TAG) {
     const changed = await s.sql<{ rev: number }>`
       update pit_season
-      set rev = rev + 1, doc = ${normalizedDoc}, updated_at = now()
+      set rev = rev + 1, doc = ${normalizedDoc}, schema_tag = ${SCHEMA_TAG}, updated_at = now()
       where id = 'main' and rev = ${row.rev}
       returning rev
     `;
-    if (changed[0]) row = { rev: Number(changed[0].rev), doc: normalizedDoc };
+    if (changed[0]) row = { rev: Number(changed[0].rev), doc: normalizedDoc, schema_tag: SCHEMA_TAG };
+    else return load(); // A concurrent command won. Never project our stale normalization.
   }
   const data = { ...s.store.sharedDoc(merged), tutorialSeen: false, session: s.auth.publicSession };
   return { ...s, row, data };
@@ -55,6 +57,12 @@ async function load() {
 export const pullSeason = createServerFn({ method: "POST" })
   .validator(z.object({ rev: z.number().int() }))
   .handler(async ({ data: input }): Promise<PullResult> => {
+    const quick = await services();
+    const meta = (await quick.sql<{rev: number; schema_tag: string}>`select rev, schema_tag from pit_season where id = 'main'`)[0];
+    if (meta?.schema_tag === SCHEMA_TAG && Number(meta.rev) === input.rev) {
+      // Verify expiry and credential generation on every pull, even unchanged ones.
+      return { mode: quick.mode, rev: Number(meta.rev), doc: null, session: await quick.auth.session() };
+    }
     const s = await load();
     const session = await s.auth.session(s.data);
     return {

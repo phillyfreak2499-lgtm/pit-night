@@ -1,6 +1,7 @@
+import { createFrameLoop } from "@/lib/pit/frame-loop";
 import { useEffect, useRef } from "react";
 import { partById } from "@/lib/pit/catalog";
-import { botFor, canSeeLoadout, weaponFamilyOf } from "@/lib/pit/engine";
+import { weaponFamilyOf } from "@/lib/pit/engine";
 import { usePit } from "@/lib/pit/store";
 import type { BotLook, BotStyle, ClassId, FighterSnap, Tier } from "@/lib/pit/types";
 import { drawSideBot, drawTopBot, drawCosmeticEffect, Fx, paintOf, shade } from "./cage-draw";
@@ -26,11 +27,10 @@ export type BotLookProps = {
 
 /** What a store's bot looks like to whoever is viewing. Weapons stay under the tarp until the bell. */
 export function useBotLook(storeId: string): BotLookProps | null {
-  const data = usePit();
-  const store = data.stores.find((s) => s.id === storeId);
-  if (!store) return null;
-  const bot = botFor(data, storeId);
-  const see = canSeeLoadout(data, storeId);
+  const store = usePit(s => s.stores.find(row => row.id === storeId));
+  const bot = usePit(s => s.bots.find(row => row.storeId === storeId));
+  const see = usePit(s => ["fought", "inspected", "complete"].includes(s.phase) || s.session.role === "commissioner" || (["crew", "captain"].includes(s.session.role) && s.session.storeId === storeId));
+  if (!store || !bot) return null;
   const wear = Object.values(bot.wear);
   const hp =
     100 -
@@ -128,11 +128,9 @@ export function BotPortrait({
     let heat = 0;
     let spin = 0;
     let visible = true;
-    let dirty = true;
-    let raf = 0;
-    let last = performance.now();
-    const enter = () => (hot = true);
-    const leave = () => (hot = false);
+    let loop: ReturnType<typeof createFrameLoop> | undefined;
+    const enter = () => { hot = true; loop?.invalidate(); };
+    const leave = () => { hot = false; loop?.invalidate(); };
     host.addEventListener("pointerenter", enter);
     host.addEventListener("pointerleave", leave);
     host.addEventListener("focusin", enter);
@@ -143,22 +141,21 @@ export function BotPortrait({
       const rect = canvas.getBoundingClientRect();
       canvas.width = Math.max(1, Math.floor(rect.width * dpr));
       canvas.height = Math.max(1, Math.floor(rect.height * dpr));
-      dirty = true;
+      loop?.invalidate();
     };
     resize();
     const ro = new ResizeObserver(resize);
     ro.observe(canvas);
     const io = new IntersectionObserver((rows) => {
       visible = rows.some((row) => row.isIntersecting);
+      loop?.setVisible(visible && !document.hidden);
     });
     io.observe(canvas);
 
-    const draw = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
-      if (visible || dirty) {
-        dirty = false;
-        heat += ((hot ? 1 : 0) - heat) * (1 - Math.exp(-dt * 6));
+    const draw = (now: number, dt: number) => {
+      {
+        heat = reduced ? 0 : heat + ((hot ? 1 : 0) - heat) * (1 - Math.exp(-dt * 6));
+        if (!hot && heat < 0.002) heat = 0;
         const w = canvas.width;
         const h = canvas.height;
         const u = Math.min(w * 0.62, h * 1.25) * zoom;
@@ -197,13 +194,17 @@ export function BotPortrait({
         if (camera === "top") drawTopBot(ctx, state, { x: w / 2, y: h / 2 }, Math.min(w, h) * 4 * zoom, spin, reduced ? 0 : t);
         else drawSideBot(ctx, state, gx, gy, u, reduced ? 0 : t, spin, facing);
         if (effect && !reduced) drawCosmeticEffect(ctx, fx, effect, gx, gy, u * 0.65, w, h, dt, paintOf(look.paint));
-        if (look.weapon === "hidden") drawTarp(ctx, look, gx, gy, u, facing, t, heat);
+        if (look.weapon === "hidden") drawTarp(ctx, look, gx, gy, u, facing, reduced ? 0 : t, heat);
       }
-      raf = requestAnimationFrame(draw);
+      return !reduced && (hot || heat > 0 || Boolean(effect));
     };
-    raf = requestAnimationFrame(draw);
+    loop = createFrameLoop(draw);
+    const visibility = () => loop?.setVisible(visible && !document.hidden);
+    document.addEventListener("visibilitychange", visibility);
+    visibility();
     return () => {
-      cancelAnimationFrame(raf);
+      loop?.dispose();
+      document.removeEventListener("visibilitychange", visibility);
       ro.disconnect();
       io.disconnect();
       host.removeEventListener("pointerenter", enter);

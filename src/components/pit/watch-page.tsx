@@ -1,6 +1,6 @@
 import { TaleOfTape } from "./tale-of-tape";
 import { Link } from "@tanstack/react-router";
-import { Flame, Maximize, Minimize, Package, Pause, Play, SkipForward, X } from "lucide-react";
+import { Flame, HelpCircle, Maximize, Minimize, Package, Pause, Play, SkipForward, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { CLASS_META } from "@/lib/pit/catalog";
@@ -56,6 +56,7 @@ export function WatchPage() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || (e.target instanceof Element && e.target.closest("button, a, input, textarea, select, [role=dialog]"))) return;
       if (stage === "lobby") return;
       if (e.key === " ") {
         e.preventDefault();
@@ -110,6 +111,9 @@ export function WatchPage() {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
+          <IconBtn label="How to play" onClick={() => { setPaused(true); data.showTutorial(); }}>
+            <HelpCircle size={18} />
+          </IconBtn>
           {stage !== "lobby" && stage !== "final" ? (
             <>
               <IconBtn label={paused ? "Play" : "Pause"} onClick={() => setPaused((p) => !p)}>

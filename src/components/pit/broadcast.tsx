@@ -1,3 +1,4 @@
+import { createFrameLoop } from "@/lib/pit/frame-loop";
 import { useEffect, useRef, useState } from "react";
 import { PAINT } from "@/lib/pit/catalog";
 import { methodLabel } from "@/lib/pit/engine";
@@ -79,8 +80,11 @@ export function Broadcast({
     const fx = fxRef.current;
     const trails = trailsRef.current;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let raf = 0;
-    let last = performance.now();
+    let loop: ReturnType<typeof createFrameLoop> | undefined;
+    let visible = true;
+    if (lastSeek.current !== seek) {
+      lastSeek.current = seek; timeRef.current = endingAt(beats, total); doneRef.current = false; fx.clear(); trails.clear();
+    }
     let shook = 0;
     // Hit-stop: the tape holds for a beat when steel meets steel.
     let freeze = 0;
@@ -99,15 +103,14 @@ export function Broadcast({
       }
       fx.clear();
       fx.cam.ready = false;
+      loop?.invalidate();
     };
     resize();
     const observer = new ResizeObserver(resize);
     observer.observe(canvas);
     observer.observe(top);
 
-    const frame = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
+    const frame = (_now: number, dt: number) => {
       const before = timeRef.current;
       if (playing && freeze <= 0) timeRef.current = Math.min(total, timeRef.current + dt * speed);
       if (freeze > 0) freeze -= dt;
@@ -200,7 +203,7 @@ export function Broadcast({
       const bars = hpFor(result, beat, local);
       if (beat.kind === "replay") for (const f of result.fighters) bars[f.id] = result.hp[f.id] ?? bars[f.id] ?? 100;
       else for (const b of drive.bots) bars[b.bot.id] = Math.round(b.hp);
-      setHp(bars);
+      setHp(previous => Object.keys(bars).length === Object.keys(previous).length && Object.entries(bars).every(([id, value]) => previous[id] === value) ? previous : bars);
       setRound(drive.round ? `Round ${drive.round}` : beat.kind === "countdown" ? "Get ready" : beat.kind === "replay" ? "Replay" : "");
       const secs = Math.floor(time);
       setClock(`${Math.floor(secs / 60)}:${(secs % 60).toString().padStart(2, "0")}`);
@@ -208,24 +211,22 @@ export function Broadcast({
         doneRef.current = true;
         onCompleteRef.current?.();
       }
-      raf = requestAnimationFrame(frame);
+      return playing && time < total - 0.02;
     };
-    raf = requestAnimationFrame(frame);
+    loop = createFrameLoop(frame);
+    const visibility = () => loop?.setVisible(visible && !document.hidden);
+    const intersection = new IntersectionObserver(rows => { visible = rows.some(row => row.isIntersecting); visibility(); });
+    intersection.observe(canvas.closest("[data-testid=broadcast]") ?? canvas);
+    document.addEventListener("visibilitychange", visibility);
+    visibility();
     return () => {
-      cancelAnimationFrame(raf);
+      loop?.dispose();
+      intersection.disconnect();
+      document.removeEventListener("visibilitychange", visibility);
       observer.disconnect();
     };
-  }, [bout, playing, result, speed, noDamage]);
+  }, [bout, playing, result, speed, noDamage, seek]);
 
-  useEffect(() => {
-    if (!result) return;
-    if (lastSeek.current === seek) return;
-    lastSeek.current = seek;
-    const beats = buildBeats(result);
-    const total = beats.reduce((m, b) => Math.max(m, b.t + b.dur), 0);
-    timeRef.current = endingAt(beats, total);
-    doneRef.current = false;
-  }, [result, seek]);
 
   if (!result) return null;
   const left = result.fighters[0];

@@ -1,3 +1,4 @@
+import { Modal } from "./modal";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { SectionLabel } from "./bits";
@@ -51,8 +52,8 @@ export function Tutorial({ onClose }: { onClose: () => void }) {
   const last = step === STEPS.length - 1;
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-deep/80 p-3 sm:items-center" data-testid="tutorial">
-      <div className="w-full max-w-lg border border-line bg-surface p-4 shadow-none md:p-6" role="dialog" aria-labelledby="tutorial-title">
+    <Modal title="How Pit Night works" testId="tutorial" onClose={onClose}>
+      <div className="w-full max-w-lg border border-line bg-surface p-4 shadow-none md:p-6">
         <div className="flex items-center justify-between gap-3">
           <SectionLabel>
             Step {step + 1} of {STEPS.length}
@@ -106,6 +107,6 @@ export function Tutorial({ onClose }: { onClose: () => void }) {
           )}
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

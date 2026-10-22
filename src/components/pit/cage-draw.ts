@@ -1,4 +1,5 @@
 import { EYES, PAINT, TRIM, styleOf } from "@/lib/pit/catalog";
+import { armorEdges, deckHardware } from "./material-detail";
 import type { BotBody, ClassId } from "@/lib/pit/types";
 import { PIT, clamp, ease, hash, lerp, type BotState, type Drive, type Spot } from "./cage-motion";
 
@@ -1220,7 +1221,9 @@ function drawWheel(
     ctx.stroke();
   }
   // Hub.
-  ctx.fillStyle = "#77736b";
+  const rim = ctx.createLinearGradient(x-r,y-r,x+r,y+r);
+  rim.addColorStop(0,"#eff4f8");rim.addColorStop(0.2,"#788896");rim.addColorStop(0.5,"#253440");rim.addColorStop(0.8,"#a7b8c5");rim.addColorStop(1,"#17212b");
+  ctx.fillStyle = rim;
   ctx.beginPath();
   ctx.arc(x, y, r * 0.45, 0, Math.PI * 2);
   ctx.fill();
@@ -1406,6 +1409,7 @@ export function drawSideBot(
   ctx.stroke();
 
   // Extruded deck: the roof catches the overhead rig, while the near face stays painted.
+  armorEdges(ctx, f.hull, u2, style.finish === "matte");
   ctx.save();
   const depth = 0.075 * u2;
   const roof = f.hull.filter(([, py]) => py < -f.height * 0.55);
@@ -3328,9 +3332,15 @@ export function drawTopBot(
 
   // Hull.
   const hg = ctx.createLinearGradient(0, -wid * 0.5, 0, wid * 0.5);
-  hg.addColorStop(0, shade(paint, 55));
-  hg.addColorStop(0.5, paint);
-  hg.addColorStop(1, shade(paint, -60));
+  if (style.finish === "chrome") {
+    hg.addColorStop(0,"#f4f8fc");hg.addColorStop(0.24,"#7892a6");hg.addColorStop(0.42,"#e3edf4");hg.addColorStop(0.5,"#263846");hg.addColorStop(1,"#8299aa");
+  } else if (style.finish === "gold") {
+    hg.addColorStop(0,"#fff0b3");hg.addColorStop(0.3,"#b98218");hg.addColorStop(0.48,"#ffe299");hg.addColorStop(1,"#68400b");
+  } else {
+    hg.addColorStop(0, shade(paint, style.finish === "matte" ? 24 : 65));
+    hg.addColorStop(0.4, paint);
+    hg.addColorStop(1, shade(paint, -70));
+  }
   ctx.fillStyle = hg;
   traceTopHull(ctx, s.bot.classId, style.body, len, wid);
   ctx.fill();
@@ -3375,6 +3385,7 @@ export function drawTopBot(
   traceTopHull(ctx, s.bot.classId, style.body, len, wid);
   ctx.clip();
   const stickers = style.stickers!;
+  deckHardware(ctx, len, wid, s.scars ?? 0, hash(s.bot.id));
   stickerBadge(ctx, stickers.left, -len * 0.08, -wid * 0.36, len * 0.42, wid * 0.18, paint, s.bot.id);
   stickerBadge(ctx, stickers.right, -len * 0.08, wid * 0.36, len * 0.42, wid * 0.18, paint, s.bot.id);
   stickerBadge(ctx, stickers.hood, len * 0.12, 0, len * 0.32, wid * 0.44, paint, s.bot.id);

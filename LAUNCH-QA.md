@@ -19,6 +19,22 @@ Branch: `feat/14-store-championship-week`. Continue the existing draft PR; no me
 
 ## Validation performed
 
+### Site upgrade follow-up
+
+| Area | Status | Evidence / remaining work |
+|---|---|---|
+| Fundamentals entrance | DONE locally | Server-enforced randomized numbered question; spelling/spacing tolerance; wrong-number and negated answers rejected; encrypted expiring challenge and eight-hour entry cookie; persistent attempt limit; strict same-origin form and internal redirects. Vite, Nitro and generated Vercel CDN middleware covered. |
+| Garage and phone navigation | DONE | Collapsible categories, owned/unlocked filter, current-look summary, tappable locked-item requirements, and a phone More menu. Existing proposals, votes, prices and unlocks remain intact. |
+| Accessible overlays | DONE | Shared Radix dialogs contain focus, make the background inert, support Escape and restore the opener. Keyboard restoration was exercised in the actual UI. Watch Party has its own help control above its full-screen layer. |
+| Physical bot detail | DONE | Beveled armor edges, machined wheel rims, overhead ventilation/rails/fasteners, finish-aware overhead metal and persistent overhead gouges. Shared Garage/fight renderer; small canvases skip fine detail. No fight-stat changes. |
+| Rendering and sync performance | DONE | Idle/reduced-motion/offscreen portrait loops stop; paused/hidden broadcast loops stop; unchanged HP state is reused; single-flight pulls skip unchanged sessions and memoized persistence avoids projection, serialization and storage writes for transient changes. Unchanged server pulls check revision/verified session before loading the document. Starter renderer is lazy-loaded. |
+| Automated checks | DONE | Typecheck, 288 passing tests / four existing skips, build:dev and scoped ESLint on new TS modules. Real loopback API suite passes behind the new entrance. Hosted checks are recorded in PR #4. |
+| Hosted interactive QA | BLOCKED by access | Supported Vercel access-link tool was retried and still returns 403 for team `teas8`. Hosted secret binding, Neon, cookie/CDN behavior and physical-phone behavior require the final hosted QA pass. |
+
+Local compiled-build CPU profiles compare the previous `ee60f51` build with this upgrade at 1280×800 and 390×844, using the repository smoke workflow with a temporary Windows/Edge profiling adapter. Three-second **idle** samples move the pointer off bot cards so deliberate hover animation is excluded. The earlier map sample dropped browser main-thread task time from 1,326 ms to 12 ms on desktop and 1,448 ms to 4 ms at phone width. Paused preview samples dropped from 1,496 ms to 7 ms and 1,513 ms to 13 ms respectively. These are local browser CPU samples, not page-load speeds, Web Vitals, network timings or real-device battery measurements. Final compiled screenshots and profiles also cover the captain Garage. The source review's recommendations are implemented; the previous review document described the pre-upgrade state.
+
+Independent review findings about redirect normalization, negated answers, focus restoration and the edge secret binding were fixed with regressions and re-reviewed. Production codes were not rotated.
+
 - `npm install --no-audit --no-fund`.
 - `npm run typecheck`.
 - `npm test`: all tests pass; four existing environment/external-skill skips remain. This includes league scheduling, championship-until-KO, regular-season Tune-Up, finalist-only prep, migration, unlocked cosmetics, proposal ownership, cross-store authorization, replacement vote reset, duplicate voting, rapid independent sticker edits, persistent wear and unchanged seeded fight exchanges.

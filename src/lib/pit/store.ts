@@ -1,5 +1,6 @@
 import { create, type StateCreator } from "zustand";
 import { persist } from "zustand/middleware";
+import { memoSnapshot, snapshotStorage } from "./snapshot-storage";
 import {
   CLASS_META,
   METRICS,
@@ -1812,11 +1813,14 @@ export function paintHex(id: string) {
   return PAINT[id] ?? PAINT.amber;
 };
 
+const persistedSnapshot = memoSnapshot((state: PitState) => ({ ...sharedDoc(state), tutorialSeen: state.tutorialSeen }), [...SHARED_KEYS, "tutorialSeen"]);
+const browserStorage = snapshotStorage<ReturnType<typeof persistedSnapshot>>(() => localStorage);
 export const usePit = create<PitState>()(persist(pitCreator, {
+      storage: browserStorage,
       name: "pit-night-storewars-v1",
       skipHydration: true,
       version: VERSION,
-      partialize: (state) => ({ ...sharedDoc(state), tutorialSeen: state.tutorialSeen }),
+      partialize: persistedSnapshot,
       migrate: (persisted, version) => {
         if (persisted && version === 4) return carryCosmetics(applyHulen(persisted as PitData));
         // Version 5 and later saves carry forward; new fields get defaults in merge.

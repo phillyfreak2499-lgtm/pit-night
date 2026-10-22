@@ -2,13 +2,15 @@
 
 The public league uses its own server-verified roles. The legacy template's external sign-in gate stays disabled in `.grok/app-env.json`; this does not disable league authorization.
 
+The full league now also requires the **fundamentals entrance** before pages, store sign-in, server functions or static site assets. It randomly asks for fundamental #1–#5, tolerates bounded spelling/spacing mistakes, and issues an eight-hour HttpOnly entry cookie. The server-only `PIT_CODE_VAULT_KEY` must be available to both the application function and generated Vercel entrance middleware. `npm run build` and `build:dev` generate that middleware before filesystem/CDN routes, including its explicit `envVarsInUse` binding. Missing configuration fails closed. This is a shared-knowledge entrance; crew/captain/Desk codes still control all privileged actions.
+
 ## Before deployment
 
 PR #4 remains a draft. Do not merge or deploy production without explicit owner approval.
 
 Confirmed Abilene team: Taylor VanSickle (Store Manager / captain), Nathan Burney and Philip Rodriguez (Sales consultants / specialists). The pre-launch placeholders migrate to this roster while retaining the surviving identity IDs. Tyler stays Jeffrey Richard’s / Kasi McMillin / Yolanda Tellez / Samantha Rodriguez; Shreveport stays Amy Schexnider / Daniel Rios. No owner-data roster blocker remains.
 
-1. Back up the Neon `pit_season` row. Apply migrations using `npm run db:migrate` with the production `DATABASE_URL`. Migration 0003 preserves the season, removes the exposed PIN/passcodes, and creates hashed credentials and expiring sessions.
+1. Back up the Neon `pit_season` row. Apply migrations using `npm run db:migrate` with the production `DATABASE_URL`. Migration 0003 preserves the season, removes the exposed PIN/passcodes, and creates hashed credentials and expiring sessions. Migration 0005 adds the normalization marker used by cheaper unchanged-state polling; it does not reset the season.
 2. Prepare server-only Vercel configuration, never `VITE_` variables. For an existing league, rotate codes only through the post-deployment step below, never from this preview branch:
    - `PIT_DESK_PIN`: a new 4–8 digit commissioner code.
    - `PIT_CAPTAIN_CODES`: JSON mapping all 14 store IDs to separate new captain codes.
@@ -20,6 +22,7 @@ Confirmed Abilene team: Taylor VanSickle (Store Manager / captain), Nathan Burne
 4. Do not set `PIT_ALLOW_PREVIEW_DB` in production. Without Neon, production league actions fail closed. The explicit value `1` is only for a disposable local production-preview check; its embedded database resets on restart.
 5. The Desk must record each store's **actual Sunday NSNU dollars** before running Monday. Clicking a color does not certify a projected amount. Official NSNU is separate from color-based robot grades and coin payments. Historical projections are deliberately not promoted to official totals.
 6. The existing production holding-page gate opens only with `SITE_OPEN=1`. Confirm this setting as part of the approved launch; this branch does not alter the gate or any production variables.
+7. On the final hosted preview, use a clean browser to verify the fundamentals screen, wrong/correct answer, direct deep links, API denial and protected static files. Then verify role login and session expiry. Existing browser entry cookies expire after eight hours. If the server vault key is changed, all entrance cookies become invalid and recoverable store codes need the original vault key; do not rotate it casually.
 
 ## Availability and rewards
 

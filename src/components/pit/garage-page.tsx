@@ -1,9 +1,10 @@
+import { Modal } from "./modal";
 import { CosmeticBoard, CosmeticTheme } from "./cosmetic-board";
 import { EffectLockerPreview } from "./effect-locker-preview";
 import type { CosmeticLoadout, StickerSlot } from "@/lib/pit/types";
 import { BuildLockBanner } from "./build-lock-banner";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 import { BODY_STYLES, CLASS_META, DECALS, EYES, FINISHES, PAINT, TOPPERS, partById, partsFor, SLOT_LABEL, styleOf, TRIM } from "@/lib/pit/catalog";
 import {
   buyCheck,
@@ -472,6 +473,8 @@ function GarageBot({ storeId }: { storeId: string }) {
   );
 }
 
+const OwnedOnly = createContext(false);
+
 function Swatch({
   color,
   active,
@@ -489,21 +492,26 @@ function Swatch({
   disabled?: boolean;
   title?: string;
 }) {
-  return (
+  const ownedOnly = useContext(OwnedOnly);
+  const [inspect, setInspect] = useState(false);
+  if (disabled && ownedOnly) return null;
+  return (<>
     <button
       type="button"
       aria-label={label}
       aria-pressed={active}
-      disabled={disabled}
+      data-locked={disabled || undefined}
       title={title ?? label}
-      className={`relative min-h-11 min-w-11 border-2 transition-transform ${disabled ? "cursor-not-allowed opacity-35" : "hover:scale-105"} ${active ? "border-amber" : "border-line"}`}
+      className={`relative min-h-11 min-w-11 border-2 transition-transform ${disabled ? "cursor-help opacity-70" : "hover:scale-105"} ${active ? "border-amber" : "border-line"}`}
       style={{ background: color, boxShadow: glow && !disabled ? `0 0 12px ${color}` : undefined }}
-      onClick={onClick}
+      onClick={() => disabled ? setInspect(true) : onClick()}
     >
       {active ? <span className="absolute inset-0 grid place-items-center font-display text-lg text-deep mix-blend-difference">✓</span> : null}
       {disabled ? <span className="absolute inset-0 grid place-items-center bg-deep/55 font-display text-[9px] tracking-widest text-fg">LOCK</span> : null}
     </button>
-  );
+    {inspect ? <Modal title="Unlock requirement" onClose={() => setInspect(false)}><div className="w-full max-w-sm border border-line bg-surface p-5"><h3 className="font-display text-2xl">Unlock requirement</h3><p className="mt-3 leading-relaxed text-muted">{title}</p><p className="mt-3 text-xs text-amber">Keep building your crew’s progress. Locked cosmetics cannot be equipped.</p><button type="button" className="mt-4 min-h-11 border border-line px-4" onClick={() => setInspect(false)}>Close</button></div></Modal> : null}
+    </>);
+
 }
 
 function Chip({
@@ -519,33 +527,37 @@ function Chip({
   disabled?: boolean;
   title?: string;
 }) {
-  return (
+  const ownedOnly = useContext(OwnedOnly);
+  const [inspect, setInspect] = useState(false);
+  if (disabled && ownedOnly) return null;
+  return (<>
     <button
       type="button"
       aria-pressed={active}
-      disabled={disabled}
+      data-locked={disabled || undefined}
       title={title}
-      className={`min-h-11 border px-3 font-display text-sm tracking-wide uppercase transition-colors ${disabled ? "cursor-not-allowed border-line text-muted opacity-40" : active ? "border-amber bg-amber/10 text-amber" : "border-line hover:border-muted"}`}
-      onClick={onClick}
+      className={`min-h-11 border px-3 font-display text-sm tracking-wide uppercase transition-colors ${disabled ? "cursor-help border-line text-muted opacity-70" : active ? "border-amber bg-amber/10 text-amber" : "border-line hover:border-muted"}`}
+      onClick={() => disabled ? setInspect(true) : onClick()}
     >
       {children}
     </button>
-  );
+    {inspect ? <Modal title="Unlock requirement" onClose={() => setInspect(false)}><div className="w-full max-w-sm border border-line bg-surface p-5"><h3 className="font-display text-2xl">Unlock requirement</h3><p className="mt-3 leading-relaxed text-muted">{title}</p><p className="mt-3 text-xs text-amber">Keep building your crew’s progress. Locked cosmetics cannot be equipped.</p><button type="button" className="mt-4 min-h-11 border border-line px-4" onClick={() => setInspect(false)}>Close</button></div></Modal> : null}
+    </>);
+
 }
 
 function Group({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-xs tracking-widest text-muted uppercase">{label}</p>
-      <div className="mt-2 flex flex-wrap gap-2">{children}</div>
-    </div>
-  );
+  return <details className="border border-line bg-deep/35" open={undefined}>
+    <summary className="min-h-12 cursor-pointer px-3 py-3 font-display text-sm tracking-widest text-fg uppercase">{label}</summary>
+    <div className="flex flex-wrap gap-2 border-t border-line p-3">{children}</div>
+  </details>;
 }
 
 function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMode: boolean }) {
   const data = usePit();
   const activeStore = data.stores.find(row => row.id === storeId)!;
   const activeBot = data.bots.find(row => row.storeId === storeId)!;
+  const [ownedOnly, setOwnedOnly] = useState(false);
   const [draft, setDraft] = useState<CosmeticLoadout | null>(null);
   const [camera, setCamera] = useState<"left" | "right" | "top">("left");
   const live = { paint: activeStore.paint, look: activeBot.look, number: activeBot.number, style: styleOf(activeBot, activeBot.classId) };
@@ -605,7 +617,7 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
     });
   };
 
-  return (
+  return (<OwnedOnly.Provider value={ownedOnly}>
     <section className="border border-line bg-surface">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
         <div>
@@ -644,15 +656,17 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
 
       <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <div className="lg:sticky lg:top-4 lg:self-start">
-          <div data-bot-hover className={`relative h-64 overflow-hidden border border-line md:h-72 ${garageClass(store.garage)}`}>
+          <div data-bot-hover tabIndex={0} aria-label="Bot preview; focus to rev" className={`relative h-64 overflow-hidden border border-line md:h-72 ${garageClass(store.garage)}`}>
             <div className="absolute inset-0 bg-deep/55" />
             <BotPortrait look={look ? { ...look, weapon: look.weapon === "hidden" ? "none" : look.weapon } : null} facing={camera === "right" ? 1 : -1} camera={camera === "top" ? "top" : "side"} zoom={0.74} className="relative h-full w-full" />
           </div>
-          <p className="mt-2 text-xs text-muted">Hover the preview to rev it. Locked items show the exact achievement needed.</p>
+          <p className="mt-2 text-xs text-muted">Hover or focus the preview to rev it. Open a category; tap any locked item to see its requirement.</p>
           <div className="mt-2 flex flex-wrap gap-2">{(["left", "right", "top"] as const).map(view => <Chip key={view} active={camera === view} onClick={() => setCamera(view)}>{view} view</Chip>)}</div>
         </div>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
+          <div className="border border-line bg-deep p-3"><p className="text-xs tracking-widest text-amber uppercase">Current look</p><p className="mt-1 text-sm">{style.body} · {store.paint} · {style.finish} · #{bot.number || "—"}</p><p className="mt-1 text-xs text-muted">{style.trim} trim · {style.eye} visor · {style.topper ?? "none"} topper</p></div>
+          <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm"><input type="checkbox" checked={ownedOnly} onChange={e => setOwnedOnly(e.target.checked)} className="h-5 w-5 accent-amber"/>Show owned / unlocked items only</label>
           <Group label="Body shell">
             {BODY_STYLES.filter((row) => row.classId === bot.classId).map((row) => {
               const open = unlocked("body", row.id);
@@ -768,7 +782,7 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
         </div>
       </div>
     </section>
-  );
+  </OwnedOnly.Provider>);
 }
 
 function WearSummary({ storeId }: { storeId: string }) {

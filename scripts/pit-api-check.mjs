@@ -1,6 +1,7 @@
 // Destructive QA fixture setup is restricted to an explicitly opted-in loopback server.
 import assert from "node:assert/strict";
 import { toJSONAsync, fromCrossJSON } from "seroval";
+import { enterLocalPit } from "./pit-entry-client.mjs";
 const base = process.env.PIT_QA_URL ?? "http://127.0.0.1:8080";
 if (
   !new Set(["127.0.0.1", "localhost"]).has(new URL(base).hostname) ||
@@ -15,7 +16,9 @@ const codes = {
 if (Object.values(codes).some((c) => !c))
   throw new Error("Configure temporary local QA codes first.");
 process.env.TSS_SERVER_FN_BASE = `${base}/_serverFn/`;
-const module = await (await fetch(`${base}/src/lib/pit/authoritative.ts`)).text();
+const entryCookie = await enterLocalPit(base);
+assert.equal((await fetch(`${base}/src/lib/pit/authoritative.ts`)).status, 401);
+const module = await (await fetch(`${base}/src/lib/pit/authoritative.ts`, { headers: { cookie: entryCookie } })).text();
 const ids = Object.fromEntries(
   [...module.matchAll(/export const (\w+) = [^\n]*createClientRpc\("([^"]+)"\)/g)].map((m) => [
     m[1],
@@ -24,7 +27,7 @@ const ids = Object.fromEntries(
 );
 assert.ok(ids.signIn && ids.mutateSeason && !module.includes("pushSeason"));
 function client() {
-  let cookie = "";
+  let cookie = entryCookie;
   let lastCookie = "";
   return {
     get lastCookie() {
@@ -46,7 +49,7 @@ function client() {
       const set = response.headers.get("set-cookie");
       if (set) {
         lastCookie = set;
-        cookie = set.split(";")[0];
+        cookie = entryCookie + "; " + set.split(";")[0];
       }
       const value = fromCrossJSON(await response.json(), { refs: new Map() });
       if (!response.ok || value.error || value instanceof Error) throw value.error ?? value;

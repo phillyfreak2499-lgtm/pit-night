@@ -14,6 +14,42 @@ import { buildBeats, fightDrive } from "../src/components/pit/cage-motion.ts";
 import { Fx } from "../src/components/pit/cage-draw.ts";
 import type { Session } from "../src/lib/pit/types.ts";
 import { styleOf } from "../src/lib/pit/catalog.ts";
+import { createFrameLoop } from "../src/lib/pit/frame-loop.ts";
+import { sameSession, singleFlight } from "../src/lib/pit/sync-policy.ts";
+import { memoSnapshot, snapshotStorage } from "../src/lib/pit/snapshot-storage.ts";
+test("transient state updates neither project nor serialize unchanged persisted data", () => {
+  let projections=0,writes=0,serializations=0;
+  const project=memoSnapshot((state: {doc: object; flash: string}) => { projections++;return {doc:state.doc}; },['doc']);
+  const doc={toJSON:()=>{serializations++;return {season:'kept'};}};
+  const storage=snapshotStorage<{doc:object}>(()=>({getItem:()=>null,setItem:()=>{writes++;},removeItem:()=>{}}));
+  const first=project({doc,flash:''});storage.setItem('test',{state:first,version:1});
+  const next=project({doc,flash:'Saved'});storage.setItem('test',{state:next,version:1});
+  assert.equal(first,next);assert.equal(projections,1);assert.equal(serializations,1);assert.equal(writes,1);
+  storage.setItem('test',{state:project({doc:{changed:true},flash:''}),version:1});assert.equal(writes,2);
+  const blocked=snapshotStorage<object>(()=>{throw new Error('Storage disabled');});
+  assert.doesNotThrow(()=>blocked.setItem('test',{state:{}}));
+  assert.equal(blocked.getItem('test'),null);
+});
+test("render loop stops idle/hidden work and resumes without hidden wall-clock time", () => {
+  let cb: ((now: number) => void) | null = null, cancelled = 0, motion = false;
+  const times: number[] = [];
+  const loop = createFrameLoop((_, dt) => { times.push(dt); return motion; }, {request: fn => { cb=fn; return 1; }, cancel: () => { cancelled++; cb=null; }});
+  const tick=(now: number) => { const fn=cb;cb=null;fn?.(now); };
+  loop.invalidate(); tick(100); assert.equal(cb,null); assert.deepEqual(times,[0]);
+  motion=true;loop.invalidate();tick(200);tick(216);assert.equal(times.at(-1),0.016);
+  loop.setVisible(false);assert.equal(cancelled,1);tick(10000);assert.equal(times.length,3);
+  loop.setVisible(true);tick(10000);assert.equal(times.at(-1),0);
+  loop.dispose();loop.invalidate();assert.equal(cb,null);
+});
+test("unchanged sessions compare by identity and overlapping polls share one request", async () => {
+  const publicRole: Session={role:'public',storeId:null,crewId:null};
+  assert.equal(sameSession(publicRole,{...publicRole}),true);
+  assert.equal(sameSession(publicRole,{role:'crew',storeId:'plano',crewId:'x'}),false);
+  let release!: ()=>void, calls=0;
+  const poll=singleFlight(async()=>{calls++;await new Promise<void>(resolve=>{release=resolve;});});
+  const one=poll(),two=poll();assert.equal(one,two);assert.equal(calls,1);release();await one;
+  const three=poll();assert.equal(calls,2);release();await three;
+});
 beforeEach((t) => t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-10-01T12:00:00Z") }));
 
 test("Abilene's confirmed team replaces legacy placeholders without resetting the season", () => {
