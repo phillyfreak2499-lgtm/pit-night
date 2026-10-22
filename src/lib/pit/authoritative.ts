@@ -38,7 +38,7 @@ async function load() {
   // This is intentionally additive: existing stores, work logs, builds, and results survive.
   const parsed = JSON.parse(row.doc) as import("./types").PitData;
   const normalized = s.store.applyLeague14(s.store.applyMondays(s.store.applyHulen(parsed)));
-  const merged = { ...s.store.sharedDoc(seed), ...s.store.sharedDoc(normalized) };
+  const merged = { ...seed, ...s.store.sharedDoc(normalized) };
   const normalizedDoc = JSON.stringify(s.store.sharedDoc(merged));
   if (normalizedDoc !== row.doc) {
     const changed = await s.sql<{ rev: number }>`
