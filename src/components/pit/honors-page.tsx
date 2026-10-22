@@ -14,7 +14,7 @@ export function HonorsPage() {
     <div className="mx-auto max-w-5xl">
       <SectionLabel>Hardware</SectionLabel>
       <h1 className="font-display text-5xl leading-none">Honors</h1>
-      <p className="mt-3 text-muted">The only championship table is the store standings. These are the things that hang on a wall.</p>
+      <p className="mt-3 text-muted">The Waterman Championship belongs to one store. These are the things that hang on a wall after the conference race and Championship Saturday.</p>
       <div className="pegboard mt-6 grid gap-4 border border-line p-4 md:grid-cols-3 md:p-6">
         <Plate kind="trophy" kicker="Period trophy" title={name(data.honors.pitBelt)} detail={bot(data.honors.pitBelt)} href={data.honors.pitBelt} />
         <Plate kind="plate" kicker="Runner-up plate" title={name(data.honors.plate)} detail={bot(data.honors.plate)} href={data.honors.plate} />
@@ -22,7 +22,7 @@ export function HonorsPage() {
           kind="build"
           kicker="Best Build"
           title={name(data.honors.bestBuild ?? pace?.storeId ?? null)}
-          detail={data.honors.bestBuildWhy || (pace ? `Pace through week ${pace.week}. Not locked until Title Monday.` : "Nobody has fought yet.")}
+          detail={data.honors.bestBuildWhy || (pace ? `Pace through week ${pace.week}. Best Build is separate from the conference championship.` : "Nobody has fought yet.")}
           href={data.honors.bestBuild ?? pace?.storeId ?? null}
           claimed={Boolean(data.honors.bestBuild)}
         />
