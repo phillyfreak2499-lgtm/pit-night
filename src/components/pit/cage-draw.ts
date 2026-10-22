@@ -1359,6 +1359,26 @@ export function drawSideBot(
   } else if (style.finish === "matte") {
     hg.addColorStop(0, shade(paint, 12));
     hg.addColorStop(1, shade(paint, -35));
+  } else if (style.finish === "satin") {
+    hg.addColorStop(0, shade(paint, 45));
+    hg.addColorStop(0.5, paint);
+    hg.addColorStop(1, shade(paint, -45));
+  } else if (style.finish === "carbon") {
+    hg.addColorStop(0, "#454a50");
+    hg.addColorStop(0.35, "#171b20");
+    hg.addColorStop(0.65, "#343a40");
+    hg.addColorStop(1, "#0b0d10");
+  } else if (style.finish === "iridescent") {
+    hg.addColorStop(0, "#6ee7ff");
+    hg.addColorStop(0.3, paint);
+    hg.addColorStop(0.6, "#cf65ff");
+    hg.addColorStop(1, "#ff8fc7");
+  } else if (style.finish === "gold") {
+    hg.addColorStop(0, "#fff1a8");
+    hg.addColorStop(0.22, "#d7a922");
+    hg.addColorStop(0.5, "#fff0a0");
+    hg.addColorStop(0.78, "#9d6b0b");
+    hg.addColorStop(1, "#4f3100");
   } else {
     hg.addColorStop(0, shade(paint, 70));
     hg.addColorStop(0.18, shade(paint, 25));
@@ -3029,6 +3049,50 @@ export function drawTop(
   ctx.restore();
 }
 
+function traceTopHull(
+  ctx: CanvasRenderingContext2D,
+  classId: ClassId,
+  body: BotBody | undefined,
+  len: number,
+  wid: number,
+) {
+  const id = body ?? (classId === "tank" ? "keystone" : classId === "specialist" ? "windlass" : "shrike");
+  ctx.beginPath();
+  if (classId === "striker") {
+    if (id === "stinger") {
+      ctx.moveTo(-len*0.5,-wid*0.34); ctx.lineTo(len*0.18,-wid*0.34); ctx.lineTo(len*0.56,0);
+      ctx.lineTo(len*0.18,wid*0.34); ctx.lineTo(-len*0.5,wid*0.34);
+    } else if (id === "raptor" || id === "warhawk") {
+      ctx.moveTo(-len*0.5,-wid*0.5); ctx.lineTo(len*0.1,-wid*0.5); ctx.lineTo(len*0.58,-wid*0.22);
+      ctx.lineTo(len*0.58,wid*0.22); ctx.lineTo(len*0.1,wid*0.5); ctx.lineTo(-len*0.5,wid*0.5);
+    } else {
+      ctx.moveTo(-len*0.5,-wid*0.45); ctx.lineTo(len*0.25,-wid*0.45); ctx.lineTo(len*0.5,-wid*0.3);
+      ctx.lineTo(len*0.5,wid*0.3); ctx.lineTo(len*0.25,wid*0.45); ctx.lineTo(-len*0.5,wid*0.45);
+    }
+  } else if (classId === "tank") {
+    if (id === "bunker") {
+      ctx.roundRect(-len*0.52,-wid*0.38,len*1.04,wid*0.76,Math.max(3,wid*0.12));
+    } else if (id === "juggernaut" || id === "colossus") {
+      ctx.moveTo(-len*0.52,-wid*0.52); ctx.lineTo(len*0.3,-wid*0.52); ctx.lineTo(len*0.55,-wid*0.35);
+      ctx.lineTo(len*0.55,wid*0.35); ctx.lineTo(len*0.3,wid*0.52); ctx.lineTo(-len*0.52,wid*0.52);
+    } else {
+      ctx.roundRect(-len*0.5,-wid*0.45,len,wid*0.9,2);
+    }
+  } else {
+    if (id === "scorpion") {
+      ctx.moveTo(-len*0.5,-wid*0.42); ctx.lineTo(len*0.12,-wid*0.5); ctx.lineTo(len*0.52,-wid*0.32);
+      ctx.lineTo(len*0.52,wid*0.32); ctx.lineTo(len*0.12,wid*0.5); ctx.lineTo(-len*0.5,wid*0.42);
+    } else if (id === "mantis" || id === "reaper") {
+      ctx.moveTo(-len*0.48,-wid*0.44); ctx.lineTo(-len*0.05,-wid*0.34); ctx.lineTo(len*0.22,-wid*0.52);
+      ctx.lineTo(len*0.5,-wid*0.28); ctx.lineTo(len*0.5,wid*0.28); ctx.lineTo(len*0.22,wid*0.52);
+      ctx.lineTo(-len*0.05,wid*0.34); ctx.lineTo(-len*0.48,wid*0.44);
+    } else {
+      ctx.roundRect(-len*0.5,-wid*0.45,len,wid*0.9,4);
+    }
+  }
+  ctx.closePath();
+}
+
 function drawTopBot(
   ctx: CanvasRenderingContext2D,
   s: BotState,
@@ -3038,6 +3102,7 @@ function drawTopBot(
   time: number,
 ) {
   const paint = paintOf(s.bot.paint);
+  const style = styleOf(s.bot, s.bot.classId);
   const tank = s.bot.classId === "tank";
   const spec = s.bot.classId === "specialist";
   const len = cage * (tank ? 0.165 : spec ? 0.135 : 0.15);
@@ -3124,20 +3189,8 @@ function drawTopBot(
   hg.addColorStop(0.5, paint);
   hg.addColorStop(1, shade(paint, -60));
   ctx.fillStyle = hg;
-  ctx.beginPath();
-  if (s.bot.classId === "striker") {
-    ctx.moveTo(-len * 0.5, -wid * 0.45);
-    ctx.lineTo(len * 0.25, -wid * 0.45);
-    ctx.lineTo(len * 0.5, -wid * 0.3);
-    ctx.lineTo(len * 0.5, wid * 0.3);
-    ctx.lineTo(len * 0.25, wid * 0.45);
-    ctx.lineTo(-len * 0.5, wid * 0.45);
-  } else {
-    ctx.roundRect(-len * 0.5, -wid * 0.45, len, wid * 0.9, tank ? 2 : 4);
-  }
-  ctx.closePath();
+  traceTopHull(ctx, s.bot.classId, style.body, len, wid);
   ctx.fill();
-  const style = styleOf(s.bot);
   ctx.strokeStyle = style.trim === "steel" ? "rgba(0,0,0,0.7)" : (TRIM[style.trim] ?? "#000");
   ctx.lineWidth = style.trim === "steel" ? 1 : Math.max(1.5, cage * 0.005);
   ctx.stroke();
