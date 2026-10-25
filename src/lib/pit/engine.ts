@@ -85,7 +85,9 @@ export function kickoffRank(data: Pick<PitData, "stores" | "kickoff">) {
     const filled = METRICS.filter((m) => g[m.stat]).length;
     const full = Object.fromEntries(METRICS.map((m) => [m.stat, g[m.stat] ?? "red"])) as GradeSet;
     const math = coinMath(full);
-    return { store, filled, coins: math.total, bySlot: math.bySlot, greens: math.greens, nsnu: ORDER[full.nsnu] };
+    // bySlot here is the jar deposit, pair bonus included, so kickoff can
+    // pay and re-pay the difference from one number per part.
+    return { store, filled, coins: math.total, bySlot: coinsByJar(full), greens: math.greens, nsnu: ORDER[full.nsnu] };
   });
   rows.sort((a, b) => b.coins - a.coins || b.greens - a.greens || b.nsnu - a.nsnu || a.store.seed - b.store.seed);
   return rows.map((row, i) => ({ ...row, seed: i + 1 }));
@@ -103,8 +105,12 @@ export function cardValue(card: StoreCard, stat: StatKey): number {
   return card[stat];
 }
 
-/** What a card pays: coins per part, by grade. */
-export function coinMath(grades: GradeSet): { bySlot: Record<KeyName, number>; total: number; greens: number } {
+/**
+ * What a card pays. `bySlot` is only the per-metric grade coins (green 3,
+ * blue 2, orange 1, red 0). `bonus` is one extra coin for every green after
+ * the first, and `total` includes it. Six greens pay 23.
+ */
+export function coinMath(grades: GradeSet): { bySlot: Record<KeyName, number>; total: number; greens: number; bonus: number } {
   const bySlot = { chassis: 0, drive: 0, weapon: 0, armor: 0, utility: 0, brain: 0 } as Record<KeyName, number>;
   let total = 0;
   let greens = 0;
@@ -114,7 +120,29 @@ export function coinMath(grades: GradeSet): { bySlot: Record<KeyName, number>; t
     total += GRADE_COINS[g];
     if (g === "green") greens += 1;
   }
-  return { bySlot, total, greens };
+  const bonus = Math.max(0, greens - 1);
+  return { bySlot, total: total + bonus, greens, bonus };
+}
+
+/**
+ * Coins that actually land in the jars. Per-metric amounts stay as graded.
+ * The pair bonus has no metric of its own, so each green after the first
+ * (scorecard order) carries one extra coin in that part's jar. The sum
+ * equals `coinMath(grades).total`.
+ */
+export function coinsByJar(grades: GradeSet): Record<KeyName, number> {
+  const math = coinMath(grades);
+  const jars = { ...math.bySlot };
+  let firstGreen = true;
+  for (const m of METRICS) {
+    if (grades[m.stat] !== "green") continue;
+    if (firstGreen) {
+      firstGreen = false;
+      continue;
+    }
+    jars[m.slot] += 1;
+  }
+  return jars;
 }
 
 export function weekQuality(grades: GradeSet): number {

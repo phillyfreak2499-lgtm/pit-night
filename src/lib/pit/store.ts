@@ -31,7 +31,7 @@ import {
   mergeWear,
   quotesForBot,
   runSaturday as playCard,
-  coinMath,
+  coinsByJar,
   spyRead,
   WEAPON_FAMILIES,
   wonThisWeek,
@@ -642,6 +642,8 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           if (!row) return bot;
           const before = data.kickoff.paid[bot.storeId] ?? {};
           const coins = { ...bot.coins };
+          // row.bySlot is coinsByJar: grade coins plus the pair bonus on later greens.
+          // A re-run pays only the difference from the last snapshot, including that bonus.
           for (const slot of SLOTS) coins[slot] = Math.max(0, (coins[slot] ?? 0) + row.bySlot[slot] - (before[slot] ?? 0));
           paid[bot.storeId] = { ...row.bySlot };
           return { ...bot, coins };
@@ -1515,7 +1517,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           const card = cardFor(data, bot.storeId);
           if (!card) return bot;
           const grades = gradesOf(card);
-          const paid = coinMath(grades).bySlot;
+          const paid = coinsByJar(grades);
           const coins = { ...bot.coins };
           for (const slot of SLOTS) coins[slot] = (coins[slot] ?? 0) + paid[slot];
           const weldForWeek = { ...bot.weldForWeek };

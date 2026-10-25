@@ -1,4 +1,5 @@
 import { GRADE_COINS, METRICS, SLOT_LABEL, bandText } from "@/lib/pit/catalog";
+import { coinMath, type GradeSet } from "@/lib/pit/engine";
 import { paintHex } from "@/lib/pit/store";
 import type { Grade, StatKey } from "@/lib/pit/types";
 
@@ -23,7 +24,8 @@ export type GradeRowData = {
 };
 
 export function coinsFor(grades: Partial<Record<StatKey, Grade>>) {
-  return METRICS.reduce((n, m) => n + (grades[m.stat] ? GRADE_COINS[grades[m.stat]!] : 0), 0);
+  const full = Object.fromEntries(METRICS.map((m) => [m.stat, grades[m.stat] ?? "red"])) as GradeSet;
+  return coinMath(full).total;
 }
 
 /** Click a color for each of the six numbers. Click it again to clear. */
