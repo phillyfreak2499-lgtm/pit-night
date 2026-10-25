@@ -41,7 +41,7 @@ import {
 import { makeData } from "./seed";
 import { BOLTS, STREAK_BADGE, allJobs, crateFor, dayOpen, programWeek, type DayKey } from "./training";
 import { eligibilityClosed } from "./eligibility";
-import { cosmeticUnlocked, earnedRewardIds, HALLOWEEN_REWARD_IDS, validBodyForClass } from "./cosmetics";
+import { bannerVerdict, cosmeticUnlocked, earnedRewardIds, HALLOWEEN_REWARD_IDS, validBodyForClass } from "./cosmetics";
 import { boltsOf, lockerItem, sparkStreak } from "./week";
 import { checkedCosmeticLoadout } from "./cosmetic-loadout";
 import { authorize } from "./commands";
@@ -924,7 +924,11 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           const week = nextFightWeek(data);
           set({
             bots: patchBot(data.bots, storeId, () =>
-              setPartWear({ ...paid, weldForWeek: { ...paid.weldForWeek, [slot]: week } }, partId, "bent"),
+              setPartWear(
+                { ...paid, services: (paid.services ?? 0) + 1, weldForWeek: { ...paid.weldForWeek, [slot]: week } },
+                partId,
+                "bent",
+              ),
             ),
             flash: `${part.name} is welded to Bent for week ${week}. Then it dies again if you do not finish the job.`,
           });
@@ -994,7 +998,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           bots: patchBot(data.bots, storeId, () => {
             const weldForWeek = { ...paid.weldForWeek };
             delete weldForWeek[slot];
-            return setPartWear({ ...paid, weldForWeek }, partId, "clean");
+            return setPartWear({ ...paid, services: (paid.services ?? 0) + 1, weldForWeek }, partId, "clean");
           }),
           flash: `${part.name} is clean. ${cost} ${slot} coins.`,
         });
@@ -1303,27 +1307,37 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         if (!isCaptainOf(data, storeId)) return;
         const bot = data.bots.find((row) => row.storeId === storeId);
         if (!bot) return;
+        let nextPatch = patch;
+        if (typeof patch.banner === "string") {
+          const verdict = bannerVerdict(patch.banner);
+          if (!verdict.ok) {
+            set({ flash: verdict.reason });
+            return;
+          }
+          nextPatch = { ...patch, banner: verdict.text };
+        }
         const current = styleOf(bot, bot.classId);
-        const next = styleOf({ classId: bot.classId, style: { ...current, ...patch, stickers: patch.stickers ?? (patch.decal !== undefined ? { ...current.stickers!, hood: patch.decal } : current.stickers) } });
+        const next = styleOf({ classId: bot.classId, style: { ...current, ...nextPatch, stickers: nextPatch.stickers ?? (nextPatch.decal !== undefined ? { ...current.stickers!, hood: nextPatch.decal } : current.stickers) } });
         const store = data.stores.find(s => s.id === storeId);
         if (!store || !checkedCosmeticLoadout(data, storeId, { paint: store.paint, look: bot.look, number: bot.number, style: next })) {
           set({ flash: "Earn or purchase that cosmetic before equipping it." }); return;
         }
-        if (patch.body) {
-          if (data.week === 1 && bot.style?.body && patch.body !== bot.style.body) {
+        if (nextPatch.body) {
+          if (data.week === 1 && bot.style?.body && nextPatch.body !== bot.style.body) {
             set({ flash: "Starter body is frozen through the first fight." });
             return;
           }
-          if (!validBodyForClass(patch.body, bot.classId) || !cosmeticUnlocked(data, storeId, "body", patch.body)) {
+          if (!validBodyForClass(nextPatch.body, bot.classId) || !cosmeticUnlocked(data, storeId, "body", nextPatch.body)) {
             set({ flash: "That body shell is still locked." });
             return;
           }
         }
-        for (const [kind, value] of Object.entries(patch)) {
-          if (value === undefined || ["flag", "walkout", "victory", "body"].includes(kind)) continue;
+        for (const [kind, value] of Object.entries(nextPatch)) {
+          if (value === undefined || value === null || typeof value === "object") continue;
+          if (["flag", "walkout", "victory", "body"].includes(kind)) continue;
           if (
-            ["finish", "decal", "trim", "eye", "topper", "mask", "weaponSkin"].includes(kind) &&
-            !cosmeticUnlocked(data, storeId, kind as "finish" | "decal" | "trim" | "eye" | "topper" | "mask" | "weaponSkin", String(value))
+            ["finish", "decal", "trim", "eye", "topper", "mask", "weaponSkin", "leds", "smoke", "banner"].includes(kind) &&
+            !cosmeticUnlocked(data, storeId, kind as "finish" | "decal" | "trim" | "eye" | "topper" | "mask" | "weaponSkin" | "leds" | "smoke" | "banner", String(value))
           ) {
             set({ flash: "Earn that cosmetic in Pit Week first." });
             return;

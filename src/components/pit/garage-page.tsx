@@ -6,7 +6,7 @@ import type { CosmeticLoadout, StickerSlot } from "@/lib/pit/types";
 import { BuildLockBanner } from "./build-lock-banner";
 import { Link } from "@tanstack/react-router";
 import { createContext, useContext, useState } from "react";
-import { BODY_STYLES, CLASS_META, DECALS, EYES, FINISHES, MASKS, PAINT, TOPPERS, WEAPON_SKINS, partById, partsFor, SLOT_LABEL, styleOf, TRIM } from "@/lib/pit/catalog";
+import { BODY_STYLES, CLASS_META, DECALS, EYES, FINISHES, LEDS, MASKS, PAINT, SMOKE, TOPPERS, WEAPON_SKINS, partById, partsFor, SLOT_LABEL, styleOf, TRIM } from "@/lib/pit/catalog";
 import {
   buyCheck,
   canSeeLoadout,
@@ -560,6 +560,9 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
       if (data.week === 1) return "Starter shell is locked after your first choice until Week 1 ends";
       return "Starter shell";
     }
+    if (kind === "decal" && value.endsWith("-foil")) return "Foil stickers: 4 Bolts, or one perfect week with 6 greens";
+    if (kind === "finish" && value === "holographic") return "Full Tune-Ups in 3 weeks, or 14 Bolts";
+    if (kind === "smoke" && value && value !== "black") return "10 Bolts in the Bolt Locker";
     const reward = rewardFor(kind, value);
     if (!reward) return "Locked";
     const row = progress.find((item) => item.reward.id === reward.id);
@@ -640,7 +643,7 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
         </div>
 
         <div className="flex flex-col gap-3">
-          <div className="border border-line bg-deep p-3"><p className="text-xs tracking-widest text-amber uppercase">Current look</p><p className="mt-1 text-sm">{style.body} · {store.paint} · {style.finish} · #{bot.number || "—"}</p><p className="mt-1 text-xs text-muted">{style.trim} trim · {style.eye} visor · {style.topper ?? "none"} topper</p></div>
+          <div className="border border-line bg-deep p-3"><p className="text-xs tracking-widest text-amber uppercase">Current look</p><p className="mt-1 text-sm">{style.body} · {store.paint} · {style.finish} · #{bot.number || "—"}{style.banner ? ` · ${style.banner}` : ""}</p><p className="mt-1 text-xs text-muted">{style.trim} trim · {style.leds && style.leds !== "none" ? `${LEDS[style.leds].label} · ` : ""}{style.eye} visor · {style.topper ?? "none"} topper{style.smoke ? ` · ${SMOKE[style.smoke].label}` : ""}</p></div>
           <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm"><input type="checkbox" checked={ownedOnly} onChange={e => setOwnedOnly(e.target.checked)} className="h-5 w-5 accent-amber"/>Show owned / unlocked items only</label>
           <Group label="Body shell">
             {BODY_STYLES.filter((row) => row.classId === bot.classId).map((row) => {
@@ -744,6 +747,26 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
             })}
           </Group>
 
+          <Group label="Light strips">
+            <Chip active={(style.leds ?? "none") === "none"} onClick={() => setStyle(storeId, { leds: "none" })}>No lights</Chip>
+            {Object.entries(LEDS).map(([key, row]) => {
+              const open = unlocked("leds", key);
+              return (
+                <Swatch key={key} color={row.hex} glow active={style.leds === key} label={row.label} disabled={!open} title={open ? row.label : lockTitle("leds", key)} onClick={() => setStyle(storeId, { leds: key as keyof typeof LEDS })} />
+              );
+            })}
+          </Group>
+
+          <Group label="Smoke">
+            <Chip active={!style.smoke} onClick={() => setStyle(storeId, { smoke: "" })}>No smoke</Chip>
+            {Object.entries(SMOKE).map(([key, row]) => {
+              const open = unlocked("smoke", key);
+              return (
+                <Swatch key={key} color={row.hex} glow active={style.smoke === key} label={row.label} disabled={!open} title={open ? row.label : lockTitle("smoke", key)} onClick={() => setStyle(storeId, { smoke: key as keyof typeof SMOKE })} />
+              );
+            })}
+          </Group>
+
           <Group label="Topper">
             {TOPPERS.map((row) => {
               const open = unlocked("topper", row.id);
@@ -771,11 +794,22 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
             {(activeStore.unlocks ?? []).filter(id => id.startsWith(kind + '-')).map(id => <Chip key={id} active={style[kind] === id} onClick={() => setStyle(storeId, { [kind]: id })}>{id.replace(kind + '-', '')}</Chip>)}
           </Group>)}
 
-          <div className="max-w-xs">
+          <div className="grid max-w-xl gap-3 sm:grid-cols-2">
             <Field label="Bay number">
               <TextInput value={bot.number} aria-label="Bay number" maxLength={3} onChange={(e) => setNumber(storeId, e.target.value)} />
             </Field>
+            <Field label="Pit banner">
+              <TextInput
+                value={style.banner ?? ""}
+                aria-label="Pit banner"
+                maxLength={12}
+                disabled={!unlocked("banner", "PIT")}
+                placeholder={unlocked("banner", "PIT") ? "Up to 12 characters" : "After the first win"}
+                onChange={(e) => setStyle(storeId, { banner: e.target.value })}
+              />
+            </Field>
           </div>
+          <p className="text-xs text-muted">{unlocked("banner", "PIT") ? "Twelve characters. Letters, numbers, and simple marks." : lockTitle("banner", "on")}</p>
         </div>
       </div>
     </section>

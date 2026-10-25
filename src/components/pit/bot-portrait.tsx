@@ -197,7 +197,13 @@ export function BotPortrait({
         if (effect && !reduced) drawCosmeticEffect(ctx, fx, effect, gx, gy, u * 0.65, w, h, dt, paintOf(look.paint));
         if (look.weapon === "hidden") drawTarp(ctx, look, gx, gy, u, facing, reduced ? 0 : t, heat);
       }
-      return !reduced && (hot || heat > 0 || Boolean(effect));
+      const living =
+        Boolean(look.style?.smoke) ||
+        look.style?.finish === "holographic" ||
+        Boolean(look.style?.leds && look.style.leds !== "none") ||
+        look.style?.topper === "beacon" ||
+        look.style?.topper === "flagpole";
+      return !reduced && (hot || heat > 0 || Boolean(effect) || living);
     };
     loop = createFrameLoop(draw);
     const visibility = () => loop?.setVisible(visible && !document.hidden);

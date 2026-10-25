@@ -732,6 +732,7 @@ function snapshot(data: PitData, storeId: string): FighterSnap {
   const weapon = resolvePart(bot, "weapon", locked);
   const drive = resolvePart(bot, "drive", locked);
   const armor = resolvePart(bot, "armor", locked);
+  const chassis = resolvePart(bot, "chassis", locked);
   return {
     id: storeId,
     name: store.name,
