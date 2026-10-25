@@ -1,3 +1,4 @@
+import { bannerVerdict } from "../../../scripts/copy-guard.mjs";
 import { styleOf } from "./catalog";
 import { cosmeticLoadoutSchema } from "./commands";
 import { cosmeticUnlocked, validBodyForClass } from "./cosmetics";
@@ -28,9 +29,13 @@ export function checkedCosmeticLoadout(
   )
     return null;
   if (data.week === 1 && bot.style?.body && style.body !== bot.style.body) return null;
-  for (const kind of ["finish", "decal", "trim", "eye", "topper"] as const) {
+  for (const kind of ["finish", "decal", "trim", "eye", "topper", "leds"] as const) {
     if (!cosmeticUnlocked(data, storeId, kind, style[kind] ?? "none")) return null;
   }
+  if (!cosmeticUnlocked(data, storeId, "smoke", style.smoke ?? "")) return null;
+  const banner = bannerVerdict(style.banner ?? "");
+  if (!banner.ok) return null;
+  if (banner.text && !cosmeticUnlocked(data, storeId, "banner", banner.text)) return null;
   if (
     Object.values(style.stickers!).some((value) => !cosmeticUnlocked(data, storeId, "decal", value))
   )
@@ -39,5 +44,5 @@ export function checkedCosmeticLoadout(
     const value = style[kind];
     if (value && (lockerItem(value)?.kind !== kind || !store.unlocks?.includes(value))) return null;
   }
-  return { ...loadout, number: loadout.number.trim().toUpperCase(), style };
+  return { ...loadout, number: loadout.number.trim().toUpperCase(), style: { ...style, banner: banner.text } };
 }

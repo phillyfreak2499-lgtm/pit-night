@@ -1,4 +1,5 @@
-// @ts-nocheck -- shared runtime JS; behavior is covered by the gate tests.
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment -- shared runtime JS; behavior is covered by the gate tests.
+// @ts-nocheck
 // Vercel's filesystem routes precede Nitro. Protect them before CDN lookup.
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { pathToFileURL } from "node:url";

@@ -27,10 +27,32 @@
  * favicon, PWA icons and title for a plain utility that keeps the og.grok.me
  * card — where no card is the expected verdict rather than a failure.
  */
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { findTrademarkHits } from "./copy-guard.mjs";
+
+export { findTrademarkHits };
 import { OG_SITE_REL_PATH, readOgSite, siteHasCustomCard } from "./grok-pwa-shared.mjs";
+
+const COSMETIC_SOURCES = ["src/lib/pit/catalog.ts", "src/lib/pit/cosmetics.ts", "src/lib/pit/week.ts"];
+
+/** Sponsor copy in the pit catalogs. Missing files are not a brand failure. */
+export function cosmeticTrademarkWarnings(workspaceRoot) {
+  const warnings = [];
+  for (const rel of COSMETIC_SOURCES) {
+    const path = join(workspaceRoot, rel);
+    if (!existsSync(path)) continue;
+    const hits = findTrademarkHits(readFileSync(path, "utf8"));
+    if (hits.length) {
+      warnings.push(
+        `BRAND WARNING: ${rel} names a real trademark (${hits.join(", ")}). `
+          + "Sponsor cosmetics need original names.",
+      );
+    }
+  }
+  return warnings;
+}
 
 // Over this, link scrapers (X card previews included) time out or skip the
 // image, so the card silently fails to unfurl. The og skill's JPEG contract
@@ -163,6 +185,7 @@ function brandWarningsOnDisk({
     }
   }
 
+  warnings.push(...cosmeticTrademarkWarnings(workspaceRoot));
   return warnings;
 }
 

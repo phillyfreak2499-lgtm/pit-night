@@ -701,25 +701,41 @@ function BoltLocker({ data, storeId, canBuy }: { data: PitData; storeId: string;
         {LOCKER.map((item) => {
           const have = owned.has(item.id);
           const equipped =
-            item.kind === "walkout" ? bot?.style?.walkout === item.id : item.kind === "victory" ? bot?.style?.victory === item.id : store.paint === item.id.replace("paint-", "");
+            item.kind === "walkout"
+              ? bot?.style?.walkout === item.id
+              : item.kind === "victory"
+                ? bot?.style?.victory === item.id
+                : item.kind === "finish"
+                  ? bot?.style?.finish === "holographic"
+                  : item.kind === "smoke"
+                    ? bot?.style?.smoke === item.id.replace("smoke-", "")
+                    : item.kind === "foil"
+                      ? false
+                      : store.paint === item.id.replace("paint-", "");
+          const kindLabel =
+            item.kind === "walkout" ? "Walk-out" : item.kind === "victory" ? "Victory" : item.kind === "finish" ? "Finish" : item.kind === "smoke" ? "Smoke" : item.kind === "foil" ? "Stickers" : "Paint";
           return (
             <li key={item.id} className="flex flex-col gap-2 bg-surface p-4">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-[10px] tracking-widest text-muted uppercase">{item.kind === "walkout" ? "Walk-out" : item.kind === "victory" ? "Victory" : "Paint"}</p>
+                  <p className="text-[10px] tracking-widest text-muted uppercase">{kindLabel}</p>
                   <p className="font-display text-lg leading-tight">{item.name}</p>
                 </div>
                 {item.hex ? <span className="h-8 w-8 border border-line" style={{ background: item.hex }} /> : null}
               </div>
               <p className="flex-1 text-sm text-muted">{item.blurb}</p>
               {have ? (
-                canBuy ? (
+                item.kind === "foil" ? (
+                  <p className="text-xs text-ok">Owned. Foil stickers are in the Garage.</p>
+                ) : canBuy ? (
                   <Btn
                     tone={equipped ? "line" : "amber"}
                     onClick={() => {
                       if (item.kind === "paint") setPaint(storeId, item.id.replace("paint-", ""));
                       else if (item.kind === "walkout") setStyle(storeId, { walkout: equipped ? "" : item.id });
-                      else setStyle(storeId, { victory: equipped ? undefined : item.id });
+                      else if (item.kind === "victory") setStyle(storeId, { victory: equipped ? "" : item.id });
+                      else if (item.kind === "finish") setStyle(storeId, { finish: equipped ? "factory" : "holographic" });
+                      else if (item.kind === "smoke") setStyle(storeId, { smoke: equipped ? "" : (item.id.replace("smoke-", "") as "neon" | "candy" | "ice" | "royal") });
                     }}
                   >
                     {equipped ? (item.kind === "paint" ? "On the bot" : "Equipped · take off") : "Use it"}

@@ -80,6 +80,8 @@ export function Broadcast({
     const fx = fxRef.current;
     const trails = trailsRef.current;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Assigned after the frame closure; listeners only fire once the effect has finished.
+    // eslint-disable-next-line prefer-const
     let loop: ReturnType<typeof createFrameLoop> | undefined;
     let visible = true;
     if (lastSeek.current !== seek) {

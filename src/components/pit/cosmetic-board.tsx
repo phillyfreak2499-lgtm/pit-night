@@ -12,14 +12,14 @@ const THEMES = [
   },
   {
     name: "ATTITUDE",
-    categories: "Decals & stickers · visor & eyes · trim",
-    kinds: ["decal", "eye", "trim"],
+    categories: "Decals & stickers · visor & eyes · trim · light strips",
+    kinds: ["decal", "eye", "trim", "leds"],
   },
-  { name: "SHOWMANSHIP", categories: "Toppers · flags · walkouts", kinds: ["topper"] },
+  { name: "SHOWMANSHIP", categories: "Toppers · flags · walkouts · banners", kinds: ["topper", "banner"] },
   {
     name: "BATTLE READY",
-    categories: "Rare finishes · battle-worn & rivalry looks · victory effects",
-    kinds: ["finish", "decal"],
+    categories: "Rare finishes · battle-worn & rivalry looks · victory effects · smoke",
+    kinds: ["finish", "decal", "smoke"],
   },
   {
     name: "CHAMPIONSHIP",

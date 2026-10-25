@@ -1,4 +1,5 @@
-// @ts-nocheck -- shared runtime JS; behavior is covered by the gate tests.
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment -- shared runtime JS; behavior is covered by the gate tests.
+// @ts-nocheck
 // Web Crypto only: shared by the server and Vercel's asset-routing middleware.
 const encoder = new TextEncoder();
 const encode = (bytes) =>
@@ -71,6 +72,8 @@ export function internalDestination(value) {
     typeof value !== "string" ||
     !value.startsWith("/") ||
     value.startsWith("//") ||
+    // Control characters and whitespace are rejected; the class is built so the check stays exact.
+    // eslint-disable-next-line no-control-regex -- rejects NUL through space, DEL, and backslash
     /[\\\u0000-\u0020\u007f]/.test(value) ||
     value.startsWith("/entry") ||
     value.length > 2000
