@@ -241,7 +241,7 @@ function juke(seed: string, time: number, amp: number): Spot {
 }
 
 function isSpinner(family: string) {
-  return family === "saw" || family === "disc" || family === "drum" || family === "chainsaw";
+  return family === "saw" || family === "disc" || family === "drum" || family === "chainsaw" || family === "flail";
 }
 
 function knockFor(family: string, damage: number) {
@@ -927,7 +927,7 @@ function meleeDrive(result: FightResult, beat: Beat, local: number, time: number
         ex.attackerHp,
         meleeBefore(result, ex),
         ex.defenderHp,
-        false,
+        (ex.tags ?? []).includes("burn") || (ex.tags ?? []).includes("jet") || atkBot.weaponFamily === "flame",
       );
       states[ai] = out.atk;
       states[di] = out.def;

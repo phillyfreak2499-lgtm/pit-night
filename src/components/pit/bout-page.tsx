@@ -43,7 +43,7 @@ export function BoutPage({ boutId }: { boutId: string }) {
                 {f.chassisName} · {f.weaponName} · {f.driveName}
               </p>
               <div className="mt-3">
-                <StatStrip {...f.stats} />
+                <StatStrip {...f.stats} battery={f.batteryMax} />
               </div>
             </div>
           ))}

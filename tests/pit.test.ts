@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { createStore } from "zustand/vanilla";
 import { pitCreator, sharedDoc, clientDoc, applyLeague14, applyDueLock } from "../src/lib/pit/store.ts";
 import { makeData } from "../src/lib/pit/seed.ts";
-import { nsnuOf, rankedStores, simulateDuel, buildCard, conferenceStandings, championshipFinalists, coinMath, coinsByJar, type GradeSet } from "../src/lib/pit/engine.ts";
+import { nsnuOf, rankedStores, simulateDuel, simulateChampionshipDuel, buildCard, conferenceStandings, championshipFinalists, coinMath, coinsByJar, type GradeSet } from "../src/lib/pit/engine.ts";
 import { weekProgress, boltsOf, lockerItem } from "../src/lib/pit/week.ts";
 import { programWeek, allJobs, crateFor } from "../src/lib/pit/training.ts";
 import { eligibilityClosed } from "../src/lib/pit/eligibility.ts";
@@ -907,15 +907,9 @@ test("season load retries a bounded number of times and skips closed-week deadli
 
 test("KO fixtures always contain a replay and particle budgets stay bounded", () => {
   const data = makeData();
-  let ko = false;
-  for (let seed = 0; seed < 50; seed++) {
-    const result = simulateDuel(data, "plano", "allen", `ko-${seed}`);
-    if (result.method !== "ko") continue;
-    ko = true;
-    assert.ok(buildBeats(result).some((b) => b.kind === "replay"));
-    break;
-  }
-  assert.ok(ko, "Seeded fixtures must actually exercise KO replay");
+  const result = simulateChampionshipDuel(data, "plano", "allen", "title");
+  assert.equal(result.method, "ko");
+  assert.ok(buildBeats(result).some((b) => b.kind === "replay"));
   const fx = new Fx();
   for (let i = 0; i < 1000; i++) fx.dust(0, 0, 1, 1);
   fx.step(1 / 60);

@@ -6,7 +6,7 @@ import type { CosmeticLoadout, StickerSlot } from "@/lib/pit/types";
 import { BuildLockBanner } from "./build-lock-banner";
 import { Link } from "@tanstack/react-router";
 import { createContext, useContext, useState } from "react";
-import { BODY_STYLES, CLASS_META, DECALS, EYES, FINISHES, LEDS, MASKS, PAINT, SMOKE, TOPPERS, WEAPON_SKINS, partById, partsFor, SLOT_LABEL, styleOf, TRIM } from "@/lib/pit/catalog";
+import { BODY_STYLES, CLASS_META, DECALS, EYES, FINISHES, LEDS, MASKS, PAINT, SMOKE, TOPPERS, WEAPON_SKINS, batteryOf, partById, partsFor, SLOT_LABEL, styleOf, TRIM } from "@/lib/pit/catalog";
 import {
   buyCheck,
   canSeeLoadout,
@@ -131,7 +131,7 @@ export function GaragePage({ storeId }: { storeId: string }) {
         <p className="mt-2 text-xs text-muted">Each number pays its part&apos;s jar every Monday: green 3, blue 2, orange 1, red 0. Sport parts cost 3, Pro 5, Super 8. Repairs come out of the same jar.</p>
       </section>
 
-      {showStats && printed ? <StatStrip {...printed.stats} /> : <p className="text-sm text-muted">{data.week === 5 ? "Power, Speed, Armor, and Heat print when the title build locks Friday, Nov 27, at 6:00 PM CT." : data.week === 1 ? "Power, Speed, Armor, and Heat print when the build locks automatically Saturday, Oct 31, at 6:00 PM CT." : "Power, Speed, Armor, and Heat print when the bot locks Saturday."}</p>}
+      {showStats && printed ? <StatStrip {...printed.stats} battery={batteryOf(partById(loadout.chassis))} /> : <p className="text-sm text-muted">{data.week === 5 ? "Power, Speed, Armor, and Heat print when the title build locks Friday, Nov 27, at 6:00 PM CT." : data.week === 1 ? "Power, Speed, Armor, and Heat print when the build locks automatically Saturday, Oct 31, at 6:00 PM CT." : "Power, Speed, Armor, and Heat print when the bot locks Saturday. Battery is the chassis stamina behind them."}</p>}
 
       <section className="grid gap-3 md:grid-cols-2">
         {SLOTS.map((slot) => {

@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { CLASS_META, partById, SLOT_LABEL } from "@/lib/pit/catalog";
+import { CLASS_META, batteryOf, partById, SLOT_LABEL } from "@/lib/pit/catalog";
 import { canSeeLoadout, cardFor, loadSignature, printedStats, recordOf, weaponFamilyOf, weekQuality, gradesOf } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
 import type { Slot } from "@/lib/pit/types";
@@ -52,7 +52,7 @@ export function StorePage({ storeId }: { storeId: string }) {
       <p className="text-sm text-muted">{CLASS_META[bot.classId].threat}</p>
       {printed ? (
         <div className="mt-4">
-          <StatStrip {...printed.stats} />
+          <StatStrip {...printed.stats} battery={batteryOf(partById(loadout.chassis))} />
         </div>
       ) : (
         <p className="mt-4 text-sm text-muted">Stats print when the bot locks Saturday. Parts stay hidden until the bell.</p>
