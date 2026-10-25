@@ -20,6 +20,7 @@ const StarterBodyPicker = lazy(() => import("./starter-body-picker"));
 import { TUTORIAL_REV, applyHulen, usePit } from "@/lib/pit/store";
 import { startSync, useSyncStatus } from "@/lib/pit/sync";
 import { setSoundMuted, soundMuted, subscribeSound } from "@/lib/pit/sound";
+import { halloweenVisuals } from "@/lib/pit/halloween";
 import { formatRemain, nextLock, PERIOD_OPENS, TextInput, useNow } from "./bits";
 import { Tutorial } from "./tutorial";
 import { StreakBadge } from "./streak-badge";
@@ -67,8 +68,10 @@ export function PitShell({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  const now = useNow();
+  const halloween = Boolean(now && halloweenVisuals(now));
   return (
-    <div className="min-h-screen text-fg">
+    <div className={`min-h-screen text-fg ${halloween ? "halloween-site" : ""}`}>
       <div className="shell-grid md:grid md:grid-cols-[13.5rem_1fr]">
         <aside className="no-print hidden border-r border-line bg-deep md:sticky md:top-0 md:flex md:h-screen md:flex-col md:justify-between md:p-4">
           <div>
@@ -82,6 +85,8 @@ export function PitShell({ children }: { children: React.ReactNode }) {
           <PhaseBlock />
         </aside>
         <div className="min-w-0">
+          {halloween ? <HalloweenBanner /> : null}
+          <OozeCelebration />
           <header className="no-print sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-line bg-deep/95 px-4 py-3 backdrop-blur md:px-6">
             <div className="md:hidden">
               <Brand compact />
@@ -169,6 +174,34 @@ function useSoundMuted() {
     return subscribeSound(() => setMuted(soundMuted()));
   }, []);
   return muted;
+}
+
+function HalloweenBanner() {
+  return (
+    <div className="halloween-banner no-print" data-testid="halloween-banner" role="status">
+      <p className="font-display text-xs tracking-[0.18em] text-amber uppercase">Halloween week</p>
+      <p className="mt-1 text-sm leading-snug">
+        Tuesday October 27 through Saturday October 31. Approve Pit Week 1 jobs to earn a pumpkin sticker, a lantern mask, a hockey mask, and the Hockey Mask Machete. The looks stay after the week and never change the fight.
+      </p>
+    </div>
+  );
+}
+
+function OozeCelebration() {
+  const ooze = usePit((s) => s.ooze);
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    if (!ooze) return;
+    setShow(true);
+    const id = window.setTimeout(() => setShow(false), 2800);
+    return () => window.clearTimeout(id);
+  }, [ooze]);
+  if (!show) return null;
+  return (
+    <div className="ooze-celebrate no-print" data-testid="halloween-ooze" role="status">
+      Green ooze! A Halloween look just unlocked. It is paint and stickers only.
+    </div>
+  );
 }
 
 function Brand({ compact = false }: { compact?: boolean }) {

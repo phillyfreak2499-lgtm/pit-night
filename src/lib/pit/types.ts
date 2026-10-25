@@ -14,8 +14,12 @@ export type Method = "ko" | "dump" | "decision" | "melee" | "scrimmage" | "bye";
 export type GarageLook = "hazard" | "concrete" | "night" | "bone" | "checker";
 export type BotLook = "plain" | "stripe" | "chevron" | "rivets";
 export type BotFinish = "factory" | "chrome" | "matte" | "worn" | "satin" | "carbon" | "iridescent" | "gold";
-export type BotDecal = "none" | "flames" | "lightning" | "teeth" | "checker" | "hazard" | "camo" | "arch" | "stars" | "circuit" | "splash" | "champion";
+export type BotDecal = "none" | "flames" | "lightning" | "teeth" | "checker" | "hazard" | "camo" | "arch" | "stars" | "circuit" | "splash" | "champion" | "pumpkin";
 export type BotTopper = "none" | "antenna" | "horns" | "mohawk" | "crown";
+export type BotMask = "none" | "lantern" | "hockey";
+/** Cosmetic blade only. Premium Halloween weapons are real parts, not skins. */
+export type BotWeaponSkin = "none" | "hockey-machete";
+export type ShowEffectId = "fog" | "blacklight";
 export type StickerSlot = "left" | "right" | "hood" | "rear";
 export type StickerSlots = Record<StickerSlot, BotDecal>;
 export type BotBody =
@@ -37,6 +41,10 @@ export type BotStyle = {
   eye: string;
   flag: boolean;
   topper?: BotTopper;
+  /** Face plate. Visual only. */
+  mask?: BotMask;
+  /** Drawn over the weapon. Does not change the equipped part or its stats. */
+  weaponSkin?: BotWeaponSkin;
   /** Bolt Locker unlocks. Shown on fight day. */
   walkout?: string;
   victory?: string;
@@ -109,6 +117,8 @@ export type Bot = {
   number: string;
   /** Older saves do not have it. Read through styleOf(). */
   style?: BotStyle;
+  /** Bought show effects. Visual only. Never a loadout slot. */
+  shows?: ShowEffectId[];
 };
 
 export type StoreCard = {
@@ -176,6 +186,9 @@ export type FighterSnap = {
   /** Visible build geometry; does not change fight calculations. */
   armorFamily?: string;
   driveFamily?: string;
+  chassisFamily?: string;
+  /** Fog and blacklight. Drawing only. */
+  shows?: ShowEffectId[];
 };
 
 export type FightResult = {

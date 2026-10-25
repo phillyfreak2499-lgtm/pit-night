@@ -3,7 +3,7 @@ import { championshipFinalists } from "./engine";
 import { sparkStreak, tunedUp } from "./week";
 import type { BotBody, PitData } from "./types";
 
-export type CosmeticKind = "finish" | "decal" | "trim" | "eye" | "paint" | "topper" | "body" | "look";
+export type CosmeticKind = "finish" | "decal" | "trim" | "eye" | "paint" | "topper" | "body" | "look" | "mask" | "weaponSkin";
 export type CosmeticReward = {
   id: string;
   kind: CosmeticKind;
@@ -15,6 +15,10 @@ export type CosmeticReward = {
 
 function approvedJobs(data: PitData, storeId: string) {
   return data.jobLog.filter((e) => e.storeId === storeId && e.status === "approved" && !e.jobId.endsWith("-crate")).length;
+}
+/** Pit Week 1 jobs only. Halloween looks are earned that week and stay unlocked after it. */
+function halloweenJobs(data: PitData, storeId: string) {
+  return data.jobLog.filter((e) => e.storeId === storeId && e.week === 1 && e.status === "approved" && !e.jobId.endsWith("-crate")).length;
 }
 function crates(data: PitData, storeId: string) {
   return data.jobLog.filter((e) => e.storeId === storeId && e.status === "approved" && e.jobId.endsWith("-crate")).length;
@@ -94,7 +98,13 @@ export const COSMETIC_REWARDS: CosmeticReward[] = [
   { id:"reward-crown", kind:"topper", value:"crown", label:"Champion Crown", requirement:"Win the Waterman Championship", progress:p(champion,1) },
   { id:"reward-champion-finish", kind:"finish", value:"gold", label:"Champion Gold Finish", requirement:"Win the Waterman Championship", progress:p(champion,1) },
   { id:"reward-champion-decal", kind:"decal", value:"champion", label:"Champion Crest", requirement:"Win the Waterman Championship", progress:p(champion,1) },
+  { id:"reward-pumpkin", kind:"decal", value:"pumpkin", label:"Pumpkin Sticker", requirement:"Approve 1 Pit Week 1 job", progress:p(halloweenJobs,1) },
+  { id:"reward-lantern-mask", kind:"mask", value:"lantern", label:"Lantern Mask", requirement:"Approve 2 Pit Week 1 jobs", progress:p(halloweenJobs,2) },
+  { id:"reward-hockey-mask", kind:"mask", value:"hockey", label:"Hockey Mask", requirement:"Approve 4 Pit Week 1 jobs", progress:p(halloweenJobs,4) },
+  { id:"reward-hockey-machete", kind:"weaponSkin", value:"hockey-machete", label:"Hockey Mask Machete", requirement:"Approve 6 Pit Week 1 jobs", progress:p(halloweenJobs,6) },
 ];
+
+export const HALLOWEEN_REWARD_IDS = ["reward-pumpkin", "reward-lantern-mask", "reward-hockey-mask", "reward-hockey-machete"] as const;
 
 const FREE: Record<CosmeticKind, Set<string>> = {
   finish:new Set(["factory"]),
@@ -105,6 +115,8 @@ const FREE: Record<CosmeticKind, Set<string>> = {
   topper:new Set(["none"]),
   body:new Set(),
   look:new Set(["plain","stripe","chevron","rivets"]),
+  mask:new Set(["none"]),
+  weaponSkin:new Set(["none"]),
 };
 
 export function earnedRewardIds(data: PitData, storeId: string) {

@@ -120,6 +120,38 @@
   }
 }
 
+.halloween-site {
+  background-image:
+    radial-gradient(ellipse at top, color-mix(in oklab, #ff8a1e 16%, transparent), transparent 46%),
+    linear-gradient(to bottom, #140c08, var(--color-bg) 32%);
+}
+
+.halloween-banner {
+  border-bottom: 1px solid #e07a1a;
+  background: #2a160c;
+  color: #fff6ea;
+  padding: 0.75rem 1rem;
+}
+
+.halloween-banner p + p {
+  color: #fff6ea;
+}
+
+.ooze-celebrate {
+  border-bottom: 1px solid #7dff4a;
+  background: #10240c;
+  color: #e9ffd8;
+  padding: 0.75rem 1rem;
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .halloween-site {
+    background-image: linear-gradient(to bottom, #140c08, var(--color-bg) 32%);
+  }
+}
+
 /* ---------- Bays: a lit garage behind a roll-up door ---------- */
 
 .bay-inside {

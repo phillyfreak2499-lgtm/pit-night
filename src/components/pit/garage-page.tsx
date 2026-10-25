@@ -6,7 +6,7 @@ import type { CosmeticLoadout, StickerSlot } from "@/lib/pit/types";
 import { BuildLockBanner } from "./build-lock-banner";
 import { Link } from "@tanstack/react-router";
 import { createContext, useContext, useState } from "react";
-import { BODY_STYLES, CLASS_META, DECALS, EYES, FINISHES, PAINT, TOPPERS, partById, partsFor, SLOT_LABEL, styleOf, TRIM } from "@/lib/pit/catalog";
+import { BODY_STYLES, CLASS_META, DECALS, EYES, FINISHES, MASKS, PAINT, TOPPERS, WEAPON_SKINS, partById, partsFor, SLOT_LABEL, styleOf, TRIM } from "@/lib/pit/catalog";
 import {
   buyCheck,
   canSeeLoadout,
@@ -746,6 +746,28 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
               const open = unlocked("eye", key);
               return (
                 <Swatch key={key} color={hex} glow active={style.eye === key} label={`${key} eye`} disabled={!open} title={open ? `${key} visor` : lockTitle("eye", key)} onClick={() => setStyle(storeId, { eye: key })} />
+              );
+            })}
+          </Group>
+
+          <Group label="Halloween masks">
+            {MASKS.map((row) => {
+              const open = unlocked("mask", row.id);
+              return (
+                <Chip key={row.id} active={(style.mask ?? "none") === row.id} disabled={!open} title={open ? row.label : lockTitle("mask", row.id)} onClick={() => setStyle(storeId, { mask: row.id })}>
+                  {row.label}{!open ? " 🔒" : ""}
+                </Chip>
+              );
+            })}
+          </Group>
+
+          <Group label="Weapon skin">
+            {WEAPON_SKINS.map((row) => {
+              const open = unlocked("weaponSkin", row.id);
+              return (
+                <Chip key={row.id} active={(style.weaponSkin ?? "none") === row.id} disabled={!open} title={open ? row.label : lockTitle("weaponSkin", row.id)} onClick={() => setStyle(storeId, { weaponSkin: row.id })}>
+                  {row.label}{!open ? " 🔒" : ""}
+                </Chip>
               );
             })}
           </Group>
