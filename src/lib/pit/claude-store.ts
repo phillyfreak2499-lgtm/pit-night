@@ -27,6 +27,19 @@ export async function readCopy(sql: Sql, kind: string, key: string) {
   )[0];
 }
 
+/**
+ * Rows of this kind first claimed on a Chicago calendar day (`YYYY-MM-DD`).
+ * `created_at` stays on the original insert, so a retry does not count twice.
+ */
+export async function countClaimedOnDay(sql: Sql, kind: string, day: string) {
+  const rows = await sql<{ n: number }>`
+    select count(*)::int as n
+    from pit_claude_text
+    where kind = ${kind}
+      and to_char(created_at at time zone 'America/Chicago', 'YYYY-MM-DD') = ${day}`;
+  return Number(rows[0]?.n ?? 0);
+}
+
 export async function finishCopy(sql: Sql, kind: string, key: string, result: { body: string } | { error: string }) {
   if ("body" in result)
     await sql`update pit_claude_text set status = 'ready', body = ${result.body}, error = null where kind = ${kind} and key = ${key} and status = 'pending'`;

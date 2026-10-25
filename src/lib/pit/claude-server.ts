@@ -34,7 +34,7 @@ async function writeOnce(
 
 /** Ask once; if numbers slip in that the facts do not hold, ask once more, then give up rather than post them. */
 async function guardedCopy(
-  feature: "bout" | "recap" | "hype",
+  feature: "bout" | "recap" | "hype" | "live",
   system: string,
   prompt: string,
   maxTokens: number,
@@ -86,6 +86,64 @@ export const getClaudeCopy = createServerFn({ method: "POST" })
     return writeOnce(subject.kind, subject.key, FEATURE_MODEL[subject.kind], () =>
       guardedCopy(subject.kind, system, prompt, maxTokens, subject.facts),
     );
+  });
+
+export type LiveCallResult =
+  | { status: "ready"; body: string; label: string; beatId: string; last: boolean }
+  | { status: "pending" }
+  | { status: "unavailable" };
+
+/**
+ * One live booth line for a resolved bout, revealed in order.
+ * The first viewer to reach a beat claims it. A ready line is never rewritten.
+ * Later beats wait until the one before them is stored. Past the daily cap,
+ * or when Claude is down, the result is empty and the page keeps the ringside call.
+ */
+export const getLiveCall = createServerFn({ method: "POST" })
+  .validator(
+    z.object({ id: z.string().min(1).max(160), index: z.number().int().min(0).max(12) }).strict(),
+  )
+  .handler(async ({ data: input }): Promise<LiveCallResult> => {
+    const [{ loadSeason }, copy, copyStore, { FEATURE_MODEL }, { getSql }] = await Promise.all([
+      import("./authoritative"),
+      import("./claude-copy"),
+      import("./claude-store"),
+      import("./claude.server"),
+      import("@/lib/db"),
+    ]);
+    const { data } = await loadSeason();
+    const beats = copy.liveSubjects(data, input.id);
+    if (!beats?.length) return { status: "unavailable" };
+    const beat = beats[input.index];
+    if (!beat) return { status: "unavailable" };
+    const sql = await getSql();
+    const previous =
+      input.index === 0 ? undefined : await copyStore.readCopy(sql, "live", beats[input.index - 1]!.key);
+    const existing = await copyStore.readCopy(sql, "live", beat.key);
+    const claimedToday = existing ? 0 : await copyStore.countClaimedOnDay(sql, "live", centralDate());
+    const gate = copy.liveRequest(
+      input.index,
+      beats.length,
+      previous?.status === "ready",
+      Boolean(existing),
+      claimedToday,
+    );
+    if (gate === "unavailable") return { status: "unavailable" };
+    if (gate === "wait") return { status: "pending" };
+    const { system, prompt, maxTokens } = copy.promptFor(beat);
+    const written = await writeOnce("live", beat.key, FEATURE_MODEL.live, () =>
+      guardedCopy("live", system, prompt, maxTokens, beat.facts),
+    );
+    if (written.status === "ready")
+      return {
+        status: "ready",
+        body: written.body,
+        label: beat.label,
+        beatId: beat.beatId,
+        last: input.index === beats.length - 1,
+      };
+    if (written.status === "pending") return { status: "pending" };
+    return { status: "unavailable" };
   });
 
 function centralDate(now = new Date()) {
