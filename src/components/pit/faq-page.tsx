@@ -127,7 +127,7 @@ export const GROUPS: Group[] = [
     items: [
       faq(
         "When do the bots lock?",
-        "Regular-season bots lock Saturday at close (6 pm Central). Championship Week finalists prep Tuesday through Friday and the Desk freezes the two title builds Friday close for Saturday.",
+        "Week 1 locks automatically Saturday, Oct 31, at 6:00 PM Central. The Desk can lock earlier. Weeks 2 through 4 lock when the Desk presses lock at Saturday close (6 pm Central). Championship Week locks automatically Friday, Nov 27, at 6:00 PM Central, ahead of the Saturday, Nov 28 championship. The Desk can lock the two title builds earlier. Captains cannot change builds after either automatic deadline.",
       ),
       faq(
         "How does a fight work?",

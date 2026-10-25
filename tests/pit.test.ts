@@ -1,7 +1,7 @@
 import test, { beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createStore } from "zustand/vanilla";
-import { pitCreator, sharedDoc, clientDoc, applyLeague14 } from "../src/lib/pit/store.ts";
+import { pitCreator, sharedDoc, clientDoc, applyLeague14, applyDueLock } from "../src/lib/pit/store.ts";
 import { makeData } from "../src/lib/pit/seed.ts";
 import { nsnuOf, rankedStores, simulateDuel, buildCard, conferenceStandings, championshipFinalists } from "../src/lib/pit/engine.ts";
 import { weekProgress, boltsOf } from "../src/lib/pit/week.ts";
@@ -9,7 +9,8 @@ import { programWeek, allJobs, crateFor } from "../src/lib/pit/training.ts";
 import { eligibilityClosed } from "../src/lib/pit/eligibility.ts";
 import { cosmeticUnlocked, cosmeticProgress } from "../src/lib/pit/cosmetics.ts";
 import { PRODUCT_QUIZ, productQuestion } from "../src/lib/pit/product-quiz.ts";
-import { authorize, commandArgs } from "../src/lib/pit/commands.ts";
+import { authorize, commandArgs, CAPTAIN_BUILD_COMMANDS, captainBuildRejection, type Command } from "../src/lib/pit/commands.ts";
+import { central, nextLockAt, weekDeadline, deadlineDue } from "../src/lib/pit/time.ts";
 import { buildBeats, fightDrive } from "../src/components/pit/cage-motion.ts";
 import { Fx } from "../src/components/pit/cage-draw.ts";
 import type { Session } from "../src/lib/pit/types.ts";
@@ -656,6 +657,177 @@ test("four 14-store cards lead to two conference champions and a knockout Champi
   store.getState().advanceWeek();
   assert.equal(store.getState().phase, "complete");
   assert.ok(store.getState().honors.pitBelt);
+});
+
+const OCT31_LOCK = "2026-10-31T23:00:00.000Z";
+const NOV27_LOCK = "2026-11-28T00:00:00.000Z";
+
+function otherBrain(current: string | null) {
+  return current === "brain-logic-stock" ? "brain-hunter-stock" : "brain-logic-stock";
+}
+
+function brainOf(store: ReturnType<typeof state>, storeId = "plano") {
+  return store.getState().bots.find((b) => b.storeId === storeId)!.draft.brain;
+}
+
+test("automatic locks use 6:00 PM Central, including the CDT and CST offsets", () => {
+  assert.equal(weekDeadline(1)!.at.toISOString(), OCT31_LOCK);
+  assert.equal(weekDeadline(1)!.label, "Saturday, Oct 31, 6:00 PM CT");
+  assert.equal(central(2026, 10, 31, 18).toISOString(), OCT31_LOCK);
+  assert.equal(weekDeadline(5)!.at.toISOString(), NOV27_LOCK);
+  assert.equal(weekDeadline(5)!.label, "Friday, Nov 27, 6:00 PM CT");
+  assert.equal(central(2026, 11, 27, 18).toISOString(), NOV27_LOCK);
+  assert.equal(deadlineDue(1, new Date("2026-10-31T22:59:59.999Z")), false);
+  assert.equal(deadlineDue(1, new Date(OCT31_LOCK)), true);
+  assert.equal(deadlineDue(5, new Date("2026-11-27T23:59:59.999Z")), false);
+  assert.equal(deadlineDue(5, new Date(NOV27_LOCK)), true);
+  for (const week of [2, 3, 4]) {
+    assert.equal(weekDeadline(week), undefined);
+    assert.equal(deadlineDue(week, new Date("2026-12-01T00:00:00.000Z")), false);
+  }
+});
+
+test("week 1 and week 5 countdowns hit their deadlines; weeks 2–4 still count to Saturday 6:00 PM CT", () => {
+  const opening = new Date("2026-10-25T17:00:00.000Z");
+  assert.equal(nextLockAt(opening, 1).toISOString(), OCT31_LOCK);
+  const afterOct31 = new Date("2026-10-31T23:00:01.000Z");
+  assert.equal(nextLockAt(afterOct31, 1).toISOString(), OCT31_LOCK);
+  assert.notEqual(nextLockAt(afterOct31).toISOString(), OCT31_LOCK);
+  const championshipTuesday = new Date("2026-11-24T18:00:00.000Z");
+  assert.equal(nextLockAt(championshipTuesday, 5).toISOString(), NOV27_LOCK);
+  assert.equal(nextLockAt(new Date("2026-11-28T00:00:01.000Z"), 5).toISOString(), NOV27_LOCK);
+  assert.equal(nextLockAt(championshipTuesday).toISOString(), central(2026, 11, 28, 18).toISOString());
+  const weekTwo = new Date("2026-11-04T18:00:00.000Z");
+  const saturday = central(2026, 11, 7, 18).toISOString();
+  assert.equal(nextLockAt(weekTwo, 2).toISOString(), saturday);
+  assert.equal(nextLockAt(weekTwo, 3).toISOString(), saturday);
+  assert.equal(nextLockAt(weekTwo, 4).toISOString(), nextLockAt(weekTwo).toISOString());
+});
+
+test("captain build commands are rejected at the Oct 31 and Nov 27 instants and not before", (t) => {
+  const beforeOct = new Date("2026-10-31T22:59:59.999Z");
+  const atOct = new Date(OCT31_LOCK);
+  const beforeNov = new Date("2026-11-27T23:59:59.999Z");
+  const atNov = new Date(NOV27_LOCK);
+  for (const name of CAPTAIN_BUILD_COMMANDS) {
+    assert.equal(captainBuildRejection(name, "captain", 1, beforeOct), null);
+    assert.match(captainBuildRejection(name, "captain", 1, atOct)!, /Oct 31/);
+    assert.equal(captainBuildRejection(name, "commissioner", 1, atOct), null);
+    assert.equal(captainBuildRejection(name, "captain", 5, beforeNov), null);
+    assert.match(captainBuildRejection(name, "captain", 5, atNov)!, /Nov 27/);
+    assert.equal(captainBuildRejection(name, "commissioner", 5, atNov), null);
+    assert.equal(captainBuildRejection(name, "captain", 2, atOct), null);
+    assert.equal(captainBuildRejection(name, "captain", 4, atNov), null);
+  }
+  for (const name of ["completeJob", "submitSpark", "lockFriday", "runSaturday", "dropDamage", "advanceWeek"] as Command[]) {
+    assert.equal(captainBuildRejection(name, "captain", 1, atOct), null);
+    assert.equal(captainBuildRejection(name, "captain", 5, atNov), null);
+  }
+  t.mock.timers.setTime(beforeOct.getTime());
+  const early = state();
+  const lockedOut = state();
+  const earlyBrain = brainOf(early);
+  early.getState().setDraftPart("plano", "brain", otherBrain(earlyBrain));
+  assert.equal(brainOf(early), otherBrain(earlyBrain));
+  assert.equal(early.getState().phase, "open");
+  t.mock.timers.setTime(atOct.getTime());
+  const kept = brainOf(lockedOut);
+  lockedOut.getState().setDraftPart("plano", "brain", otherBrain(kept));
+  lockedOut.getState().setDraftLoadout("plano", { ...lockedOut.getState().bots.find((b) => b.storeId === "plano")!.draft, brain: otherBrain(kept) });
+  lockedOut.getState().lockStore("plano");
+  assert.equal(brainOf(lockedOut), kept);
+  assert.equal(lockedOut.getState().bots.find((b) => b.storeId === "plano")!.locked, null);
+  assert.match(lockedOut.getState().flash, /Oct 31/);
+  assert.equal(lockedOut.getState().phase, "open");
+  const desk = state("commissioner");
+  const switched = otherBrain(brainOf(desk));
+  desk.getState().setDraftPart("plano", "brain", switched);
+  assert.equal(brainOf(desk), switched);
+  assert.equal(desk.getState().phase, "open");
+});
+
+test("Oct 31 automatic lock freezes captains and still lets the Desk run, damage, and advance", (t) => {
+  t.mock.timers.setTime(Date.parse("2026-10-31T22:59:59.999Z"));
+  const store = state("commissioner");
+  assert.equal(applyDueLock(store.getState(), new Date()), null);
+  t.mock.timers.setTime(Date.parse(OCT31_LOCK));
+  const due = applyDueLock(store.getState(), new Date());
+  assert.ok(due);
+  assert.equal(due!.phase, "locked");
+  assert.equal(due!.weeks.find((w) => w.number === 1)!.lockedAt, Date.parse(OCT31_LOCK));
+  assert.ok(due!.bots.every((b) => b.locked));
+  const logLength = due!.log.length;
+  store.setState({ phase: due!.phase, weeks: due!.weeks, bots: due!.bots, log: due!.log, flash: due!.flash });
+  const cap = store.getState().crew.find((c) => c.storeId === "plano" && c.role === "captain")!;
+  const frozenBrain = brainOf(store);
+  store.setState({ session: { role: "captain", storeId: "plano", crewId: cap.id } });
+  store.getState().setDraftPart("plano", "brain", otherBrain(frozenBrain));
+  assert.equal(brainOf(store), frozenBrain);
+  store.setState({ session: state("commissioner").getState().session });
+  store.getState().lockFriday();
+  assert.equal(store.getState().phase, "locked");
+  assert.equal(store.getState().log.length, logLength);
+  assert.equal(store.getState().weeks.find((w) => w.number === 1)!.lockedAt, Date.parse(OCT31_LOCK));
+  assert.match(store.getState().flash, /Already locked/);
+  for (const row of store.getState().stores) store.getState().setOfficialNsnu(row.id, 1100);
+  store.getState().runSaturday();
+  assert.equal(store.getState().phase, "fought");
+  assert.equal(store.getState().bouts.filter((b) => b.week === 1 && b.kind === "bout").length, 7);
+  store.getState().dropDamage();
+  assert.equal(store.getState().phase, "inspected");
+  store.getState().advanceWeek();
+  assert.equal(store.getState().week, 2);
+  assert.equal(store.getState().phase, "open");
+  store.setState({ session: { role: "captain", storeId: "plano", crewId: cap.id } });
+  const weekTwoBrain = brainOf(store);
+  store.getState().setDraftPart("plano", "brain", otherBrain(weekTwoBrain));
+  assert.equal(brainOf(store), otherBrain(weekTwoBrain));
+});
+
+test("week 5 title builds lock at Friday Nov 27 6:00 PM CT and the championship still runs", (t) => {
+  const store = championshipState();
+  const finalist = championshipFinalists(store.getState())[0]!;
+  const cap = store.getState().crew.find((c) => c.storeId === finalist && c.role === "captain")!;
+  store.setState({ session: { role: "captain", storeId: finalist, crewId: cap.id } });
+  t.mock.timers.setTime(Date.parse("2026-11-27T23:59:59.999Z"));
+  assert.equal(applyDueLock(store.getState(), new Date()), null);
+  const before = brainOf(store, finalist);
+  store.getState().setDraftPart(finalist, "brain", otherBrain(before));
+  assert.equal(brainOf(store, finalist), otherBrain(before));
+  t.mock.timers.setTime(Date.parse(NOV27_LOCK));
+  const kept = brainOf(store, finalist);
+  store.getState().setDraftPart(finalist, "brain", otherBrain(kept));
+  assert.equal(brainOf(store, finalist), kept);
+  assert.match(store.getState().flash, /Nov 27/);
+  assert.equal(store.getState().phase, "open");
+  store.setState({ session: state("commissioner").getState().session });
+  const due = applyDueLock(store.getState(), new Date());
+  assert.ok(due);
+  assert.equal(due!.phase, "locked");
+  assert.equal(due!.weeks.find((w) => w.number === 5)!.lockedAt, Date.parse(NOV27_LOCK));
+  const finalists = championshipFinalists(due!);
+  assert.ok(finalists.every((id) => due!.bots.find((b) => b.storeId === id)!.locked));
+  assert.ok(due!.bots.filter((b) => !finalists.includes(b.storeId)).every((b) => b.locked == null));
+  const logLength = due!.log.length;
+  store.setState({ phase: due!.phase, weeks: due!.weeks, bots: due!.bots, log: due!.log, flash: due!.flash });
+  store.setState({ session: { role: "captain", storeId: finalist, crewId: cap.id } });
+  const frozen = brainOf(store, finalist);
+  store.getState().setDraftPart(finalist, "brain", otherBrain(frozen));
+  assert.equal(brainOf(store, finalist), frozen);
+  store.setState({ session: state("commissioner").getState().session });
+  store.getState().lockFriday();
+  assert.equal(store.getState().log.length, logLength);
+  assert.equal(store.getState().weeks.find((w) => w.number === 5)!.lockedAt, Date.parse(NOV27_LOCK));
+  assert.match(store.getState().flash, /Already locked/);
+  store.getState().runSaturday();
+  assert.equal(store.getState().phase, "fought");
+  const championship = store.getState().bouts.find((bout) => bout.week === 5 && bout.title === "Waterman Championship");
+  assert.ok(championship?.result);
+  assert.equal(store.getState().bouts.some((bout) => bout.week === 5 && bout.result == null), false);
+  store.getState().dropDamage();
+  assert.equal(store.getState().phase, "inspected");
+  store.getState().advanceWeek();
+  assert.equal(store.getState().phase, "complete");
 });
 
 test("KO fixtures always contain a replay and particle budgets stay bounded", () => {

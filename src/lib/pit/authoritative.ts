@@ -40,7 +40,9 @@ async function load() {
   const parsed = JSON.parse(row.doc) as import("./types").PitData;
   const normalized = s.store.applyLeague14(s.store.applyMondays(s.store.applyHulen(parsed)));
   const merged = { ...seed, ...s.store.sharedDoc(normalized) };
-  const normalizedDoc = JSON.stringify(s.store.sharedDoc(merged));
+  const due = s.store.applyDueLock(merged, new Date());
+  const effective = due ?? merged;
+  const normalizedDoc = JSON.stringify(s.store.sharedDoc(effective));
   if (normalizedDoc !== row.doc || row.schema_tag !== SCHEMA_TAG) {
     const changed = await s.sql<{ rev: number }>`
       update pit_season
@@ -51,7 +53,7 @@ async function load() {
     if (changed[0]) row = { rev: Number(changed[0].rev), doc: normalizedDoc, schema_tag: SCHEMA_TAG };
     else return load(); // A concurrent command won. Never project our stale normalization.
   }
-  const data = { ...s.store.sharedDoc(merged), tutorialSeen: false, session: s.auth.publicSession };
+  const data = { ...s.store.sharedDoc(effective), tutorialSeen: false, session: s.auth.publicSession };
   return { ...s, row, data };
 }
 /** Server-only: the normalized season for other server functions (Claude copy, the Monday job). */
@@ -63,7 +65,9 @@ export const pullSeason = createServerFn({ method: "POST" })
   .handler(async ({ data: input }): Promise<PullResult> => {
     const quick = await services();
     const meta = (await quick.sql<{rev: number; schema_tag: string}>`select rev, schema_tag from pit_season where id = 'main'`)[0];
-    if (meta?.schema_tag === SCHEMA_TAG && Number(meta.rev) === input.rev) {
+    const { anyDeadlineDue } = await import("./time");
+    // Once a scheduled lock can be due, read the season so it freezes without a Desk button.
+    if (!anyDeadlineDue(new Date()) && meta?.schema_tag === SCHEMA_TAG && Number(meta.rev) === input.rev) {
       // Verify expiry and credential generation on every pull, even unchanged ones.
       return { mode: quick.mode, rev: Number(meta.rev), doc: null, session: await quick.auth.session() };
     }
@@ -133,12 +137,14 @@ export const mutateSeason = createServerFn({ method: "POST" })
     return { name, args: commandArgs[name].parse(input.args) as unknown[] };
   })
   .handler(async ({ data: input }) => {
-    const { authorize } = await import("./commands");
+    const { authorize, captainBuildRejection } = await import("./commands");
     for (let attempt = 0; attempt < 8; attempt++) {
       const s = await load();
       s.auth.sameOrigin();
       const session = await s.auth.session(s.data);
       authorize(s.data, session, input.name, input.args);
+      const buildRejection = captainBuildRejection(input.name, session.role, s.data.week, new Date());
+      if (buildRejection) throw new Error(buildRejection);
       const state = s.vanilla.createStore(s.store.pitCreator);
       state.setState({ ...s.data, session, flash: "" });
       if (input.name === "submitSpark") {

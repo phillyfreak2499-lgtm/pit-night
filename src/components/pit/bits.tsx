@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { CLASS_META, METRICS, SLOT_LABEL, tierWord } from "@/lib/pit/catalog";
 import { coinMath, gradesOf, methodLabel, recordOf } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
-import { central, centralDay } from "@/lib/pit/time";
+import { nextLockAt } from "@/lib/pit/time";
 import type { Bout, Grade, StoreCard } from "@/lib/pit/types";
 
 export function useNow() {
@@ -19,13 +19,9 @@ export function useNow() {
 /** Period 12 opens at Central midnight, October 25, 2026. */
 export const PERIOD_OPENS = new Date("2026-10-25T05:00:00.000Z");
 
-/** Bots lock at Saturday close. Fights run Monday morning on the official numbers. */
-export function nextLock(now: Date) {
-  const today = centralDay(now);
-  const add = (6 - today.weekday + 7) % 7;
-  let target = central(today.y, today.m, today.d + add, 18);
-  if (target.getTime() <= now.getTime()) target = central(today.y, today.m, today.d + add + 7, 18);
-  return target;
+/** Countdown to this week's build lock. Weeks 2–4 still count to Saturday 6:00 PM CT. */
+export function nextLock(now: Date, week?: number) {
+  return nextLockAt(now, week);
 }
 
 export function formatRemain(ms: number) {

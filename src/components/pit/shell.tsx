@@ -20,6 +20,7 @@ const StarterBodyPicker = lazy(() => import("./starter-body-picker"));
 import { TUTORIAL_REV, applyHulen, usePit } from "@/lib/pit/store";
 import { startSync, useSyncStatus } from "@/lib/pit/sync";
 import { setSoundMuted, soundMuted, subscribeSound } from "@/lib/pit/sound";
+import { weekDeadline } from "@/lib/pit/time";
 import { formatRemain, nextLock, PERIOD_OPENS, TextInput, useNow } from "./bits";
 import { Tutorial } from "./tutorial";
 import { StreakBadge } from "./streak-badge";
@@ -223,7 +224,7 @@ function PhaseBlock() {
     <div className="border border-line p-3">
       <p className="font-display text-xs tracking-[0.2em] text-muted uppercase">Week {week}</p>
       <p className="font-display text-xl leading-none">{meta?.name ?? "Season"}</p>
-      <p className="mt-2 text-xs tracking-widest text-amber uppercase">{phaseLabel(phase)}</p>
+      <p className="mt-2 text-xs tracking-widest text-amber uppercase">{phaseLabel(phase, week)}</p>
     </div>
   );
 }
@@ -233,16 +234,19 @@ function ClockLine() {
   const week = usePit((s) => s.week);
   const now = useNow();
   const beforeOpen = Boolean(now && now.getTime() < PERIOD_OPENS.getTime());
+  const deadline = weekDeadline(week);
   const remain = now
-    ? formatRemain((beforeOpen ? PERIOD_OPENS : nextLock(now)).getTime() - now.getTime())
+    ? formatRemain((beforeOpen ? PERIOD_OPENS : nextLock(now, week)).getTime() - now.getTime())
     : "—";
   return (
     <p className="truncate text-sm text-muted">
-      Week {week} · {phaseLabel(phase)}
+      Week {week} · {phaseLabel(phase, week)}
       {phase === "open"
         ? beforeOpen
           ? ` · Opens Oct 25 ${remain}`
-          : ` · Saturday lock ${remain}`
+          : deadline
+            ? ` · Locks ${deadline.label} ${remain}`
+            : ` · Saturday lock ${remain}`
         : ""}
     </p>
   );
@@ -331,9 +335,9 @@ function Boot() {
   );
 }
 
-function phaseLabel(phase: string) {
+function phaseLabel(phase: string, week?: number) {
   if (phase === "open") return "Floor open";
-  if (phase === "locked") return "Locked for Monday";
+  if (phase === "locked") return week === 5 ? "Locked for Saturday" : "Locked for Monday";
   if (phase === "fought") return "Monday card";
   if (phase === "inspected") return "Damage posted";
   return "Season closed";

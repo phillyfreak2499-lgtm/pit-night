@@ -46,6 +46,7 @@ import { cosmeticUnlocked, validBodyForClass } from "./cosmetics";
 import { boltsOf, lockerItem, sparkStreak } from "./week";
 import { checkedCosmeticLoadout } from "./cosmetic-loadout";
 import { authorize } from "./commands";
+import { buildLockMessage, deadlineDue, weekDeadline } from "./time";
 import type { BotDecal, CosmeticLoadout, StickerSlot } from "./types";
 import type { Bot, BotLook, BotStyle, Condition, FightResult, GarageLook, Grade, Kickoff, Loadout, PitData, Session, Slot, StatKey, StoreCard } from "./types";
 
@@ -155,6 +156,48 @@ function starterBodyGuard(data: PitData, storeId: string): string | null {
   return data.week === 1 && !bot?.style?.body
     ? "Choose and lock your Week 1 body first."
     : null;
+}
+
+/** Captains and crew cannot move iron once this week's automatic deadline has passed. The Desk still can. */
+function captainBuildBlock(data: PitData): string | null {
+  if (isBoss(data) || !deadlineDue(data.week, new Date())) return null;
+  return buildLockMessage(data.week);
+}
+
+function buildsFrozen(data: PitData): boolean {
+  const finalists = data.week === 5 ? championshipFinalists(data) : null;
+  return data.bots.every((bot) => {
+    if (finalists && !finalists.includes(bot.storeId)) return true;
+    return bot.locked != null;
+  });
+}
+
+function lockPatch(data: PitData, at: number) {
+  const championship = data.week === 5;
+  const finalists = championshipFinalists(data);
+  return {
+    phase: "locked" as const,
+    weeks: data.weeks.map((w) => (w.number === data.week ? { ...w, lockedAt: w.lockedAt ?? at } : w)),
+    bots: data.bots.map((b) =>
+      championship && !finalists.includes(b.storeId)
+        ? { ...b, locked: null }
+        : { ...b, locked: { ...(b.locked ?? b.draft) }, equipped: { ...(b.locked ?? b.draft) } },
+    ),
+    flash: championship
+      ? "Championship builds frozen. Saturday ends only with a knockout."
+      : `Locked. ${data.stores.length} builds frozen for Monday. Click in Sunday's colors, then run the card.`,
+    log: [`Week ${data.week} locked.`, ...data.log.slice(0, 23)],
+  };
+}
+
+/**
+ * Freeze the current week once its automatic deadline has passed.
+ * Returns null before the deadline, once the phase has already moved on, and for weeks with no deadline (2–4).
+ */
+export function applyDueLock<T extends PitData>(data: T, now: Date): T | null {
+  const deadline = weekDeadline(data.week);
+  if (!deadline || now.getTime() < deadline.at.getTime() || data.phase !== "open") return null;
+  return { ...data, ...lockPatch(data, deadline.at.getTime()) };
 }
 
 function patchBot(bots: Bot[], storeId: string, fn: (bot: Bot) => Bot): Bot[] {
@@ -383,6 +426,11 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "Sign in to choose this store's starter body." });
           return;
         }
+        const buildBlock = captainBuildBlock(data);
+        if (buildBlock) {
+          set({ flash: buildBlock });
+          return;
+        }
         const bot = data.bots.find((row) => row.storeId === storeId);
         if (!bot) return;
         if (data.week !== 1 || data.bouts.some((bout) => bout.week === 1 && bout.result) || bot.style?.body) {
@@ -432,6 +480,11 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         if (starterBlock && !isBoss(data)) { set({ flash: starterBlock }); return; }
         if (!isCaptainOf(data, storeId)) {
           set({ flash: "Only the captain can change parts." });
+          return;
+        }
+        const buildBlock = captainBuildBlock(data);
+        if (buildBlock) {
+          set({ flash: buildBlock });
           return;
         }
         const reopened = data.phase === "locked" && !data.bots.find((b) => b.storeId === storeId)?.locked;
@@ -493,6 +546,11 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "Only the captain can change parts." });
           return;
         }
+        const buildBlock = captainBuildBlock(data);
+        if (buildBlock) {
+          set({ flash: buildBlock });
+          return;
+        }
         const reopened = data.phase === "locked" && !data.bots.find((b) => b.storeId === storeId)?.locked;
         if (data.phase !== "open" && !(data.phase === "locked" && (isBoss(data) || reopened))) {
           set({ flash: "The bay is frozen." });
@@ -530,7 +588,9 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
               locked: current.locked && isBoss(data) ? { ...draft } : current.locked,
             }),
           ),
-          flash: "Draft is the best lock in the bay. It still has to be locked by Saturday close.",
+          flash: weekDeadline(data.week)
+            ? `Draft is the best lock in the bay. It still has to be locked by ${weekDeadline(data.week)!.label}.`
+            : "Draft is the best lock in the bay. It still has to be locked by Saturday close.",
         });
       },
       lockStore: (storeId) => {
@@ -541,6 +601,11 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         if (starterBlock && !isBoss(data)) { set({ flash: starterBlock }); return; }
         if (!isCaptainOf(data, storeId)) {
           set({ flash: "Captain clipboard required." });
+          return;
+        }
+        const buildBlock = captainBuildBlock(data);
+        if (buildBlock) {
+          set({ flash: buildBlock });
           return;
         }
         if (data.phase !== "open" && data.phase !== "locked") {
@@ -732,6 +797,11 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "The wallet answers to the captain." });
           return;
         }
+        const buildBlock = captainBuildBlock(data);
+        if (buildBlock) {
+          set({ flash: buildBlock });
+          return;
+        }
         const part = partById(partId);
         if (!part) return;
         const check = buyCheck(data, storeId, part);
@@ -772,6 +842,11 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         if (starterBlock && !isBoss(data)) { set({ flash: starterBlock }); return; }
         if (!isCaptainOf(data, storeId)) {
           set({ flash: "Repairs go through the captain." });
+          return;
+        }
+        const buildBlock = captainBuildBlock(data);
+        if (buildBlock) {
+          set({ flash: buildBlock });
           return;
         }
         if (data.phase === "locked" || data.phase === "fought") {
@@ -1322,13 +1397,14 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         ];
         const same = prior?.signature === read.signature && Boolean(prior?.lines.length);
         const called = prior?.guess ? ` You called ${prior.guess}.` : "";
+        const until = weekDeadline(data.week)?.label ?? "Saturday close";
         set({
           intel,
           flash: same
             ? `${read.botName} has not moved.${called}`
             : read.locked
               ? `${read.botName} is locked. This is the locked iron.${called}`
-              : `${read.botName} read. The captain can still move it before Saturday close.${called}`,
+              : `${read.botName} read. The captain can still move it before ${until}.${called}`,
         });
       },
       setTags: (week, on) => {
@@ -1372,21 +1448,18 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "The bots are already locked this week." });
           return;
         }
-        const finalists = championshipFinalists(data);
-        const championship = data.week === 5;
-        set({
-          phase: "locked",
-          weeks: data.weeks.map((w) => (w.number === data.week ? { ...w, lockedAt: w.lockedAt ?? Date.now() } : w)),
-          bots: data.bots.map((b) =>
-            championship && !finalists.includes(b.storeId)
-              ? { ...b, locked: null }
-              : { ...b, locked: { ...(b.locked ?? b.draft) }, equipped: { ...(b.locked ?? b.draft) } },
-          ),
-          flash: championship
-            ? "Championship builds frozen. Saturday ends only with a knockout."
-            : `Locked. ${data.stores.length} builds frozen for Monday. Click in Sunday's colors, then run the card.`,
-          log: [`Week ${data.week} locked.`, ...data.log.slice(0, 23)],
-        });
+        const deadline = weekDeadline(data.week);
+        if (deadline && Date.now() >= deadline.at.getTime() && data.phase === "locked" && buildsFrozen(data)) {
+          set({
+            flash:
+              data.week === 5
+                ? `Already locked at ${deadline.label}. Saturday, Nov 28 still runs from this desk.`
+                : `Already locked at ${deadline.label}. Run the card, drop damage, and advance when you are ready.`,
+          });
+          return;
+        }
+        const at = deadline && Date.now() >= deadline.at.getTime() ? deadline.at.getTime() : Date.now();
+        set(lockPatch(data, at));
       },
       runSaturday: () => {
         const data = get();

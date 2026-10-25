@@ -218,7 +218,7 @@ export type WeekMeta = {
   name: string;
   blurb: string;
   tagsEnabled: boolean;
-  /** When the desk locked this week's bots. */
+  /** When this week's builds locked, from the Desk button or an automatic deadline. */
   lockedAt?: number;
 };
 

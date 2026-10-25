@@ -18,7 +18,7 @@ export function BuildLockBanner({ storeId }: { storeId: string }) {
       role="status"
       data-testid="build-frozen"
     >
-      <p className="font-display tracking-wide text-amber">SATURDAY LOCK — BUILD FROZEN</p>
+      <p className="font-display tracking-wide text-amber">{data.week === 5 ? "FRIDAY TITLE LOCK — BUILD FROZEN" : "SATURDAY LOCK — BUILD FROZEN"}</p>
       <p className="mt-1 text-sm">
         {lockedAt
           ? `Locked ${new Date(lockedAt).toLocaleString("en-US", { timeZone: "America/Chicago" })} Central. `
