@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { botFor, buildCard, championshipFinalists, conferenceStandings, houseTape, regularSeasonRecordOf } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
 import { programWeek } from "@/lib/pit/training";
+import { weekDeadline } from "@/lib/pit/time";
 import { tunedUp } from "@/lib/pit/week";
 import { ArenaHero } from "./arena-hero";
 import { BotPortrait, useBotLook } from "./bot-portrait";
@@ -14,7 +15,8 @@ export function Titantron() {
   const weekMeta = data.weeks.find((w) => w.number === data.week);
   const now = useNow();
   const beforeOpen = !now || now.getTime() < PERIOD_OPENS.getTime();
-  const remain = now ? formatRemain((beforeOpen ? PERIOD_OPENS : nextLock(now)).getTime() - now.getTime()) : "—";
+  const deadline = weekDeadline(data.week);
+  const remain = now ? formatRemain((beforeOpen ? PERIOD_OPENS : nextLock(now, data.week)).getTime() - now.getTime()) : "—";
   const gazette = data.gazette[0];
   const featured =
     data.bouts.find((b) => b.week === data.week && b.title === "Main event") ??
@@ -54,12 +56,16 @@ export function Titantron() {
             <p className="mt-2 text-sm text-muted">{weekMeta?.blurb}</p>
           </Panel>
           <Panel className="p-4">
-            <p className="text-xs tracking-widest text-muted uppercase">{beforeOpen ? "Opens Oct 25" : data.week === 5 ? "Friday title lock" : "Saturday lock"}</p>
+            <p className="text-xs tracking-widest text-muted uppercase">{beforeOpen ? "Opens Oct 25" : data.week === 5 ? "Friday Nov 27 lock" : data.week === 1 ? "Saturday Oct 31 lock" : "Saturday lock"}</p>
             <p className="font-display text-4xl leading-none text-amber tabular-nums">{data.phase === "open" || beforeOpen ? remain : phaseWord(data.phase)}</p>
             <p className="mt-2 text-sm text-muted">
               {beforeOpen
                 ? "October 25, 2026. Build now. The first bell has not rung."
-                : data.week === 5 ? "Only the two finalists prep this week. Friday close freezes the title builds for Saturday." : "Each store locks one build at Saturday close. That build fights Monday."}
+                : data.week === 5
+                  ? "Only the two finalists prep this week. Title builds lock automatically Friday, Nov 27, at 6:00 PM CT, ahead of Saturday, Nov 28."
+                  : data.week === 1
+                    ? `Builds lock automatically ${deadline?.label ?? "Saturday, Oct 31, 6:00 PM CT"}. That build fights Monday.`
+                    : "Each store locks one build at Saturday close. That build fights Monday."}
             </p>
           </Panel>
           <Panel className="p-4">
@@ -88,7 +94,7 @@ export function Titantron() {
             <FighterCard storeId={featured?.teamB[0] ?? "allen"} facing={-1} />
           </div>
           <div className="px-4 py-3 text-sm text-muted">
-            {featured?.result ? <ResultLine bout={featured} /> : data.week === 5 ? "Championship Saturday. Finalists lock Friday; the title fight runs until knockout." : "Card posts Monday morning. Lock your build by Saturday close."}
+            {featured?.result ? <ResultLine bout={featured} /> : data.week === 5 ? "Championship Saturday, Nov 28. Title builds lock automatically Friday, Nov 27, at 6:00 PM CT. The fight runs until knockout." : data.week === 1 ? "Card posts Monday morning. Builds lock automatically Saturday, Oct 31, at 6:00 PM CT." : "Card posts Monday morning. Lock your build by Saturday close."}
           </div>
         </Panel>
         <Panel className="p-4">

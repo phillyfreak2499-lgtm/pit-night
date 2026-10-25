@@ -354,7 +354,7 @@ export const WEEK_META: WeekMeta[] = [
   {
     number: 1,
     name: "Shakedown",
-    blurb: "Oct 25–31. Locks Saturday at close. Seven fights Monday Nov 2. Every store fights.",
+    blurb: "Oct 25–31. Builds lock automatically Saturday, Oct 31, at 6:00 PM CT. Seven fights Monday Nov 2. Every store fights.",
     tagsEnabled: false,
   },
   {
@@ -378,7 +378,7 @@ export const WEEK_META: WeekMeta[] = [
   {
     number: 5,
     name: "Championship Week",
-    blurb: "Nov 24–28. Finalists prepare Tuesday through Friday. Saturday Nov 28: Waterman Championship, no judges, fight until knockout.",
+    blurb: "Nov 24–28. Finalists prepare Tuesday through Friday. Title builds lock automatically Friday, Nov 27, at 6:00 PM CT. Saturday Nov 28: Waterman Championship, no judges, fight until knockout.",
     tagsEnabled: false,
   },
 ];

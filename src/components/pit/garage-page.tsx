@@ -131,7 +131,7 @@ export function GaragePage({ storeId }: { storeId: string }) {
         <p className="mt-2 text-xs text-muted">Each number pays its part&apos;s jar every Monday: green 3, blue 2, orange 1, red 0. Sport parts cost 3, Pro 5, Super 8. Repairs come out of the same jar.</p>
       </section>
 
-      {showStats && printed ? <StatStrip {...printed.stats} /> : <p className="text-sm text-muted">Power, Speed, Armor, and Heat print when the bot locks Saturday.</p>}
+      {showStats && printed ? <StatStrip {...printed.stats} /> : <p className="text-sm text-muted">{data.week === 5 ? "Power, Speed, Armor, and Heat print when the title build locks Friday, Nov 27, at 6:00 PM CT." : data.week === 1 ? "Power, Speed, Armor, and Heat print when the build locks automatically Saturday, Oct 31, at 6:00 PM CT." : "Power, Speed, Armor, and Heat print when the bot locks Saturday."}</p>}
 
       <section className="grid gap-3 md:grid-cols-2">
         {SLOTS.map((slot) => {
@@ -214,7 +214,7 @@ export function GaragePage({ storeId }: { storeId: string }) {
       ) : (
         <section className="flex flex-wrap gap-2">
           <Btn testId="lock-button" onClick={() => lockStore(storeId)} disabled={Boolean(bot.locked) || (data.phase !== "open" && data.phase !== "locked")}>
-            {bot.locked ? "Locked" : "Lock for Monday"}
+            {bot.locked ? "Locked" : data.week === 5 ? "Lock for Saturday" : "Lock for Monday"}
           </Btn>
           <p className="self-center text-sm text-muted">{store.captain} is on the clipboard.</p>
         </section>

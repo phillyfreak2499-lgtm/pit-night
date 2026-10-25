@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { buildLockMessage, deadlineDue } from "./time";
 import type { PitData, Session } from "./types";
 
 const id = z.string().min(1).max(120);
@@ -102,6 +103,33 @@ export const commandArgs = {
   resetSeason: z.tuple([]),
 } as const;
 export type Command = keyof typeof commandArgs;
+
+/** Commands that change a fighting build. Cosmetics, training, and Desk steps are not in this set. */
+export const CAPTAIN_BUILD_COMMANDS = new Set<Command>([
+  "setDraftPart",
+  "setDraftLoadout",
+  "lockStore",
+  "chooseStarterBody",
+  "buyPart",
+  "repairSlot",
+  "acceptProposal",
+]);
+
+/**
+ * Server rejection for a captain or crew build change once that week's automatic
+ * deadline has passed. The commissioner can still edit. Weeks 2–4 have no deadline.
+ */
+export function captainBuildRejection(
+  name: Command,
+  role: Session["role"],
+  week: number,
+  now: Date,
+): string | null {
+  if (role === "commissioner") return null;
+  if (!CAPTAIN_BUILD_COMMANDS.has(name)) return null;
+  if (!deadlineDue(week, now)) return null;
+  return buildLockMessage(week);
+}
 const desk = new Set<Command>([
   "unlockStore",
   "updateCard",

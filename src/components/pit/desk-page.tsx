@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { weekDeadline } from "@/lib/pit/time";
 import { usePit } from "@/lib/pit/store";
 import { Btn, Field, SectionLabel, TextInput } from "./bits";
 import { ScoreInputs } from "./score-card";
@@ -87,6 +88,7 @@ function DeskLive() {
   const [call, setCall] = useState("");
   const [theme, setTheme] = useState(data.tagline);
   const meta = data.weeks.find((w) => w.number === data.week);
+  const deadline = weekDeadline(data.week);
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
@@ -99,7 +101,7 @@ function DeskLive() {
       </div>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <Btn testId="lock-friday" onClick={lockFriday}>
-          {data.week === 5 ? "Lock finalists (Fri close)" : "Lock the bots (Sat close)"}
+          {data.week === 5 ? "Lock finalists (Fri Nov 27)" : data.week === 1 ? "Lock the bots (auto Sat Oct 31)" : "Lock the bots (Sat close)"}
         </Btn>
         <Btn testId="run-saturday" tone="spark" onClick={runSaturday}>
           {data.week === 5 ? "Run Championship (Sat)" : "Run the card (Monday)"}
@@ -111,6 +113,13 @@ function DeskLive() {
           Advance week
         </Btn>
       </div>
+      {deadline ? (
+        <p className="text-sm text-muted">
+          {data.week === 5
+            ? `Title builds lock automatically ${deadline.label}, before the Saturday, Nov 28 championship. This button still locks early. If that automatic lock has already landed, pressing it again changes nothing. Run the championship, drop damage, and advance still follow.`
+            : `Week 1 builds lock automatically ${deadline.label}, even if this button has not been pressed. It still locks early, and pressing it again after the automatic lock changes nothing. Enter Sunday's numbers, run the card, drop damage, and advance still follow.`}
+        </p>
+      ) : null}
       <KickoffPanel />
       <ClaudeCheck />
       <SyncPanel />

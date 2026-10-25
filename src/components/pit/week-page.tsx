@@ -64,6 +64,11 @@ export function WeekPage() {
             </h1>
             <p className="mt-2 text-lg text-fg">{plan.tagline}</p>
             <p className="mt-1 text-xs tracking-wide text-muted uppercase">From {plan.source}</p>
+            {plan.week === 5 ? (
+              <p className="mt-2 text-sm text-amber">Title builds lock automatically Friday, Nov 27, at 6:00 PM CT.</p>
+            ) : plan.week === 1 ? (
+              <p className="mt-2 text-sm text-amber">Builds lock automatically Saturday, Oct 31, at 6:00 PM CT.</p>
+            ) : null}
           </div>
           <div className="flex gap-2">
             {PROGRAM.map((w) => (

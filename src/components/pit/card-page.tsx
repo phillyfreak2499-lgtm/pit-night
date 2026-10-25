@@ -24,7 +24,11 @@ export function CardPage() {
       </Link>
       {bouts.length === 0 ? (
         <p className="mt-6 border border-line bg-surface p-4">
-          The card is not printed yet. Captains lock Saturday at close. Sunday the desk clicks in the official colors. Monday morning the desk hits Run the card.
+          {week === 5
+            ? "The card is not printed yet. Title builds lock automatically Friday, Nov 27, at 6:00 PM CT. Saturday, Nov 28 the desk runs the championship."
+            : week === 1
+              ? "The card is not printed yet. Builds lock automatically Saturday, Oct 31, at 6:00 PM CT. Sunday the desk clicks in the official colors. Monday morning the desk hits Run the card."
+              : "The card is not printed yet. Captains lock Saturday at close. Sunday the desk clicks in the official colors. Monday morning the desk hits Run the card."}
         </p>
       ) : null}
       {bouts.length === 0 ? (
