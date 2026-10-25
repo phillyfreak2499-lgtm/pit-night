@@ -1,7 +1,8 @@
 import { BuildLockBanner } from "./build-lock-banner";
 import { useState } from "react";
 import { KEY_SOURCE, PARTS, SLOT_LABEL, tierWord } from "@/lib/pit/catalog";
-import { buyCheck, canSeeLoadout, shopOpen } from "@/lib/pit/engine";
+import { SHOW_EFFECTS } from "@/lib/pit/halloween";
+import { buyCheck, canSeeLoadout, shopOpen, showCheck } from "@/lib/pit/engine";
 import { usePit } from "@/lib/pit/store";
 import type { Slot } from "@/lib/pit/types";
 import { Btn, SectionLabel } from "./bits";
@@ -13,6 +14,7 @@ const SLOTS: Slot[] = ["chassis", "drive", "weapon", "armor", "utility", "brain"
 export function ShopPage({ storeId }: { storeId: string }) {
   const data = usePit();
   const buyPart = usePit((s) => s.buyPart);
+  const buyShow = usePit((s) => s.buyShow);
   const propose = usePit((s) => s.propose);
   const [slot, setSlot] = useState<Slot>("weapon");
   const store = data.stores.find((s) => s.id === storeId);
@@ -108,6 +110,32 @@ export function ShopPage({ storeId }: { storeId: string }) {
               );
             })}
           </ul>
+          <section className="mt-6 border border-line bg-surface p-4" data-testid="halloween-show-shop">
+            <SectionLabel>Show effects</SectionLabel>
+            <p className="mt-2 text-sm text-muted">
+              Fog Machine and Blacklight Mode cost 8 utility coins, the same as a Super. They are light only. On sale Sunday, November 1 at midnight Central through Championship Saturday.
+            </p>
+            <ul className="mt-3 flex flex-col gap-3">
+              {SHOW_EFFECTS.map((effect) => {
+                const check = showCheck(data, storeId, effect.id);
+                const owned = bot.shows?.includes(effect.id) ?? false;
+                const have = bot.coins.utility ?? 0;
+                return (
+                  <li key={effect.id} className="border border-line bg-deep p-4">
+                    <h2 className="font-display text-2xl leading-none">{effect.name}</h2>
+                    <p className="mt-2 text-sm text-muted">{effect.blurb}</p>
+                    <p className="mt-2 text-sm">8 utility coins. Jar has {have}.</p>
+                    <p className={`mt-2 text-sm ${owned ? "text-ok" : check.ok ? "text-amber" : "text-muted"}`}>
+                      {owned ? "Already in the rafters." : check.reason}
+                    </p>
+                    <Btn className="mt-3" disabled={!check.ok} onClick={() => buyShow(storeId, effect.id)}>
+                      Buy
+                    </Btn>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
         </>
       )}
     </div>

@@ -28,7 +28,7 @@ export function checkedCosmeticLoadout(
   )
     return null;
   if (data.week === 1 && bot.style?.body && style.body !== bot.style.body) return null;
-  for (const kind of ["finish", "decal", "trim", "eye", "topper"] as const) {
+  for (const kind of ["finish", "decal", "trim", "eye", "topper", "mask", "weaponSkin"] as const) {
     if (!cosmeticUnlocked(data, storeId, kind, style[kind] ?? "none")) return null;
   }
   if (

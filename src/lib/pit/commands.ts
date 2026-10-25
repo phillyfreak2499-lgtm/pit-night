@@ -22,16 +22,18 @@ const card = z
   })
   .strict();
 const body = z.enum(["shrike","raptor","stinger","viper","warhawk","keystone","juggernaut","bunker","fortress","colossus","windlass","scorpion","mantis","phantom","reaper"]);
-const decal = z.enum(["none","flames","lightning","teeth","checker","hazard","camo","arch","stars","circuit","splash","champion"]);
+const decal = z.enum(["none","flames","lightning","teeth","checker","hazard","camo","arch","stars","circuit","splash","champion","pumpkin"]);
 const style = z
   .object({
     body: body.optional(),
     topper: z.enum(["none","antenna","horns","mohawk","crown"]).optional(),
+    mask: z.enum(["none","lantern","hockey"]).optional(),
+    weaponSkin: z.enum(["none","hockey-machete"]).optional(),
     trim: id.optional(),
     eye: id.optional(),
     finish: z.enum(["factory","chrome","matte","worn","satin","carbon","iridescent","gold"]).optional(),
     decal: z
-      .enum(["none","flames","lightning","teeth","checker","hazard","camo","arch","stars","circuit","splash","champion"])
+      .enum(["none","flames","lightning","teeth","checker","hazard","camo","arch","stars","circuit","splash","champion","pumpkin"])
       .optional(),
     flag: z.boolean().optional(),
     stickers: z.object({ left: decal, right: decal, hood: decal, rear: decal }).strict().optional(),
@@ -62,6 +64,7 @@ export const commandArgs = {
   acceptProposal: z.tuple([id]),
   dismissProposal: z.tuple([id]),
   buyPart: z.tuple([id, id]),
+  buyShow: z.tuple([id, z.enum(["fog", "blacklight"])]),
   repairSlot: z.tuple([id, slot, z.enum(["full", "weld", "salvage", "crown"])]),
   nameMvp: z.tuple([id, id]),
   renameBot: z.tuple([id, text]),

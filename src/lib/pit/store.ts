@@ -20,6 +20,7 @@ import {
   buildCard,
   kickoffRank,
   buyCheck,
+  showCheck,
   cardFor,
   championshipFinalists,
   craftScore,
@@ -40,7 +41,7 @@ import {
 import { makeData } from "./seed";
 import { BOLTS, STREAK_BADGE, allJobs, crateFor, dayOpen, programWeek, type DayKey } from "./training";
 import { eligibilityClosed } from "./eligibility";
-import { cosmeticUnlocked, validBodyForClass } from "./cosmetics";
+import { cosmeticUnlocked, earnedRewardIds, HALLOWEEN_REWARD_IDS, validBodyForClass } from "./cosmetics";
 import { boltsOf, lockerItem, sparkStreak } from "./week";
 import { checkedCosmeticLoadout } from "./cosmetic-loadout";
 import { authorize } from "./commands";
@@ -52,6 +53,8 @@ const FIELD_OF: Record<StatKey, keyof StoreCard> = { nsnu: "nsnu", conv: "conv",
 
 export type PitState = PitData & {
   flash: string;
+  /** Bumps when a Halloween look unlocks, so the floor can throw green ooze. Not saved. */
+  ooze: number;
   setSticker: (storeId: string, slot: StickerSlot, decal: BotDecal) => void;
   proposeCosmetic: (storeId: string, loadout: CosmeticLoadout) => void;
   voteCosmetic: (id: string) => void;
@@ -75,6 +78,7 @@ export type PitState = PitData & {
   acceptProposal: (id: string) => void;
   dismissProposal: (id: string) => void;
   buyPart: (storeId: string, partId: string) => void;
+  buyShow: (storeId: string, effectId: "fog" | "blacklight") => void;
   repairSlot: (storeId: string, slot: Slot, mode: "full" | "weld" | "salvage" | "crown") => void;
   nameMvp: (storeId: string, crewId: string) => void;
   renameBot: (storeId: string, name: string) => void;
@@ -116,6 +120,19 @@ export type PitState = PitData & {
 
 function isBoss(data: PitData) {
   return data.session.role === "commissioner";
+}
+
+const HALLOWEEN_LABEL: Record<(typeof HALLOWEEN_REWARD_IDS)[number], string> = {
+  "reward-pumpkin": "Pumpkin Sticker",
+  "reward-lantern-mask": "Lantern Mask",
+  "reward-hockey-mask": "Hockey Mask",
+  "reward-hockey-machete": "Hockey Mask Machete",
+};
+
+function newlyEarnedHalloween(data: PitData, storeId: string, before: Set<string>) {
+  const after = earnedRewardIds(data, storeId);
+  const hit = HALLOWEEN_REWARD_IDS.find((id) => after.has(id) && !before.has(id));
+  return hit ? HALLOWEEN_LABEL[hit] : null;
 }
 
 /** The signed-in crew member, if any. The desk acts as nobody. */
@@ -262,6 +279,7 @@ function fresh(): PitState {
   return {
     ...makeData(),
     flash: "",
+    ooze: 0,
     setSticker: () => {},
     proposeCosmetic: () => {},
     voteCosmetic: () => {},
@@ -285,6 +303,7 @@ function fresh(): PitState {
     acceptProposal: () => {},
     dismissProposal: () => {},
     buyPart: () => {},
+    buyShow: () => {},
     repairSlot: () => {},
     nameMvp: () => {},
     renameBot: () => {},
@@ -364,7 +383,7 @@ export function clientDoc(state: PitData, session: Session): SharedDoc {
   out.bots = out.bots.map(bot => {
     if (session.role !== "public" && session.storeId === bot.storeId) return bot;
     const stock = { chassis: stockPart("chassis", bot.classId).id, armor: stockPart("armor", bot.classId).id, drive: stockPart("drive", bot.classId).id, weapon: stockPart("weapon", bot.classId).id, utility: null, brain: stockPart("brain", bot.classId).id };
-    return { ...bot, draft: stock, equipped: stock, locked: bot.locked ? stock : null, owned: [], partWear: {}, weldForWeek: {}, coins: { chassis: 0, armor: 0, drive: 0, weapon: 0, utility: 0, brain: 0 }, voucher: 0, repairSpent: 0 };
+    return { ...bot, draft: stock, equipped: stock, locked: bot.locked ? stock : null, owned: [], partWear: {}, weldForWeek: {}, coins: { chassis: 0, armor: 0, drive: 0, weapon: 0, utility: 0, brain: 0 }, voucher: 0, repairSpent: 0, shows: [] };
   });
   return out;
 }
@@ -833,6 +852,31 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           return `${name} bought for ${cost} coins.`;
         }
       },
+      buyShow: (storeId, effectId) => {
+        const data = get();
+        const championshipBlock = championshipPrepGuard(data, storeId);
+        if (championshipBlock && !isBoss(data)) { set({ flash: championshipBlock }); return; }
+        const starterBlock = starterBodyGuard(data, storeId);
+        if (starterBlock && !isBoss(data)) { set({ flash: starterBlock }); return; }
+        if (!isCaptainOf(data, storeId)) {
+          set({ flash: "The wallet answers to the captain." });
+          return;
+        }
+        const check = showCheck(data, storeId, effectId);
+        if (!check.ok) {
+          set({ flash: check.reason });
+          return;
+        }
+        const effect = effectId;
+        set({
+          bots: patchBot(data.bots, storeId, (bot) => ({
+            ...bot,
+            coins: { ...bot.coins, utility: (bot.coins.utility ?? 0) - check.cost },
+            shows: [...(bot.shows ?? []), effect],
+          })),
+          flash: `${effect === "fog" ? "Fog Machine" : "Blacklight Mode"} is in the rafters. Light only. The fight does not change.`,
+        });
+      },
       repairSlot: (storeId, slot, mode) => {
         const data = get();
         const championshipBlock = championshipPrepGuard(data, storeId);
@@ -1073,9 +1117,17 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         const id = `${week}:${jobId}:${who.id}`;
         const status = who.role === "captain" || data.session.role === "commissioner" ? "approved" : "pending";
         const entry = { id, week, jobId, storeId: who.storeId, crewId: who.id, crewName: who.name, note: clean, status, at: Date.now() } as const;
+        const before = status === "approved" ? earnedRewardIds(data, who.storeId) : null;
+        const jobLog = [...data.jobLog.filter((e) => e.id !== id), entry];
+        const unlocked = before ? newlyEarnedHalloween({ ...data, jobLog }, who.storeId, before) : null;
         set({
-          jobLog: [...data.jobLog.filter((e) => e.id !== id), entry],
-          flash: status === "approved" ? `${job.title} is done.` : `${job.title} sent to the captain for a thumbs-up.`,
+          jobLog,
+          ooze: unlocked ? Date.now() : data.ooze,
+          flash: unlocked
+            ? `${job.title} is done. ${unlocked} unlocked. It stays on the bot after Halloween week, and it does not change the fight.`
+            : status === "approved"
+              ? `${job.title} is done.`
+              : `${job.title} sent to the captain for a thumbs-up.`,
         });
       },
       approveJob: (entryId) => {
@@ -1087,9 +1139,15 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "That week is closed. Approvals had to land before the card ran." });
           return;
         }
+        const before = earnedRewardIds(data, entry.storeId);
+        const jobLog = data.jobLog.map((e) => (e.id === entryId ? { ...e, status: "approved" as const } : e));
+        const unlocked = newlyEarnedHalloween({ ...data, jobLog }, entry.storeId, before);
         set({
-          jobLog: data.jobLog.map((e) => (e.id === entryId ? { ...e, status: "approved" } : e)),
-          flash: `${entry.crewName} is approved. +${entry.jobId.endsWith("-crate") ? BOLTS.crate : BOLTS.job} bolts.`,
+          jobLog,
+          ooze: unlocked ? Date.now() : data.ooze,
+          flash: unlocked
+            ? `${entry.crewName} is approved. ${unlocked} unlocked. It stays on the bot after Halloween week, and it does not change the fight.`
+            : `${entry.crewName} is approved. +${entry.jobId.endsWith("-crate") ? BOLTS.crate : BOLTS.job} bolts.`,
         });
       },
       rejectJob: (entryId) => {
@@ -1264,8 +1322,8 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         for (const [kind, value] of Object.entries(patch)) {
           if (value === undefined || ["flag", "walkout", "victory", "body"].includes(kind)) continue;
           if (
-            ["finish", "decal", "trim", "eye", "topper"].includes(kind) &&
-            !cosmeticUnlocked(data, storeId, kind as "finish" | "decal" | "trim" | "eye" | "topper", String(value))
+            ["finish", "decal", "trim", "eye", "topper", "mask", "weaponSkin"].includes(kind) &&
+            !cosmeticUnlocked(data, storeId, kind as "finish" | "decal" | "trim" | "eye" | "topper" | "mask" | "weaponSkin", String(value))
           ) {
             set({ flash: "Earn that cosmetic in Pit Week first." });
             return;

@@ -1,4 +1,4 @@
-import type { BotBody, BotDecal, BotFinish, BotStyle, BotTopper, ClassId, KeyName, Slot, StatKey, Tier } from "./types";
+import type { BotBody, BotDecal, BotFinish, BotMask, BotStyle, BotTopper, BotWeaponSkin, ClassId, KeyName, Slot, StatKey, Tier } from "./types";
 
 export const SCRAP_CAP = 18;
 export const VERSION = 6;
@@ -88,6 +88,18 @@ export const DECALS: { id: BotDecal; label: string }[] = [
   { id: "circuit", label: "Circuit board" },
   { id: "splash", label: "Paint splash" },
   { id: "champion", label: "Champion crest" },
+  { id: "pumpkin", label: "Pumpkin sticker" },
+];
+
+export const MASKS: { id: BotMask; label: string }[] = [
+  { id: "none", label: "No mask" },
+  { id: "lantern", label: "Lantern Mask" },
+  { id: "hockey", label: "Hockey Mask" },
+];
+
+export const WEAPON_SKINS: { id: BotWeaponSkin; label: string }[] = [
+  { id: "none", label: "No weapon skin" },
+  { id: "hockey-machete", label: "Hockey Mask Machete" },
 ];
 
 export const TRIM: Record<string, string> = {
@@ -788,6 +800,102 @@ const FAMILIES: Family[] = [
       pro: "Finds the gap in the armor and keeps hitting it.",
       super: "Never lets go. Never backs off. Costs armor to run.",
       championship: "Title hunter. Nothing walks out of the cage clean.",
+    },
+  },
+  {
+    slot: "weapon",
+    family: "chainsaw",
+    stat: "demoClose",
+    key: "weapon",
+    tags: ["speed", "saw", "halloween"],
+    nudge: nudge(4, 1, -2, 0),
+    names: { super: "Texas Chainsaw" },
+    jobs: {
+      super: "A parade saw with a loud first bite. It bogs down when the other bot is wearing more plate. On the peg November 1 through Championship Saturday. Eight weapon coins.",
+    },
+  },
+  {
+    slot: "weapon",
+    family: "slasher",
+    stat: "demoClose",
+    key: "weapon",
+    tags: ["speed", "halloween"],
+    nudge: nudge(2, 3, -2, 0),
+    names: { super: "Slasher Blade" },
+    jobs: {
+      super: "A long kitchen blade. The lunge lands when you are already faster. If you are not, it is just a late swing. November 1 through Championship Saturday. Eight weapon coins.",
+    },
+  },
+  {
+    slot: "weapon",
+    family: "ghost",
+    stat: "demoClose",
+    key: "weapon",
+    tags: ["heat", "halloween"],
+    nudge: nudge(2, 2, -3, 2),
+    names: { super: "Ghost Blade" },
+    jobs: {
+      super: "A pale blade that slips partway through plate and leaves a light trail. Without Heat it fades. November 1 through Championship Saturday. Eight weapon coins.",
+    },
+  },
+  {
+    slot: "weapon",
+    family: "launcher",
+    stat: "demoClose",
+    key: "weapon",
+    tags: ["smash", "halloween"],
+    nudge: nudge(3, -2, 0, 1),
+    names: { super: "Pumpkin Launcher" },
+    jobs: {
+      super: "Lobs a pumpkin into the middle exchange. The first swing is the wind-up. November 1 through Championship Saturday. Eight weapon coins.",
+    },
+  },
+  {
+    slot: "weapon",
+    family: "bones",
+    stat: "demoClose",
+    key: "weapon",
+    tags: ["control", "claw", "heat", "halloween"],
+    nudge: nudge(0, 0, -1, 4),
+    names: { super: "Skeleton Claws" },
+    jobs: {
+      super: "A rattling grapple. It can still walk someone to the edge, and it likes strikers more than tanks. Less Heat than Lockjaw. November 1 through Championship Saturday. Eight weapon coins.",
+    },
+  },
+  {
+    slot: "weapon",
+    family: "broom",
+    stat: "demoClose",
+    key: "weapon",
+    tags: ["heat", "halloween"],
+    nudge: nudge(1, 2, 0, 2),
+    names: { super: "Witch's Broom" },
+    jobs: {
+      super: "A broom that plants like a staff when your Heat is up. Until then it is a broom. November 1 through Championship Saturday. Eight weapon coins.",
+    },
+  },
+  {
+    slot: "chassis",
+    family: "pumpkin",
+    stat: "nsnu",
+    key: "chassis",
+    tags: ["armor", "halloween"],
+    nudge: nudge(2, -1, 4, -2),
+    names: { super: "Pumpkin Chassis" },
+    jobs: {
+      super: "A round festive shell for any class. It shrugs the first bite and swings a little softer all night. It does not change your class. November 1 through Championship Saturday. Eight chassis coins.",
+    },
+  },
+  {
+    slot: "drive",
+    family: "ghostchaser",
+    stat: "demoRate",
+    key: "drive",
+    tags: ["speed", "halloween"],
+    nudge: nudge(0, 3, -2, 1),
+    names: { super: "Ghost Chaser" },
+    jobs: {
+      super: "A light-bar chase wagon with round lamps. It closes on a slower bot and gives up plate to do it. November 1 through Championship Saturday. Eight drive coins.",
     },
   },
 ];

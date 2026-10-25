@@ -1,4 +1,5 @@
 import { EYES, PAINT, TRIM, styleOf } from "@/lib/pit/catalog";
+import { halloweenVisuals } from "@/lib/pit/halloween";
 import { armorEdges, deckHardware } from "./material-detail";
 import type { BotBody, ClassId } from "@/lib/pit/types";
 import { PIT, clamp, ease, hash, lerp, type BotState, type Drive, type Spot } from "./cage-motion";
@@ -511,6 +512,57 @@ export class Fx {
     this.side.push({ kind: "flash", x, y, vx: 0, vy: 0, life: 0.18, max: 0.18, size: scale * 1.2, color: "#fff", ground: 0, rot: 0, vr: 0 });
   }
 
+  /** Festive slime. Blacklight makes the same ooze brighter. */
+  ooze(x: number, y: number, scale: number, glow: boolean) {
+    this.side.push({
+      kind: "smoke",
+      x: x + (Math.random() - 0.5) * scale * 0.8,
+      y: y - scale * (0.05 + Math.random() * 0.25),
+      vx: (Math.random() - 0.5) * scale * 0.4,
+      vy: -scale * (0.15 + Math.random() * 0.35),
+      life: 1.1,
+      max: 1.1,
+      size: scale * (glow ? 0.28 : 0.16),
+      color: glow ? "170,255,80" : "70,190,60",
+      ground: y,
+      rot: 0,
+      vr: 0,
+    });
+    if (glow) {
+      this.side.push({
+        kind: "spark",
+        x,
+        y: y - scale * 0.2,
+        vx: (Math.random() - 0.5) * scale,
+        vy: -scale * (0.4 + Math.random()),
+        life: 0.45,
+        max: 0.45,
+        size: Math.max(1.5, scale * 0.02),
+        color: "#d6ff6a",
+        ground: y + scale,
+        rot: 0,
+        vr: 0,
+      });
+    }
+  }
+
+  ghostTrail(x: number, y: number, scale: number) {
+    this.side.push({
+      kind: "smoke",
+      x,
+      y: y - scale * 0.2,
+      vx: (Math.random() - 0.5) * scale * 0.2,
+      vy: -scale * 0.15,
+      life: 0.7,
+      max: 0.7,
+      size: scale * 0.12,
+      color: "190,255,210",
+      ground: y,
+      rot: 0,
+      vr: 0,
+    });
+  }
+
   /** Rate-limited emitter. Returns how many to spawn this frame. */
   tick(key: string, rate: number, dt: number) {
     const acc = (this.emit.get(key) ?? 0) + rate * dt;
@@ -685,18 +737,19 @@ const LOGO = { x: 0.5, y: 0.56, w: 0.46 };
 
 const backdropCache = new WeakMap<
   CanvasRenderingContext2D,
-  { w: number; h: number; v: number; canvas: HTMLCanvasElement }
+  { w: number; h: number; v: number; decor: number; canvas: HTMLCanvasElement }
 >();
 
 function backdrop(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  const decor = halloweenVisuals() ? 1 : 0;
   const hit = backdropCache.get(ctx);
-  if (hit && hit.w === w && hit.h === h && hit.v === logoVersion) return hit.canvas;
+  if (hit && hit.w === w && hit.h === h && hit.v === logoVersion && hit.decor === decor) return hit.canvas;
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
   const c = canvas.getContext("2d");
   if (c) paintBackdrop(c, w, h);
-  backdropCache.set(ctx, { w, h, v: logoVersion, canvas });
+  backdropCache.set(ctx, { w, h, v: logoVersion, decor, canvas });
   return canvas;
 }
 
@@ -1042,6 +1095,66 @@ function paintBackdrop(c: CanvasRenderingContext2D, w: number, h: number) {
     c.fill();
   }
   c.globalCompositeOperation = "source-over";
+  if (halloweenVisuals()) paintHalloweenTrim(c, w, h);
+}
+
+/** Static ring dressing for Halloween week. Motion lives in the live frame, not this cache. */
+function paintHalloweenTrim(c: CanvasRenderingContext2D, w: number, h: number) {
+  c.save();
+  // String lights along the truss. Decorative, not a status signal.
+  for (let i = 0; i < 18; i++) {
+    const x = w * (0.06 + i * 0.05);
+    c.fillStyle = i % 2 === 0 ? "#ff8a1e" : "#7dff4a";
+    c.beginPath();
+    c.arc(x, h * 0.07, Math.max(2, w * 0.006), 0, Math.PI * 2);
+    c.fill();
+  }
+  const pumpkins: [number, number, number][] = [
+    [0.08, 0.22, 0.045],
+    [0.92, 0.24, 0.04],
+    [0.12, 0.78, 0.05],
+    [0.88, 0.76, 0.046],
+  ];
+  for (const [px, py, s] of pumpkins) {
+    const x = w * px;
+    const y = h * py;
+    const r = w * s;
+    c.fillStyle = "#e07014";
+    c.beginPath();
+    c.ellipse(x, y, r, r * 0.86, 0, 0, Math.PI * 2);
+    c.fill();
+    c.strokeStyle = "#8a3d08";
+    c.lineWidth = Math.max(1, r * 0.08);
+    c.beginPath();
+    c.moveTo(x, y - r * 0.7);
+    c.lineTo(x, y + r * 0.7);
+    c.stroke();
+    c.fillStyle = "#2f6b22";
+    c.fillRect(x - r * 0.08, y - r * 1.05, r * 0.16, r * 0.28);
+    c.fillStyle = "#2a1408";
+    for (const [ox, oy] of [[-0.28, -0.05], [0.28, -0.05], [0, 0.28]] as const) {
+      c.beginPath();
+      c.moveTo(x + ox * r, y + oy * r - r * 0.12);
+      c.lineTo(x + ox * r + r * 0.12, y + oy * r + r * 0.16);
+      c.lineTo(x + ox * r - r * 0.12, y + oy * r + r * 0.16);
+      c.closePath();
+      c.fill();
+    }
+  }
+  c.restore();
+}
+
+function drawRingFog(ctx: CanvasRenderingContext2D, w: number, h: number, time: number, reduced: boolean) {
+  ctx.save();
+  const drift = reduced ? 0 : Math.sin(time * 0.6) * w * 0.04;
+  ctx.fillStyle = "rgba(210,214,206,0.16)";
+  for (let i = 0; i < (reduced ? 2 : 5); i++) {
+    const y = h * (0.58 + i * 0.06);
+    ctx.beginPath();
+    ctx.ellipse(w * 0.5 + drift * (i % 2 === 0 ? 1 : -1), y, w * 0.55, h * 0.05, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 function hazardBand(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
@@ -1726,6 +1839,10 @@ export function drawSideBot(
     ctx.fill();
   }
 
+  drawFaceMask(ctx, style.mask, f, u2, top);
+  if (s.bot.chassisFamily === "pumpkin") drawPumpkinShell(ctx, f, u2);
+  if (s.bot.driveFamily === "ghostchaser") drawChaserLamps(ctx, f, u2, top);
+
   if (style.flag && !s.flipped)
     drawFlag(ctx, f, u2, top, trim, paint, s.bot.storeName ?? "", time, s.charging, facing);
   if (!s.flipped) drawTopper(ctx, style.topper, top, u2, trim, eye);
@@ -2018,6 +2135,25 @@ function drawDecal(
       ctx.fill();
     }
     ctx.globalAlpha=1;
+  } else if (decal === "pumpkin") {
+    const cx = X(0.42);
+    const cy = Y(0.48);
+    const r = Math.min(u * 0.09, h * u * 0.36);
+    ctx.fillStyle = "#e07014";
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r, r * 0.86, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#2f6b22";
+    ctx.fillRect(cx - r * 0.12, cy - r * 1.05, r * 0.24, r * 0.28);
+    ctx.fillStyle = "#2a1408";
+    for (const [ox, oy] of [[-0.32, -0.08], [0.32, -0.08], [0, 0.28]] as const) {
+      ctx.beginPath();
+      ctx.moveTo(cx + ox * r, cy + oy * r - r * 0.16);
+      ctx.lineTo(cx + ox * r + r * 0.16, cy + oy * r + r * 0.18);
+      ctx.lineTo(cx + ox * r - r * 0.16, cy + oy * r + r * 0.18);
+      ctx.closePath();
+      ctx.fill();
+    }
   } else if (decal === "champion") {
     const cx=X(0.45), cy=Y(0.45), r=Math.min(u*0.095,h*u*0.4);
     ctx.fillStyle="#f6cd46"; ctx.strokeStyle="#563700"; ctx.lineWidth=Math.max(1,u*0.008);
@@ -2243,6 +2379,170 @@ function steel(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number
   return g;
 }
 
+function drawFaceMask(ctx: CanvasRenderingContext2D, mask: string | undefined, f: Frame, u: number, top: number) {
+  if (!mask || mask === "none") return;
+  const vx = (f.front - (f.treads ? 0.2 : 0.36)) * u;
+  const vy = top + f.height * u * 0.2;
+  ctx.save();
+  if (mask === "lantern") {
+    ctx.fillStyle = "#e07014";
+    ctx.beginPath();
+    ctx.ellipse(vx, vy, u * 0.09, u * 0.07, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#2a1408";
+    ctx.beginPath();
+    ctx.moveTo(vx - u * 0.03, vy - u * 0.01);
+    ctx.lineTo(vx - u * 0.01, vy + u * 0.02);
+    ctx.lineTo(vx - u * 0.05, vy + u * 0.02);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(vx + u * 0.03, vy - u * 0.01);
+    ctx.lineTo(vx + u * 0.05, vy + u * 0.02);
+    ctx.lineTo(vx + u * 0.01, vy + u * 0.02);
+    ctx.closePath();
+    ctx.fill();
+  } else if (mask === "hockey") {
+    ctx.fillStyle = "#f4f1ea";
+    ctx.beginPath();
+    ctx.roundRect(vx - u * 0.07, vy - u * 0.05, u * 0.14, u * 0.1, u * 0.03);
+    ctx.fill();
+    ctx.fillStyle = "#1b1a18";
+    for (const ox of [-0.03, 0, 0.03]) ctx.fillRect(vx + ox * u, vy - u * 0.02, u * 0.012, u * 0.04);
+  }
+  ctx.restore();
+}
+
+function drawPumpkinShell(ctx: CanvasRenderingContext2D, f: Frame, u: number) {
+  const b = hullBounds(f);
+  ctx.save();
+  ctx.globalAlpha = 0.35;
+  ctx.strokeStyle = "#e07014";
+  ctx.lineWidth = Math.max(1, u * 0.02);
+  for (let i = 1; i <= 3; i++) {
+    const x = lerp(b.minX, b.maxX, i / 4) * u;
+    ctx.beginPath();
+    ctx.moveTo(x, b.top * u);
+    ctx.quadraticCurveTo(x, (b.top + b.bottom) * 0.5 * u, x, b.bottom * u);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawChaserLamps(ctx: CanvasRenderingContext2D, f: Frame, u: number, top: number) {
+  ctx.save();
+  ctx.fillStyle = "#f3efe6";
+  ctx.fillRect(-0.12 * u, top - 0.04 * u, 0.24 * u, 0.02 * u);
+  for (const [x, color] of [[-0.08, "#ffe9a8"], [0.08, "#fff"]] as const) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(x * u, top - 0.03 * u, 0.025 * u, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawHockeyMachete(ctx: CanvasRenderingContext2D, f: Frame, u: number) {
+  const fx = f.front * u;
+  const cy = f.deck * u * 0.55;
+  ctx.save();
+  ctx.translate(fx, cy);
+  ctx.fillStyle = "#d7d2c8";
+  ctx.beginPath();
+  ctx.moveTo(0, -0.04 * u);
+  ctx.lineTo(0.42 * u, -0.015 * u);
+  ctx.lineTo(0.46 * u, 0.02 * u);
+  ctx.lineTo(0.08 * u, 0.045 * u);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#f4f1ea";
+  ctx.beginPath();
+  ctx.ellipse(0.5 * u, -0.01 * u, 0.055 * u, 0.07 * u, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#1b1a18";
+  ctx.fillRect(0.47 * u, -0.03 * u, 0.012 * u, 0.04 * u);
+  ctx.fillRect(0.5 * u, -0.03 * u, 0.012 * u, 0.04 * u);
+  ctx.restore();
+}
+
+function drawHalloweenWeapon(ctx: CanvasRenderingContext2D, fam: string, f: Frame, u: number, spin: number, stroke: number) {
+  const fx = f.front * u;
+  const cy = f.deck * u * 0.5;
+  ctx.save();
+  if (fam === "chainsaw") {
+    ctx.translate(fx - 0.05 * u, cy);
+    ctx.rotate(lerp(-0.2, 0.15, stroke));
+    ctx.fillStyle = "#3a3834";
+    ctx.fillRect(0, -0.04 * u, 0.22 * u, 0.08 * u);
+    ctx.fillStyle = "#c5bfb4";
+    ctx.fillRect(0.18 * u, -0.025 * u, 0.34 * u, 0.05 * u);
+    ctx.fillStyle = "#f3efe6";
+    const tooth = 0.04 * u;
+    for (let i = 0; i < 6; i++) {
+      const shift = (spin % tooth);
+      ctx.fillRect(0.2 * u + i * tooth - shift, -0.04 * u, tooth * 0.45, 0.08 * u);
+    }
+  } else if (fam === "slasher") {
+    ctx.fillStyle = "#e8e4dc";
+    ctx.beginPath();
+    ctx.moveTo(fx, cy - 0.02 * u);
+    ctx.lineTo(fx + 0.48 * u, cy);
+    ctx.lineTo(fx, cy + 0.02 * u);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#2a241c";
+    ctx.fillRect(fx - 0.06 * u, cy - 0.025 * u, 0.08 * u, 0.05 * u);
+  } else if (fam === "ghost") {
+    ctx.globalAlpha = 0.78;
+    ctx.fillStyle = "#d9ffe4";
+    ctx.beginPath();
+    ctx.moveTo(fx, cy - 0.03 * u);
+    ctx.lineTo(fx + 0.4 * u, cy);
+    ctx.lineTo(fx, cy + 0.03 * u);
+    ctx.closePath();
+    ctx.fill();
+  } else if (fam === "launcher") {
+    ctx.strokeStyle = "#6b4a28";
+    ctx.lineWidth = 0.03 * u;
+    ctx.beginPath();
+    ctx.moveTo(fx, cy);
+    ctx.lineTo(fx + 0.28 * u, cy - 0.16 * u);
+    ctx.stroke();
+    ctx.fillStyle = "#e07014";
+    ctx.beginPath();
+    ctx.arc(fx + 0.34 * u, cy - 0.2 * u, 0.07 * u, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#2f6b22";
+    ctx.fillRect(fx + 0.32 * u, cy - 0.3 * u, 0.03 * u, 0.05 * u);
+  } else if (fam === "bones") {
+    ctx.strokeStyle = "#f3efe6";
+    ctx.lineWidth = 0.02 * u;
+    ctx.lineCap = "round";
+    for (const y of [-0.08, 0.08]) {
+      ctx.beginPath();
+      ctx.moveTo(fx, cy + y * u);
+      ctx.quadraticCurveTo(fx + 0.16 * u, cy + y * u * 1.4, fx + 0.32 * u, cy + y * 0.2 * u);
+      ctx.stroke();
+    }
+  } else if (fam === "broom") {
+    ctx.strokeStyle = "#8a5a32";
+    ctx.lineWidth = 0.025 * u;
+    ctx.beginPath();
+    ctx.moveTo(fx, cy + 0.08 * u);
+    ctx.lineTo(fx + 0.08 * u, cy - 0.28 * u);
+    ctx.stroke();
+    ctx.strokeStyle = "#c4a15a";
+    ctx.lineWidth = 0.012 * u;
+    for (let i = -2; i <= 2; i++) {
+      ctx.beginPath();
+      ctx.moveTo(fx + 0.08 * u, cy - 0.28 * u);
+      ctx.lineTo(fx + 0.2 * u, cy - 0.34 * u + i * 0.03 * u);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
 function weaponBack(ctx: CanvasRenderingContext2D, s: BotState, f: Frame, u: number, spin: number) {
   const fam = s.bot.weaponFamily;
   if (fam === "hammer") {
@@ -2298,6 +2598,15 @@ function weaponFront(
 ) {
   const fam = s.bot.weaponFamily;
   const fx = f.front * u;
+  const skin = styleOf(s.bot).weaponSkin;
+  if (skin === "hockey-machete") {
+    drawHockeyMachete(ctx, f, u);
+    return;
+  }
+  if (fam === "chainsaw" || fam === "slasher" || fam === "ghost" || fam === "launcher" || fam === "bones" || fam === "broom") {
+    drawHalloweenWeapon(ctx, fam, f, u, spin, s.stroke);
+    return;
+  }
   if (fam === "flip") {
     const hx = fx - 0.12 * u;
     const hy = f.deck * u * 0.55;
@@ -2477,6 +2786,8 @@ export type SideOpts = {
   hazards?: boolean;
   /** Store-colored light beams during a walk-out. */
   beams?: string | null;
+  /** Green ooze on a win. Week 1 tapes stay festive after the decorations come down. */
+  festive?: boolean;
 };
 
 export function drawSide(
@@ -2524,6 +2835,8 @@ export function drawSide(
   ctx.scale(cam.z, cam.z);
   ctx.translate(-cx, -cy);
   ctx.drawImage(backdrop(ctx, w, h), 0, 0);
+  const festive = Boolean(opts.festive || halloweenVisuals());
+  if (drive.bots.some((bot) => bot.bot.shows?.includes("fog"))) drawRingFog(ctx, w, h, time, opts.reduced);
   // Contact light belongs on the steel and floor, with falloff at arena scale.
   if (drive.impact && fx.flash > 0 && !opts.reduced) {
     const hit = project(drive.impact, w, h);
@@ -2594,6 +2907,20 @@ export function drawSide(
         } else if (look.walkout === "walkout-smoke") {
           for (let i = fx.tick(`stage-${s.bot.id}`, 9, dt); i > 0; i--) fx.stageSmoke(p.x, p.y, p.size);
         }
+      }
+      if (s.celebrate && festive && !opts.reduced) {
+        const glow = Boolean(s.bot.shows?.includes("blacklight"));
+        for (let i = fx.tick(`ooze-${s.bot.id}`, glow ? 14 : 8, dt); i > 0; i--) fx.ooze(p.x, p.y, p.size, glow);
+      } else if (s.celebrate && festive && opts.reduced) {
+        ctx.save();
+        ctx.fillStyle = s.bot.shows?.includes("blacklight") ? "rgba(180,255,80,0.45)" : "rgba(70,180,50,0.4)";
+        ctx.beginPath();
+        ctx.ellipse(p.x, p.y, p.size * 0.8, p.size * 0.2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+      if (!opts.reduced && s.bot.weaponFamily === "ghost") {
+        for (let i = fx.tick(`ghost-${s.bot.id}`, 8, dt); i > 0; i--) fx.ghostTrail(p.x - facing * p.size * 0.3, p.y, p.size);
       }
       if (s.celebrate && look.victory) {
         const paint = paintOf(s.bot.paint);
@@ -3422,7 +3749,18 @@ function topWeapon(
   spin: number,
 ) {
   const fam = s.bot.weaponFamily;
+  const skin = styleOf(s.bot).weaponSkin;
   ctx.fillStyle = "#cfcac0";
+  if (skin === "hockey-machete" || fam === "slasher" || fam === "ghost" || fam === "chainsaw" || fam === "launcher" || fam === "bones" || fam === "broom") {
+    ctx.fillStyle = fam === "ghost" ? "#d9ffe4" : fam === "launcher" ? "#e07014" : fam === "broom" ? "#c4a15a" : "#f4f1ea";
+    ctx.fillRect(len * 0.35, -wid * 0.1, len * 0.42, wid * 0.2);
+    if (fam === "launcher") {
+      ctx.beginPath();
+      ctx.arc(len * 0.78, 0, wid * 0.16, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return;
+  }
   if (fam === "disc" || fam === "saw") {
     // Vertical blade seen edge-on, with a blur box.
     const x = len * (fam === "saw" ? 0.25 + s.stroke * 0.15 : 0.55);
@@ -3506,7 +3844,7 @@ export function stepBots(
 ) {
   for (const s of drive.bots) {
     const fam = s.bot.weaponFamily;
-    const rate = fam === "disc" ? 34 : fam === "drum" ? 28 : fam === "saw" ? 24 : 0;
+    const rate = fam === "disc" ? 34 : fam === "drum" ? 28 : fam === "saw" || fam === "chainsaw" ? 24 : 0;
     fx.spin.set(s.bot.id, ((fx.spin.get(s.bot.id) ?? 0) + rate * s.rev * dt) % (Math.PI * 200));
     if (reduced || s.gone > 0 || s.lift > 0.05) continue;
     let trail = trails.get(s.bot.id);
