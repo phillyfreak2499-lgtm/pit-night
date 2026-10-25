@@ -58,7 +58,7 @@ export function RulesPage() {
         <SectionLabel>How it works</SectionLabel>
         <h1 className="font-display text-5xl leading-none">The store is the bot</h1>
         <p className="mt-3 text-muted">
-          The Waterman Battle Bot League is the Monday morning card for The Waterman Group. Period 12 has fourteen Good Feet stores in two seven-store conferences. Every store fights November 2, 9, 16, and 23. The Metro Champion and Frontier Champion then meet Saturday, November 28. The trophy hangs in a building. Pit crew get a name on the titantron. They do not take hardware home.
+          The Waterman Battle Bot League is the Monday morning card for The Waterman Group. Period 12 has fourteen Good Feet stores in two seven-store conferences. Every store fights November 2, 9, and 16, then the Week 4 Monday. The Metro Champion and Frontier Champion then meet Saturday, November 28. The trophy hangs in a building. Pit crew get a name on the titantron. They do not take hardware home.
         </p>
         <p className="mt-2 text-sm">
           New here? Start with the{" "}

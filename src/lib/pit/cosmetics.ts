@@ -58,13 +58,17 @@ function finalist(data: PitData, storeId: string) {
 function champion(data: PitData, storeId: string) {
   return data.honors.pitBelt === storeId ? 1 : 0;
 }
+/** Desk-finalized regular-season cards. House projections are not grades yet. */
+function finalizedCard(card: { storeId: string; week: number; projected: boolean }, storeId: string) {
+  return card.storeId === storeId && card.week <= 4 && card.projected === false;
+}
 function greenWeeks(stat: StatKey) {
   return (data: PitData, storeId: string) =>
-    data.storeCards.filter((card) => card.storeId === storeId && card.week <= 4 && gradesOf(card)[stat] === "green").length;
+    data.storeCards.filter((card) => finalizedCard(card, storeId) && gradesOf(card)[stat] === "green").length;
 }
 function perfectWeeks(data: PitData, storeId: string) {
   return data.storeCards.filter(
-    (card) => card.storeId === storeId && card.week <= 4 && METRICS.every((metric) => gradesOf(card)[metric.stat] === "green"),
+    (card) => finalizedCard(card, storeId) && METRICS.every((metric) => gradesOf(card)[metric.stat] === "green"),
   ).length;
 }
 function serviceMarks(data: PitData, storeId: string) {

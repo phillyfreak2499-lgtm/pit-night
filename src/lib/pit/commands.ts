@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { championshipFinalists } from "./engine";
 import { buildLockMessage, deadlineDue } from "./time";
 import type { PitData, Session } from "./types";
 import { FINISH_IDS, SMOKE_IDS, STICKER_ART, TOPPER_IDS, type BotDecal } from "./types";
@@ -125,6 +126,7 @@ export const CAPTAIN_BUILD_COMMANDS = new Set<Command>([
   "lockStore",
   "chooseStarterBody",
   "buyPart",
+  "buyShow",
   "repairSlot",
   "acceptProposal",
 ]);
@@ -132,17 +134,33 @@ export const CAPTAIN_BUILD_COMMANDS = new Set<Command>([
 /**
  * Server rejection for a captain or crew build change once that week's automatic
  * deadline has passed. The commissioner can still edit. Weeks 2–4 have no deadline.
+ * Week 5 non-finalists get the championship message, not the lock message.
  */
 export function captainBuildRejection(
   name: Command,
   role: Session["role"],
   week: number,
   now: Date,
+  subject?: { data: PitData; args: readonly unknown[] },
 ): string | null {
   if (role === "commissioner") return null;
   if (!CAPTAIN_BUILD_COMMANDS.has(name)) return null;
   if (!deadlineDue(week, now)) return null;
+  if (week === 5 && subject && !finalistBuild(subject.data, name, subject.args)) {
+    return "Championship Week bot work belongs to the two conference champions. Rally behind a finalist instead.";
+  }
   return buildLockMessage(week);
+}
+
+function finalistBuild(data: PitData, name: Command, args: readonly unknown[]) {
+  const raw = args[0];
+  const storeId =
+    name === "acceptProposal"
+      ? data.proposals.find((proposal) => proposal.id === raw)?.storeId
+      : typeof raw === "string" && data.stores.some((store) => store.id === raw)
+        ? raw
+        : undefined;
+  return storeId != null && championshipFinalists(data).includes(storeId);
 }
 const desk = new Set<Command>([
   "unlockStore",

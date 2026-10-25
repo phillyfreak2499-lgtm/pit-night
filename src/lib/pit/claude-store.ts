@@ -1,5 +1,6 @@
 /** Storage for Claude-written copy: claim once, write once, never rewrite a ready row. */
 import type { Sql } from "@/lib/db";
+import { central } from "./time";
 
 /** A claim is stale after this long, so a crashed writer does not block the copy forever. */
 const PENDING_STALE = "3 minutes";
@@ -28,16 +29,55 @@ export async function readCopy(sql: Sql, kind: string, key: string) {
 }
 
 /**
+ * Chicago midnight through the next midnight, as instants.
+ * `created_at >= start and created_at < end` can use the (kind, created_at) index.
+ */
+function chicagoDayBounds(day: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
+  if (!match) return null;
+  const y = Number(match[1]);
+  const m = Number(match[2]);
+  const d = Number(match[3]);
+  return { start: central(y, m, d, 0, 0), end: central(y, m, d + 1, 0, 0) };
+}
+
+/**
  * Rows of this kind first claimed on a Chicago calendar day (`YYYY-MM-DD`).
  * `created_at` stays on the original insert, so a retry does not count twice.
+ * The predicate is a created_at range so `pit_claude_text_kind_created` can serve it.
  */
 export async function countClaimedOnDay(sql: Sql, kind: string, day: string) {
+  const bounds = chicagoDayBounds(day);
+  if (!bounds) return 0;
   const rows = await sql<{ n: number }>`
     select count(*)::int as n
     from pit_claude_text
     where kind = ${kind}
-      and to_char(created_at at time zone 'America/Chicago', 'YYYY-MM-DD') = ${day}`;
+      and created_at >= ${bounds.start.toISOString()}::timestamptz
+      and created_at < ${bounds.end.toISOString()}::timestamptz`;
   return Number(rows[0]?.n ?? 0);
+}
+
+/**
+ * Insert the row, then count. Over the daily cap, the new pending row is removed
+ * so two requests cannot both pass a count-then-insert check. An existing key
+ * does not take another slot.
+ */
+export async function reserveCopy(
+  sql: Sql,
+  kind: string,
+  key: string,
+  model: string,
+  limit: number,
+  day: string,
+): Promise<"claimed" | "existing" | "capped"> {
+  if (await readCopy(sql, kind, key)) return "existing";
+  if (!(await claimCopy(sql, kind, key, model))) return "existing";
+  if ((await countClaimedOnDay(sql, kind, day)) > limit) {
+    await sql`delete from pit_claude_text where kind = ${kind} and key = ${key} and status = 'pending' and body is null`;
+    return "capped";
+  }
+  return "claimed";
 }
 
 export async function finishCopy(sql: Sql, kind: string, key: string, result: { body: string } | { error: string }) {

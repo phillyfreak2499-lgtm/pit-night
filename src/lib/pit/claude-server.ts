@@ -11,12 +11,14 @@ async function writeOnce(
   key: string,
   model: string,
   generate: () => Promise<string>,
+  options?: { preclaimed?: boolean },
 ): Promise<CopyResult> {
   const [{ getSql }, copyStore] = await Promise.all([import("@/lib/db"), import("./claude-store")]);
   const sql = await getSql();
   // Only a new key, a stale claim or a failed one past its wait is claimed; a ready row
   // is never rewritten, so a posted card keeps the copy it first got.
-  if (!(await copyStore.claimCopy(sql, kind, key, model))) {
+  // A live beat reserved under the daily cap is already ours (`preclaimed`).
+  if (!options?.preclaimed && !(await copyStore.claimCopy(sql, kind, key, model))) {
     const row = await copyStore.readCopy(sql, kind, key);
     if (row?.status === "ready" && row.body) return { status: "ready", body: row.body };
     if (row?.status === "pending") return { status: "pending" };
@@ -120,19 +122,49 @@ export const getLiveCall = createServerFn({ method: "POST" })
     const previous =
       input.index === 0 ? undefined : await copyStore.readCopy(sql, "live", beats[input.index - 1]!.key);
     const existing = await copyStore.readCopy(sql, "live", beat.key);
-    const claimedToday = existing ? 0 : await copyStore.countClaimedOnDay(sql, "live", centralDate());
     const gate = copy.liveRequest(
       input.index,
       beats.length,
       previous?.status === "ready",
       Boolean(existing),
-      claimedToday,
+      0,
     );
     if (gate === "unavailable") return { status: "unavailable" };
     if (gate === "wait") return { status: "pending" };
+    // Reserve the row before trusting the count, matching the rulebook cap.
+    // The Chicago-day count uses created_at so the kind/created_at index applies.
+    let preclaimed = false;
+    if (!existing) {
+      const slot = await copyStore.reserveCopy(
+        sql,
+        "live",
+        beat.key,
+        FEATURE_MODEL.live,
+        copy.LIVE_LIMIT_PER_DAY,
+        centralDate(),
+      );
+      if (slot === "capped") return { status: "unavailable" };
+      if (slot === "claimed") preclaimed = true;
+      else {
+        const row = await copyStore.readCopy(sql, "live", beat.key);
+        if (row?.status === "ready" && row.body)
+          return {
+            status: "ready",
+            body: row.body,
+            label: beat.label,
+            beatId: beat.beatId,
+            last: input.index === beats.length - 1,
+          };
+        if (row?.status === "pending") return { status: "pending" };
+      }
+    }
     const { system, prompt, maxTokens } = copy.promptFor(beat);
-    const written = await writeOnce("live", beat.key, FEATURE_MODEL.live, () =>
-      guardedCopy("live", system, prompt, maxTokens, beat.facts),
+    const written = await writeOnce(
+      "live",
+      beat.key,
+      FEATURE_MODEL.live,
+      () => guardedCopy("live", system, prompt, maxTokens, beat.facts),
+      { preclaimed },
     );
     if (written.status === "ready")
       return {

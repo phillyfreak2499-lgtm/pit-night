@@ -1,9 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { createStore } from "zustand/vanilla";
 import { pitCreator } from "../src/lib/pit/store.ts";
 import { makeData, WEEK_META } from "../src/lib/pit/seed.ts";
-import { PARTS, TIER_PRICE, partById } from "../src/lib/pit/catalog.ts";
+import { PARTS, TIER_PRICE, partById, stockPart } from "../src/lib/pit/catalog.ts";
 import { programWeek } from "../src/lib/pit/training.ts";
 import { cosmeticUnlocked } from "../src/lib/pit/cosmetics.ts";
 import { authorize, commandArgs } from "../src/lib/pit/commands.ts";
@@ -29,7 +30,7 @@ import {
   halloweenVisuals,
   premiumHalloweenOpen,
 } from "../src/lib/pit/halloween.ts";
-import type { Bot, FighterSnap, PitData, Session, StatBlock } from "../src/lib/pit/types.ts";
+import type { Bot, ClassId, FighterSnap, Loadout, PitData, Session, StatBlock } from "../src/lib/pit/types.ts";
 
 const NAMES: Record<(typeof PREMIUM_PART_IDS)[number], string> = {
   "weapon-chainsaw-super": "Texas Chainsaw",
@@ -49,6 +50,11 @@ test("Halloween dates follow Pit Week 1 and Championship Saturday", () => {
   assert.equal(week5.start, "2026-11-24");
   assert.match(WEEK_META[0]!.blurb, /Oct 25/);
   assert.match(WEEK_META[0]!.blurb, /31/);
+  assert.match(WEEK_META[3]!.blurb, /Week 4 Monday/);
+  assert.doesNotMatch(WEEK_META[3]!.blurb, /Nov 23/);
+  const rules = readFileSync(new URL("../src/components/pit/rules-page.tsx", import.meta.url), "utf8");
+  assert.match(rules, /Week 4 Monday/);
+  assert.doesNotMatch(rules, /Nov 23|November 23/);
   assert.match(WEEK_META[4]!.blurb, /Nov 28/);
   assert.equal(HALLOWEEN_PIT_START.toISOString(), "2026-10-27T05:00:00.000Z");
   assert.equal(HALLOWEEN_PIT_SATURDAY.toISOString(), "2026-10-31T05:00:00.000Z");
@@ -435,4 +441,65 @@ function snap(over: Partial<FighterSnap> = {}): FighterSnap {
 
 function near(actual: number, expected: number) {
   assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} ~= ${expected}`);
+}
+
+test("seeded class matchups of each Halloween part against existing supers", () => {
+  const classes: ClassId[] = ["striker", "tank", "specialist"];
+  const seeds = 24;
+  const base = makeData();
+  const lines: string[] = [];
+  for (const classId of classes) {
+    for (const halloweenId of PREMIUM_PART_IDS) {
+      const halloween = partById(halloweenId)!;
+      const peers = PARTS.filter(
+        (part) =>
+          part.slot === halloween.slot &&
+          part.tier === "super" &&
+          !part.tags.includes("halloween") &&
+          (part.classLock == null || part.classLock === classId),
+      );
+      assert.ok(peers.length > 0, `${classId} ${halloween.name}`);
+      let wins = 0;
+      let fights = 0;
+      for (const peer of peers) {
+        for (let seed = 0; seed < seeds; seed++) {
+          const data = dressClass(base, classId, halloween.id, peer.id);
+          const result = simulateDuel(data, "plano", "allen", `hw:${classId}:${halloween.id}:${peer.id}:${seed}`);
+          fights += 1;
+          if (result.winnerIds.includes("plano")) wins += 1;
+        }
+      }
+      lines.push(
+        `${classId} ${halloween.name} vs ${peers.length} ${halloween.slot} supers: ${((wins / fights) * 100).toFixed(1)}% (${wins}/${fights})`,
+      );
+    }
+  }
+  console.log(["Halloween balance (plano win rate, not retuned)", ...lines].join("\n"));
+  assert.equal(lines.length, classes.length * PREMIUM_PART_IDS.length);
+});
+
+function dressClass(base: PitData, classId: ClassId, halloweenId: string, peerId: string): PitData {
+  const halloween = partById(halloweenId)!;
+  const peer = partById(peerId)!;
+  const data = structuredClone(base) as PitData;
+  const apply = (storeId: string, partId: string, slot: typeof halloween.slot) => {
+    const bot = data.bots.find((row) => row.storeId === storeId)!;
+    const draft: Loadout = {
+      chassis: stockPart("chassis", classId).id,
+      armor: stockPart("armor", classId).id,
+      drive: stockPart("drive", classId).id,
+      weapon: stockPart("weapon", classId).id,
+      utility: stockPart("utility", classId).id,
+      brain: stockPart("brain", classId).id,
+    };
+    draft[slot] = partId;
+    bot.classId = classId;
+    bot.draft = draft;
+    bot.locked = null;
+    bot.equipped = { ...draft };
+    bot.owned = [...new Set([...bot.owned, partId])];
+  };
+  apply("plano", halloween.id, halloween.slot);
+  apply("allen", peer.id, peer.slot);
+  return data;
 }

@@ -372,7 +372,7 @@ export const WEEK_META: WeekMeta[] = [
   {
     number: 4,
     name: "Conference Finale",
-    blurb: "Nov 15–21. Locks Saturday at close. Final regular-season card Monday Nov 23. One Metro and one Frontier champion advance.",
+    blurb: "Nov 15–21. Locks Saturday at close. Final regular-season card is the Week 4 Monday. One Metro and one Frontier champion advance.",
     tagsEnabled: false,
   },
   {

@@ -57,6 +57,8 @@ function makeWorkspace({
 test("sponsor copy rejects real trademarks and skips a workspace with no pit catalogs", () => {
   assert.deepEqual(findTrademarkHits("Snap-on and Red Bull"), ["snap-on", "snapon", "red bull", "redbull"]);
   assert.deepEqual(findTrademarkHits("mobile Arch Labs Fort Worth"), []);
+  assert.deepEqual(findTrademarkHits("Ghostbusters"), ["ghostbusters"]);
+  assert.deepEqual(findTrademarkHits("Ecto-1"), ["ecto"]);
   assert.deepEqual(cosmeticTrademarkWarnings(TEMPLATE_ROOT), []);
   const empty = makeWorkspace({ siteJson: UTILITY_SITE });
   assert.deepEqual(cosmeticTrademarkWarnings(empty), []);

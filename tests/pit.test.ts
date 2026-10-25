@@ -1,5 +1,6 @@
 import test, { beforeEach } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { createStore } from "zustand/vanilla";
 import { pitCreator, sharedDoc, clientDoc, applyLeague14, applyDueLock } from "../src/lib/pit/store.ts";
 import { makeData } from "../src/lib/pit/seed.ts";
@@ -73,6 +74,16 @@ test("Locker identity names persist without changing the store, bot build, wear 
   assert.equal(commandArgs.renameIdentity.safeParse(['plano','X'.repeat(23),'Team']).success,false);
   const crew=state('crew');crew.getState().renameIdentity('plano','Forbidden','Forbidden');
   assert.notEqual(crew.getState().bots.find(b=>b.storeId==='plano')!.name,'FORBIDDEN');
+  const named = league.getState().bots.find(b=>b.storeId==='plano')!.name;
+  const team = league.getState().stores.find(s=>s.id==='plano')!.teamName;
+  league.getState().renameBot('plano','Ghostbusters');
+  assert.equal(league.getState().bots.find(b=>b.storeId==='plano')!.name, named);
+  assert.match(league.getState().flash, /isn't allowed/);
+  league.getState().renameIdentity('plano','Ecto','Plano Pit Crew');
+  assert.equal(league.getState().bots.find(b=>b.storeId==='plano')!.name, named);
+  league.getState().renameIdentity('plano','Steel Fang','Ghostbusters');
+  assert.equal(league.getState().stores.find(s=>s.id==='plano')!.teamName, team);
+  assert.match(league.getState().flash, /isn't allowed/);
 });
 
 test("Abilene's confirmed team replaces legacy placeholders without resetting the season", () => {
@@ -716,7 +727,10 @@ test("captain build commands are rejected at the Oct 31 and Nov 27 instants and 
     assert.match(captainBuildRejection(name, "captain", 1, atOct)!, /Oct 31/);
     assert.equal(captainBuildRejection(name, "commissioner", 1, atOct), null);
     assert.equal(captainBuildRejection(name, "captain", 5, beforeNov), null);
-    assert.match(captainBuildRejection(name, "captain", 5, atNov)!, /Nov 27/);
+    assert.match(
+      captainBuildRejection(name, "captain", 5, atNov, { data: makeData(), args: ["plano"] })!,
+      /conference champions/,
+    );
     assert.equal(captainBuildRejection(name, "commissioner", 5, atNov), null);
     assert.equal(captainBuildRejection(name, "captain", 2, atOct), null);
     assert.equal(captainBuildRejection(name, "captain", 4, atNov), null);
@@ -821,6 +835,23 @@ test("week 5 title builds lock at Friday Nov 27 6:00 PM CT and the championship 
   assert.equal(store.getState().log.length, logLength);
   assert.equal(store.getState().weeks.find((w) => w.number === 5)!.lockedAt, Date.parse(NOV27_LOCK));
   assert.match(store.getState().flash, /Already locked/);
+  const finalistsNow = championshipFinalists(store.getState());
+  const outsider = store.getState().stores.find((row) => !finalistsNow.includes(row.id))!;
+  assert.match(
+    captainBuildRejection("buyPart", "captain", 5, new Date(NOV27_LOCK), { data: store.getState(), args: [finalist] })!,
+    /Nov 27/,
+  );
+  assert.match(
+    captainBuildRejection("buyShow", "captain", 5, new Date(NOV27_LOCK), { data: store.getState(), args: [outsider.id] })!,
+    /conference champions/,
+  );
+  assert.equal(
+    captainBuildRejection("buyPart", "captain", 5, new Date("2026-11-27T23:59:59.999Z"), {
+      data: store.getState(),
+      args: [outsider.id],
+    }),
+    null,
+  );
   store.getState().runSaturday();
   assert.equal(store.getState().phase, "fought");
   const championship = store.getState().bouts.find((bout) => bout.week === 5 && bout.title === "Waterman Championship");
@@ -830,6 +861,48 @@ test("week 5 title builds lock at Friday Nov 27 6:00 PM CT and the championship 
   assert.equal(store.getState().phase, "inspected");
   store.getState().advanceWeek();
   assert.equal(store.getState().phase, "complete");
+});
+
+test("pressing Lock again does not add another log line once every eligible build is frozen", () => {
+  for (const week of [2, 3, 4]) {
+    const store = state("commissioner");
+    store.setState({ week });
+    store.getState().lockFriday();
+    assert.equal(store.getState().phase, "locked");
+    assert.equal(store.getState().log.filter((line) => line === `Week ${week} locked.`).length, 1);
+    const log = store.getState().log;
+    store.getState().lockFriday();
+    assert.deepEqual(store.getState().log, log);
+    assert.match(store.getState().flash, /Already locked/);
+  }
+});
+
+test("buyShow is refused with the build lock, and a week-5 non-finalist is not told the builds locked", (t) => {
+  const store = championshipState();
+  const finalists = championshipFinalists(store.getState());
+  const finalist = finalists[0]!;
+  const outsider = store.getState().stores.find((row) => !finalists.includes(row.id))!;
+  const outsiderCap = store.getState().crew.find((c) => c.storeId === outsider.id && c.role === "captain")!;
+  const finalistCap = store.getState().crew.find((c) => c.storeId === finalist && c.role === "captain")!;
+  t.mock.timers.setTime(Date.parse(NOV27_LOCK));
+  store.setState({ session: { role: "captain", storeId: outsider.id, crewId: outsiderCap.id } });
+  const outsiderShows = store.getState().bots.find((b) => b.storeId === outsider.id)!.shows ?? [];
+  store.getState().buyShow(outsider.id, "fog");
+  assert.match(store.getState().flash, /conference champions/);
+  assert.deepEqual(store.getState().bots.find((b) => b.storeId === outsider.id)!.shows ?? [], outsiderShows);
+  store.setState({ session: { role: "captain", storeId: finalist, crewId: finalistCap.id } });
+  const finalistShows = store.getState().bots.find((b) => b.storeId === finalist)!.shows ?? [];
+  store.getState().buyShow(finalist, "fog");
+  assert.match(store.getState().flash, /Nov 27/);
+  assert.deepEqual(store.getState().bots.find((b) => b.storeId === finalist)!.shows ?? [], finalistShows);
+});
+
+test("season load retries a bounded number of times and skips closed-week deadline work on an unchanged poll", () => {
+  const source = readFileSync(new URL("../src/lib/pit/authoritative.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /else return load\(\)/);
+  assert.match(source, /for \(let attempt = 0; attempt < 8; attempt\+\+\)/);
+  assert.match(source, /deadlines: !closed/);
+  assert.match(source, /doc::json->>'phase'/);
 });
 
 test("KO fixtures always contain a replay and particle budgets stay bounded", () => {
@@ -978,6 +1051,24 @@ const STATS = ["nsnu", "conv", "demoRate", "demoClose", "arch", "ticket"] as con
 function planoCoins(store: ReturnType<typeof state>) {
   return JSON.stringify(store.getState().bots.find((bot) => bot.storeId === "plano")!.coins);
 }
+
+test("projected scorecards do not unlock grade cosmetics", () => {
+  const store = state();
+  gradeCards(store, [1, 2, 3], "all");
+  const progress = (id: string) => cosmeticProgress(store.getState(), "plano").find((row) => row.reward.id === id)!;
+  assert.equal(progress("reward-led-nsnu").current, 3);
+  assert.equal(progress("reward-led-nsnu").earned, true);
+  assert.equal(progress("reward-foil").current, 3);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "leds", "nsnu"), true);
+  store.setState({
+    storeCards: store.getState().storeCards.map((card) => (card.storeId === "plano" ? { ...card, projected: true } : card)),
+  });
+  assert.equal(progress("reward-led-nsnu").current, 0);
+  assert.equal(progress("reward-led-nsnu").earned, false);
+  assert.equal(progress("reward-foil").current, 0);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "leds", "nsnu"), false);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "decal", "gear"), false);
+});
 
 function gradeCards(store: ReturnType<typeof state>, weeks: number[], green: StatKey | StatKey[] | "all") {
   const sample = store.getState().storeCards.find((card) => card.storeId === "plano");

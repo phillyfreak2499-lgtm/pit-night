@@ -18,7 +18,7 @@ import {
   unsupportedNumbers,
   upcomingMatchups,
 } from "../src/lib/pit/claude-copy.ts";
-import { claimCopy, countClaimedOnDay, finishCopy, readCopy } from "../src/lib/pit/claude-store.ts";
+import { claimCopy, countClaimedOnDay, finishCopy, readCopy, reserveCopy } from "../src/lib/pit/claude-store.ts";
 import { FEATURE_MODEL, HAIKU } from "../src/lib/pit/claude.server.ts";
 import type { Sql } from "../src/lib/db.ts";
 import type { FightResult } from "../src/lib/pit/types.ts";
@@ -103,6 +103,45 @@ test("copy is claimed once, written once, and a ready row is never rewritten", a
   assert.deepEqual(await readCopy(sql, "live", "b1:walkout"), { status: "ready", body: "They walk out." });
   await pg.query("update pit_claude_text set created_at = now() - interval '2 days' where kind = 'live'");
   assert.equal(await countClaimedOnDay(sql, "live", day), 0);
+});
+
+test("parallel live claims refuse the 65th beat and never store more than the daily cap", async () => {
+  const pg = new PGlite();
+  const dir = new URL("../migrations/", import.meta.url);
+  for (const name of readdirSync(dir).filter((f) => f.endsWith(".sql")).sort()) await pg.exec(readFileSync(new URL(name, dir), "utf8"));
+  const run = async <T>(text: string, params: unknown[]) => (await pg.query<T>(text, params)).rows;
+  const sql = (async <T>(strings: TemplateStringsArray, ...values: unknown[]) => {
+    let text = strings[0]!;
+    values.forEach((_, i) => (text += `$${i + 1}${strings[i + 1]}`));
+    return run<T>(text, values);
+  }) as unknown as Sql;
+  sql.query = (text: string, params: unknown[] = []) => run(text, params);
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(new Date());
+  const index = await pg.query<{ indexdef: string }>(
+    "select indexdef from pg_indexes where indexname = 'pit_claude_text_kind_created'",
+  );
+  assert.match(index.rows[0]?.indexdef ?? "", /kind, created_at/);
+
+  for (let i = 0; i < LIVE_LIMIT_PER_DAY; i++) {
+    assert.equal(await reserveCopy(sql, "live", `serial:${i}`, "claude-haiku-5-5", LIVE_LIMIT_PER_DAY, day), "claimed");
+  }
+  assert.equal(await reserveCopy(sql, "live", "serial:over", "claude-haiku-5-5", LIVE_LIMIT_PER_DAY, day), "capped");
+  assert.equal(await countClaimedOnDay(sql, "live", day), LIVE_LIMIT_PER_DAY);
+  assert.equal(await reserveCopy(sql, "live", "serial:0", "claude-haiku-5-5", LIVE_LIMIT_PER_DAY, day), "existing");
+  assert.equal(await countClaimedOnDay(sql, "live", day), LIVE_LIMIT_PER_DAY);
+  assert.equal(await readCopy(sql, "live", "serial:over"), undefined);
+
+  const raced = await Promise.all(
+    Array.from({ length: LIVE_LIMIT_PER_DAY + 16 }, (_, i) =>
+      reserveCopy(sql, "live-race", `race:${i}`, "claude-haiku-5-5", LIVE_LIMIT_PER_DAY, day),
+    ),
+  );
+  const stored = await countClaimedOnDay(sql, "live-race", day);
+  const claimed = raced.filter((result) => result === "claimed").length;
+  assert.equal(stored, claimed);
+  assert.ok(stored <= LIVE_LIMIT_PER_DAY);
+  assert.ok(raced.includes("capped"));
+  assert.equal(claimed + raced.filter((result) => result === "capped").length, raced.length);
 });
 
 test("live calls follow the resolved tape and hide the ending until the decision", () => {
@@ -237,7 +276,9 @@ test("the live booth generates in order, under a daily cap, and keeps the key on
   assert.doesNotMatch(page, /ANTHROPIC|readApiKey|askClaude/);
   assert.match(server, /getLiveCall/);
   assert.match(server, /guardedCopy\("live"/);
-  assert.match(server, /countClaimedOnDay/);
+  assert.match(server, /reserveCopy/);
+  assert.match(server, /LIVE_LIMIT_PER_DAY/);
+  assert.match(server, /preclaimed/);
   assert.match(server, /import\("\.\/claude\.server"\)/);
   assert.doesNotMatch(server, /ANTHROPIC_API_KEY|readApiKey\(/);
 });

@@ -52,6 +52,8 @@ export const TRADEMARK_NEEDLES = [
   "starbucks",
   "mcdonald",
   "formula 1",
+  "ghostbusters",
+  "ecto",
 ];
 
 /** @type {readonly string[]} */
@@ -136,6 +138,19 @@ export function abusiveBanner(text) {
     .filter(Boolean)
     .map(foldWord);
   return tokens.includes("kys");
+}
+
+/**
+ * Bot and team names use the banner trademark and profanity policy.
+ * The caller keeps its own length limit (22 for a bot, 40 for a team).
+ * @param {string} text
+ * @returns {string | null}
+ */
+export function blockedName(text) {
+  const collapsed = String(text ?? "").replace(/\s+/g, " ").trim();
+  if (!collapsed) return null;
+  if (abusiveBanner(collapsed) || findTrademarkHits(collapsed).length > 0) return "That name isn't allowed.";
+  return null;
 }
 
 /**

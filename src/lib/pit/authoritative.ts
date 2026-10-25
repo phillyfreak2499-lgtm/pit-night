@@ -28,33 +28,41 @@ async function services() {
   const mode: SyncMode = db.dbSource === "neon" ? "live" : "preview";
   return { sql, store, auth, vanilla, mode };
 }
-async function load() {
+async function load(options?: { deadlines?: boolean }) {
+  const deadlines = options?.deadlines !== false;
   const s = await services();
   const seed = s.vanilla.createStore(s.store.pitCreator).getState();
   await s.sql`insert into pit_season (id, rev, doc) values ('main', 1, ${JSON.stringify(s.store.sharedDoc(seed))}) on conflict (id) do nothing`;
-  let row = (
-    await s.sql<{ rev: number; doc: string; schema_tag: string }>`select rev, doc, schema_tag from pit_season where id = 'main'`
-  )[0]!;
-  // Normalize the persisted season before it can override the new 14-store seed.
-  // This is intentionally additive: existing stores, work logs, builds, and results survive.
-  const parsed = JSON.parse(row.doc) as import("./types").PitData;
-  const normalized = s.store.applyLeague14(s.store.applyMondays(s.store.applyHulen(parsed)));
-  const merged = { ...seed, ...s.store.sharedDoc(normalized) };
-  const due = s.store.applyDueLock(merged, new Date());
-  const effective = due ?? merged;
-  const normalizedDoc = JSON.stringify(s.store.sharedDoc(effective));
-  if (normalizedDoc !== row.doc || row.schema_tag !== SCHEMA_TAG) {
-    const changed = await s.sql<{ rev: number }>`
-      update pit_season
-      set rev = rev + 1, doc = ${normalizedDoc}, schema_tag = ${SCHEMA_TAG}, updated_at = now()
-      where id = 'main' and rev = ${row.rev}
-      returning rev
-    `;
-    if (changed[0]) row = { rev: Number(changed[0].rev), doc: normalizedDoc, schema_tag: SCHEMA_TAG };
-    else return load(); // A concurrent command won. Never project our stale normalization.
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const row = (
+      await s.sql<{ rev: number; doc: string; schema_tag: string }>`select rev, doc, schema_tag from pit_season where id = 'main'`
+    )[0];
+    if (!row) continue;
+    // Normalize the persisted season before it can override the new 14-store seed.
+    // This is intentionally additive: existing stores, work logs, builds, and results survive.
+    const parsed = JSON.parse(row.doc) as import("./types").PitData;
+    const normalized = s.store.applyLeague14(s.store.applyMondays(s.store.applyHulen(parsed)));
+    const merged = { ...seed, ...s.store.sharedDoc(normalized) };
+    const due = deadlines ? s.store.applyDueLock(merged, new Date()) : null;
+    const effective = due ?? merged;
+    const normalizedDoc = JSON.stringify(s.store.sharedDoc(effective));
+    let rev = Number(row.rev);
+    let doc = row.doc;
+    if (normalizedDoc !== row.doc || row.schema_tag !== SCHEMA_TAG) {
+      const changed = await s.sql<{ rev: number }>`
+        update pit_season
+        set rev = rev + 1, doc = ${normalizedDoc}, schema_tag = ${SCHEMA_TAG}, updated_at = now()
+        where id = 'main' and rev = ${row.rev}
+        returning rev
+      `;
+      if (!changed[0]) continue; // A concurrent command won. Read again, up to 8 tries.
+      rev = Number(changed[0].rev);
+      doc = normalizedDoc;
+    }
+    const data = { ...s.store.sharedDoc(effective), tutorialSeen: false, session: s.auth.publicSession };
+    return { ...s, row: { rev, doc, schema_tag: SCHEMA_TAG }, data };
   }
-  const data = { ...s.store.sharedDoc(effective), tutorialSeen: false, session: s.auth.publicSession };
-  return { ...s, row, data };
+  throw new Error("The league is busy. Please try again.");
 }
 /** Server-only: the normalized season for other server functions (Claude copy, the Monday job). */
 export async function loadSeason() {
@@ -64,14 +72,21 @@ export const pullSeason = createServerFn({ method: "POST" })
   .validator(z.object({ rev: z.number().int() }))
   .handler(async ({ data: input }): Promise<PullResult> => {
     const quick = await services();
-    const meta = (await quick.sql<{rev: number; schema_tag: string}>`select rev, schema_tag from pit_season where id = 'main'`)[0];
+    const meta = (
+      await quick.sql<{ rev: number; schema_tag: string; phase: string | null }>`
+        select rev, schema_tag, doc::json->>'phase' as phase from pit_season where id = 'main'
+      `
+    )[0];
     const { anyDeadlineDue } = await import("./time");
-    // Once a scheduled lock can be due, read the season so it freezes without a Desk button.
-    if (!anyDeadlineDue(new Date()) && meta?.schema_tag === SCHEMA_TAG && Number(meta.rev) === input.rev) {
+    const closed = meta?.phase != null && meta.phase !== "open";
+    const unchanged = meta?.schema_tag === SCHEMA_TAG && Number(meta.rev) === input.rev;
+    // A closed week does not re-run the deadline normalizer on every poll.
+    // An open week still loads once a scheduled lock can be due, so it freezes without a Desk button.
+    if (unchanged && (closed || !anyDeadlineDue(new Date()))) {
       // Verify expiry and credential generation on every pull, even unchanged ones.
       return { mode: quick.mode, rev: Number(meta.rev), doc: null, session: await quick.auth.session() };
     }
-    const s = await load();
+    const s = await load({ deadlines: !closed });
     const session = await s.auth.session(s.data);
     return {
       mode: s.mode,
@@ -143,7 +158,10 @@ export const mutateSeason = createServerFn({ method: "POST" })
       s.auth.sameOrigin();
       const session = await s.auth.session(s.data);
       authorize(s.data, session, input.name, input.args);
-      const buildRejection = captainBuildRejection(input.name, session.role, s.data.week, new Date());
+      const buildRejection = captainBuildRejection(input.name, session.role, s.data.week, new Date(), {
+        data: s.data,
+        args: input.args,
+      });
       if (buildRejection) throw new Error(buildRejection);
       const state = s.vanilla.createStore(s.store.pitCreator);
       state.setState({ ...s.data, session, flash: "" });

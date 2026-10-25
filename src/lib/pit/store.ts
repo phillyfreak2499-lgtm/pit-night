@@ -41,6 +41,7 @@ import {
 import { makeData } from "./seed";
 import { BOLTS, STREAK_BADGE, allJobs, crateFor, dayOpen, programWeek, type DayKey } from "./training";
 import { eligibilityClosed } from "./eligibility";
+import { blockedName } from "../../../scripts/copy-guard.mjs";
 import { bannerVerdict, cosmeticUnlocked, earnedRewardIds, HALLOWEEN_REWARD_IDS, validBodyForClass } from "./cosmetics";
 import { boltsOf, lockerItem, sparkStreak } from "./week";
 import { checkedCosmeticLoadout } from "./cosmetic-loadout";
@@ -862,6 +863,11 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "The wallet answers to the captain." });
           return;
         }
+        const buildBlock = captainBuildBlock(data);
+        if (buildBlock) {
+          set({ flash: buildBlock });
+          return;
+        }
         const check = showCheck(data, storeId, effectId);
         if (!check.ok) {
           set({ flash: check.reason });
@@ -1020,10 +1026,15 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         });
       },
       renameBot: (storeId, name) => {
-        const clean = name.trim().toUpperCase().slice(0, 22);
-        if (!clean) return;
         const data = get();
         if (!isBoss(data) && !isCaptainOf(data, storeId)) return;
+        const clean = name.trim().toUpperCase().replace(/\s+/g, " ").slice(0, 22);
+        if (!clean) return;
+        const blocked = blockedName(clean);
+        if (blocked) {
+          set({ flash: blocked });
+          return;
+        }
         set({ bots: patchBot(data.bots, storeId, (b) => ({ ...b, name: clean })), flash: `Bot is now ${clean}.` });
       },
       renameIdentity: (storeId, botName, teamName) => {
@@ -1033,6 +1044,11 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         const cleanTeam = teamName.trim().replace(/\s+/g, " ");
         // eslint-disable-next-line no-control-regex -- names may not contain C0 controls or DEL
         if (!cleanBot || cleanBot.length > 22 || !cleanTeam || cleanTeam.length > 40 || /[\u0000-\u001f\u007f]/.test(botName + teamName)) return;
+        const blocked = blockedName(cleanBot) ?? blockedName(cleanTeam);
+        if (blocked) {
+          set({ flash: blocked });
+          return;
+        }
         if (!data.stores.some(s => s.id === storeId)) return;
         set({
           bots: patchBot(data.bots, storeId, bot => ({ ...bot, name: cleanBot })),
@@ -1520,10 +1536,11 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           return;
         }
         const deadline = weekDeadline(data.week);
-        if (deadline && Date.now() >= deadline.at.getTime() && data.phase === "locked" && buildsFrozen(data)) {
+        if (data.phase === "locked" && buildsFrozen(data)) {
           set({
-            flash:
-              data.week === 5
+            flash: !deadline
+              ? "Already locked. Run the card, drop damage, and advance when you are ready."
+              : data.week === 5
                 ? `Already locked at ${deadline.label}. Saturday, Nov 28 still runs from this desk.`
                 : `Already locked at ${deadline.label}. Run the card, drop damage, and advance when you are ready.`,
           });

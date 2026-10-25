@@ -274,7 +274,11 @@ type Family = {
   nudge: Part["nudge"];
 };
 
-/** Coin prices. A part can earn at most 9 before the title lock (three green weeks). */
+/**
+ * Coin prices. Earnings are separate from the sticker price: a green week pays
+ * 3 into that metric's jar, and each green after the first adds one pair-bonus
+ * coin to that jar, in scorecard order. Six greens pay 23.
+ */
 export const TIER_PRICE: Record<Tier, number> = {
   stock: 0,
   sport: 3,
