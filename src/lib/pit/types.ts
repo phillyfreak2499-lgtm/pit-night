@@ -13,9 +13,48 @@ export type BoutKind = "bout" | "bye" | "tag" | "semi" | "final" | "melee";
 export type Method = "ko" | "dump" | "decision" | "melee" | "scrimmage" | "bye";
 export type GarageLook = "hazard" | "concrete" | "night" | "bone" | "checker";
 export type BotLook = "plain" | "stripe" | "chevron" | "rivets";
-export type BotFinish = "factory" | "chrome" | "matte" | "worn" | "satin" | "carbon" | "iridescent" | "gold";
-export type BotDecal = "none" | "flames" | "lightning" | "teeth" | "checker" | "hazard" | "camo" | "arch" | "stars" | "circuit" | "splash" | "champion";
-export type BotTopper = "none" | "antenna" | "horns" | "mohawk" | "crown";
+export const FINISH_IDS = ["factory", "chrome", "matte", "worn", "satin", "carbon", "iridescent", "gold", "holographic"] as const;
+export type BotFinish = (typeof FINISH_IDS)[number];
+/** Base sticker art. Foil versions are the same id plus "-foil" and share the four slots. */
+export const STICKER_ART = [
+  "none",
+  "flames",
+  "lightning",
+  "teeth",
+  "checker",
+  "hazard",
+  "camo",
+  "arch",
+  "stars",
+  "circuit",
+  "splash",
+  "champion",
+  "pumpkin",
+  "roundel",
+  "gear",
+  "wrench",
+  "optics",
+  "skull",
+  "bullseye",
+  "plate",
+  "gearhead",
+  "brace",
+  "fuel",
+  "tonic",
+  "archlabs",
+  "turbo",
+] as const;
+export type StickerArt = (typeof STICKER_ART)[number];
+export type BotDecal = StickerArt | `${Exclude<StickerArt, "none">}-foil`;
+export const TOPPER_IDS = ["none", "antenna", "horns", "mohawk", "crown", "beacon", "dish", "flagpole"] as const;
+export type BotTopper = (typeof TOPPER_IDS)[number];
+export type BotMask = "none" | "lantern" | "hockey";
+/** Cosmetic blade only. Premium Halloween weapons are real parts, not skins. */
+export type BotWeaponSkin = "none" | "hockey-machete";
+export type ShowEffectId = "fog" | "blacklight";
+export type BotLeds = "none" | StatKey;
+export const SMOKE_IDS = ["", "neon", "candy", "ice", "royal", "black"] as const;
+export type BotSmoke = (typeof SMOKE_IDS)[number];
 export type StickerSlot = "left" | "right" | "hood" | "rear";
 export type StickerSlots = Record<StickerSlot, BotDecal>;
 export type BotBody =
@@ -37,6 +76,16 @@ export type BotStyle = {
   eye: string;
   flag: boolean;
   topper?: BotTopper;
+  /** Face plate. Visual only. */
+  mask?: BotMask;
+  /** Drawn over the weapon. Does not change the equipped part or its stats. */
+  weaponSkin?: BotWeaponSkin;
+  /** Glow along the trim. Absent on old saves; styleOf() defaults to none. */
+  leds?: BotLeds;
+  /** Colored smoke. Empty string means off. Old saves omit it. */
+  smoke?: BotSmoke;
+  /** Pit banner, 12 characters. Empty on old saves. */
+  banner?: string;
   /** Bolt Locker unlocks. Shown on fight day. */
   walkout?: string;
   victory?: string;
@@ -104,11 +153,15 @@ export type Bot = {
   locked: Loadout | null;
   /** Week number whose Saturday the emergency weld covers. */
   weldForWeek: Partial<Record<Slot, number>>;
+  /** Successful full repairs and emergency welds. Cosmetic progress only. Old saves omit it. */
+  services?: number;
   look: BotLook;
   /** Bay number painted on the bot. Decoration, not a stat. */
   number: string;
   /** Older saves do not have it. Read through styleOf(). */
   style?: BotStyle;
+  /** Bought show effects. Visual only. Never a loadout slot. */
+  shows?: ShowEffectId[];
 };
 
 export type StoreCard = {
@@ -176,6 +229,9 @@ export type FighterSnap = {
   /** Visible build geometry; does not change fight calculations. */
   armorFamily?: string;
   driveFamily?: string;
+  chassisFamily?: string;
+  /** Fog and blacklight. Drawing only. */
+  shows?: ShowEffectId[];
 };
 
 export type FightResult = {
@@ -218,7 +274,7 @@ export type WeekMeta = {
   name: string;
   blurb: string;
   tagsEnabled: boolean;
-  /** When the desk locked this week's bots. */
+  /** When this week's builds locked, from the Desk button or an automatic deadline. */
   lockedAt?: number;
 };
 

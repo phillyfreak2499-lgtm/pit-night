@@ -98,11 +98,11 @@ export function boltsOf(data: Pick<PitData, "jobLog" | "sparkLog" | "picks" | "b
 /** Bolt Locker. Looks only. */
 export type LockerItem = {
   id: string;
-  kind: "walkout" | "victory" | "paint";
+  kind: "walkout" | "victory" | "paint" | "finish" | "smoke" | "foil";
   name: string;
   price: number;
   blurb: string;
-  /** For paints. */
+  /** For paints and smoke swatches. */
   hex?: string;
 };
 
@@ -116,6 +116,12 @@ export const LOCKER: LockerItem[] = [
   { id: "paint-candy", kind: "paint", name: "Candy Red", price: 6, blurb: "Deep candy-apple red.", hex: "#e3123f" },
   { id: "paint-ice", kind: "paint", name: "Glacier", price: 6, blurb: "Pale ice blue.", hex: "#bfe8ff" },
   { id: "paint-royal", kind: "paint", name: "Royal Purple", price: 6, blurb: "For bays that act like they own the place.", hex: "#6a2bd9" },
+  { id: "sticker-foil", kind: "foil", name: "Holo foil stickers", price: 4, blurb: "Foil versions of stickers you already own. They still use the four fixed slots. A perfect week with 6 greens unlocks the same shine." },
+  { id: "finish-holographic", kind: "finish", name: "Holographic finish", price: 14, blurb: "The shell shifts color under the lights. Full Tune-Ups in 3 weeks unlock it too." },
+  { id: "smoke-neon", kind: "smoke", name: "Neon smoke", price: 10, blurb: "Locker neon, blown out as smoke. Looks only.", hex: "#39ff6a" },
+  { id: "smoke-candy", kind: "smoke", name: "Candy smoke", price: 10, blurb: "Candy-apple smoke from the Locker colors.", hex: "#e3123f" },
+  { id: "smoke-ice", kind: "smoke", name: "Glacier smoke", price: 10, blurb: "Pale ice smoke. A Locker color, not a part.", hex: "#bfe8ff" },
+  { id: "smoke-royal", kind: "smoke", name: "Royal smoke", price: 10, blurb: "Royal purple smoke from the Locker.", hex: "#6a2bd9" },
 ];
 
 export function lockerItem(id: string | undefined) {

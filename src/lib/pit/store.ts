@@ -20,6 +20,7 @@ import {
   buildCard,
   kickoffRank,
   buyCheck,
+  showCheck,
   cardFor,
   championshipFinalists,
   craftScore,
@@ -27,13 +28,11 @@ import {
   foesThisWeek,
   gradesOf,
   hashString,
-  keyForStat,
   lastPlaceId,
   mergeWear,
   quotesForBot,
   runSaturday as playCard,
-  coinMath,
-  shopOpen,
+  coinsByJar,
   spyRead,
   WEAPON_FAMILIES,
   wonThisWeek,
@@ -42,10 +41,12 @@ import {
 import { makeData } from "./seed";
 import { BOLTS, STREAK_BADGE, allJobs, crateFor, dayOpen, programWeek, type DayKey } from "./training";
 import { eligibilityClosed } from "./eligibility";
-import { cosmeticUnlocked, validBodyForClass } from "./cosmetics";
+import { blockedName } from "../../../scripts/copy-guard.mjs";
+import { bannerVerdict, cosmeticUnlocked, earnedRewardIds, HALLOWEEN_REWARD_IDS, validBodyForClass } from "./cosmetics";
 import { boltsOf, lockerItem, sparkStreak } from "./week";
 import { checkedCosmeticLoadout } from "./cosmetic-loadout";
 import { authorize } from "./commands";
+import { buildLockMessage, deadlineDue, weekDeadline } from "./time";
 import type { BotDecal, CosmeticLoadout, StickerSlot } from "./types";
 import type { Bot, BotLook, BotStyle, Condition, FightResult, GarageLook, Grade, Kickoff, Loadout, PitData, Session, Slot, StatKey, StoreCard } from "./types";
 
@@ -53,6 +54,8 @@ const FIELD_OF: Record<StatKey, keyof StoreCard> = { nsnu: "nsnu", conv: "conv",
 
 export type PitState = PitData & {
   flash: string;
+  /** Bumps when a Halloween look unlocks, so the floor can throw green ooze. Not saved. */
+  ooze: number;
   setSticker: (storeId: string, slot: StickerSlot, decal: BotDecal) => void;
   proposeCosmetic: (storeId: string, loadout: CosmeticLoadout) => void;
   voteCosmetic: (id: string) => void;
@@ -76,6 +79,7 @@ export type PitState = PitData & {
   acceptProposal: (id: string) => void;
   dismissProposal: (id: string) => void;
   buyPart: (storeId: string, partId: string) => void;
+  buyShow: (storeId: string, effectId: "fog" | "blacklight") => void;
   repairSlot: (storeId: string, slot: Slot, mode: "full" | "weld" | "salvage" | "crown") => void;
   nameMvp: (storeId: string, crewId: string) => void;
   renameBot: (storeId: string, name: string) => void;
@@ -119,6 +123,19 @@ function isBoss(data: PitData) {
   return data.session.role === "commissioner";
 }
 
+const HALLOWEEN_LABEL: Record<(typeof HALLOWEEN_REWARD_IDS)[number], string> = {
+  "reward-pumpkin": "Pumpkin Sticker",
+  "reward-lantern-mask": "Lantern Mask",
+  "reward-hockey-mask": "Hockey Mask",
+  "reward-hockey-machete": "Hockey Mask Machete",
+};
+
+function newlyEarnedHalloween(data: PitData, storeId: string, before: Set<string>) {
+  const after = earnedRewardIds(data, storeId);
+  const hit = HALLOWEEN_REWARD_IDS.find((id) => after.has(id) && !before.has(id));
+  return hit ? HALLOWEEN_LABEL[hit] : null;
+}
+
 /** The signed-in crew member, if any. The desk acts as nobody. */
 function actor(data: PitData) {
   const { role, crewId } = data.session;
@@ -155,6 +172,48 @@ function starterBodyGuard(data: PitData, storeId: string): string | null {
   return data.week === 1 && !bot?.style?.body
     ? "Choose and lock your Week 1 body first."
     : null;
+}
+
+/** Captains and crew cannot move iron once this week's automatic deadline has passed. The Desk still can. */
+function captainBuildBlock(data: PitData): string | null {
+  if (isBoss(data) || !deadlineDue(data.week, new Date())) return null;
+  return buildLockMessage(data.week);
+}
+
+function buildsFrozen(data: PitData): boolean {
+  const finalists = data.week === 5 ? championshipFinalists(data) : null;
+  return data.bots.every((bot) => {
+    if (finalists && !finalists.includes(bot.storeId)) return true;
+    return bot.locked != null;
+  });
+}
+
+function lockPatch(data: PitData, at: number) {
+  const championship = data.week === 5;
+  const finalists = championshipFinalists(data);
+  return {
+    phase: "locked" as const,
+    weeks: data.weeks.map((w) => (w.number === data.week ? { ...w, lockedAt: w.lockedAt ?? at } : w)),
+    bots: data.bots.map((b) =>
+      championship && !finalists.includes(b.storeId)
+        ? { ...b, locked: null }
+        : { ...b, locked: { ...(b.locked ?? b.draft) }, equipped: { ...(b.locked ?? b.draft) } },
+    ),
+    flash: championship
+      ? "Championship builds frozen. Saturday ends only with a knockout."
+      : `Locked. ${data.stores.length} builds frozen for Monday. Click in Sunday's colors, then run the card.`,
+    log: [`Week ${data.week} locked.`, ...data.log.slice(0, 23)],
+  };
+}
+
+/**
+ * Freeze the current week once its automatic deadline has passed.
+ * Returns null before the deadline, once the phase has already moved on, and for weeks with no deadline (2–4).
+ */
+export function applyDueLock<T extends PitData>(data: T, now: Date): T | null {
+  const deadline = weekDeadline(data.week);
+  if (!deadline || now.getTime() < deadline.at.getTime() || data.phase !== "open") return null;
+  return { ...data, ...lockPatch(data, deadline.at.getTime()) };
 }
 
 function patchBot(bots: Bot[], storeId: string, fn: (bot: Bot) => Bot): Bot[] {
@@ -221,6 +280,7 @@ function fresh(): PitState {
   return {
     ...makeData(),
     flash: "",
+    ooze: 0,
     setSticker: () => {},
     proposeCosmetic: () => {},
     voteCosmetic: () => {},
@@ -244,6 +304,7 @@ function fresh(): PitState {
     acceptProposal: () => {},
     dismissProposal: () => {},
     buyPart: () => {},
+    buyShow: () => {},
     repairSlot: () => {},
     nameMvp: () => {},
     renameBot: () => {},
@@ -323,7 +384,7 @@ export function clientDoc(state: PitData, session: Session): SharedDoc {
   out.bots = out.bots.map(bot => {
     if (session.role !== "public" && session.storeId === bot.storeId) return bot;
     const stock = { chassis: stockPart("chassis", bot.classId).id, armor: stockPart("armor", bot.classId).id, drive: stockPart("drive", bot.classId).id, weapon: stockPart("weapon", bot.classId).id, utility: null, brain: stockPart("brain", bot.classId).id };
-    return { ...bot, draft: stock, equipped: stock, locked: bot.locked ? stock : null, owned: [], partWear: {}, weldForWeek: {}, coins: { chassis: 0, armor: 0, drive: 0, weapon: 0, utility: 0, brain: 0 }, voucher: 0, repairSpent: 0 };
+    return { ...bot, draft: stock, equipped: stock, locked: bot.locked ? stock : null, owned: [], partWear: {}, weldForWeek: {}, coins: { chassis: 0, armor: 0, drive: 0, weapon: 0, utility: 0, brain: 0 }, voucher: 0, repairSpent: 0, shows: [] };
   });
   return out;
 }
@@ -383,6 +444,11 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "Sign in to choose this store's starter body." });
           return;
         }
+        const buildBlock = captainBuildBlock(data);
+        if (buildBlock) {
+          set({ flash: buildBlock });
+          return;
+        }
         const bot = data.bots.find((row) => row.storeId === storeId);
         if (!bot) return;
         if (data.week !== 1 || data.bouts.some((bout) => bout.week === 1 && bout.result) || bot.style?.body) {
@@ -432,6 +498,11 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         if (starterBlock && !isBoss(data)) { set({ flash: starterBlock }); return; }
         if (!isCaptainOf(data, storeId)) {
           set({ flash: "Only the captain can change parts." });
+          return;
+        }
+        const buildBlock = captainBuildBlock(data);
+        if (buildBlock) {
+          set({ flash: buildBlock });
           return;
         }
         const reopened = data.phase === "locked" && !data.bots.find((b) => b.storeId === storeId)?.locked;
@@ -493,6 +564,11 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "Only the captain can change parts." });
           return;
         }
+        const buildBlock = captainBuildBlock(data);
+        if (buildBlock) {
+          set({ flash: buildBlock });
+          return;
+        }
         const reopened = data.phase === "locked" && !data.bots.find((b) => b.storeId === storeId)?.locked;
         if (data.phase !== "open" && !(data.phase === "locked" && (isBoss(data) || reopened))) {
           set({ flash: "The bay is frozen." });
@@ -530,7 +606,9 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
               locked: current.locked && isBoss(data) ? { ...draft } : current.locked,
             }),
           ),
-          flash: "Draft is the best lock in the bay. It still has to be locked by Saturday close.",
+          flash: weekDeadline(data.week)
+            ? `Draft is the best lock in the bay. It still has to be locked by ${weekDeadline(data.week)!.label}.`
+            : "Draft is the best lock in the bay. It still has to be locked by Saturday close.",
         });
       },
       lockStore: (storeId) => {
@@ -541,6 +619,11 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         if (starterBlock && !isBoss(data)) { set({ flash: starterBlock }); return; }
         if (!isCaptainOf(data, storeId)) {
           set({ flash: "Captain clipboard required." });
+          return;
+        }
+        const buildBlock = captainBuildBlock(data);
+        if (buildBlock) {
+          set({ flash: buildBlock });
           return;
         }
         if (data.phase !== "open" && data.phase !== "locked") {
@@ -644,6 +727,8 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           if (!row) return bot;
           const before = data.kickoff.paid[bot.storeId] ?? {};
           const coins = { ...bot.coins };
+          // row.bySlot is coinsByJar: grade coins plus the pair bonus on later greens.
+          // A re-run pays only the difference from the last snapshot, including that bonus.
           for (const slot of SLOTS) coins[slot] = Math.max(0, (coins[slot] ?? 0) + row.bySlot[slot] - (before[slot] ?? 0));
           paid[bot.storeId] = { ...row.bySlot };
           return { ...bot, coins };
@@ -654,7 +739,6 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         const main = card.filter((b) => b.kind === "bout").at(-1);
         const metroTop = ranked.filter((row) => row.store.conference === "metro").sort((a,b) => (seedOf.get(a.store.id) ?? 99) - (seedOf.get(b.store.id) ?? 99))[0]!;
         const frontierTop = ranked.filter((row) => row.store.conference === "frontier").sort((a,b) => (seedOf.get(a.store.id) ?? 99) - (seedOf.get(b.store.id) ?? 99))[0]!;
-        const top = ranked[0]!;
         const gazette = data.gazette.map((g) =>
           g.id === "g-open"
             ? {
@@ -732,6 +816,11 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "The wallet answers to the captain." });
           return;
         }
+        const buildBlock = captainBuildBlock(data);
+        if (buildBlock) {
+          set({ flash: buildBlock });
+          return;
+        }
         const part = partById(partId);
         if (!part) return;
         const check = buyCheck(data, storeId, part);
@@ -764,6 +853,36 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           return `${name} bought for ${cost} coins.`;
         }
       },
+      buyShow: (storeId, effectId) => {
+        const data = get();
+        const championshipBlock = championshipPrepGuard(data, storeId);
+        if (championshipBlock && !isBoss(data)) { set({ flash: championshipBlock }); return; }
+        const starterBlock = starterBodyGuard(data, storeId);
+        if (starterBlock && !isBoss(data)) { set({ flash: starterBlock }); return; }
+        if (!isCaptainOf(data, storeId)) {
+          set({ flash: "The wallet answers to the captain." });
+          return;
+        }
+        const buildBlock = captainBuildBlock(data);
+        if (buildBlock) {
+          set({ flash: buildBlock });
+          return;
+        }
+        const check = showCheck(data, storeId, effectId);
+        if (!check.ok) {
+          set({ flash: check.reason });
+          return;
+        }
+        const effect = effectId;
+        set({
+          bots: patchBot(data.bots, storeId, (bot) => ({
+            ...bot,
+            coins: { ...bot.coins, utility: (bot.coins.utility ?? 0) - check.cost },
+            shows: [...(bot.shows ?? []), effect],
+          })),
+          flash: `${effect === "fog" ? "Fog Machine" : "Blacklight Mode"} is in the rafters. Light only. The fight does not change.`,
+        });
+      },
       repairSlot: (storeId, slot, mode) => {
         const data = get();
         const championshipBlock = championshipPrepGuard(data, storeId);
@@ -772,6 +891,11 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         if (starterBlock && !isBoss(data)) { set({ flash: starterBlock }); return; }
         if (!isCaptainOf(data, storeId)) {
           set({ flash: "Repairs go through the captain." });
+          return;
+        }
+        const buildBlock = captainBuildBlock(data);
+        if (buildBlock) {
+          set({ flash: buildBlock });
           return;
         }
         if (data.phase === "locked" || data.phase === "fought") {
@@ -806,7 +930,11 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           const week = nextFightWeek(data);
           set({
             bots: patchBot(data.bots, storeId, () =>
-              setPartWear({ ...paid, weldForWeek: { ...paid.weldForWeek, [slot]: week } }, partId, "bent"),
+              setPartWear(
+                { ...paid, services: (paid.services ?? 0) + 1, weldForWeek: { ...paid.weldForWeek, [slot]: week } },
+                partId,
+                "bent",
+              ),
             ),
             flash: `${part.name} is welded to Bent for week ${week}. Then it dies again if you do not finish the job.`,
           });
@@ -876,7 +1004,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           bots: patchBot(data.bots, storeId, () => {
             const weldForWeek = { ...paid.weldForWeek };
             delete weldForWeek[slot];
-            return setPartWear({ ...paid, weldForWeek }, partId, "clean");
+            return setPartWear({ ...paid, services: (paid.services ?? 0) + 1, weldForWeek }, partId, "clean");
           }),
           flash: `${part.name} is clean. ${cost} ${slot} coins.`,
         });
@@ -898,10 +1026,15 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         });
       },
       renameBot: (storeId, name) => {
-        const clean = name.trim().toUpperCase().slice(0, 22);
-        if (!clean) return;
         const data = get();
         if (!isBoss(data) && !isCaptainOf(data, storeId)) return;
+        const clean = name.trim().toUpperCase().replace(/\s+/g, " ").slice(0, 22);
+        if (!clean) return;
+        const blocked = blockedName(clean);
+        if (blocked) {
+          set({ flash: blocked });
+          return;
+        }
         set({ bots: patchBot(data.bots, storeId, (b) => ({ ...b, name: clean })), flash: `Bot is now ${clean}.` });
       },
       renameIdentity: (storeId, botName, teamName) => {
@@ -909,7 +1042,13 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         if (!isBoss(data) && !isCaptainOf(data, storeId)) return;
         const cleanBot = botName.trim().replace(/\s+/g, " ").toUpperCase();
         const cleanTeam = teamName.trim().replace(/\s+/g, " ");
+        // eslint-disable-next-line no-control-regex -- names may not contain C0 controls or DEL
         if (!cleanBot || cleanBot.length > 22 || !cleanTeam || cleanTeam.length > 40 || /[\u0000-\u001f\u007f]/.test(botName + teamName)) return;
+        const blocked = blockedName(cleanBot) ?? blockedName(cleanTeam);
+        if (blocked) {
+          set({ flash: blocked });
+          return;
+        }
         if (!data.stores.some(s => s.id === storeId)) return;
         set({
           bots: patchBot(data.bots, storeId, bot => ({ ...bot, name: cleanBot })),
@@ -998,9 +1137,17 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         const id = `${week}:${jobId}:${who.id}`;
         const status = who.role === "captain" || data.session.role === "commissioner" ? "approved" : "pending";
         const entry = { id, week, jobId, storeId: who.storeId, crewId: who.id, crewName: who.name, note: clean, status, at: Date.now() } as const;
+        const before = status === "approved" ? earnedRewardIds(data, who.storeId) : null;
+        const jobLog = [...data.jobLog.filter((e) => e.id !== id), entry];
+        const unlocked = before ? newlyEarnedHalloween({ ...data, jobLog }, who.storeId, before) : null;
         set({
-          jobLog: [...data.jobLog.filter((e) => e.id !== id), entry],
-          flash: status === "approved" ? `${job.title} is done.` : `${job.title} sent to the captain for a thumbs-up.`,
+          jobLog,
+          ooze: unlocked ? Date.now() : data.ooze,
+          flash: unlocked
+            ? `${job.title} is done. ${unlocked} unlocked. It stays on the bot after Halloween week, and it does not change the fight.`
+            : status === "approved"
+              ? `${job.title} is done.`
+              : `${job.title} sent to the captain for a thumbs-up.`,
         });
       },
       approveJob: (entryId) => {
@@ -1012,9 +1159,15 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "That week is closed. Approvals had to land before the card ran." });
           return;
         }
+        const before = earnedRewardIds(data, entry.storeId);
+        const jobLog = data.jobLog.map((e) => (e.id === entryId ? { ...e, status: "approved" as const } : e));
+        const unlocked = newlyEarnedHalloween({ ...data, jobLog }, entry.storeId, before);
         set({
-          jobLog: data.jobLog.map((e) => (e.id === entryId ? { ...e, status: "approved" } : e)),
-          flash: `${entry.crewName} is approved. +${entry.jobId.endsWith("-crate") ? BOLTS.crate : BOLTS.job} bolts.`,
+          jobLog,
+          ooze: unlocked ? Date.now() : data.ooze,
+          flash: unlocked
+            ? `${entry.crewName} is approved. ${unlocked} unlocked. It stays on the bot after Halloween week, and it does not change the fight.`
+            : `${entry.crewName} is approved. +${entry.jobId.endsWith("-crate") ? BOLTS.crate : BOLTS.job} bolts.`,
         });
       },
       rejectJob: (entryId) => {
@@ -1170,27 +1323,37 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         if (!isCaptainOf(data, storeId)) return;
         const bot = data.bots.find((row) => row.storeId === storeId);
         if (!bot) return;
+        let nextPatch = patch;
+        if (typeof patch.banner === "string") {
+          const verdict = bannerVerdict(patch.banner);
+          if (!verdict.ok) {
+            set({ flash: verdict.reason });
+            return;
+          }
+          nextPatch = { ...patch, banner: verdict.text };
+        }
         const current = styleOf(bot, bot.classId);
-        const next = styleOf({ classId: bot.classId, style: { ...current, ...patch, stickers: patch.stickers ?? (patch.decal !== undefined ? { ...current.stickers!, hood: patch.decal } : current.stickers) } });
+        const next = styleOf({ classId: bot.classId, style: { ...current, ...nextPatch, stickers: nextPatch.stickers ?? (nextPatch.decal !== undefined ? { ...current.stickers!, hood: nextPatch.decal } : current.stickers) } });
         const store = data.stores.find(s => s.id === storeId);
         if (!store || !checkedCosmeticLoadout(data, storeId, { paint: store.paint, look: bot.look, number: bot.number, style: next })) {
           set({ flash: "Earn or purchase that cosmetic before equipping it." }); return;
         }
-        if (patch.body) {
-          if (data.week === 1 && bot.style?.body && patch.body !== bot.style.body) {
+        if (nextPatch.body) {
+          if (data.week === 1 && bot.style?.body && nextPatch.body !== bot.style.body) {
             set({ flash: "Starter body is frozen through the first fight." });
             return;
           }
-          if (!validBodyForClass(patch.body, bot.classId) || !cosmeticUnlocked(data, storeId, "body", patch.body)) {
+          if (!validBodyForClass(nextPatch.body, bot.classId) || !cosmeticUnlocked(data, storeId, "body", nextPatch.body)) {
             set({ flash: "That body shell is still locked." });
             return;
           }
         }
-        for (const [kind, value] of Object.entries(patch)) {
-          if (value === undefined || ["flag", "walkout", "victory", "body"].includes(kind)) continue;
+        for (const [kind, value] of Object.entries(nextPatch)) {
+          if (value === undefined || value === null || typeof value === "object") continue;
+          if (["flag", "walkout", "victory", "body"].includes(kind)) continue;
           if (
-            ["finish", "decal", "trim", "eye", "topper"].includes(kind) &&
-            !cosmeticUnlocked(data, storeId, kind as "finish" | "decal" | "trim" | "eye" | "topper", String(value))
+            ["finish", "decal", "trim", "eye", "topper", "mask", "weaponSkin", "leds", "smoke", "banner"].includes(kind) &&
+            !cosmeticUnlocked(data, storeId, kind as "finish" | "decal" | "trim" | "eye" | "topper" | "mask" | "weaponSkin" | "leds" | "smoke" | "banner", String(value))
           ) {
             set({ flash: "Earn that cosmetic in Pit Week first." });
             return;
@@ -1240,7 +1403,6 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "Eight specialists is the bay cap." });
           return;
         }
-        const count = specialists.length + 1;
         set({
           crew: [...data.crew, { id: `${storeId}-crew-${Date.now().toString(36)}`, storeId, name: clean, role: "specialist" }],
           flash: `${clean} is on the clock.`,
@@ -1322,13 +1484,14 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         ];
         const same = prior?.signature === read.signature && Boolean(prior?.lines.length);
         const called = prior?.guess ? ` You called ${prior.guess}.` : "";
+        const until = weekDeadline(data.week)?.label ?? "Saturday close";
         set({
           intel,
           flash: same
             ? `${read.botName} has not moved.${called}`
             : read.locked
               ? `${read.botName} is locked. This is the locked iron.${called}`
-              : `${read.botName} read. The captain can still move it before Saturday close.${called}`,
+              : `${read.botName} read. The captain can still move it before ${until}.${called}`,
         });
       },
       setTags: (week, on) => {
@@ -1372,21 +1535,19 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "The bots are already locked this week." });
           return;
         }
-        const finalists = championshipFinalists(data);
-        const championship = data.week === 5;
-        set({
-          phase: "locked",
-          weeks: data.weeks.map((w) => (w.number === data.week ? { ...w, lockedAt: w.lockedAt ?? Date.now() } : w)),
-          bots: data.bots.map((b) =>
-            championship && !finalists.includes(b.storeId)
-              ? { ...b, locked: null }
-              : { ...b, locked: { ...(b.locked ?? b.draft) }, equipped: { ...(b.locked ?? b.draft) } },
-          ),
-          flash: championship
-            ? "Championship builds frozen. Saturday ends only with a knockout."
-            : `Locked. ${data.stores.length} builds frozen for Monday. Click in Sunday's colors, then run the card.`,
-          log: [`Week ${data.week} locked.`, ...data.log.slice(0, 23)],
-        });
+        const deadline = weekDeadline(data.week);
+        if (data.phase === "locked" && buildsFrozen(data)) {
+          set({
+            flash: !deadline
+              ? "Already locked. Run the card, drop damage, and advance when you are ready."
+              : data.week === 5
+                ? `Already locked at ${deadline.label}. Saturday, Nov 28 still runs from this desk.`
+                : `Already locked at ${deadline.label}. Run the card, drop damage, and advance when you are ready.`,
+          });
+          return;
+        }
+        const at = deadline && Date.now() >= deadline.at.getTime() ? deadline.at.getTime() : Date.now();
+        set(lockPatch(data, at));
       },
       runSaturday: () => {
         const data = get();
@@ -1518,7 +1679,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           const card = cardFor(data, bot.storeId);
           if (!card) return bot;
           const grades = gradesOf(card);
-          const paid = coinMath(grades).bySlot;
+          const paid = coinsByJar(grades);
           const coins = { ...bot.coins };
           for (const slot of SLOTS) coins[slot] = (coins[slot] ?? 0) + paid[slot];
           const weldForWeek = { ...bot.weldForWeek };

@@ -1,9 +1,10 @@
-import { BODY_STYLES, bodyStyle } from "./catalog";
-import { championshipFinalists } from "./engine";
+import { bannerVerdict } from "../../../scripts/copy-guard.mjs";
+import { BODY_STYLES, METRICS, bodyStyle } from "./catalog";
+import { championshipFinalists, gradesOf, recordOf } from "./engine";
 import { sparkStreak, tunedUp } from "./week";
-import type { BotBody, PitData } from "./types";
+import type { BotBody, PitData, StatKey } from "./types";
 
-export type CosmeticKind = "finish" | "decal" | "trim" | "eye" | "paint" | "topper" | "body" | "look";
+export type CosmeticKind = "finish" | "decal" | "trim" | "eye" | "paint" | "topper" | "body" | "look" | "mask" | "weaponSkin" | "leds" | "smoke" | "banner";
 export type CosmeticReward = {
   id: string;
   kind: CosmeticKind;
@@ -15,6 +16,10 @@ export type CosmeticReward = {
 
 function approvedJobs(data: PitData, storeId: string) {
   return data.jobLog.filter((e) => e.storeId === storeId && e.status === "approved" && !e.jobId.endsWith("-crate")).length;
+}
+/** Pit Week 1 jobs only. Halloween looks are earned that week and stay unlocked after it. */
+function halloweenJobs(data: PitData, storeId: string) {
+  return data.jobLog.filter((e) => e.storeId === storeId && e.week === 1 && e.status === "approved" && !e.jobId.endsWith("-crate")).length;
 }
 function crates(data: PitData, storeId: string) {
   return data.jobLog.filter((e) => e.storeId === storeId && e.status === "approved" && e.jobId.endsWith("-crate")).length;
@@ -52,6 +57,57 @@ function finalist(data: PitData, storeId: string) {
 }
 function champion(data: PitData, storeId: string) {
   return data.honors.pitBelt === storeId ? 1 : 0;
+}
+/** Desk-finalized regular-season cards. House projections are not grades yet. */
+function finalizedCard(card: { storeId: string; week: number; projected: boolean }, storeId: string) {
+  return card.storeId === storeId && card.week <= 4 && card.projected === false;
+}
+function greenWeeks(stat: StatKey) {
+  return (data: PitData, storeId: string) =>
+    data.storeCards.filter((card) => finalizedCard(card, storeId) && gradesOf(card)[stat] === "green").length;
+}
+function perfectWeeks(data: PitData, storeId: string) {
+  return data.storeCards.filter(
+    (card) => finalizedCard(card, storeId) && METRICS.every((metric) => gradesOf(card)[metric.stat] === "green"),
+  ).length;
+}
+function serviceMarks(data: PitData, storeId: string) {
+  const bot = data.bots.find((row) => row.storeId === storeId);
+  if (!bot) return 0;
+  const welded = Object.values(bot.weldForWeek ?? {}).some((week) => typeof week === "number");
+  return (bot.services ?? 0) > 0 || bot.repairSpent > 0 || welded ? 1 : 0;
+}
+function bestWinStreak(data: PitData, storeId: string) {
+  const bouts = data.bouts
+    .filter((bout) => bout.week <= 4 && bout.result && bout.result.method !== "scrimmage")
+    .filter((bout) => bout.result!.winnerIds.includes(storeId) || bout.result!.loserIds.includes(storeId))
+    .sort((a, b) => a.week - b.week || a.slot - b.slot);
+  let current = 0;
+  let best = 0;
+  for (const bout of bouts) {
+    if (bout.result!.winnerIds.includes(storeId)) {
+      current += 1;
+      best = Math.max(best, current);
+    } else current = 0;
+  }
+  return best;
+}
+function bestPickStreak(data: PitData, storeId: string) {
+  const picks = data.picks.filter((pick) => pick.storeId === storeId).sort((a, b) => a.at - b.at || a.id.localeCompare(b.id));
+  let current = 0;
+  let best = 0;
+  for (const pick of picks) {
+    const bout = data.bouts.find((row) => row.id === pick.boutId && row.result);
+    if (!bout?.result) continue;
+    if (bout.result.winnerIds.includes(pick.pick)) {
+      current += 1;
+      best = Math.max(best, current);
+    } else current = 0;
+  }
+  return best;
+}
+function storeWins(data: PitData, storeId: string) {
+  return recordOf(data, storeId).w;
 }
 const p = (fn:(d:PitData,s:string)=>number,target:number) => (data:PitData,storeId:string) => ({current:fn(data,storeId),target});
 
@@ -94,17 +150,53 @@ export const COSMETIC_REWARDS: CosmeticReward[] = [
   { id:"reward-crown", kind:"topper", value:"crown", label:"Champion Crown", requirement:"Win the Waterman Championship", progress:p(champion,1) },
   { id:"reward-champion-finish", kind:"finish", value:"gold", label:"Champion Gold Finish", requirement:"Win the Waterman Championship", progress:p(champion,1) },
   { id:"reward-champion-decal", kind:"decal", value:"champion", label:"Champion Crest", requirement:"Win the Waterman Championship", progress:p(champion,1) },
+  { id:"reward-pumpkin", kind:"decal", value:"pumpkin", label:"Pumpkin Sticker", requirement:"Approve 1 Pit Week 1 job", progress:p(halloweenJobs,1) },
+  { id:"reward-lantern-mask", kind:"mask", value:"lantern", label:"Lantern Mask", requirement:"Approve 2 Pit Week 1 jobs", progress:p(halloweenJobs,2) },
+  { id:"reward-hockey-mask", kind:"mask", value:"hockey", label:"Hockey Mask", requirement:"Approve 4 Pit Week 1 jobs", progress:p(halloweenJobs,4) },
+  { id:"reward-hockey-machete", kind:"weaponSkin", value:"hockey-machete", label:"Hockey Mask Machete", requirement:"Approve 6 Pit Week 1 jobs", progress:p(halloweenJobs,6) },
+  { id:"reward-gear", kind:"decal", value:"gear", label:"Gear", requirement:"Post a green NSNU grade", progress:p(greenWeeks("nsnu"),1) },
+  { id:"reward-wrench", kind:"decal", value:"wrench", label:"Wrench", requirement:"Survive a repair or an emergency weld", progress:p(serviceMarks,1) },
+  { id:"reward-optics", kind:"decal", value:"optics", label:"Robot Eyes", requirement:"Hit 2 Monday picks", progress:p(correctPicks,2) },
+  { id:"reward-skull", kind:"decal", value:"skull", label:"Cartoon Skull", requirement:"Win by knockout", progress:p(koWins,1) },
+  { id:"reward-bullseye", kind:"decal", value:"bullseye", label:"Bullseye", requirement:"Post a green Demo Close grade", progress:p(greenWeeks("demoClose"),1) },
+  { id:"reward-plate", kind:"decal", value:"plate", label:"Armor Plate", requirement:"Post a green Conv % grade", progress:p(greenWeeks("conv"),1) },
+  { id:"reward-gearhead", kind:"decal", value:"gearhead", label:"Gearhead Garage", requirement:"Post a green NSNU grade", progress:p(greenWeeks("nsnu"),1) },
+  { id:"reward-brace", kind:"decal", value:"brace", label:"Bolt & Brace Co.", requirement:"Post a green Conv % grade", progress:p(greenWeeks("conv"),1) },
+  { id:"reward-fuel", kind:"decal", value:"fuel", label:"Pit Fuel", requirement:"Post a green Demo Rate grade", progress:p(greenWeeks("demoRate"),1) },
+  { id:"reward-tonic", kind:"decal", value:"tonic", label:"Torque Tonic", requirement:"Post a green Demo Close grade", progress:p(greenWeeks("demoClose"),1) },
+  { id:"reward-archlabs", kind:"decal", value:"archlabs", label:"Arch Labs", requirement:"Post a green Arch Supports grade", progress:p(greenWeeks("arch"),1) },
+  { id:"reward-turbo", kind:"decal", value:"turbo", label:"Ticket Turbo", requirement:"Post a green Demo Ticket grade", progress:p(greenWeeks("ticket"),1) },
+  { id:"reward-foil", kind:"decal", value:"foil", label:"Holo foil stickers", requirement:"Post a perfect week with 6 greens, or buy foil for 4 Bolts", progress:p(perfectWeeks,1) },
+  { id:"reward-led-nsnu", kind:"leds", value:"nsnu", label:"NSNU light strip", requirement:"Post 3 green NSNU grades", progress:p(greenWeeks("nsnu"),3) },
+  { id:"reward-led-conv", kind:"leds", value:"conv", label:"Conv light strip", requirement:"Post 3 green Conv % grades", progress:p(greenWeeks("conv"),3) },
+  { id:"reward-led-demo", kind:"leds", value:"demoRate", label:"Demo Rate light strip", requirement:"Post 3 green Demo Rate grades", progress:p(greenWeeks("demoRate"),3) },
+  { id:"reward-led-close", kind:"leds", value:"demoClose", label:"Demo Close light strip", requirement:"Post 3 green Demo Close grades", progress:p(greenWeeks("demoClose"),3) },
+  { id:"reward-led-arch", kind:"leds", value:"arch", label:"Arch light strip", requirement:"Post 3 green Arch Supports grades", progress:p(greenWeeks("arch"),3) },
+  { id:"reward-led-ticket", kind:"leds", value:"ticket", label:"Ticket light strip", requirement:"Post 3 green Demo Ticket grades", progress:p(greenWeeks("ticket"),3) },
+  { id:"reward-beacon", kind:"topper", value:"beacon", label:"Beacon", requirement:"Win 3 fights in a row", progress:p(bestWinStreak,3) },
+  { id:"reward-dish", kind:"topper", value:"dish", label:"Satellite Dish", requirement:"Score 3 perfect Daily Sparks", progress:p(perfectSparks,3) },
+  { id:"reward-flagpole", kind:"topper", value:"flagpole", label:"Flag Pole", requirement:"Hit 3 Monday picks in a row", progress:p(bestPickStreak,3) },
+  { id:"reward-holo", kind:"finish", value:"holographic", label:"Holographic Finish", requirement:"Earn Full Tune-Ups in 3 weeks, or buy it for 14 Bolts", progress:p(tuneUps,3) },
+  { id:"reward-smoke-black", kind:"smoke", value:"black", label:"Black Smoke", requirement:"Win by knockout", progress:p(koWins,1) },
+  { id:"reward-banner", kind:"banner", value:"on", label:"Pit Banner", requirement:"Win a fight", progress:p(storeWins,1) },
 ];
+
+export const HALLOWEEN_REWARD_IDS = ["reward-pumpkin", "reward-lantern-mask", "reward-hockey-mask", "reward-hockey-machete"] as const;
 
 const FREE: Record<CosmeticKind, Set<string>> = {
   finish:new Set(["factory"]),
-  decal:new Set(["none"]),
+  decal:new Set(["none","roundel"]),
   trim:new Set(["steel","black","white"]),
   eye:new Set(["green","amber"]),
   paint:new Set(["amber","rust","bone","teal","crimson","gold","steel","mud","brass","olive","copper","cobalt","sky","lime","forest","violet","magenta","cherry","graphite"]),
   topper:new Set(["none"]),
   body:new Set(),
   look:new Set(["plain","stripe","chevron","rivets"]),
+  mask:new Set(["none"]),
+  weaponSkin:new Set(["none"]),
+  leds:new Set(["none",""]),
+  smoke:new Set(["","none"]),
+  banner:new Set([""]),
 };
 
 export function earnedRewardIds(data: PitData, storeId: string) {
@@ -112,6 +204,15 @@ export function earnedRewardIds(data: PitData, storeId: string) {
 }
 export function rewardFor(kind: CosmeticKind, value: string) {
   return COSMETIC_REWARDS.find(r=>r.kind===kind && r.value===value);
+}
+function lockerOwned(data: PitData, storeId: string, itemId: string) {
+  return Boolean(data.stores.find((store) => store.id === storeId)?.unlocks?.includes(itemId));
+}
+function rewardHeld(data: PitData, storeId: string, rewardId: string, earned: Set<string>) {
+  if (earned.has(rewardId)) return true;
+  if (rewardId === "reward-foil" && lockerOwned(data, storeId, "sticker-foil")) return true;
+  if (rewardId === "reward-holo" && lockerOwned(data, storeId, "finish-holographic")) return true;
+  return false;
 }
 function bodyRewardValue(data:PitData,storeId:string,value:string) {
   const bot=data.bots.find(b=>b.storeId===storeId);
@@ -126,17 +227,31 @@ function bodyRewardValue(data:PitData,storeId:string,value:string) {
 }
 export function cosmeticUnlocked(data:PitData,storeId:string,kind:CosmeticKind,value:string) {
   if(kind==="body") return bodyRewardValue(data,storeId,value);
+  if(kind==="banner") {
+    if(!value) return true;
+    if(!bannerVerdict(value).ok) return false;
+    return earnedRewardIds(data,storeId).has("reward-banner");
+  }
+  if(kind==="decal" && value.endsWith("-foil")) {
+    const base=value.slice(0,-5);
+    if(!cosmeticUnlocked(data,storeId,"decal",base)) return false;
+    const earned=earnedRewardIds(data,storeId);
+    return rewardHeld(data,storeId,"reward-foil",earned);
+  }
   if(FREE[kind].has(value)) return true;
+  const earned=earnedRewardIds(data,storeId);
   const reward=rewardFor(kind,value);
-  if(reward && earnedRewardIds(data,storeId).has(reward.id)) return true;
-  const store=data.stores.find(s=>s.id===storeId);
-  if(kind==="paint" && store?.unlocks?.includes(`paint-${value}`)) return true;
+  if(reward && rewardHeld(data,storeId,reward.id,earned)) return true;
+  if(kind==="paint" && lockerOwned(data,storeId,`paint-${value}`)) return true;
+  if(kind==="finish" && value==="holographic" && lockerOwned(data,storeId,"finish-holographic")) return true;
+  if(kind==="smoke" && value && lockerOwned(data,storeId,`smoke-${value}`)) return true;
   return false;
 }
 export function cosmeticProgress(data:PitData,storeId:string) {
   const earned=earnedRewardIds(data,storeId);
-  return COSMETIC_REWARDS.map(reward=>({reward,earned:earned.has(reward.id),...reward.progress(data,storeId)}));
+  return COSMETIC_REWARDS.map(reward=>({reward,earned:rewardHeld(data,storeId,reward.id,earned),...reward.progress(data,storeId)}));
 }
+export { bannerVerdict };
 export function eliteBodyFor(classId:string): BotBody {
   return classId==="tank" ? "fortress" : classId==="specialist" ? "phantom" : "viper";
 }

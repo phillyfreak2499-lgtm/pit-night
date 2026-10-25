@@ -20,7 +20,7 @@ export function EffectLockerPreview({ storeId, canBuy }: { storeId: string; canB
         fight stats. Reduced motion uses the description below.
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
-        {LOCKER.filter((i) => i.kind !== "paint").map((i) => (
+        {LOCKER.filter((i) => i.kind === "walkout" || i.kind === "victory" || i.kind === "smoke").map((i) => (
           <Btn key={i.id} tone={effect === i.id ? "amber" : "line"} onClick={() => setEffect(i.id)}>
             {i.name}
           </Btn>

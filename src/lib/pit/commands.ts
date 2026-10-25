@@ -1,5 +1,18 @@
 import { z } from "zod";
+import { championshipFinalists } from "./engine";
+import { buildLockMessage, deadlineDue } from "./time";
 import type { PitData, Session } from "./types";
+import { FINISH_IDS, SMOKE_IDS, STICKER_ART, TOPPER_IDS, type BotDecal } from "./types";
+
+const decalValues = [
+  ...STICKER_ART,
+  ...STICKER_ART.flatMap((id): BotDecal[] => (id === "none" ? [] : [`${id}-foil`])),
+] as [BotDecal, ...BotDecal[]];
+const decal = z.enum(decalValues);
+const finish = z.enum(FINISH_IDS);
+const topper = z.enum(TOPPER_IDS);
+const smoke = z.enum(SMOKE_IDS);
+const leds = z.enum(["none", "nsnu", "conv", "demoRate", "demoClose", "arch", "ticket"]);
 
 const id = z.string().min(1).max(120);
 const text = z.string().max(500);
@@ -21,19 +34,21 @@ const card = z
   })
   .strict();
 const body = z.enum(["shrike","raptor","stinger","viper","warhawk","keystone","juggernaut","bunker","fortress","colossus","windlass","scorpion","mantis","phantom","reaper"]);
-const decal = z.enum(["none","flames","lightning","teeth","checker","hazard","camo","arch","stars","circuit","splash","champion"]);
 const style = z
   .object({
     body: body.optional(),
-    topper: z.enum(["none","antenna","horns","mohawk","crown"]).optional(),
+    topper: topper.optional(),
+    mask: z.enum(["none", "lantern", "hockey"]).optional(),
+    weaponSkin: z.enum(["none", "hockey-machete"]).optional(),
     trim: id.optional(),
     eye: id.optional(),
-    finish: z.enum(["factory","chrome","matte","worn","satin","carbon","iridescent","gold"]).optional(),
-    decal: z
-      .enum(["none","flames","lightning","teeth","checker","hazard","camo","arch","stars","circuit","splash","champion"])
-      .optional(),
+    finish: finish.optional(),
+    decal: decal.optional(),
     flag: z.boolean().optional(),
     stickers: z.object({ left: decal, right: decal, hood: decal, rear: decal }).strict().optional(),
+    leds: leds.optional(),
+    smoke: smoke.optional(),
+    banner: z.string().max(12).optional(),
     walkout: z.enum(["", "walkout-pyro", "walkout-smoke", "walkout-sparks"]).optional(),
     victory: z.enum(["", "victory-confetti", "victory-fireworks"]).optional(),
   })
@@ -61,9 +76,11 @@ export const commandArgs = {
   acceptProposal: z.tuple([id]),
   dismissProposal: z.tuple([id]),
   buyPart: z.tuple([id, id]),
+  buyShow: z.tuple([id, z.enum(["fog", "blacklight"])]),
   repairSlot: z.tuple([id, slot, z.enum(["full", "weld", "salvage", "crown"])]),
   nameMvp: z.tuple([id, id]),
   renameBot: z.tuple([id, text]),
+  // eslint-disable-next-line no-control-regex -- names may not contain C0 controls or DEL
   renameIdentity: z.tuple([id, z.string().trim().min(1).max(22).regex(/^[^\u0000-\u001f\u007f]+$/), z.string().trim().min(1).max(40).regex(/^[^\u0000-\u001f\u007f]+$/)]),
   renameCaptain: z.tuple([id, text]),
   setPaint: z.tuple([id, id]),
@@ -101,6 +118,50 @@ export const commandArgs = {
   resetSeason: z.tuple([]),
 } as const;
 export type Command = keyof typeof commandArgs;
+
+/** Commands that change a fighting build. Cosmetics, training, and Desk steps are not in this set. */
+export const CAPTAIN_BUILD_COMMANDS = new Set<Command>([
+  "setDraftPart",
+  "setDraftLoadout",
+  "lockStore",
+  "chooseStarterBody",
+  "buyPart",
+  "buyShow",
+  "repairSlot",
+  "acceptProposal",
+]);
+
+/**
+ * Server rejection for a captain or crew build change once that week's automatic
+ * deadline has passed. The commissioner can still edit. Weeks 2–4 have no deadline.
+ * Week 5 non-finalists get the championship message, not the lock message.
+ */
+export function captainBuildRejection(
+  name: Command,
+  role: Session["role"],
+  week: number,
+  now: Date,
+  subject?: { data: PitData; args: readonly unknown[] },
+): string | null {
+  if (role === "commissioner") return null;
+  if (!CAPTAIN_BUILD_COMMANDS.has(name)) return null;
+  if (!deadlineDue(week, now)) return null;
+  if (week === 5 && subject && !finalistBuild(subject.data, name, subject.args)) {
+    return "Championship Week bot work belongs to the two conference champions. Rally behind a finalist instead.";
+  }
+  return buildLockMessage(week);
+}
+
+function finalistBuild(data: PitData, name: Command, args: readonly unknown[]) {
+  const raw = args[0];
+  const storeId =
+    name === "acceptProposal"
+      ? data.proposals.find((proposal) => proposal.id === raw)?.storeId
+      : typeof raw === "string" && data.stores.some((store) => store.id === raw)
+        ? raw
+        : undefined;
+  return storeId != null && championshipFinalists(data).includes(storeId);
+}
 const desk = new Set<Command>([
   "unlockStore",
   "updateCard",

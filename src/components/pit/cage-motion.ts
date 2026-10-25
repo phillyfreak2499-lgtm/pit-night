@@ -241,7 +241,7 @@ function juke(seed: string, time: number, amp: number): Spot {
 }
 
 function isSpinner(family: string) {
-  return family === "saw" || family === "disc" || family === "drum";
+  return family === "saw" || family === "disc" || family === "drum" || family === "chainsaw";
 }
 
 function knockFor(family: string, damage: number) {

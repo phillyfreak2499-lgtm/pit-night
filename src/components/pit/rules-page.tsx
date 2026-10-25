@@ -11,7 +11,7 @@ export const RULES: { title: string; text: string }[] = [
   },
   {
     title: "Crew owns the look; captain has the final call",
-    text: "In the Garage, specialists propose only cosmetics their store has unlocked. Each person may keep one current proposal and vote once on each open proposal. Votes never equip a look: the captain accepts it. Left armor, right armor, top/hood and rear panel each have their own sticker. Weekly themes are Identity, Attitude, Showmanship, Battle Ready and Championship; all achievement requirements and Bolt prices still apply. Cosmetic changes never repair wear or change combat stats. Rehearse walkouts and victory effects before buying.",
+    text: "In the Garage, specialists propose only cosmetics their store has unlocked. Each person may keep one current proposal and vote once on each open proposal. Votes never equip a look: the captain accepts it. Left armor, right armor, top/hood and rear panel each have their own sticker, including foil versions. Light strips, smoke, a 12-character banner, and extra toppers are looks too. Weekly themes are Identity, Attitude, Showmanship, Battle Ready and Championship; all achievement requirements and Bolt prices still apply. Cosmetic changes never repair wear, spend part coins, or change combat stats. Rehearse walkouts, victory effects, and smoke before buying.",
   },
   {
     title: "What scores",
@@ -58,7 +58,7 @@ export function RulesPage() {
         <SectionLabel>How it works</SectionLabel>
         <h1 className="font-display text-5xl leading-none">The store is the bot</h1>
         <p className="mt-3 text-muted">
-          The Waterman Battle Bot League is the Monday morning card for The Waterman Group. Period 12 has fourteen Good Feet stores in two seven-store conferences. Every store fights November 2, 9, 16, and 23. The Metro Champion and Frontier Champion then meet Saturday, November 28. The trophy hangs in a building. Pit crew get a name on the titantron. They do not take hardware home.
+          The Waterman Battle Bot League is the Monday morning card for The Waterman Group. Period 12 has fourteen Good Feet stores in two seven-store conferences. Every store fights November 2, 9, and 16, then the Week 4 Monday. The Metro Champion and Frontier Champion then meet Saturday, November 28. The trophy hangs in a building. Pit crew get a name on the titantron. They do not take hardware home.
         </p>
         <p className="mt-2 text-sm">
           New here? Start with the{" "}

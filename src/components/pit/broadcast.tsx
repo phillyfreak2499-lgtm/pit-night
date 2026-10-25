@@ -2,6 +2,7 @@ import { createFrameLoop } from "@/lib/pit/frame-loop";
 import { useEffect, useRef, useState } from "react";
 import { PAINT } from "@/lib/pit/catalog";
 import { methodLabel } from "@/lib/pit/engine";
+import { halloweenVisuals } from "@/lib/pit/halloween";
 import { armSound, playBell, playClank, playCount, playCrit, playDecision, playFinisher, playHit } from "@/lib/pit/sound";
 import type { Bout, Exchange, FightResult } from "@/lib/pit/types";
 import { Fx, drawSide, drawTop, impactPoints, stepBots } from "./cage-draw";
@@ -80,6 +81,7 @@ export function Broadcast({
     const fx = fxRef.current;
     const trails = trailsRef.current;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // eslint-disable-next-line prefer-const -- resize() reads loop before assignment; const would throw
     let loop: ReturnType<typeof createFrameLoop> | undefined;
     let visible = true;
     if (lastSeek.current !== seek) {
@@ -196,6 +198,7 @@ export function Broadcast({
         combo: combo.n >= 2 && time - combo.at < 2.5 ? { n: combo.n, t: (time - combo.at) / 2.5, color: combo.color } : null,
         hazards,
         beams: heroSide ? (PAINT[heroSide.paint] ?? null) : beat.kind === "bumper" && mainEvent ? "#f0a202" : null,
+        festive: halloweenVisuals() || bout.week === 1,
       });
       drawTop(topCtx, top.width, top.height, drive, fx, trails, time, dt, reduced);
       setCaption(captionFor(result, bout, beat, noDamage));

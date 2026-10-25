@@ -1,19 +1,23 @@
 import test, { beforeEach } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { createStore } from "zustand/vanilla";
-import { pitCreator, sharedDoc, clientDoc, applyLeague14 } from "../src/lib/pit/store.ts";
+import { pitCreator, sharedDoc, clientDoc, applyLeague14, applyDueLock } from "../src/lib/pit/store.ts";
 import { makeData } from "../src/lib/pit/seed.ts";
-import { nsnuOf, rankedStores, simulateDuel, buildCard, conferenceStandings, championshipFinalists } from "../src/lib/pit/engine.ts";
-import { weekProgress, boltsOf } from "../src/lib/pit/week.ts";
+import { nsnuOf, rankedStores, simulateDuel, buildCard, conferenceStandings, championshipFinalists, coinMath, coinsByJar, type GradeSet } from "../src/lib/pit/engine.ts";
+import { weekProgress, boltsOf, lockerItem } from "../src/lib/pit/week.ts";
 import { programWeek, allJobs, crateFor } from "../src/lib/pit/training.ts";
 import { eligibilityClosed } from "../src/lib/pit/eligibility.ts";
-import { cosmeticUnlocked, cosmeticProgress } from "../src/lib/pit/cosmetics.ts";
+import { cosmeticUnlocked, cosmeticProgress, bannerVerdict } from "../src/lib/pit/cosmetics.ts";
+import { checkedCosmeticLoadout } from "../src/lib/pit/cosmetic-loadout.ts";
 import { PRODUCT_QUIZ, productQuestion } from "../src/lib/pit/product-quiz.ts";
-import { authorize, commandArgs } from "../src/lib/pit/commands.ts";
+import { authorize, commandArgs, CAPTAIN_BUILD_COMMANDS, captainBuildRejection, type Command } from "../src/lib/pit/commands.ts";
+import { central, nextLockAt, weekDeadline, deadlineDue } from "../src/lib/pit/time.ts";
 import { buildBeats, fightDrive } from "../src/components/pit/cage-motion.ts";
 import { Fx } from "../src/components/pit/cage-draw.ts";
-import type { Session } from "../src/lib/pit/types.ts";
-import { styleOf } from "../src/lib/pit/catalog.ts";
+import type { Bout, FightResult, Grade, KeyName, Session, StatKey, StoreCard } from "../src/lib/pit/types.ts";
+import { STICKER_ART } from "../src/lib/pit/types.ts";
+import { DECALS, styleOf, GRADE_COINS, METRICS } from "../src/lib/pit/catalog.ts";
 import { createFrameLoop } from "../src/lib/pit/frame-loop.ts";
 import { sameSession, singleFlight } from "../src/lib/pit/sync-policy.ts";
 import { memoSnapshot, snapshotStorage } from "../src/lib/pit/snapshot-storage.ts";
@@ -70,6 +74,16 @@ test("Locker identity names persist without changing the store, bot build, wear 
   assert.equal(commandArgs.renameIdentity.safeParse(['plano','X'.repeat(23),'Team']).success,false);
   const crew=state('crew');crew.getState().renameIdentity('plano','Forbidden','Forbidden');
   assert.notEqual(crew.getState().bots.find(b=>b.storeId==='plano')!.name,'FORBIDDEN');
+  const named = league.getState().bots.find(b=>b.storeId==='plano')!.name;
+  const team = league.getState().stores.find(s=>s.id==='plano')!.teamName;
+  league.getState().renameBot('plano','Ghostbusters');
+  assert.equal(league.getState().bots.find(b=>b.storeId==='plano')!.name, named);
+  assert.match(league.getState().flash, /isn't allowed/);
+  league.getState().renameIdentity('plano','Ecto','Plano Pit Crew');
+  assert.equal(league.getState().bots.find(b=>b.storeId==='plano')!.name, named);
+  league.getState().renameIdentity('plano','Steel Fang','Ghostbusters');
+  assert.equal(league.getState().stores.find(s=>s.id==='plano')!.teamName, team);
+  assert.match(league.getState().flash, /isn't allowed/);
 });
 
 test("Abilene's confirmed team replaces legacy placeholders without resetting the season", () => {
@@ -658,6 +672,239 @@ test("four 14-store cards lead to two conference champions and a knockout Champi
   assert.ok(store.getState().honors.pitBelt);
 });
 
+const OCT31_LOCK = "2026-10-31T23:00:00.000Z";
+const NOV27_LOCK = "2026-11-28T00:00:00.000Z";
+
+function otherBrain(current: string | null) {
+  return current === "brain-logic-stock" ? "brain-hunter-stock" : "brain-logic-stock";
+}
+
+function brainOf(store: ReturnType<typeof state>, storeId = "plano") {
+  return store.getState().bots.find((b) => b.storeId === storeId)!.draft.brain;
+}
+
+test("automatic locks use 6:00 PM Central, including the CDT and CST offsets", () => {
+  assert.equal(weekDeadline(1)!.at.toISOString(), OCT31_LOCK);
+  assert.equal(weekDeadline(1)!.label, "Saturday, Oct 31, 6:00 PM CT");
+  assert.equal(central(2026, 10, 31, 18).toISOString(), OCT31_LOCK);
+  assert.equal(weekDeadline(5)!.at.toISOString(), NOV27_LOCK);
+  assert.equal(weekDeadline(5)!.label, "Friday, Nov 27, 6:00 PM CT");
+  assert.equal(central(2026, 11, 27, 18).toISOString(), NOV27_LOCK);
+  assert.equal(deadlineDue(1, new Date("2026-10-31T22:59:59.999Z")), false);
+  assert.equal(deadlineDue(1, new Date(OCT31_LOCK)), true);
+  assert.equal(deadlineDue(5, new Date("2026-11-27T23:59:59.999Z")), false);
+  assert.equal(deadlineDue(5, new Date(NOV27_LOCK)), true);
+  for (const week of [2, 3, 4]) {
+    assert.equal(weekDeadline(week), undefined);
+    assert.equal(deadlineDue(week, new Date("2026-12-01T00:00:00.000Z")), false);
+  }
+});
+
+test("week 1 and week 5 countdowns hit their deadlines; weeks 2–4 still count to Saturday 6:00 PM CT", () => {
+  const opening = new Date("2026-10-25T17:00:00.000Z");
+  assert.equal(nextLockAt(opening, 1).toISOString(), OCT31_LOCK);
+  const afterOct31 = new Date("2026-10-31T23:00:01.000Z");
+  assert.equal(nextLockAt(afterOct31, 1).toISOString(), OCT31_LOCK);
+  assert.notEqual(nextLockAt(afterOct31).toISOString(), OCT31_LOCK);
+  const championshipTuesday = new Date("2026-11-24T18:00:00.000Z");
+  assert.equal(nextLockAt(championshipTuesday, 5).toISOString(), NOV27_LOCK);
+  assert.equal(nextLockAt(new Date("2026-11-28T00:00:01.000Z"), 5).toISOString(), NOV27_LOCK);
+  assert.equal(nextLockAt(championshipTuesday).toISOString(), central(2026, 11, 28, 18).toISOString());
+  const weekTwo = new Date("2026-11-04T18:00:00.000Z");
+  const saturday = central(2026, 11, 7, 18).toISOString();
+  assert.equal(nextLockAt(weekTwo, 2).toISOString(), saturday);
+  assert.equal(nextLockAt(weekTwo, 3).toISOString(), saturday);
+  assert.equal(nextLockAt(weekTwo, 4).toISOString(), nextLockAt(weekTwo).toISOString());
+});
+
+test("captain build commands are rejected at the Oct 31 and Nov 27 instants and not before", (t) => {
+  const beforeOct = new Date("2026-10-31T22:59:59.999Z");
+  const atOct = new Date(OCT31_LOCK);
+  const beforeNov = new Date("2026-11-27T23:59:59.999Z");
+  const atNov = new Date(NOV27_LOCK);
+  for (const name of CAPTAIN_BUILD_COMMANDS) {
+    assert.equal(captainBuildRejection(name, "captain", 1, beforeOct), null);
+    assert.match(captainBuildRejection(name, "captain", 1, atOct)!, /Oct 31/);
+    assert.equal(captainBuildRejection(name, "commissioner", 1, atOct), null);
+    assert.equal(captainBuildRejection(name, "captain", 5, beforeNov), null);
+    assert.match(
+      captainBuildRejection(name, "captain", 5, atNov, { data: makeData(), args: ["plano"] })!,
+      /conference champions/,
+    );
+    assert.equal(captainBuildRejection(name, "commissioner", 5, atNov), null);
+    assert.equal(captainBuildRejection(name, "captain", 2, atOct), null);
+    assert.equal(captainBuildRejection(name, "captain", 4, atNov), null);
+  }
+  for (const name of ["completeJob", "submitSpark", "lockFriday", "runSaturday", "dropDamage", "advanceWeek"] as Command[]) {
+    assert.equal(captainBuildRejection(name, "captain", 1, atOct), null);
+    assert.equal(captainBuildRejection(name, "captain", 5, atNov), null);
+  }
+  t.mock.timers.setTime(beforeOct.getTime());
+  const early = state();
+  const lockedOut = state();
+  const earlyBrain = brainOf(early);
+  early.getState().setDraftPart("plano", "brain", otherBrain(earlyBrain));
+  assert.equal(brainOf(early), otherBrain(earlyBrain));
+  assert.equal(early.getState().phase, "open");
+  t.mock.timers.setTime(atOct.getTime());
+  const kept = brainOf(lockedOut);
+  lockedOut.getState().setDraftPart("plano", "brain", otherBrain(kept));
+  lockedOut.getState().setDraftLoadout("plano", { ...lockedOut.getState().bots.find((b) => b.storeId === "plano")!.draft, brain: otherBrain(kept) });
+  lockedOut.getState().lockStore("plano");
+  assert.equal(brainOf(lockedOut), kept);
+  assert.equal(lockedOut.getState().bots.find((b) => b.storeId === "plano")!.locked, null);
+  assert.match(lockedOut.getState().flash, /Oct 31/);
+  assert.equal(lockedOut.getState().phase, "open");
+  const desk = state("commissioner");
+  const switched = otherBrain(brainOf(desk));
+  desk.getState().setDraftPart("plano", "brain", switched);
+  assert.equal(brainOf(desk), switched);
+  assert.equal(desk.getState().phase, "open");
+});
+
+test("Oct 31 automatic lock freezes captains and still lets the Desk run, damage, and advance", (t) => {
+  t.mock.timers.setTime(Date.parse("2026-10-31T22:59:59.999Z"));
+  const store = state("commissioner");
+  assert.equal(applyDueLock(store.getState(), new Date()), null);
+  t.mock.timers.setTime(Date.parse(OCT31_LOCK));
+  const due = applyDueLock(store.getState(), new Date());
+  assert.ok(due);
+  assert.equal(due!.phase, "locked");
+  assert.equal(due!.weeks.find((w) => w.number === 1)!.lockedAt, Date.parse(OCT31_LOCK));
+  assert.ok(due!.bots.every((b) => b.locked));
+  const logLength = due!.log.length;
+  store.setState({ phase: due!.phase, weeks: due!.weeks, bots: due!.bots, log: due!.log, flash: due!.flash });
+  const cap = store.getState().crew.find((c) => c.storeId === "plano" && c.role === "captain")!;
+  const frozenBrain = brainOf(store);
+  store.setState({ session: { role: "captain", storeId: "plano", crewId: cap.id } });
+  store.getState().setDraftPart("plano", "brain", otherBrain(frozenBrain));
+  assert.equal(brainOf(store), frozenBrain);
+  store.setState({ session: state("commissioner").getState().session });
+  store.getState().lockFriday();
+  assert.equal(store.getState().phase, "locked");
+  assert.equal(store.getState().log.length, logLength);
+  assert.equal(store.getState().weeks.find((w) => w.number === 1)!.lockedAt, Date.parse(OCT31_LOCK));
+  assert.match(store.getState().flash, /Already locked/);
+  for (const row of store.getState().stores) store.getState().setOfficialNsnu(row.id, 1100);
+  store.getState().runSaturday();
+  assert.equal(store.getState().phase, "fought");
+  assert.equal(store.getState().bouts.filter((b) => b.week === 1 && b.kind === "bout").length, 7);
+  store.getState().dropDamage();
+  assert.equal(store.getState().phase, "inspected");
+  store.getState().advanceWeek();
+  assert.equal(store.getState().week, 2);
+  assert.equal(store.getState().phase, "open");
+  store.setState({ session: { role: "captain", storeId: "plano", crewId: cap.id } });
+  const weekTwoBrain = brainOf(store);
+  store.getState().setDraftPart("plano", "brain", otherBrain(weekTwoBrain));
+  assert.equal(brainOf(store), otherBrain(weekTwoBrain));
+});
+
+test("week 5 title builds lock at Friday Nov 27 6:00 PM CT and the championship still runs", (t) => {
+  const store = championshipState();
+  const finalist = championshipFinalists(store.getState())[0]!;
+  const cap = store.getState().crew.find((c) => c.storeId === finalist && c.role === "captain")!;
+  store.setState({ session: { role: "captain", storeId: finalist, crewId: cap.id } });
+  t.mock.timers.setTime(Date.parse("2026-11-27T23:59:59.999Z"));
+  assert.equal(applyDueLock(store.getState(), new Date()), null);
+  const before = brainOf(store, finalist);
+  store.getState().setDraftPart(finalist, "brain", otherBrain(before));
+  assert.equal(brainOf(store, finalist), otherBrain(before));
+  t.mock.timers.setTime(Date.parse(NOV27_LOCK));
+  const kept = brainOf(store, finalist);
+  store.getState().setDraftPart(finalist, "brain", otherBrain(kept));
+  assert.equal(brainOf(store, finalist), kept);
+  assert.match(store.getState().flash, /Nov 27/);
+  assert.equal(store.getState().phase, "open");
+  store.setState({ session: state("commissioner").getState().session });
+  const due = applyDueLock(store.getState(), new Date());
+  assert.ok(due);
+  assert.equal(due!.phase, "locked");
+  assert.equal(due!.weeks.find((w) => w.number === 5)!.lockedAt, Date.parse(NOV27_LOCK));
+  const finalists = championshipFinalists(due!);
+  assert.ok(finalists.every((id) => due!.bots.find((b) => b.storeId === id)!.locked));
+  assert.ok(due!.bots.filter((b) => !finalists.includes(b.storeId)).every((b) => b.locked == null));
+  const logLength = due!.log.length;
+  store.setState({ phase: due!.phase, weeks: due!.weeks, bots: due!.bots, log: due!.log, flash: due!.flash });
+  store.setState({ session: { role: "captain", storeId: finalist, crewId: cap.id } });
+  const frozen = brainOf(store, finalist);
+  store.getState().setDraftPart(finalist, "brain", otherBrain(frozen));
+  assert.equal(brainOf(store, finalist), frozen);
+  store.setState({ session: state("commissioner").getState().session });
+  store.getState().lockFriday();
+  assert.equal(store.getState().log.length, logLength);
+  assert.equal(store.getState().weeks.find((w) => w.number === 5)!.lockedAt, Date.parse(NOV27_LOCK));
+  assert.match(store.getState().flash, /Already locked/);
+  const finalistsNow = championshipFinalists(store.getState());
+  const outsider = store.getState().stores.find((row) => !finalistsNow.includes(row.id))!;
+  assert.match(
+    captainBuildRejection("buyPart", "captain", 5, new Date(NOV27_LOCK), { data: store.getState(), args: [finalist] })!,
+    /Nov 27/,
+  );
+  assert.match(
+    captainBuildRejection("buyShow", "captain", 5, new Date(NOV27_LOCK), { data: store.getState(), args: [outsider.id] })!,
+    /conference champions/,
+  );
+  assert.equal(
+    captainBuildRejection("buyPart", "captain", 5, new Date("2026-11-27T23:59:59.999Z"), {
+      data: store.getState(),
+      args: [outsider.id],
+    }),
+    null,
+  );
+  store.getState().runSaturday();
+  assert.equal(store.getState().phase, "fought");
+  const championship = store.getState().bouts.find((bout) => bout.week === 5 && bout.title === "Waterman Championship");
+  assert.ok(championship?.result);
+  assert.equal(store.getState().bouts.some((bout) => bout.week === 5 && bout.result == null), false);
+  store.getState().dropDamage();
+  assert.equal(store.getState().phase, "inspected");
+  store.getState().advanceWeek();
+  assert.equal(store.getState().phase, "complete");
+});
+
+test("pressing Lock again does not add another log line once every eligible build is frozen", () => {
+  for (const week of [2, 3, 4]) {
+    const store = state("commissioner");
+    store.setState({ week });
+    store.getState().lockFriday();
+    assert.equal(store.getState().phase, "locked");
+    assert.equal(store.getState().log.filter((line) => line === `Week ${week} locked.`).length, 1);
+    const log = store.getState().log;
+    store.getState().lockFriday();
+    assert.deepEqual(store.getState().log, log);
+    assert.match(store.getState().flash, /Already locked/);
+  }
+});
+
+test("buyShow is refused with the build lock, and a week-5 non-finalist is not told the builds locked", (t) => {
+  const store = championshipState();
+  const finalists = championshipFinalists(store.getState());
+  const finalist = finalists[0]!;
+  const outsider = store.getState().stores.find((row) => !finalists.includes(row.id))!;
+  const outsiderCap = store.getState().crew.find((c) => c.storeId === outsider.id && c.role === "captain")!;
+  const finalistCap = store.getState().crew.find((c) => c.storeId === finalist && c.role === "captain")!;
+  t.mock.timers.setTime(Date.parse(NOV27_LOCK));
+  store.setState({ session: { role: "captain", storeId: outsider.id, crewId: outsiderCap.id } });
+  const outsiderShows = store.getState().bots.find((b) => b.storeId === outsider.id)!.shows ?? [];
+  store.getState().buyShow(outsider.id, "fog");
+  assert.match(store.getState().flash, /conference champions/);
+  assert.deepEqual(store.getState().bots.find((b) => b.storeId === outsider.id)!.shows ?? [], outsiderShows);
+  store.setState({ session: { role: "captain", storeId: finalist, crewId: finalistCap.id } });
+  const finalistShows = store.getState().bots.find((b) => b.storeId === finalist)!.shows ?? [];
+  store.getState().buyShow(finalist, "fog");
+  assert.match(store.getState().flash, /Nov 27/);
+  assert.deepEqual(store.getState().bots.find((b) => b.storeId === finalist)!.shows ?? [], finalistShows);
+});
+
+test("season load retries a bounded number of times and skips closed-week deadline work on an unchanged poll", () => {
+  const source = readFileSync(new URL("../src/lib/pit/authoritative.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /else return load\(\)/);
+  assert.match(source, /for \(let attempt = 0; attempt < 8; attempt\+\+\)/);
+  assert.match(source, /deadlines: !closed/);
+  assert.match(source, /doc::json->>'phase'/);
+});
+
 test("KO fixtures always contain a replay and particle budgets stay bounded", () => {
   const data = makeData();
   let ko = false;
@@ -674,3 +921,546 @@ test("KO fixtures always contain a replay and particle budgets stay bounded", ()
   fx.step(1 / 60);
   assert.ok(fx.side.length <= 360 && fx.top.length <= 200);
 });
+
+function gradesWithGreens(greens: number, rest: Grade = "red"): GradeSet {
+  const grades = {} as GradeSet;
+  METRICS.forEach((metric, index) => {
+    grades[metric.stat] = index < greens ? "green" : rest;
+  });
+  return grades;
+}
+
+function jarSum(coins: Record<KeyName, number>) {
+  return Object.values(coins).reduce((sum, n) => sum + n, 0);
+}
+
+test("pair bonus is one coin per green after the first and a sweep pays 23", () => {
+  assert.deepEqual(GRADE_COINS, { green: 3, blue: 2, orange: 1, red: 0 });
+  const cases = [
+    { greens: 0, bonus: 0, total: 0 },
+    { greens: 1, bonus: 0, total: 3 },
+    { greens: 2, bonus: 1, total: 7 },
+    { greens: 3, bonus: 2, total: 11 },
+    { greens: 6, bonus: 5, total: 23 },
+  ];
+  for (const row of cases) {
+    const grades = gradesWithGreens(row.greens);
+    const math = coinMath(grades);
+    assert.equal(math.greens, row.greens, `${row.greens} greens`);
+    assert.equal(math.bonus, row.bonus, `${row.greens} greens bonus`);
+    assert.equal(math.total, row.total, `${row.greens} greens total`);
+    for (const metric of METRICS) {
+      assert.equal(math.bySlot[metric.slot], GRADE_COINS[grades[metric.stat]]);
+    }
+    const jars = coinsByJar(grades);
+    assert.equal(jarSum(jars), math.total);
+    METRICS.forEach((metric, index) => {
+      const extra = index > 0 && index < row.greens ? 1 : 0;
+      assert.equal(jars[metric.slot], math.bySlot[metric.slot] + extra);
+    });
+  }
+  const late = Object.fromEntries(
+    METRICS.map((metric) => [metric.stat, metric.stat === "arch" || metric.stat === "ticket" ? "green" : "red"]),
+  ) as GradeSet;
+  const lateMath = coinMath(late);
+  assert.equal(lateMath.greens, 2);
+  assert.equal(lateMath.bonus, 1);
+  assert.equal(lateMath.total, 7);
+  assert.equal(lateMath.bySlot.utility, 3);
+  assert.equal(lateMath.bySlot.brain, 3);
+  const lateJars = coinsByJar(late);
+  assert.equal(lateJars.utility, 3);
+  assert.equal(lateJars.brain, 4);
+  assert.equal(jarSum(lateJars), 7);
+});
+
+test("kickoff and Monday payouts deposit the pair bonus, and a kickoff re-run pays the difference", () => {
+  const store = state("commissioner", false);
+  const paintKickoff = (storeId: string, grades: GradeSet) => {
+    for (const metric of METRICS) store.getState().setKickoffGrade(storeId, metric.stat, grades[metric.stat]);
+  };
+  for (const row of store.getState().stores) paintKickoff(row.id, gradesWithGreens(0));
+  paintKickoff("plano", gradesWithGreens(6));
+  paintKickoff("allen", gradesWithGreens(2));
+  store.getState().applyKickoff();
+
+  const coinsOf = (id: string) => store.getState().bots.find((bot) => bot.storeId === id)!.coins;
+  assert.deepEqual(coinsOf("plano"), coinsByJar(gradesWithGreens(6)));
+  assert.equal(jarSum(coinsOf("plano")), 23);
+  assert.deepEqual(coinsOf("allen"), coinsByJar(gradesWithGreens(2)));
+  assert.equal(jarSum(coinsOf("allen")), 7);
+  for (const row of store.getState().stores) {
+    if (row.id === "plano" || row.id === "allen") continue;
+    assert.equal(jarSum(coinsOf(row.id)), 0, row.id);
+  }
+
+  const spent = { ...coinsOf("plano"), chassis: coinsOf("plano").chassis - 1 };
+  store.setState({
+    bots: store.getState().bots.map((bot) => (bot.storeId === "plano" ? { ...bot, coins: spent } : bot)),
+  });
+  store.getState().applyKickoff();
+  assert.deepEqual(coinsOf("plano"), spent);
+  assert.deepEqual(coinsOf("allen"), coinsByJar(gradesWithGreens(2)));
+
+  store.getState().setKickoffGrade("plano", "ticket", "blue");
+  store.getState().applyKickoff();
+  const fiveGreens = gradesWithGreens(6);
+  fiveGreens.ticket = "blue";
+  const afterBlue = {
+    ...coinsByJar(fiveGreens),
+    chassis: coinsByJar(fiveGreens).chassis - 1,
+  };
+  assert.deepEqual(coinsOf("plano"), afterBlue);
+  assert.equal(jarSum(coinsOf("plano")), 20);
+  assert.deepEqual(coinsOf("allen"), coinsByJar(gradesWithGreens(2)));
+  store.getState().applyKickoff();
+  assert.deepEqual(coinsOf("plano"), afterBlue);
+
+  store.getState().setKickoffGrade("plano", "nsnu", "red");
+  store.getState().applyKickoff();
+  const shifted = { ...fiveGreens, nsnu: "red" as const };
+  const owed = coinsByJar(shifted);
+  assert.equal(coinMath(shifted).total, 17);
+  assert.equal(coinMath(shifted).bonus, 3);
+  assert.deepEqual(coinsOf("plano"), owed);
+  assert.equal(jarSum(coinsOf("plano")), 17);
+  const held = { ...coinsOf("plano") };
+  store.getState().applyKickoff();
+  assert.deepEqual(coinsOf("plano"), held);
+  assert.deepEqual(store.getState().kickoff.paid.plano, owed);
+
+  const monday = state("commissioner", false);
+  for (const row of monday.getState().stores) {
+    for (const metric of METRICS) monday.getState().setGrade(row.id, metric.stat, "red");
+  }
+  for (const metric of METRICS) monday.getState().setGrade("plano", metric.stat, gradesWithGreens(3)[metric.stat]);
+  monday.setState({ phase: "inspected" });
+  monday.getState().advanceWeek();
+  const mondayCoins = (id: string) => monday.getState().bots.find((bot) => bot.storeId === id)!.coins;
+  assert.equal(monday.getState().week, 2);
+  assert.deepEqual(mondayCoins("plano"), coinsByJar(gradesWithGreens(3)));
+  assert.equal(jarSum(mondayCoins("plano")), 11);
+  for (const row of monday.getState().stores) {
+    if (row.id === "plano") continue;
+    assert.equal(jarSum(mondayCoins(row.id)), 0, row.id);
+  }
+});
+
+const STATS = ["nsnu", "conv", "demoRate", "demoClose", "arch", "ticket"] as const satisfies readonly StatKey[];
+
+function planoCoins(store: ReturnType<typeof state>) {
+  return JSON.stringify(store.getState().bots.find((bot) => bot.storeId === "plano")!.coins);
+}
+
+test("projected scorecards do not unlock grade cosmetics", () => {
+  const store = state();
+  gradeCards(store, [1, 2, 3], "all");
+  const progress = (id: string) => cosmeticProgress(store.getState(), "plano").find((row) => row.reward.id === id)!;
+  assert.equal(progress("reward-led-nsnu").current, 3);
+  assert.equal(progress("reward-led-nsnu").earned, true);
+  assert.equal(progress("reward-foil").current, 3);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "leds", "nsnu"), true);
+  store.setState({
+    storeCards: store.getState().storeCards.map((card) => (card.storeId === "plano" ? { ...card, projected: true } : card)),
+  });
+  assert.equal(progress("reward-led-nsnu").current, 0);
+  assert.equal(progress("reward-led-nsnu").earned, false);
+  assert.equal(progress("reward-foil").current, 0);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "leds", "nsnu"), false);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "decal", "gear"), false);
+});
+
+function gradeCards(store: ReturnType<typeof state>, weeks: number[], green: StatKey | StatKey[] | "all") {
+  const sample = store.getState().storeCards.find((card) => card.storeId === "plano");
+  assert.ok(sample);
+  const on = green === "all" ? new Set<StatKey>(STATS) : new Set<StatKey>(Array.isArray(green) ? green : [green]);
+  const grades = Object.fromEntries(STATS.map((stat) => [stat, on.has(stat) ? "green" : "red"])) as StoreCard["grades"];
+  const others = store.getState().storeCards.filter((card) => card.storeId !== "plano");
+  const mine = weeks.map((week) => ({ ...sample, id: `plano-w${week}-test`, week, grades, projected: false }));
+  store.setState({ storeCards: [...others, ...mine] });
+}
+
+function fightResult(winner: string, loser: string, method: FightResult["method"]): FightResult {
+  const bye = method === "bye";
+  return {
+    winnerIds: [winner],
+    loserIds: bye ? [] : [loser],
+    method,
+    blowout: false,
+    exchanges: [],
+    finisher: null,
+    hp: {},
+    fighters: [],
+    wear: {},
+    seed: `${method}:${winner}`,
+  };
+}
+
+function bout(id: string, week: number, slot: number, winner: string, loser: string, method: FightResult["method"]): Bout {
+  const bye = method === "bye";
+  return {
+    id,
+    week,
+    slot,
+    kind: bye ? "bye" : "bout",
+    title: id,
+    storeIds: bye ? [winner] : [winner, loser],
+    teamA: [winner],
+    teamB: bye ? [] : [loser],
+    result: fightResult(winner, loser, method),
+  };
+}
+
+function grantApprovedJobs(store: ReturnType<typeof state>, count: number) {
+  store.setState({
+    jobLog: Array.from({ length: count }, (_, index) => ({
+      id: `bolt-${index}`,
+      week: 1,
+      jobId: `bolt-job-${index}`,
+      storeId: "plano",
+      crewId: "plano-captain",
+      crewName: "Captain",
+      note: "Bolts for the locker",
+      status: "approved" as const,
+      at: index + 1,
+    })),
+  });
+}
+
+function markTuned(store: ReturnType<typeof state>, week: number) {
+  const data = store.getState();
+  const plan = programWeek(week);
+  assert.ok(plan);
+  const specialists = data.crew.filter((crew) => crew.storeId === "plano" && crew.role === "specialist");
+  const captain = data.crew.find((crew) => crew.storeId === "plano" && crew.role === "captain");
+  assert.ok(captain);
+  const jobs = allJobs(plan).flatMap((job) =>
+    specialists.map((crew) => ({
+      id: `${week}:${job.id}:${crew.id}`,
+      week,
+      jobId: job.id,
+      storeId: "plano",
+      crewId: crew.id,
+      crewName: crew.name,
+      note: "Tuned",
+      status: "approved" as const,
+      at: week,
+    })),
+  );
+  jobs.push({
+    id: `${week}:${plan.care.id}:${captain.id}`,
+    week,
+    jobId: plan.care.id,
+    storeId: "plano",
+    crewId: captain.id,
+    crewName: captain.name,
+    note: "CARE",
+    status: "approved",
+    at: week,
+  });
+  const sparks = plan.days.flatMap((day) =>
+    specialists.map((crew) => ({
+      id: `${week}:${day.day}:${crew.id}`,
+      week,
+      day: day.day,
+      storeId: "plano",
+      crewId: crew.id,
+      correct: 0,
+      total: 3,
+      at: week,
+    })),
+  );
+  store.setState({ jobLog: [...data.jobLog, ...jobs], sparkLog: [...data.sparkLog, ...sparks] });
+}
+
+test("old saves default the new cosmetic fields and drop a banner the filter rejects", () => {
+  const legacy = styleOf({ style: { decal: "flames" } });
+  assert.equal(legacy.leds, "none");
+  assert.equal(legacy.smoke, "");
+  assert.equal(legacy.banner, "");
+  assert.equal(styleOf({ style: { banner: "fuck" } }).banner, "");
+  assert.equal(styleOf({ style: { banner: "  PIT   NIGHT  " } }).banner, "PIT NIGHT");
+  const store = state();
+  store.setState({
+    bots: store.getState().bots.map((bot) =>
+      bot.storeId === "plano" ? { ...bot, style: { ...styleOf(bot), banner: "fuck" } } : bot,
+    ),
+  });
+  const before = planoCoins(store);
+  store.getState().setStyle("plano", { trim: "white" });
+  const bot = store.getState().bots.find((row) => row.storeId === "plano")!;
+  assert.equal(bot.style?.trim, "white");
+  assert.equal(bot.style?.banner, "");
+  assert.equal(planoCoins(store), before);
+});
+
+test("new sticker art stays in the four slots and foil is a suffix, not a fifth slot", () => {
+  for (const row of DECALS) commandArgs.setSticker.parse(["plano", "hood", row.id]);
+  assert.equal(commandArgs.setSticker.safeParse(["plano", "left", "nike"]).success, false);
+  assert.equal(commandArgs.setSticker.safeParse(["plano", "left", "roundel-foil"]).success, true);
+  for (const id of STICKER_ART) {
+    const foil = DECALS.some((row) => row.id === `${id}-foil`);
+    assert.equal(foil, id !== "none");
+  }
+  const store = state();
+  gradeCards(store, [1], []);
+  const before = structuredClone(store.getState().bots.find((bot) => bot.storeId === "plano")!);
+  const fightBefore = simulateDuel(store.getState(), "plano", "allen", "roundel").exchanges;
+  store.getState().setSticker("plano", "left", "roundel");
+  const after = store.getState().bots.find((bot) => bot.storeId === "plano")!;
+  assert.equal(after.style?.stickers?.left, "roundel");
+  assert.equal(after.style?.stickers?.right, "none");
+  assert.deepEqual({ ...after, style: before.style }, before);
+  assert.deepEqual(simulateDuel(store.getState(), "plano", "allen", "roundel").exchanges, fightBefore);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "decal", "gear"), false);
+  store.getState().setSticker("plano", "hood", "gear");
+  assert.equal(store.getState().bots.find((bot) => bot.storeId === "plano")!.style?.stickers?.hood, "none");
+});
+
+test("metric stickers, LEDs and foil follow green grades without spending part coins", () => {
+  const store = state();
+  const before = planoCoins(store);
+  gradeCards(store, [1], "nsnu");
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "decal", "gear"), true);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "decal", "gearhead"), true);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "decal", "turbo"), false);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "decal", "archlabs"), false);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "leds", "nsnu"), false);
+  gradeCards(store, [1], "conv");
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "decal", "plate"), true);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "decal", "brace"), true);
+  gradeCards(store, [1], "demoRate");
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "decal", "fuel"), true);
+  gradeCards(store, [1], "demoClose");
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "decal", "bullseye"), true);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "decal", "tonic"), true);
+  gradeCards(store, [1], "arch");
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "decal", "archlabs"), true);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "decal", "turbo"), false);
+  gradeCards(store, [1], "ticket");
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "decal", "turbo"), true);
+  gradeCards(store, [1, 2, 5], "nsnu");
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "leds", "nsnu"), false);
+  gradeCards(store, [1, 2, 3], "ticket");
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "leds", "ticket"), true);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "leds", "arch"), false);
+  gradeCards(store, [1, 2, 3], "all");
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "decal", "roundel-foil"), true);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "decal", "gear-foil"), true);
+  store.getState().setStyle("plano", { leds: "ticket", stickers: { left: "turbo-foil", right: "none", hood: "none", rear: "none" } });
+  const bot = store.getState().bots.find((row) => row.storeId === "plano")!;
+  assert.equal(bot.style?.leds, "ticket");
+  assert.equal(bot.style?.stickers?.left, "turbo-foil");
+  assert.equal(planoCoins(store), before);
+  assert.equal(bot.repairSpent, 0);
+});
+
+test("foil, holographic finish and locker smoke spend Bolts and leave part coins alone", () => {
+  const foil = state();
+  gradeCards(foil, [1], []);
+  const foilCoins = planoCoins(foil);
+  grantApprovedJobs(foil, 2);
+  assert.equal(boltsOf(foil.getState(), "plano").balance, 4);
+  foil.getState().buyLocker("plano", "sticker-foil");
+  assert.equal(boltsOf(foil.getState(), "plano").spent, 4);
+  assert.equal(cosmeticUnlocked(foil.getState(), "plano", "decal", "roundel-foil"), true);
+  assert.equal(cosmeticUnlocked(foil.getState(), "plano", "decal", "gear-foil"), false);
+  assert.equal(cosmeticProgress(foil.getState(), "plano").find((row) => row.reward.id === "reward-foil")?.earned, true);
+  foil.getState().setSticker("plano", "rear", "roundel-foil");
+  assert.equal(foil.getState().bots.find((bot) => bot.storeId === "plano")!.style?.stickers?.rear, "roundel-foil");
+  assert.equal(planoCoins(foil), foilCoins);
+
+  const smoke = state();
+  const smokeCoins = planoCoins(smoke);
+  grantApprovedJobs(smoke, 5);
+  assert.equal(boltsOf(smoke.getState(), "plano").balance, 10);
+  smoke.getState().buyLocker("plano", "smoke-neon");
+  smoke.getState().buyLocker("plano", "smoke-black");
+  assert.equal(lockerItem("smoke-black"), undefined);
+  assert.equal(cosmeticUnlocked(smoke.getState(), "plano", "smoke", "neon"), true);
+  assert.equal(cosmeticUnlocked(smoke.getState(), "plano", "smoke", "candy"), false);
+  assert.equal(cosmeticUnlocked(smoke.getState(), "plano", "smoke", "black"), false);
+  smoke.getState().setStyle("plano", { smoke: "neon" });
+  assert.equal(smoke.getState().bots.find((bot) => bot.storeId === "plano")!.style?.smoke, "neon");
+  assert.equal(planoCoins(smoke), smokeCoins);
+  assert.equal(boltsOf(smoke.getState(), "plano").spent, 10);
+
+  const holo = state();
+  const holoCoins = planoCoins(holo);
+  grantApprovedJobs(holo, 7);
+  assert.equal(boltsOf(holo.getState(), "plano").balance, 14);
+  assert.equal(cosmeticUnlocked(holo.getState(), "plano", "finish", "holographic"), false);
+  holo.getState().buyLocker("plano", "finish-holographic");
+  assert.equal(cosmeticUnlocked(holo.getState(), "plano", "finish", "holographic"), true);
+  holo.getState().setStyle("plano", { finish: "holographic" });
+  assert.equal(holo.getState().bots.find((bot) => bot.storeId === "plano")!.style?.finish, "holographic");
+  assert.equal(planoCoins(holo), holoCoins);
+});
+
+test("three Full Tune-Ups unlock the holographic finish without a Bolt purchase", () => {
+  const store = state();
+  store.setState({ week: 3 });
+  markTuned(store, 1);
+  markTuned(store, 2);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "finish", "holographic"), false);
+  markTuned(store, 3);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "finish", "holographic"), true);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "topper", "dish"), false);
+  const before = planoCoins(store);
+  store.getState().setStyle("plano", { finish: "holographic" });
+  assert.equal(store.getState().bots.find((bot) => bot.storeId === "plano")!.style?.finish, "holographic");
+  assert.equal(planoCoins(store), before);
+});
+
+test("a voucher repair or emergency weld unlocks the wrench and does not spend part coins", () => {
+  const store = state();
+  const bot = store.getState().bots.find((row) => row.storeId === "plano")!;
+  store.setState({
+    bots: store.getState().bots.map((row) =>
+      row.storeId === "plano"
+        ? {
+            ...row,
+            voucher: 2,
+            repairSpent: 0,
+            coins: { chassis: 0, drive: 0, weapon: 0, armor: 0, utility: 0, brain: 0 },
+            partWear: { ...row.partWear, [row.equipped.weapon]: "scratched", [row.equipped.armor]: "disabled" },
+          }
+        : row,
+    ),
+  });
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "decal", "wrench"), false);
+  store.getState().repairSlot("plano", "weapon", "salvage");
+  assert.equal(store.getState().bots.find((row) => row.storeId === "plano")!.services ?? 0, 0);
+  store.getState().repairSlot("plano", "weapon", "full");
+  let next = store.getState().bots.find((row) => row.storeId === "plano")!;
+  assert.equal(next.services, 1);
+  assert.equal(next.repairSpent, 0);
+  assert.equal(next.voucher, 1);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "decal", "wrench"), true);
+  store.getState().repairSlot("plano", "armor", "weld");
+  next = store.getState().bots.find((row) => row.storeId === "plano")!;
+  assert.equal(next.services, 2);
+  assert.equal(next.repairSpent, 0);
+  assert.equal(next.voucher, 0);
+  assert.deepEqual(next.coins, { chassis: 0, drive: 0, weapon: 0, armor: 0, utility: 0, brain: 0 });
+  assert.equal(bot.owned.length, next.owned.length);
+
+  const legacy = state();
+  legacy.setState({
+    bots: legacy.getState().bots.map((row) => (row.storeId === "plano" ? { ...row, repairSpent: 1, services: 0 } : row)),
+  });
+  assert.equal(cosmeticUnlocked(legacy.getState(), "plano", "decal", "wrench"), true);
+  legacy.setState({
+    bots: legacy.getState().bots.map((row) =>
+      row.storeId === "plano" ? { ...row, repairSpent: 0, services: 0, weldForWeek: { weapon: 1 } } : row,
+    ),
+  });
+  assert.equal(cosmeticUnlocked(legacy.getState(), "plano", "decal", "wrench"), true);
+});
+
+test("knockouts, win streaks, perfect Sparks and pick streaks unlock toppers, skull and black smoke", () => {
+  const store = state();
+  const before = planoCoins(store);
+  store.setState({
+    bouts: [
+      bout("w1", 1, 0, "plano", "allen", "decision"),
+      bout("w2", 2, 0, "plano", "allen", "decision"),
+      bout("scrim", 2, 1, "plano", "allen", "scrimmage"),
+    ],
+  });
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "banner", "PIT NIGHT"), true);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "decal", "skull"), false);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "smoke", "black"), false);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "topper", "beacon"), false);
+  store.setState({ bouts: [...store.getState().bouts, bout("w3", 3, 0, "plano", "allen", "ko")] });
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "decal", "skull"), true);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "smoke", "black"), true);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "topper", "beacon"), true);
+  store.setState({ bouts: [bout("late", 5, 0, "plano", "allen", "ko")] });
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "decal", "skull"), false);
+  store.setState({
+    bouts: [
+      bout("a", 1, 0, "plano", "allen", "decision"),
+      bout("b", 1, 1, "allen", "plano", "decision"),
+      bout("c", 2, 0, "plano", "allen", "decision"),
+    ],
+  });
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "topper", "beacon"), false);
+
+  store.setState({
+    sparkLog: [1, 2, 3].map((index) => ({
+      id: `spark-${index}`,
+      week: 1,
+      day: "tue",
+      storeId: "plano",
+      crewId: `crew-${index}`,
+      correct: 3,
+      total: 3,
+      at: index,
+    })),
+  });
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "topper", "dish"), true);
+
+  const won = bout("pick-win", 1, 0, "allen", "waco", "decision");
+  const lost = bout("pick-loss", 1, 1, "waco", "allen", "decision");
+  const open = { ...bout("pick-open", 1, 2, "allen", "waco", "decision"), result: null };
+  store.setState({
+    bouts: [won, lost, open],
+    picks: [
+      { id: "p1", week: 1, boutId: won.id, storeId: "plano", crewId: "a", pick: "allen", at: 1 },
+      { id: "p2", week: 1, boutId: lost.id, storeId: "plano", crewId: "a", pick: "allen", at: 2 },
+      { id: "p3", week: 1, boutId: open.id, storeId: "plano", crewId: "a", pick: "allen", at: 3 },
+      { id: "p4", week: 1, boutId: won.id, storeId: "plano", crewId: "b", pick: "allen", at: 4 },
+      { id: "p5", week: 1, boutId: won.id, storeId: "plano", crewId: "c", pick: "allen", at: 5 },
+    ],
+  });
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "decal", "optics"), true);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "topper", "horns"), true);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "topper", "flagpole"), false);
+  store.setState({
+    picks: [
+      ...store.getState().picks,
+      { id: "p6", week: 1, boutId: won.id, storeId: "plano", crewId: "d", pick: "allen", at: 6 },
+    ],
+  });
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "topper", "flagpole"), true);
+  store.getState().setStyle("plano", { topper: "flagpole", smoke: "black", banner: "PIT NIGHT" });
+  const dressed = store.getState().bots.find((row) => row.storeId === "plano")!;
+  assert.equal(dressed.style?.topper, "none");
+  assert.equal(dressed.style?.smoke ?? "", "");
+  store.setState({ bouts: [bout("banner-win", 1, 0, "plano", "allen", "ko"), won, lost, open] });
+  store.getState().setStyle("plano", { topper: "flagpole", smoke: "black", banner: "PIT NIGHT" });
+  const unlocked = store.getState().bots.find((row) => row.storeId === "plano")!;
+  assert.equal(unlocked.style?.topper, "flagpole");
+  assert.equal(unlocked.style?.smoke, "black");
+  assert.equal(unlocked.style?.banner, "PIT NIGHT");
+  assert.equal(planoCoins(store), before);
+});
+
+test("the pit banner stays locked until a win and rejects profanity and trademarks", () => {
+  const store = state();
+  const before = planoCoins(store);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "banner", ""), true);
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "banner", "PIT NIGHT"), false);
+  store.getState().setStyle("plano", { banner: "PIT NIGHT" });
+  assert.equal(store.getState().bots.find((bot) => bot.storeId === "plano")!.style?.banner ?? "", "");
+  store.setState({ bouts: [bout("scrim", 1, 0, "plano", "allen", "scrimmage")] });
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "banner", "PIT NIGHT"), false);
+  store.setState({ bouts: [bout("bye", 1, 0, "plano", "allen", "bye")] });
+  assert.equal(cosmeticUnlocked(store.getState(), "plano", "banner", "PIT NIGHT"), true);
+  store.getState().setStyle("plano", { banner: "PIT NIGHT" });
+  assert.equal(store.getState().bots.find((bot) => bot.storeId === "plano")!.style?.banner, "PIT NIGHT");
+  for (const bad of ["fuck", "f.u.c.k", "Snap-on", "1234567890123"]) {
+    assert.equal(bannerVerdict(bad).ok, false);
+    store.getState().setStyle("plano", { banner: bad });
+    assert.equal(store.getState().bots.find((bot) => bot.storeId === "plano")!.style?.banner, "PIT NIGHT");
+  }
+  const look = {
+    paint: "amber",
+    look: "plain" as const,
+    number: "1",
+    style: { ...styleOf(store.getState().bots.find((bot) => bot.storeId === "plano")), banner: "fuck" },
+  };
+  assert.equal(checkedCosmeticLoadout(store.getState(), "plano", look)?.style.banner, "");
+  assert.equal(commandArgs.proposeCosmetic.safeParse(["plano", { ...look, style: { ...look.style, banner: "x".repeat(13) } }]).success, false);
+  assert.equal(planoCoins(store), before);});

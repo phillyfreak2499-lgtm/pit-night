@@ -11,12 +11,14 @@ async function writeOnce(
   key: string,
   model: string,
   generate: () => Promise<string>,
+  options?: { preclaimed?: boolean },
 ): Promise<CopyResult> {
   const [{ getSql }, copyStore] = await Promise.all([import("@/lib/db"), import("./claude-store")]);
   const sql = await getSql();
   // Only a new key, a stale claim or a failed one past its wait is claimed; a ready row
   // is never rewritten, so a posted card keeps the copy it first got.
-  if (!(await copyStore.claimCopy(sql, kind, key, model))) {
+  // A live beat reserved under the daily cap is already ours (`preclaimed`).
+  if (!options?.preclaimed && !(await copyStore.claimCopy(sql, kind, key, model))) {
     const row = await copyStore.readCopy(sql, kind, key);
     if (row?.status === "ready" && row.body) return { status: "ready", body: row.body };
     if (row?.status === "pending") return { status: "pending" };
@@ -34,7 +36,7 @@ async function writeOnce(
 
 /** Ask once; if numbers slip in that the facts do not hold, ask once more, then give up rather than post them. */
 async function guardedCopy(
-  feature: "bout" | "recap" | "hype",
+  feature: "bout" | "recap" | "hype" | "live",
   system: string,
   prompt: string,
   maxTokens: number,
@@ -86,6 +88,94 @@ export const getClaudeCopy = createServerFn({ method: "POST" })
     return writeOnce(subject.kind, subject.key, FEATURE_MODEL[subject.kind], () =>
       guardedCopy(subject.kind, system, prompt, maxTokens, subject.facts),
     );
+  });
+
+export type LiveCallResult =
+  | { status: "ready"; body: string; label: string; beatId: string; last: boolean }
+  | { status: "pending" }
+  | { status: "unavailable" };
+
+/**
+ * One live booth line for a resolved bout, revealed in order.
+ * The first viewer to reach a beat claims it. A ready line is never rewritten.
+ * Later beats wait until the one before them is stored. Past the daily cap,
+ * or when Claude is down, the result is empty and the page keeps the ringside call.
+ */
+export const getLiveCall = createServerFn({ method: "POST" })
+  .validator(
+    z.object({ id: z.string().min(1).max(160), index: z.number().int().min(0).max(12) }).strict(),
+  )
+  .handler(async ({ data: input }): Promise<LiveCallResult> => {
+    const [{ loadSeason }, copy, copyStore, { FEATURE_MODEL }, { getSql }] = await Promise.all([
+      import("./authoritative"),
+      import("./claude-copy"),
+      import("./claude-store"),
+      import("./claude.server"),
+      import("@/lib/db"),
+    ]);
+    const { data } = await loadSeason();
+    const beats = copy.liveSubjects(data, input.id);
+    if (!beats?.length) return { status: "unavailable" };
+    const beat = beats[input.index];
+    if (!beat) return { status: "unavailable" };
+    const sql = await getSql();
+    const previous =
+      input.index === 0 ? undefined : await copyStore.readCopy(sql, "live", beats[input.index - 1]!.key);
+    const existing = await copyStore.readCopy(sql, "live", beat.key);
+    const gate = copy.liveRequest(
+      input.index,
+      beats.length,
+      previous?.status === "ready",
+      Boolean(existing),
+      0,
+    );
+    if (gate === "unavailable") return { status: "unavailable" };
+    if (gate === "wait") return { status: "pending" };
+    // Reserve the row before trusting the count, matching the rulebook cap.
+    // The Chicago-day count uses created_at so the kind/created_at index applies.
+    let preclaimed = false;
+    if (!existing) {
+      const slot = await copyStore.reserveCopy(
+        sql,
+        "live",
+        beat.key,
+        FEATURE_MODEL.live,
+        copy.LIVE_LIMIT_PER_DAY,
+        centralDate(),
+      );
+      if (slot === "capped") return { status: "unavailable" };
+      if (slot === "claimed") preclaimed = true;
+      else {
+        const row = await copyStore.readCopy(sql, "live", beat.key);
+        if (row?.status === "ready" && row.body)
+          return {
+            status: "ready",
+            body: row.body,
+            label: beat.label,
+            beatId: beat.beatId,
+            last: input.index === beats.length - 1,
+          };
+        if (row?.status === "pending") return { status: "pending" };
+      }
+    }
+    const { system, prompt, maxTokens } = copy.promptFor(beat);
+    const written = await writeOnce(
+      "live",
+      beat.key,
+      FEATURE_MODEL.live,
+      () => guardedCopy("live", system, prompt, maxTokens, beat.facts),
+      { preclaimed },
+    );
+    if (written.status === "ready")
+      return {
+        status: "ready",
+        body: written.body,
+        label: beat.label,
+        beatId: beat.beatId,
+        last: input.index === beats.length - 1,
+      };
+    if (written.status === "pending") return { status: "pending" };
+    return { status: "unavailable" };
   });
 
 function centralDate(now = new Date()) {

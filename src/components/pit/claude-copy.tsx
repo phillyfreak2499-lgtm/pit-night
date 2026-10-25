@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { askRulebook, claudeHealth, getClaudeCopy, rulebookQuota, type CopyResult } from "@/lib/pit/claude-server";
+import {
+  askRulebook,
+  claudeHealth,
+  getClaudeCopy,
+  getLiveCall,
+  rulebookQuota,
+  type CopyResult,
+} from "@/lib/pit/claude-server";
 import { usePit } from "@/lib/pit/store";
 import { Btn, Panel, SectionLabel } from "./bits";
 
@@ -49,6 +56,75 @@ export function ClaudeCopy({
           </p>
         ))
       )}
+    </div>
+  );
+}
+
+const LIVE_BEAT_GAP_MS = 1200;
+
+/**
+ * Play-by-play revealed in order under the ringside call.
+ * Each beat is fetched only after the previous one is ready, so a stored card
+ * still reads as a sequence and a dark booth adds nothing to the page.
+ */
+export function LiveCall({ boutId }: { boutId: string }) {
+  return <LiveCallFeed key={boutId} boutId={boutId} />;
+}
+
+function LiveCallFeed({ boutId }: { boutId: string }) {
+  const [lines, setLines] = useState<{ beatId: string; label: string; body: string }[]>([]);
+  useEffect(() => {
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let index = 0;
+    let tries = 0;
+    const load = () => {
+      getLiveCall({ data: { id: boutId, index } })
+        .then((res) => {
+          if (!alive) return;
+          if (res.status === "pending") {
+            if (tries++ < 8) timer = setTimeout(load, 5000);
+            return;
+          }
+          if (res.status !== "ready") return;
+          tries = 0;
+          setLines((prev) =>
+            prev.some((line) => line.beatId === res.beatId)
+              ? prev
+              : [...prev, { beatId: res.beatId, label: res.label, body: res.body }],
+          );
+          if (!res.last) {
+            index += 1;
+            timer = setTimeout(load, LIVE_BEAT_GAP_MS);
+          }
+        })
+        .catch(() => {
+          // Claude, the cap, or the network: the bout page stands without this feed.
+        });
+    };
+    load();
+    return () => {
+      alive = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, [boutId]);
+
+  if (!lines.length) return null;
+  return (
+    <div className="border-l-2 border-amber pl-3" data-testid="claude-live">
+      <p className="text-[11px] tracking-[0.2em] text-amber uppercase">Live call</p>
+      <ol className="mt-1 flex flex-col gap-2" aria-live="polite">
+        {lines.map((line) => (
+          <li key={line.beatId}>
+            <p className="text-[10px] tracking-[0.16em] text-muted uppercase">{line.label}</p>
+            {line.body.split(/\n\s*\n/).map((para, i) => (
+              <p key={i} className="mt-0.5 text-sm leading-relaxed whitespace-pre-line">
+                {para}
+              </p>
+            ))}
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }

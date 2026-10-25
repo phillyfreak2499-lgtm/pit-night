@@ -10,10 +10,12 @@ import {
   OG_PENDING_MAX_AGE_MS,
   OG_PENDING_REL_PATH,
   computeBrandWarnings,
+  cosmeticTrademarkWarnings,
   ogPendingActive,
   parseBrandCheckArgs,
   siteDeclaresOgTypeGame,
 } from "./brand-check.mjs";
+import { findTrademarkHits } from "./copy-guard.mjs";
 
 const TEMPLATE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SCRIPT = join(TEMPLATE_ROOT, "scripts/brand-check.mjs");
@@ -51,6 +53,22 @@ function makeWorkspace({
   }
   return root;
 }
+
+test("sponsor copy rejects real trademarks and skips a workspace with no pit catalogs", () => {
+  assert.deepEqual(findTrademarkHits("Snap-on and Red Bull"), ["snap-on", "snapon", "red bull", "redbull"]);
+  assert.deepEqual(findTrademarkHits("mobile Arch Labs Fort Worth"), []);
+  assert.deepEqual(findTrademarkHits("Ghostbusters"), ["ghostbusters"]);
+  assert.deepEqual(findTrademarkHits("Ecto-1"), ["ecto"]);
+  assert.deepEqual(cosmeticTrademarkWarnings(TEMPLATE_ROOT), []);
+  const empty = makeWorkspace({ siteJson: UTILITY_SITE });
+  assert.deepEqual(cosmeticTrademarkWarnings(empty), []);
+  mkdirSync(join(empty, "src/lib/pit"), { recursive: true });
+  writeFileSync(join(empty, "src/lib/pit/catalog.ts"), "export const label = \"Snap-on\";\n");
+  const warnings = cosmeticTrademarkWarnings(empty);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /snap-on/);
+  assert.match(warnings[0], /catalog\.ts/);
+});
 
 test("non-canvas app with no custom card gets a soft BRAND NOTE (utility exception)", () => {
   const root = makeWorkspace({ siteJson: UTILITY_SITE });

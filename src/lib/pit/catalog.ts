@@ -1,4 +1,5 @@
-import type { BotBody, BotDecal, BotFinish, BotStyle, BotTopper, ClassId, KeyName, Slot, StatKey, Tier } from "./types";
+import { bannerVerdict } from "../../../scripts/copy-guard.mjs";
+import { STICKER_ART, type BotBody, type BotDecal, type BotFinish, type BotLeds, type BotMask, type BotSmoke, type BotStyle, type BotTopper, type BotWeaponSkin, type ClassId, type KeyName, type Slot, type StatKey, type StickerArt, type Tier } from "./types";
 
 export const SCRAP_CAP = 18;
 export const VERSION = 6;
@@ -73,9 +74,10 @@ export const FINISHES: { id: BotFinish; label: string; note: string }[] = [
   { id: "iridescent", label: "Iridescent", note: "Color shifts under the lights." },
   { id: "worn", label: "Battle-worn", note: "Scratches and rust." },
   { id: "gold", label: "Champion Gold", note: "Reserved for the Waterman Champion." },
+  { id: "holographic", label: "Holographic", note: "Full Tune-Ups in 3 weeks, or 14 Bolts." },
 ];
 
-export const DECALS: { id: BotDecal; label: string }[] = [
+const BASE_DECALS: { id: StickerArt; label: string }[] = [
   { id: "none", label: "None" },
   { id: "hazard", label: "Hazard stripes" },
   { id: "arch", label: "Arch badge" },
@@ -88,7 +90,47 @@ export const DECALS: { id: BotDecal; label: string }[] = [
   { id: "circuit", label: "Circuit board" },
   { id: "splash", label: "Paint splash" },
   { id: "champion", label: "Champion crest" },
+  { id: "pumpkin", label: "Pumpkin sticker" },
+  { id: "roundel", label: "Number roundel" },
+  { id: "gear", label: "Gear" },
+  { id: "wrench", label: "Wrench" },
+  { id: "optics", label: "Robot eyes" },
+  { id: "skull", label: "Cartoon skull" },
+  { id: "bullseye", label: "Bullseye" },
+  { id: "plate", label: "Armor plate" },
+  { id: "gearhead", label: "Gearhead Garage" },
+  { id: "brace", label: "Bolt & Brace Co." },
+  { id: "fuel", label: "Pit Fuel" },
+  { id: "tonic", label: "Torque Tonic" },
+  { id: "archlabs", label: "Arch Labs" },
+  { id: "turbo", label: "Ticket Turbo" },
 ];
+
+export const MASKS: { id: BotMask; label: string }[] = [
+  { id: "none", label: "No mask" },
+  { id: "lantern", label: "Lantern Mask" },
+  { id: "hockey", label: "Hockey Mask" },
+];
+
+export const WEAPON_SKINS: { id: BotWeaponSkin; label: string }[] = [
+  { id: "none", label: "No weapon skin" },
+  { id: "hockey-machete", label: "Hockey Mask Machete" },
+];
+
+export const DECALS: { id: BotDecal; label: string }[] = [
+  ...BASE_DECALS,
+  ...BASE_DECALS.filter((row) => row.id !== "none").map((row) => ({
+    id: `${row.id}-foil` as BotDecal,
+    label: `${row.label} · foil`,
+  })),
+];
+
+/** Strip a foil suffix. Unknown ids come back unchanged and not foil. */
+export function decalArt(id: string): { art: string; foil: boolean } {
+  const foil = id.endsWith("-foil");
+  const art = foil ? id.slice(0, -"-foil".length) : id;
+  return { art: (STICKER_ART as readonly string[]).includes(art) ? art : id, foil: foil && (STICKER_ART as readonly string[]).includes(art) };
+}
 
 export const TRIM: Record<string, string> = {
   steel: "#b8b2a6",
@@ -110,7 +152,38 @@ export const EYES: Record<string, string> = {
   purple: "#b46bff",
 };
 
-export const DEFAULT_STYLE: BotStyle = { finish: "factory", decal: "none", trim: "steel", eye: "green", flag: false, topper: "none" };
+/** LED strip colors, one per weekly metric. */
+export const LEDS: Record<Exclude<BotLeds, "none">, { label: string; hex: string }> = {
+  nsnu: { label: "NSNU gold", hex: "#ffd23a" },
+  conv: { label: "Conv green", hex: "#3dff8a" },
+  demoRate: { label: "Demo blue", hex: "#3fb4ff" },
+  demoClose: { label: "Close ember", hex: "#ff6a2a" },
+  arch: { label: "Arch violet", hex: "#c46bff" },
+  ticket: { label: "Ticket pink", hex: "#ff4fa3" },
+};
+
+/** Smoke colors. Locker paints plus knockout black. rgb feeds the particle renderer. */
+export const SMOKE: Record<Exclude<BotSmoke, "">, { label: string; hex: string; rgb: string }> = {
+  neon: { label: "Neon smoke", hex: "#39ff6a", rgb: "57,255,106" },
+  candy: { label: "Candy smoke", hex: "#e3123f", rgb: "227,18,63" },
+  ice: { label: "Glacier smoke", hex: "#bfe8ff", rgb: "191,232,255" },
+  royal: { label: "Royal smoke", hex: "#6a2bd9", rgb: "106,43,217" },
+  black: { label: "Black smoke", hex: "#2a2c31", rgb: "42,44,49" },
+};
+
+export const DEFAULT_STYLE: BotStyle = {
+  finish: "factory",
+  decal: "none",
+  trim: "steel",
+  eye: "green",
+  flag: false,
+  topper: "none",
+  leds: "none",
+  smoke: "",
+  banner: "",
+  mask: "none",
+  weaponSkin: "none",
+};
 
 export function defaultBody(classId: ClassId): BotBody {
   return classId === "tank" ? "keystone" : classId === "specialist" ? "windlass" : "shrike";
@@ -141,6 +214,9 @@ export const TOPPERS: { id: BotTopper; label: string }[] = [
   { id: "horns", label: "Pit horns" },
   { id: "mohawk", label: "Steel mohawk" },
   { id: "crown", label: "Champion crown" },
+  { id: "beacon", label: "Beacon" },
+  { id: "dish", label: "Satellite dish" },
+  { id: "flagpole", label: "Flag pole" },
 ];
 
 export function bodyStyle(id: string | undefined) {
@@ -153,7 +229,12 @@ export function styleOf(source: ({ style?: Partial<BotStyle>; classId?: ClassId 
   const cls = classId ?? source?.classId ?? "striker";
   const style = { ...DEFAULT_STYLE, body: source?.style?.body ?? defaultBody(cls), ...(source?.style ?? {}) };
   const stickers = { left: "none" as const, right: "none" as const, hood: style.decal, rear: "none" as const, ...style.stickers };
-  return { ...style, decal: stickers.hood, stickers };
+  const leds = style.leds && style.leds in LEDS ? style.leds : "none";
+  const smoke = style.smoke && style.smoke in SMOKE ? style.smoke : "";
+  const rawBanner = typeof style.banner === "string" ? style.banner : "";
+  const judged = bannerVerdict(rawBanner);
+  const banner = judged.ok ? judged.text : "";
+  return { ...style, decal: stickers.hood, stickers, leds, smoke, banner };
 }
 
 export type Part = {
@@ -171,8 +252,6 @@ export type Part = {
   /** Coins from this part's own jar. */
   price: number;
 };
-
-const ZERO = { power: 0, speed: 0, armor: 0, heat: 0 };
 
 function nudge(
   power = 0,
@@ -195,7 +274,11 @@ type Family = {
   nudge: Part["nudge"];
 };
 
-/** Coin prices. A part can earn at most 9 before the title lock (three green weeks). */
+/**
+ * Coin prices. Earnings are separate from the sticker price: a green week pays
+ * 3 into that metric's jar, and each green after the first adds one pair-bonus
+ * coin to that jar, in scorecard order. Six greens pay 23.
+ */
 export const TIER_PRICE: Record<Tier, number> = {
   stock: 0,
   sport: 3,
@@ -790,6 +873,102 @@ const FAMILIES: Family[] = [
       pro: "Finds the gap in the armor and keeps hitting it.",
       super: "Never lets go. Never backs off. Costs armor to run.",
       championship: "Title hunter. Nothing walks out of the cage clean.",
+    },
+  },
+  {
+    slot: "weapon",
+    family: "chainsaw",
+    stat: "demoClose",
+    key: "weapon",
+    tags: ["speed", "saw", "halloween"],
+    nudge: nudge(4, 1, -2, 0),
+    names: { super: "Texas Chainsaw" },
+    jobs: {
+      super: "A parade saw with a loud first bite. It bogs down when the other bot is wearing more plate. On the peg November 1 through Championship Saturday. Eight weapon coins.",
+    },
+  },
+  {
+    slot: "weapon",
+    family: "slasher",
+    stat: "demoClose",
+    key: "weapon",
+    tags: ["speed", "halloween"],
+    nudge: nudge(2, 3, -2, 0),
+    names: { super: "Slasher Blade" },
+    jobs: {
+      super: "A long kitchen blade. The lunge lands when you are already faster. If you are not, it is just a late swing. November 1 through Championship Saturday. Eight weapon coins.",
+    },
+  },
+  {
+    slot: "weapon",
+    family: "ghost",
+    stat: "demoClose",
+    key: "weapon",
+    tags: ["heat", "halloween"],
+    nudge: nudge(2, 2, -3, 2),
+    names: { super: "Ghost Blade" },
+    jobs: {
+      super: "A pale blade that slips partway through plate and leaves a light trail. Without Heat it fades. November 1 through Championship Saturday. Eight weapon coins.",
+    },
+  },
+  {
+    slot: "weapon",
+    family: "launcher",
+    stat: "demoClose",
+    key: "weapon",
+    tags: ["smash", "halloween"],
+    nudge: nudge(3, -2, 0, 1),
+    names: { super: "Pumpkin Launcher" },
+    jobs: {
+      super: "Lobs a pumpkin into the middle exchange. The first swing is the wind-up. November 1 through Championship Saturday. Eight weapon coins.",
+    },
+  },
+  {
+    slot: "weapon",
+    family: "bones",
+    stat: "demoClose",
+    key: "weapon",
+    tags: ["control", "claw", "heat", "halloween"],
+    nudge: nudge(0, 0, -1, 4),
+    names: { super: "Skeleton Claws" },
+    jobs: {
+      super: "A rattling grapple. It can still walk someone to the edge, and it likes strikers more than tanks. Less Heat than Lockjaw. November 1 through Championship Saturday. Eight weapon coins.",
+    },
+  },
+  {
+    slot: "weapon",
+    family: "broom",
+    stat: "demoClose",
+    key: "weapon",
+    tags: ["heat", "halloween"],
+    nudge: nudge(1, 2, 0, 2),
+    names: { super: "Witch's Broom" },
+    jobs: {
+      super: "A broom that plants like a staff when your Heat is up. Until then it is a broom. November 1 through Championship Saturday. Eight weapon coins.",
+    },
+  },
+  {
+    slot: "chassis",
+    family: "pumpkin",
+    stat: "nsnu",
+    key: "chassis",
+    tags: ["armor", "halloween"],
+    nudge: nudge(2, -1, 4, -2),
+    names: { super: "Pumpkin Chassis" },
+    jobs: {
+      super: "A round festive shell for any class. It shrugs the first bite and swings a little softer all night. It does not change your class. November 1 through Championship Saturday. Eight chassis coins.",
+    },
+  },
+  {
+    slot: "drive",
+    family: "ghostchaser",
+    stat: "demoRate",
+    key: "drive",
+    tags: ["speed", "halloween"],
+    nudge: nudge(0, 3, -2, 1),
+    names: { super: "Ghost Chaser" },
+    jobs: {
+      super: "A light-bar chase wagon with round lamps. It closes on a slower bot and gives up plate to do it. November 1 through Championship Saturday. Eight drive coins.",
     },
   },
 ];

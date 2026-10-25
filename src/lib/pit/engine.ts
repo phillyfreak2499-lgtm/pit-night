@@ -10,8 +10,9 @@ import {
   metricFor,
   type Part,
 } from "./catalog";
+import { isPremiumHalloweenPart, PREMIUM_CLOSED_REASON, premiumHalloweenOpen, showEffect } from "./halloween";
 import { BOLTS, TUNE_UP_BONUS } from "./training";
-import { boltsOf, tunedUp } from "./week";
+import { tunedUp } from "./week";
 import type {
   Bot,
   Bout,
@@ -85,7 +86,9 @@ export function kickoffRank(data: Pick<PitData, "stores" | "kickoff">) {
     const filled = METRICS.filter((m) => g[m.stat]).length;
     const full = Object.fromEntries(METRICS.map((m) => [m.stat, g[m.stat] ?? "red"])) as GradeSet;
     const math = coinMath(full);
-    return { store, filled, coins: math.total, bySlot: math.bySlot, greens: math.greens, nsnu: ORDER[full.nsnu] };
+    // bySlot here is the jar deposit, pair bonus included, so kickoff can
+    // pay and re-pay the difference from one number per part.
+    return { store, filled, coins: math.total, bySlot: coinsByJar(full), greens: math.greens, nsnu: ORDER[full.nsnu] };
   });
   rows.sort((a, b) => b.coins - a.coins || b.greens - a.greens || b.nsnu - a.nsnu || a.store.seed - b.store.seed);
   return rows.map((row, i) => ({ ...row, seed: i + 1 }));
@@ -103,8 +106,12 @@ export function cardValue(card: StoreCard, stat: StatKey): number {
   return card[stat];
 }
 
-/** What a card pays: coins per part, by grade. */
-export function coinMath(grades: GradeSet): { bySlot: Record<KeyName, number>; total: number; greens: number } {
+/**
+ * What a card pays. `bySlot` is only the per-metric grade coins (green 3,
+ * blue 2, orange 1, red 0). `bonus` is one extra coin for every green after
+ * the first, and `total` includes it. Six greens pay 23.
+ */
+export function coinMath(grades: GradeSet): { bySlot: Record<KeyName, number>; total: number; greens: number; bonus: number } {
   const bySlot = { chassis: 0, drive: 0, weapon: 0, armor: 0, utility: 0, brain: 0 } as Record<KeyName, number>;
   let total = 0;
   let greens = 0;
@@ -114,7 +121,29 @@ export function coinMath(grades: GradeSet): { bySlot: Record<KeyName, number>; t
     total += GRADE_COINS[g];
     if (g === "green") greens += 1;
   }
-  return { bySlot, total, greens };
+  const bonus = Math.max(0, greens - 1);
+  return { bySlot, total: total + bonus, greens, bonus };
+}
+
+/**
+ * Coins that actually land in the jars. Per-metric amounts stay as graded.
+ * The pair bonus has no metric of its own, so each green after the first
+ * (scorecard order) carries one extra coin in that part's jar. The sum
+ * equals `coinMath(grades).total`.
+ */
+export function coinsByJar(grades: GradeSet): Record<KeyName, number> {
+  const math = coinMath(grades);
+  const jars = { ...math.bySlot };
+  let firstGreen = true;
+  for (const m of METRICS) {
+    if (grades[m.stat] !== "green") continue;
+    if (firstGreen) {
+      firstGreen = false;
+      continue;
+    }
+    jars[m.slot] += 1;
+  }
+  return jars;
 }
 
 export function weekQuality(grades: GradeSet): number {
@@ -388,19 +417,22 @@ export function resolvePart(bot: Bot, slot: Slot, loadout: Loadout): { part: Par
 function synergy(classId: ClassId, weapon: Part | null, drive: Part | null, utility: Part | null): number {
   let s = 0;
   const fam = weapon?.family;
-  const speedWep = fam === "saw" || fam === "drum" || fam === "disc";
+  const claw = fam === "claw" || fam === "bones";
+  const speedWep = fam === "saw" || fam === "drum" || fam === "disc" || fam === "chainsaw" || fam === "slasher";
   const smash = fam === "hammer" || fam === "wedge";
   if (classId === "striker" && speedWep) s += fam === "disc" ? 0.16 : 0.14;
   if (classId === "striker" && smash) s -= 0.16;
-  if (classId === "striker" && fam === "claw") s -= 0.06;
+  if (classId === "striker" && claw) s -= 0.06;
   if (classId === "tank" && speedWep) s -= fam === "disc" ? 0.4 : 0.28;
   if (classId === "tank" && smash) s += 0.14;
-  if (classId === "tank" && fam === "claw") s -= 0.08;
-  if (classId === "specialist" && fam === "claw") s += 0.18;
+  if (classId === "tank" && claw) s -= 0.08;
+  if (classId === "specialist" && claw) s += 0.18;
   if (classId === "specialist" && speedWep) s -= 0.14;
   if (classId === "specialist" && fam === "wedge") s -= 0.06;
   if (classId === "tank" && drive?.family === "treads") s += 0.05;
   if (classId === "striker" && (drive?.family === "mag" || drive?.family === "flip")) s += 0.04;
+  if (classId === "striker" && drive?.family === "ghostchaser") s += 0.03;
+  if (classId === "tank" && drive?.family === "ghostchaser") s -= 0.04;
   if (classId === "specialist" && drive?.family === "omni") s += 0.05;
   if (utility?.family === "burn" && classId === "striker") s += 0.04;
   if (utility?.family === "weld") s += 0.03;
@@ -564,6 +596,14 @@ const SPY_DEPTH: Record<Tier, number> = { stock: 0, sport: 1, pro: 2, super: 3, 
 
 const FAMILY_WORD: Record<string, string> = {
   saw: "a saw",
+  chainsaw: "a Texas chainsaw",
+  slasher: "a slasher blade",
+  ghost: "a ghost blade",
+  launcher: "a pumpkin launcher",
+  bones: "skeleton claws",
+  broom: "a witch's broom",
+  pumpkin: "a pumpkin chassis",
+  ghostchaser: "a ghost chaser",
   drum: "a drum",
   wedge: "a wedge",
   hammer: "a hammer",
@@ -598,6 +638,14 @@ function weaponTell(classId: ClassId, family: string): string | null {
   if (classId === "striker" && family === "claw") return "A claw on a striker. Heat is not their week.";
   if (classId === "specialist" && speed) return "A speed weapon on a specialist. The claw is the point.";
   if (classId === "specialist" && family === "wedge") return "A wedge on a specialist. They are not a tank.";
+  if (family === "chainsaw") return "A Texas chainsaw. Loud first bite, and it bogs in thick plate.";
+  if (family === "slasher") return "Slasher Blade. It loves a bot that is already faster.";
+  if (family === "ghost") return "Ghost Blade. It slips through plate when Heat is real, and it leaves a trail.";
+  if (family === "launcher") return "Pumpkin Launcher. The middle exchange is the one that lands.";
+  if (family === "bones") return "Skeleton Claws. A cheerful grapple, happier against a striker than a tank.";
+  if (family === "broom") return "Witch's Broom. A staff when Heat is up, a broom until then.";
+  if (family === "ghostchaser") return "Ghost Chaser. It closes on a slower bot and gives up plate.";
+  if (family === "pumpkin") return "Pumpkin Chassis. A round shell that shrugs the first bite and swings softer.";
   return null;
 }
 
@@ -685,7 +733,6 @@ function snapshot(data: PitData, storeId: string): FighterSnap {
   const drive = resolvePart(bot, "drive", locked);
   const armor = resolvePart(bot, "armor", locked);
   const chassis = resolvePart(bot, "chassis", locked);
-  const utility = resolvePart(bot, "utility", locked);
   return {
     id: storeId,
     name: store.name,
@@ -701,6 +748,8 @@ function snapshot(data: PitData, storeId: string): FighterSnap {
     weaponFamily: weapon.part?.family ?? "none",
     armorFamily: armor.part?.family,
     driveFamily: drive.part?.family,
+    chassisFamily: chassis.part?.family,
+    shows: bot.shows,
     weaponName: partById(locked.weapon)?.name ?? "Bare shaft",
     driveName: partById(locked.drive)?.name ?? "—",
     armorName: partById(locked.armor)?.name ?? "—",
@@ -783,6 +832,8 @@ function strikeDamage(attacker: FighterSnap, defender: FighterSnap, index: numbe
     tags.push("wrong-iron");
   }
 
+  dmg = halloweenStrikeAdjust(attacker, defender, index, dmg, tags);
+
   const variance = 0.92 + rng() * 0.16;
   dmg = clamp(dmg * variance, 8, 58);
 
@@ -790,7 +841,82 @@ function strikeDamage(attacker: FighterSnap, defender: FighterSnap, index: numbe
   return { damage: Math.round(dmg), tags, call };
 }
 
+/**
+ * Halloween parts share the normal damage number. Each one adds a single
+ * trade, then the usual variance and clamp still apply. Fog and blacklight
+ * are not read here.
+ */
+export function halloweenStrikeAdjust(attacker: FighterSnap, defender: FighterSnap, index: number, dmg: number, tags: string[]) {
+  const w = attacker.weaponFamily;
+  if (w === "chainsaw") {
+    if (index === 0) {
+      dmg += 4;
+      tags.push("chainsaw");
+    }
+    if (attacker.stats.armor < defender.stats.armor) {
+      dmg *= 0.85;
+      tags.push("bog");
+    }
+  } else if (w === "slasher") {
+    if (attacker.stats.speed > defender.stats.speed) {
+      if (index === 0) {
+        dmg += 6;
+        tags.push("lunge");
+      }
+    } else {
+      dmg *= 0.8;
+      tags.push("late-slash");
+    }
+  } else if (w === "ghost") {
+    dmg += defender.stats.armor * 0.38 * 0.3;
+    tags.push("phase");
+    if (attacker.stats.heat < 10) {
+      dmg *= 0.72;
+      tags.push("fade");
+    }
+  } else if (w === "launcher") {
+    if (index === 0) dmg *= 0.72;
+    if (index === 1) {
+      dmg += 8;
+      tags.push("lob");
+    }
+  } else if (w === "bones") {
+    if (defender.classId === "tank") dmg *= 0.85;
+    else if (defender.classId === "striker") {
+      dmg += 2;
+      tags.push("rattle");
+    }
+  } else if (w === "broom") {
+    if (attacker.stats.heat >= defender.stats.heat) {
+      dmg += 3;
+      tags.push("staff");
+    } else {
+      dmg -= 4;
+      tags.push("broom");
+    }
+  }
+  if (attacker.chassisFamily === "pumpkin") dmg *= 0.93;
+  if (defender.chassisFamily === "pumpkin" && index === 0) dmg *= 0.94;
+  if (attacker.driveFamily === "ghostchaser" && index === 0 && attacker.stats.speed > defender.stats.speed) {
+    dmg += 3;
+    tags.push("chase");
+  }
+  if (defender.driveFamily === "ghostchaser") dmg *= 1.06;
+  return dmg;
+}
+
 function callLine(attacker: FighterSnap, defender: FighterSnap, tags: string[], index: number): string {
+  if (tags.includes("bog")) return `${attacker.botName} revs the Texas Chainsaw. The plate is thick, and the saw keeps singing.`;
+  if (tags.includes("chainsaw")) return `${attacker.botName} opens with the Texas Chainsaw. The first bite is the parade.`;
+  if (tags.includes("lunge")) return `${attacker.botName} lunges with the Slasher Blade and finds a clean line.`;
+  if (tags.includes("late-slash")) return `${attacker.botName} brings the Slasher Blade around late. A faster week would love this one.`;
+  if (tags.includes("fade")) return `The Ghost Blade thins out. More Heat and ${attacker.botName} would light the lane.`;
+  if (tags.includes("phase")) return `${attacker.botName} lets the Ghost Blade slip through the plate, trail and all.`;
+  if (tags.includes("lob")) return `${attacker.botName} lofts a pumpkin into the middle of the cage. Festive, and it counts.`;
+  if (tags.includes("rattle")) return `Skeleton Claws chatter. ${attacker.botName} keeps the grab cheerful.`;
+  if (tags.includes("staff")) return `${attacker.botName} plants the Witch's Broom like a staff and conducts the exchange.`;
+  if (tags.includes("broom")) return `${attacker.botName} is still sweeping. The broom becomes a staff when the Heat catches up.`;
+  if (tags.includes("chase")) return `Ghost Chaser closes the gap. ${attacker.botName} arrives with the lamps on.`;
   if (tags.includes("ceiling-fan")) {
     return `${attacker.botName} spins the disc. On that chassis it is a ceiling fan. ${defender.botName} walks through it.`;
   }
@@ -950,7 +1076,7 @@ export function simulateDuel(data: PitData, idA: string, idB: string, seed: stri
       if (hp[loserSnap.id] === 0) method = "ko";
     }
     if (method === "decision") {
-      const control = winnerSnap.weaponFamily === "wedge" || winnerSnap.weaponFamily === "claw";
+      const control = winnerSnap.weaponFamily === "wedge" || winnerSnap.weaponFamily === "claw" || winnerSnap.weaponFamily === "bones";
       if (control && hp[loserSnap.id]! < 36 && winnerSnap.stats.power > loserSnap.stats.armor * 0.7) {
         method = "dump";
         hp[loserSnap.id] = Math.max(0, hp[loserSnap.id]! - 8);
@@ -1210,27 +1336,6 @@ export function simulateMelee(data: PitData, ids: string[], seed: string): Fight
   };
 }
 
-function priorPairs(data: PitData): Set<string> {
-  const set = new Set<string>();
-  for (const bout of data.bouts) {
-    if (bout.kind === "bye" || bout.kind === "melee") continue;
-    const ids = [...bout.teamA, ...bout.teamB];
-    for (let i = 0; i < ids.length; i++) {
-      for (let j = i + 1; j < ids.length; j++) {
-        const [a, b] = [ids[i]!, ids[j]!].sort();
-        if (bout.teamA.includes(a!) && bout.teamA.includes(b!)) continue;
-        if (bout.teamB.includes(a!) && bout.teamB.includes(b!)) continue;
-        set.add(`${a}|${b}`);
-      }
-    }
-  }
-  return set;
-}
-
-function pairKey(a: string, b: string) {
-  return [a, b].sort().join("|");
-}
-
 function seededWheel(stores: { id: string; seed: number }[], week: number): { bye: string | null; pairs: [string, string][] } {
   const ring = [...stores].sort((a, b) => a.seed - b.seed).map((store) => store.id);
   const n = ring.length;
@@ -1407,9 +1512,9 @@ function drillCard(row: (typeof DRILL_ROWS)[number], week: number): StoreCard {
 
 function scrimmageNote(player: FighterSnap, drill: FighterSnap, won: boolean): string {
   const wrong =
-    (player.classId === "tank" && (player.weaponFamily === "disc" || player.weaponFamily === "saw" || player.weaponFamily === "drum")) ||
+    (player.classId === "tank" && (player.weaponFamily === "disc" || player.weaponFamily === "saw" || player.weaponFamily === "drum" || player.weaponFamily === "chainsaw" || player.weaponFamily === "slasher")) ||
     (player.classId === "striker" && (player.weaponFamily === "wedge" || player.weaponFamily === "hammer")) ||
-    (player.classId === "specialist" && player.weaponFamily !== "claw");
+    (player.classId === "specialist" && player.weaponFamily !== "claw" && player.weaponFamily !== "bones");
   if (!won && wrong) {
     return `${player.botName} is on the wrong weapon for a ${player.classId}. The drill is stock, on a blue week, and still won. No damage was written.`;
   }
@@ -1832,6 +1937,7 @@ export function buyCheck(
   if (!shopOpen(data)) return { ok: false, reason: data.week === 1 && !data.kickoff?.appliedAt ? "The shop opens when the desk pays the Period 11 kickoff coins." : "The shop shuts when the bots lock Saturday and reopens after the damage report.", cost: 0 };
   if (part.tier === "championship") return { ok: false, reason: "Championship parts are never sold.", cost: 0 };
   if (part.tier === "stock") return { ok: false, reason: "Stock is already on the peg.", cost: 0 };
+  if (isPremiumHalloweenPart(part.id) && !premiumHalloweenOpen()) return { ok: false, reason: PREMIUM_CLOSED_REASON, cost: part.price };
   if (part.classLock && part.slot !== "chassis") return { ok: false, reason: "Wrong class.", cost: 0 };
   if (ownsPart(bot, part)) return { ok: false, reason: "Already in the cage.", cost: part.price };
   let cost = part.price;
@@ -1848,6 +1954,22 @@ export function buyCheck(
     };
   }
   return { ok: true, reason: "On the peg.", cost };
+}
+
+/** Visual show effects. Same shop clock and the Halloween sale window. They never enter the loadout. */
+export function showCheck(data: PitData, storeId: string, effectId: string): { ok: boolean; reason: string; cost: number } {
+  const effect = showEffect(effectId);
+  if (!effect) return { ok: false, reason: "That show effect is not on the peg.", cost: 0 };
+  const bot = botFor(data, storeId);
+  if (data.phase === "open" && bot.locked) return { ok: false, reason: "This build is locked. Ask the Desk for a lock override.", cost: 0 };
+  if (!shopOpen(data)) return { ok: false, reason: data.week === 1 && !data.kickoff?.appliedAt ? "The shop opens when the desk pays the Period 11 kickoff coins." : "The shop shuts when the bots lock Saturday and reopens after the damage report.", cost: 0 };
+  if (!premiumHalloweenOpen()) return { ok: false, reason: PREMIUM_CLOSED_REASON, cost: effect.price };
+  if (bot.shows?.includes(effect.id)) return { ok: false, reason: "Already in the rafters.", cost: effect.price };
+  const have = bot.coins[effect.key] ?? 0;
+  if (have < effect.price) {
+    return { ok: false, reason: `Needs ${effect.price} utility coins. You have ${have}. Arch Supports pays them: green 3, blue 2, orange 1, red 0.`, cost: effect.price };
+  }
+  return { ok: true, reason: "On the peg.", cost: effect.price };
 }
 
 export function statLabel(stat: StatKey): string {

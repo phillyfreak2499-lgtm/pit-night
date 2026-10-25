@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { usePit } from "@/lib/pit/store";
 import { ResultLine, SectionLabel, StatStrip } from "./bits";
 import { Broadcast } from "./broadcast";
-import { ClaudeCopy } from "./claude-copy";
+import { ClaudeCopy, LiveCall } from "./claude-copy";
 
 export function BoutPage({ boutId }: { boutId: string }) {
   const bout = usePit((s) => s.bouts.find((b) => b.id === boutId));
@@ -31,6 +31,7 @@ export function BoutPage({ boutId }: { boutId: string }) {
       <Broadcast bout={bout} />
       <TaleOfTape bout={bout} />
       <ClaudeCopy kind="bout" id={bout.id} label="Ringside call" />
+      <LiveCall boutId={bout.id} />
       <div className="grid gap-3 md:grid-cols-2">
         {result.fighters
           .filter((f) => f.id !== "house")

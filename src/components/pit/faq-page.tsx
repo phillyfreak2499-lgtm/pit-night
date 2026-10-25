@@ -110,7 +110,7 @@ export const GROUPS: Group[] = [
       ),
       faq(
         "Does paint or a decal change the fight?",
-        "No. Body shells, paint, finish, four sticker slots, trim, visor, flag, toppers, walkouts, victory effects and bay numbers are just for looks. Crew can draft unlocked looks and vote in the Garage. Each person gets one vote per proposal; the captain chooses which proposal to apply. Weekly themes highlight categories without waiving unlocks or Bolt prices. Battle history stays until repaired.",
+        "No. Body shells, paint, finish, four sticker slots, trim, visor, light strips, smoke, banner, flag, toppers, walkouts, victory effects and bay numbers are just for looks. Crew can draft unlocked looks and vote in the Garage. Each person gets one vote per proposal; the captain chooses which proposal to apply. Weekly themes highlight categories without waiving unlocks or Bolt prices. Battle history stays until repaired.",
       ),
       faq(
         "What does a Scry do?",
@@ -127,7 +127,7 @@ export const GROUPS: Group[] = [
     items: [
       faq(
         "When do the bots lock?",
-        "Regular-season bots lock Saturday at close (6 pm Central). Championship Week finalists prep Tuesday through Friday and the Desk freezes the two title builds Friday close for Saturday.",
+        "Week 1 locks automatically Saturday, Oct 31, at 6:00 PM Central. The Desk can lock earlier. Weeks 2 through 4 lock when the Desk presses lock at Saturday close (6 pm Central). Championship Week locks automatically Friday, Nov 27, at 6:00 PM Central, ahead of the Saturday, Nov 28 championship. The Desk can lock the two title builds earlier. Captains cannot change builds after either automatic deadline.",
       ),
       faq(
         "How does a fight work?",
