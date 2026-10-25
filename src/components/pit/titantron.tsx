@@ -211,15 +211,6 @@ function phaseWord(phase: string) {
   return "CLOSED";
 }
 
-function StandingBot({ storeId }: { storeId: string }) {
-  const look = useBotLook(storeId);
-  return (
-    <span className="hidden h-16 w-32 sm:block">
-      <BotPortrait look={look} facing={-1} floor={false} zoom={0.9} className="h-full w-full" />
-    </span>
-  );
-}
-
 function PitWeekCallout() {
   const data = usePit();
   const plan = programWeek(Math.min(5, Math.max(1, data.week)));

@@ -64,6 +64,7 @@ export const commandArgs = {
   repairSlot: z.tuple([id, slot, z.enum(["full", "weld", "salvage", "crown"])]),
   nameMvp: z.tuple([id, id]),
   renameBot: z.tuple([id, text]),
+  // eslint-disable-next-line no-control-regex -- names may not contain C0 controls or DEL
   renameIdentity: z.tuple([id, z.string().trim().min(1).max(22).regex(/^[^\u0000-\u001f\u007f]+$/), z.string().trim().min(1).max(40).regex(/^[^\u0000-\u001f\u007f]+$/)]),
   renameCaptain: z.tuple([id, text]),
   setPaint: z.tuple([id, id]),

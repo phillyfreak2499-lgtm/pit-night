@@ -1989,7 +1989,7 @@ function drawDecal(
         const a=-Math.PI/2+i*Math.PI/5;
         const r=(i%2===0?rr:rr*0.42)*u;
         const px=Math.cos(a)*r, py=Math.sin(a)*r;
-        i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+        if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
       }
       ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
     }

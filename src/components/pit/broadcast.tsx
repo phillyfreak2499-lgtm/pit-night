@@ -80,6 +80,7 @@ export function Broadcast({
     const fx = fxRef.current;
     const trails = trailsRef.current;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // eslint-disable-next-line prefer-const -- resize() reads loop before assignment; const would throw
     let loop: ReturnType<typeof createFrameLoop> | undefined;
     let visible = true;
     if (lastSeek.current !== seek) {

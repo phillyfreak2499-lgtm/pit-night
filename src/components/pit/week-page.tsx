@@ -8,7 +8,6 @@ import { paintHex, usePit } from "@/lib/pit/store";
 import {
   BOLTS,
   DAY_LABEL,
-  DAY_ORDER,
   PROGRAM,
   STREAK_BADGE,
   TUNE_UP_BONUS,
