@@ -1,5 +1,6 @@
 import { bannerVerdict } from "../../../scripts/copy-guard.mjs";
 import { STICKER_ART, type BotBody, type BotDecal, type BotFinish, type BotLeds, type BotMask, type BotSmoke, type BotStyle, type BotTopper, type BotWeaponSkin, type ClassId, type KeyName, type Slot, type StatKey, type StickerArt, type Tier } from "./types";
+import { ROSTER_PARTS } from "./roster";
 
 export const SCRAP_CAP = 18;
 export const VERSION = 6;
@@ -63,7 +64,12 @@ export const PAINT: Record<string, string> = {
 };
 
 /** Paints only the Bolt Locker sells. Key is the paint, value is the locker item. */
-export const LOCKER_PAINTS: Record<string, string> = { neon: "paint-neon", candy: "paint-candy", ice: "paint-ice", royal: "paint-royal" };
+export const LOCKER_PAINTS: Record<string, string> = {
+  neon: "paint-neon",
+  candy: "paint-candy",
+  ice: "paint-ice",
+  royal: "paint-royal",
+};
 
 export const FINISHES: { id: BotFinish; label: string; note: string }[] = [
   { id: "factory", label: "Factory", note: "Clean gloss." },
@@ -189,23 +195,119 @@ export function defaultBody(classId: ClassId): BotBody {
   return classId === "tank" ? "keystone" : classId === "specialist" ? "windlass" : "shrike";
 }
 
-export type BodyStyle = { id: BotBody; classId: ClassId; label: string; starter: boolean; note: string };
+export type BodyStyle = {
+  id: BotBody;
+  classId: ClassId;
+  label: string;
+  starter: boolean;
+  note: string;
+};
 export const BODY_STYLES: BodyStyle[] = [
-  { id: "shrike", classId: "striker", label: "Shrike", starter: true, note: "Low race-bot wedge profile." },
-  { id: "raptor", classId: "striker", label: "Raptor", starter: true, note: "Long nose, exposed shoulders." },
-  { id: "stinger", classId: "striker", label: "Stinger", starter: true, note: "Narrow, angular and mean." },
-  { id: "viper", classId: "striker", label: "Viper", starter: false, note: "Full Tune-Up reward shell." },
-  { id: "warhawk", classId: "striker", label: "Warhawk", starter: false, note: "Conference Champion shell." },
-  { id: "keystone", classId: "tank", label: "Keystone", starter: true, note: "Classic armored block." },
-  { id: "juggernaut", classId: "tank", label: "Juggernaut", starter: true, note: "Wide shoulders and heavy stance." },
-  { id: "bunker", classId: "tank", label: "Bunker", starter: true, note: "Low enclosed armor shell." },
-  { id: "fortress", classId: "tank", label: "Fortress", starter: false, note: "Full Tune-Up reward shell." },
-  { id: "colossus", classId: "tank", label: "Colossus", starter: false, note: "Conference Champion shell." },
-  { id: "windlass", classId: "specialist", label: "Windlass", starter: true, note: "Industrial grappler profile." },
-  { id: "scorpion", classId: "specialist", label: "Scorpion", starter: true, note: "Forward pincers and raised deck." },
-  { id: "mantis", classId: "specialist", label: "Mantis", starter: true, note: "Tall front arms and cut waist." },
-  { id: "phantom", classId: "specialist", label: "Phantom", starter: false, note: "Full Tune-Up reward shell." },
-  { id: "reaper", classId: "specialist", label: "Reaper", starter: false, note: "Conference Champion shell." },
+  {
+    id: "shrike",
+    classId: "striker",
+    label: "Shrike",
+    starter: true,
+    note: "Low race-bot wedge profile.",
+  },
+  {
+    id: "raptor",
+    classId: "striker",
+    label: "Raptor",
+    starter: true,
+    note: "Long nose, exposed shoulders.",
+  },
+  {
+    id: "stinger",
+    classId: "striker",
+    label: "Stinger",
+    starter: true,
+    note: "Narrow, angular and mean.",
+  },
+  {
+    id: "viper",
+    classId: "striker",
+    label: "Viper",
+    starter: false,
+    note: "Full Tune-Up reward shell.",
+  },
+  {
+    id: "warhawk",
+    classId: "striker",
+    label: "Warhawk",
+    starter: false,
+    note: "Conference Champion shell.",
+  },
+  {
+    id: "keystone",
+    classId: "tank",
+    label: "Keystone",
+    starter: true,
+    note: "Classic armored block.",
+  },
+  {
+    id: "juggernaut",
+    classId: "tank",
+    label: "Juggernaut",
+    starter: true,
+    note: "Wide shoulders and heavy stance.",
+  },
+  {
+    id: "bunker",
+    classId: "tank",
+    label: "Bunker",
+    starter: true,
+    note: "Low enclosed armor shell.",
+  },
+  {
+    id: "fortress",
+    classId: "tank",
+    label: "Fortress",
+    starter: false,
+    note: "Full Tune-Up reward shell.",
+  },
+  {
+    id: "colossus",
+    classId: "tank",
+    label: "Colossus",
+    starter: false,
+    note: "Conference Champion shell.",
+  },
+  {
+    id: "windlass",
+    classId: "specialist",
+    label: "Windlass",
+    starter: true,
+    note: "Industrial grappler profile.",
+  },
+  {
+    id: "scorpion",
+    classId: "specialist",
+    label: "Scorpion",
+    starter: true,
+    note: "Forward pincers and raised deck.",
+  },
+  {
+    id: "mantis",
+    classId: "specialist",
+    label: "Mantis",
+    starter: true,
+    note: "Tall front arms and cut waist.",
+  },
+  {
+    id: "phantom",
+    classId: "specialist",
+    label: "Phantom",
+    starter: false,
+    note: "Full Tune-Up reward shell.",
+  },
+  {
+    id: "reaper",
+    classId: "specialist",
+    label: "Reaper",
+    starter: false,
+    note: "Conference Champion shell.",
+  },
 ];
 
 export const TOPPERS: { id: BotTopper; label: string }[] = [
@@ -225,7 +327,10 @@ export function bodyStyle(id: string | undefined) {
 export function starterBodies(classId?: ClassId) {
   return BODY_STYLES.filter((row) => row.starter && (!classId || row.classId === classId));
 }
-export function styleOf(source: ({ style?: Partial<BotStyle>; classId?: ClassId } | null | undefined), classId?: ClassId): BotStyle {
+export function styleOf(
+  source: { style?: Partial<BotStyle>; classId?: ClassId } | null | undefined,
+  classId?: ClassId,
+): BotStyle {
   const cls = classId ?? source?.classId ?? "striker";
   const style = { ...DEFAULT_STYLE, body: source?.style?.body ?? defaultBody(cls), ...(source?.style ?? {}) };
   const stickers = { left: "none" as const, right: "none" as const, hood: style.decal, rear: "none" as const, ...style.stickers };
@@ -236,6 +341,16 @@ export function styleOf(source: ({ style?: Partial<BotStyle>; classId?: ClassId 
   const banner = judged.ok ? judged.text : "";
   return { ...style, decal: stickers.hood, stickers, leds, smoke, banner };
 }
+
+/** Inclusive month/day window inside the 2026 season, Central time. */
+export type PartWindow = { start: [number, number]; end: [number, number] };
+
+/** A chassis likes one class, and one other slot when that slot is a listed family. */
+export type Affinity = {
+  classId?: ClassId;
+  slot?: "drive" | "weapon" | "armor" | "utility";
+  families?: string[];
+};
 
 export type Part = {
   id: string;
@@ -251,14 +366,20 @@ export type Part = {
   nudge: { power: number; speed: number; armor: number; heat: number };
   /** Coins from this part's own jar. */
   price: number;
+  /** Green weeks of this part's own stat required before it can be bought. */
+  greenWeeks?: number;
+  /** Those green weeks have to be the most recent ones, with no break. */
+  straight?: boolean;
+  /** Shop window. Absent means the peg is up all season. */
+  window?: PartWindow;
+  /** Chassis stamina. Omitted chassis use the stock battery. */
+  battery?: number;
+  /** Build-fit override for a price that is off the 3/5/8 ladder. */
+  fit?: number;
+  affinity?: Affinity;
 };
 
-function nudge(
-  power = 0,
-  speed = 0,
-  armor = 0,
-  heat = 0,
-): Part["nudge"] {
+function nudge(power = 0, speed = 0, armor = 0, heat = 0): Part["nudge"] {
   return { power, speed, armor, heat };
 }
 
@@ -272,12 +393,19 @@ type Family = {
   names: Partial<Record<Tier, string>>;
   jobs: Partial<Record<Tier, string>>;
   nudge: Part["nudge"];
+  nudges?: Partial<Record<Tier, Part["nudge"]>>;
+  prices?: Partial<Record<Tier, number>>;
+  gates?: Partial<Record<Tier, { weeks: number; straight?: boolean }>>;
+  windows?: Partial<Record<Tier, PartWindow>>;
+  batteries?: Partial<Record<Tier, number>>;
+  fits?: Partial<Record<Tier, number>>;
+  affinity?: Affinity;
 };
 
 /**
- * Coin prices. Earnings are separate from the sticker price: a green week pays
- * 3 into that metric's jar, and each green after the first adds one pair-bonus
- * coin to that jar, in scorecard order. Six greens pay 23.
+ * Coin prices. A green week pays 3 into that metric's jar, and each green
+ * after the first adds one pair-bonus coin. Six greens pay 23. Reactor is
+ * priced at 12, which is four plain green payouts before the pair bonus.
  */
 export const TIER_PRICE: Record<Tier, number> = {
   stock: 0,
@@ -288,7 +416,12 @@ export const TIER_PRICE: Record<Tier, number> = {
 };
 
 /** Coins a grade pays into its part's jar. */
-export const GRADE_COINS: Record<"green" | "blue" | "orange" | "red", number> = { green: 3, blue: 2, orange: 1, red: 0 };
+export const GRADE_COINS: Record<"green" | "blue" | "orange" | "red", number> = {
+  green: 3,
+  blue: 2,
+  orange: 1,
+  red: 0,
+};
 
 /** Repair bills, from the damaged part's own jar. */
 export const REPAIR_PRICE = { scratched: 1, bent: 2, disabled: 4, weld: 1 } as const;
@@ -309,12 +442,60 @@ const pct = (n: number) => `${Math.round(n)}%`;
 
 /** The six weekly numbers, the part each one feeds, and the grade bands. */
 export const METRICS: Metric[] = [
-  { stat: "nsnu", slot: "chassis", label: "NSNU", short: "NSNU", bands: [1000, 900, 800], format: money, step: 1 },
-  { stat: "conv", slot: "armor", label: "Conv %", short: "Conv", bands: [64, 56, 47], format: pct, step: 1 },
-  { stat: "demoRate", slot: "drive", label: "Demo Rate", short: "Demo", bands: [88, 80, 72], format: pct, step: 1 },
-  { stat: "demoClose", slot: "weapon", label: "Demo Close %", short: "Close", bands: [73, 70, 65], format: pct, step: 1 },
-  { stat: "arch", slot: "utility", label: "Arch Supports", short: "Arch", bands: [3.8, 3.0, 2.5], format: (n) => n.toFixed(1), step: 0.1 },
-  { stat: "ticket", slot: "brain", label: "Demo Ticket Avg", short: "Ticket", bands: [1800, 1600, 1400], format: money, step: 1 },
+  {
+    stat: "nsnu",
+    slot: "chassis",
+    label: "NSNU",
+    short: "NSNU",
+    bands: [1000, 900, 800],
+    format: money,
+    step: 1,
+  },
+  {
+    stat: "conv",
+    slot: "armor",
+    label: "Conv %",
+    short: "Conv",
+    bands: [64, 56, 47],
+    format: pct,
+    step: 1,
+  },
+  {
+    stat: "demoRate",
+    slot: "drive",
+    label: "Demo Rate",
+    short: "Demo",
+    bands: [88, 80, 72],
+    format: pct,
+    step: 1,
+  },
+  {
+    stat: "demoClose",
+    slot: "weapon",
+    label: "Demo Close %",
+    short: "Close",
+    bands: [73, 70, 65],
+    format: pct,
+    step: 1,
+  },
+  {
+    stat: "arch",
+    slot: "utility",
+    label: "Arch Supports",
+    short: "Arch",
+    bands: [3.8, 3.0, 2.5],
+    format: (n) => n.toFixed(1),
+    step: 0.1,
+  },
+  {
+    stat: "ticket",
+    slot: "brain",
+    label: "Demo Ticket Avg",
+    short: "Ticket",
+    bands: [1800, 1600, 1400],
+    format: money,
+    step: 1,
+  },
 ];
 
 export function metricFor(stat: StatKey): Metric {
@@ -330,8 +511,16 @@ export function bandText(m: Metric) {
   const [g, b, o] = m.bands;
   const dec = m.step < 1;
   const minus = (n: number) => (dec ? (n - 0.1).toFixed(1) : String(n - 1));
-  const f = (n: number) => (m.format === money ? `$${n.toLocaleString("en-US")}` : m.format === pct ? `${n}%` : dec ? n.toFixed(1) : String(n));
-  const fm = (n: string) => (m.format === money ? `$${Number(n).toLocaleString("en-US")}` : m.format === pct ? `${n}%` : n);
+  const f = (n: number) =>
+    m.format === money
+      ? `$${n.toLocaleString("en-US")}`
+      : m.format === pct
+        ? `${n}%`
+        : dec
+          ? n.toFixed(1)
+          : String(n);
+  const fm = (n: string) =>
+    m.format === money ? `$${Number(n).toLocaleString("en-US")}` : m.format === pct ? `${n}%` : n;
   return {
     green: `${f(g)}+`,
     blue: `${f(b)}–${fm(minus(g))}`,
@@ -341,9 +530,10 @@ export function bandText(m: Metric) {
 }
 
 /** Which weekly number fills which part's coin jar. */
-export const KEY_SOURCE: Record<KeyName, { stat: StatKey; label: string; green: string }> = Object.fromEntries(
-  METRICS.map((m) => [m.slot, { stat: m.stat, label: m.label, green: bandText(m).green }]),
-) as Record<KeyName, { stat: StatKey; label: string; green: string }>;
+export const KEY_SOURCE: Record<KeyName, { stat: StatKey; label: string; green: string }> =
+  Object.fromEntries(
+    METRICS.map((m) => [m.slot, { stat: m.stat, label: m.label, green: bandText(m).green }]),
+  ) as Record<KeyName, { stat: StatKey; label: string; green: string }>;
 
 export const KEY_ORDER: KeyName[] = ["chassis", "drive", "weapon", "armor", "utility", "brain"];
 
@@ -802,7 +992,8 @@ const FAMILIES: Family[] = [
       championship: "Overtime",
     },
     jobs: {
-      stock: "A bead that keeps a scratched week from becoming a bent one.",
+      stock:
+        "A bead in the fight. A little health comes back every exchange. It does not pay a repair quote.",
       sport: "Cleaner bead. The crew already did the work on Saturday.",
       pro: "Weld for a garage that does not panic at the quote.",
       super: "Crew Chief on the rail. The bot fights like somebody has the clipboard.",
@@ -824,7 +1015,8 @@ const FAMILIES: Family[] = [
       championship: "The Tell",
     },
     jobs: {
-      stock: "Underdog read. See their tier — or their class and weapon family.",
+      stock:
+        "Underdog read. See their tier, or their class and weapon family. In the cage, a bot that is behind hits a little cleaner.",
       sport: "A clearer read. Still worthless if you are already the bully.",
       pro: "The scry a quiet store uses to pick the counter.",
       super: "Blueprint. You fight the drawing, not the rumor.",
@@ -837,7 +1029,7 @@ const FAMILIES: Family[] = [
     stat: "ticket",
     key: "brain",
     tags: ["smart"],
-    nudge: nudge(1, 1, 2, 1),
+    nudge: nudge(0, 0, 0, 0),
     names: {
       stock: "Logic Board",
       sport: "Sport Logic",
@@ -846,7 +1038,8 @@ const FAMILIES: Family[] = [
       championship: "The Oracle — Title",
     },
     jobs: {
-      stock: "Reads the cage. Turns toward the other bot. That is about it.",
+      stock:
+        "Defensive. Reads the cage and stays off the hazards. A higher tier reads them better. It does not change Power, Speed, Armor or Heat.",
       sport: "Picks a side and stays on it. Fewer wasted charges.",
       pro: "Tracks the weapon, not the paint. Hits land where they count.",
       super: "Plans three moves out. The other driver feels slow.",
@@ -859,7 +1052,7 @@ const FAMILIES: Family[] = [
     stat: "ticket",
     key: "brain",
     tags: ["smart", "aggro"],
-    nudge: nudge(3, 2, -1, 0),
+    nudge: nudge(0, 0, 0, 0),
     names: {
       stock: "Hunter Chip",
       sport: "Sport Hunter",
@@ -868,7 +1061,8 @@ const FAMILIES: Family[] = [
       championship: "Apex — Title",
     },
     jobs: {
-      stock: "Points the weapon at the closest thing and goes.",
+      stock:
+        "Aggressive. Goes for the closest bot and will cross a saw to do it. A higher tier hits cleaner. It does not change the four printed numbers.",
       sport: "Smells a bent wheel from across the cage.",
       pro: "Finds the gap in the armor and keeps hitting it.",
       super: "Never lets go. Never backs off. Costs armor to run.",
@@ -980,6 +1174,7 @@ function buildParts(): Part[] {
       const name = family.names[tier];
       const job = family.jobs[tier];
       if (!name || !job) return;
+      const gate = family.gates?.[tier];
       parts.push({
         id: `${family.slot}-${family.family}-${tier}`,
         slot: family.slot,
@@ -991,15 +1186,29 @@ function buildParts(): Part[] {
         key: family.key,
         job,
         tags: family.tags,
-        nudge: family.nudge,
-        price: TIER_PRICE[tier],
+        nudge: family.nudges?.[tier] ?? family.nudge,
+        price: family.prices?.[tier] ?? TIER_PRICE[tier],
+        greenWeeks: gate?.weeks,
+        straight: gate?.straight,
+        window: family.windows?.[tier],
+        battery: family.batteries?.[tier],
+        fit: family.fits?.[tier],
+        affinity: family.affinity,
       });
     });
   }
   return parts;
 }
 
-export const PARTS: Part[] = buildParts();
+export const PARTS: Part[] = [...buildParts(), ...ROSTER_PARTS];
+
+/** Stamina on a chassis that does not name its own battery. */
+export const STOCK_BATTERY = 64;
+
+export function batteryOf(part: Part | null | undefined): number {
+  if (!part || part.slot !== "chassis") return STOCK_BATTERY;
+  return part.battery ?? STOCK_BATTERY;
+}
 
 const BY_ID = new Map(PARTS.map((p) => [p.id, p]));
 

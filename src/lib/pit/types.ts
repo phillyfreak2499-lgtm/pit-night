@@ -226,12 +226,23 @@ export type FighterSnap = {
   tuned?: boolean;
   /** Parts still damaged going in. Drawn as dents and scrapes. */
   scars?: number;
-  /** Visible build geometry; does not change fight calculations. */
+  /** Installed families. The fight reads these; they are not paint. */
   armorFamily?: string;
   driveFamily?: string;
   chassisFamily?: string;
-  /** Fog and blacklight. Drawing only. */
+  /** Fog Machine and Blacklight Mode. Drawing only. */
   shows?: ShowEffectId[];
+  /** Null when the utility slot is empty. */
+  utilityFamily?: string | null;
+  brainFamily?: string;
+  /** Chassis stamina at the bell. */
+  batteryMax?: number;
+  /** Tier of each installed part. Stock when the field is missing. */
+  tiers?: Partial<Record<Slot, Tier>>;
+  /** Bent and scratched parts fight at a fraction. */
+  wearMult?: Partial<Record<Slot, number>>;
+  /** Chassis class/slot synergy copied off the part. */
+  affinity?: { classId?: ClassId; slot?: "drive" | "weapon" | "armor" | "utility"; families?: string[] };
 };
 
 export type FightResult = {

@@ -27,17 +27,17 @@ const STEPS = [
   {
     kicker: "The numbers",
     title: "Six numbers. Six parts. Colors pay coins.",
-    body: "NSNU builds the chassis, Conv % the armor, Demo Rate the drive, Demo Close % the weapon, Arch Supports the utility, and Demo Ticket Avg the brain. Each week green pays 3 coins into that part's jar, blue 2, orange 1, red 0. Week 1 coins come from your Period 11 colors.",
+    body: "NSNU builds the chassis, Conv % the armor, Demo Rate the drive, Demo Close % the weapon, Arch Supports the utility, and Demo Ticket Avg the brain. Each week green pays 3 coins into that part's jar, blue 2, orange 1, red 0. Week 1 coins come from your Period 11 colors. The brain does not change the four printed numbers. It changes how the bot fights. Battery is the chassis stamina and drains as the fight goes on.",
   },
   {
     kicker: "The garage",
     title: "Spend coins. Build smart. Lock by Saturday close.",
-    body: "Sport parts cost 3 coins, Pro 5, Super 8, from that part's own jar. Repairs come from the same jar. Paint and decals are just for looks. Bolt a Scry on the utility slot to scout your opponent. Whatever is on the bot at Saturday close is what fights Monday.",
+    body: "Sport parts cost 3 coins, Pro 5, Super 8, from that part's own jar. Some chassis cost more because the battery is the part, up to Reactor at 12. The top armor, weapons, and brains also want green weeks on their number. Skeleton and Ghost Veil are November 1 through 28 only. Paint and decals are just for looks. Every other part changes the fight. Bolt a Scry on the utility slot to scout, and to hit cleaner when you are behind. Whatever is on the bot at Saturday close is what fights Monday.",
   },
   {
     kicker: "Monday morning",
     title: "Three rounds, live. Then the damage report.",
-    body: "Sunday the Desk enters every store's six colors. Monday the whole card plays: seven fights and no byes. Regular-season fights are three rounds, with a slow-motion replay on a knockout. Put the Watch Party on the big screen for the huddle.",
+    body: "Sunday the Desk enters every store's six colors. Monday the whole card plays: seven fights and no byes. Both bots swing for three rounds. The floor always has saws, a pit, and water. Grudge Night adds flame jets. A smarter brain avoids them. A reckless one does not. The same two builds always fight the same way. Put the Watch Party on the big screen for the huddle.",
   },
   {
     kicker: "The trophy",

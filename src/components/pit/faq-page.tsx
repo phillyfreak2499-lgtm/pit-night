@@ -98,7 +98,7 @@ export const GROUPS: Group[] = [
       ),
       faq(
         "What do parts cost?",
-        "Sport 3 coins, Pro 5, Super 8, paid from that part's own jar. Season-earned parts and coins carry forward if your store reaches Championship Week.",
+        "The ladder is Sport 3, Pro 5, Super 8, paid from that part's own jar. A few chassis cost more because the battery is the part: Sprinter and Hornet 5, Hybrid and Dynamo 6, Scorpion and Crab 7, Capacitor and Mule 8, Monolith 10, Reactor 12. Season-earned parts and coins carry forward if your store reaches Championship Week.",
       ),
       faq(
         "When is the shop open?",
@@ -114,7 +114,7 @@ export const GROUPS: Group[] = [
       ),
       faq(
         "What does a Scry do?",
-        "Put a Scry in the utility slot to scout an opponent. Call the weapon you think they're running and it tells you if you were right. Other utility parts help you fight instead.",
+        "Put a Scry in the utility slot to scout an opponent. Call the weapon you think they're running and it tells you if you were right. In the cage, a Scry also hits a little cleaner when your week is behind theirs. Other utilities fight: Spotlight and UV Lamp cut through bait, Decoy and Ghost Veil pull aim off you, Oil Slick dumps traction, Med Bay and the pit weld put health back, Leech steals heat, Tremor stumbles a bot that is not hovering, Blackout and Smoke Screen and Siren scramble a brain that is not lit, Grapple holds once, Mirror kicks damage back. Fog Machine and Blacklight Mode are lights in the rafters. They do not change the fight.",
       ),
       faq(
         "Can we change our bot's class?",
@@ -131,11 +131,23 @@ export const GROUPS: Group[] = [
       ),
       faq(
         "How does a fight work?",
-        "There's a countdown, then three rounds. Each round the bots circle and trade blows, then one lands the big hit. Damage, combos, and knockouts show on screen. If neither bot is knocked out, the one with more health wins the decision.",
+        "There's a countdown, then three rounds. Both bots swing every round. The card shows the heavier blow. The floor has a pit, a water lane, and two saws every week. Grudge Night adds flame jets. If neither bot is knocked out, the one with more health wins the decision. Nothing in the cage is a coin flip: the same two builds always produce the same fight.",
       ),
       faq(
         "What decides who wins?",
-        "Your six numbers set how strong the bot is that week. Your build decides how well it fights: the parts you bought, whether they're repaired, and whether your weapon matches up well. The Full Tune-Up adds a little on top. A great week with a bad build can still lose.",
+        "Your six numbers set how strong the bot is that week. The whole build decides the fight: chassis and its battery, armor, drive, weapon, utility, and the brain. Better iron hits harder and soaks more. A smarter brain aims, guards, and treats the hazards differently. The wrong weapon on the wrong class is a real penalty. Counters matter: gel eats a flail, chainmail eats a saw, a wedge does not flip an Anchor, flame ignores gel, an Anchor plants an air cushion, chip flame never lights reactive armor, Lodestone turns a Tesla coil around, and Skeleton slips a hit. The Full Tune-Up adds a little on top. A great week with a bad build can still lose.",
+      ),
+      faq(
+        "Do brains change Power, Speed, Armor, or Heat?",
+        "No. Logic, Hunter, Berserker, Turtle, Sniper, Brawler, Jammer, Phoenix, and Skynet change how the bot drives. A higher tier of the same brain fights cleaner. They do not add to the four printed numbers. Berserker is the cheap aggressive one. Turtle is slow and hard to break. Sniper wants range and stays off the hazards. Brawler punishes anyone who comes in. Jammer scrambles the other brain. Phoenix gets up once. Skynet reads the floor like Logic and hits like Hunter. Phoenix wants three green Demo Ticket weeks. Skynet wants four straight green Demo Ticket weeks.",
+      ),
+      faq(
+        "What is battery?",
+        "Battery is the chassis stamina. It drains every exchange. When it is low the bot slows and the weapon weakens. Armor does not sag with it. Reactor holds the most. Sprinter and Hornet spend it faster. A Tesla Coil also drains the other bot's battery.",
+      ),
+      faq(
+        "Which parts need green weeks?",
+        "Sport armor is coins only. Pro armor wants one green Conv % week, and the Super of each new armor family wants two to four. Wrecking Ball wants two green Demo Close weeks, Impaler and Inferno three, Storm four. The battery chassis want green NSNU weeks: one for Sprinter and Hornet, two for Hybrid, Dynamo, Scorpion and Crab, three for Capacitor, Mule and Monolith. Reactor wants four straight green NSNU weeks and 12 chassis coins, which is exactly four green payouts. Three greens pay 9, so Monolith's price of 10 still needs one extra coin in the jar. Skeleton and Ghost Veil are 8 coins and only on the peg November 1 through November 28.",
       ),
       faq(
         "Are there byes?",

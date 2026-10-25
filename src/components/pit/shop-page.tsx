@@ -88,6 +88,9 @@ export function ShopPage({ storeId }: { storeId: string }) {
                       </span>
                     </li>
                     {part.classLock ? <li className="border border-line px-2 py-1 text-muted">{part.classLock} chassis</li> : null}
+                    {part.greenWeeks ? <li className="border border-line px-2 py-1 text-muted">{part.straight ? `${part.greenWeeks} straight green weeks` : `${part.greenWeeks} green week${part.greenWeeks === 1 ? "" : "s"}`}</li> : null}
+                    {part.window ? <li className="border border-line px-2 py-1 text-muted">November 1–28 only</li> : null}
+                    {part.battery ? <li className="border border-line px-2 py-1 text-muted">Battery {part.battery}</li> : null}
                   </ul>
                   <p className={`mt-2 text-sm ${owned ? "text-ok" : check.ok ? "text-amber" : "text-muted"}`}>
                     {owned

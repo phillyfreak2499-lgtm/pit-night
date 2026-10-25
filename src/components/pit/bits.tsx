@@ -136,20 +136,24 @@ export function StatStrip({
   speed,
   armor,
   heat,
+  battery,
 }: {
   power: number;
   speed: number;
   armor: number;
   heat: number;
+  /** Chassis stamina. Omitted on cards that only print the four fight numbers. */
+  battery?: number;
 }) {
   const rows = [
     ["Power", power],
     ["Speed", speed],
     ["Armor", armor],
     ["Heat", heat],
+    ...(battery != null ? [["Battery", battery] as const] : []),
   ] as const;
   return (
-    <div className="grid grid-cols-4 gap-2">
+    <div className={`grid gap-2 ${battery != null ? "grid-cols-3 sm:grid-cols-5" : "grid-cols-4"}`}>
       {rows.map(([label, value]) => (
         <div key={label} className="border border-line bg-deep px-2 py-2">
           <p className="text-[0.65rem] tracking-widest text-muted uppercase">{label}</p>

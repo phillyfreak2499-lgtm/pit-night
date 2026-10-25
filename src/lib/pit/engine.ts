@@ -1,5 +1,6 @@
 import {
   CLASS_META,
+  batteryOf,
   partById,
   partsFor,
   stockPart,
@@ -11,6 +12,9 @@ import {
   type Part,
 } from "./catalog";
 import { isPremiumHalloweenPart, PREMIUM_CLOSED_REASON, premiumHalloweenOpen, showEffect } from "./halloween";
+import { duelWear, fightDuel, preferFighter } from "./combat";
+import { centralDay } from "./time";
+export { halloweenStrikeAdjust } from "./combat";
 import { BOLTS, TUNE_UP_BONUS } from "./training";
 import { tunedUp } from "./week";
 import type {
@@ -48,11 +52,16 @@ const GRADE_Q: Record<Grade, number> = {
 
 const TIER_FIT: Record<string, number> = {
   stock: 0,
-  sport: 0.055,
-  pro: 0.1,
-  super: 0.15,
-  championship: 0.19,
+  sport: 0.07,
+  pro: 0.13,
+  super: 0.2,
+  championship: 0.24,
 };
+
+/** Chassis nudges used to count at 0.45, so a bought chassis barely moved the bot. */
+export const CHASSIS_WEIGHT = 0.7;
+/** An equipped utility's tier now counts in full. An empty slot still adds nothing. */
+export const UTILITY_FIT = 1;
 
 /** Grade one number against its bands from the scorecard chart. */
 export function gradeMetric(stat: StatKey, value: number): Grade {
@@ -90,14 +99,22 @@ export function kickoffRank(data: Pick<PitData, "stores" | "kickoff">) {
     // pay and re-pay the difference from one number per part.
     return { store, filled, coins: math.total, bySlot: coinsByJar(full), greens: math.greens, nsnu: ORDER[full.nsnu] };
   });
-  rows.sort((a, b) => b.coins - a.coins || b.greens - a.greens || b.nsnu - a.nsnu || a.store.seed - b.store.seed);
+  rows.sort(
+    (a, b) =>
+      b.coins - a.coins || b.greens - a.greens || b.nsnu - a.nsnu || a.store.seed - b.store.seed,
+  );
   return rows.map((row, i) => ({ ...row, seed: i + 1 }));
 }
 
 /** Stable text for a card, for seeding the fight dice. */
 export function cardKey(card: StoreCard | undefined) {
   if (!card) return "none";
-  const g = card.grades ? Object.entries(card.grades).sort().map(([k, v]) => `${k}=${v}`).join(",") : "";
+  const g = card.grades
+    ? Object.entries(card.grades)
+        .sort()
+        .map(([k, v]) => `${k}=${v}`)
+        .join(",")
+    : "";
   return `${card.nsnu}:${card.conv}:${card.demoRate}:${card.demoClose}:${card.arch}:${card.demoTicket}${g ? `:${g}` : ""}`;
 }
 
@@ -213,7 +230,8 @@ export function conferenceRecordOf(data: PitData, storeId: string): { w: number;
   let w = 0;
   let l = 0;
   for (const bout of data.bouts) {
-    if (!bout.result || bout.week > 4 || bout.kind !== "bout" || !bout.storeIds.includes(storeId)) continue;
+    if (!bout.result || bout.week > 4 || bout.kind !== "bout" || !bout.storeIds.includes(storeId))
+      continue;
     const opponentId = bout.storeIds.find((id) => id !== storeId);
     if (!opponentId || storeFor(data, opponentId).conference !== store.conference) continue;
     if (bout.result.winnerIds.includes(storeId)) w += 1;
@@ -231,28 +249,44 @@ export function cumulativeNsnu(data: PitData, storeId: string): number {
 export function greenCount(data: PitData, storeId: string): number {
   return data.storeCards
     .filter((card) => card.storeId === storeId && card.week <= 4)
-    .reduce((sum, card) => sum + METRICS.filter((m) => card.grades?.[m.stat] === "green").length, 0);
+    .reduce(
+      (sum, card) => sum + METRICS.filter((m) => card.grades?.[m.stat] === "green").length,
+      0,
+    );
 }
 
 /** Earned effort through the four-week regular season. Spending cosmetics never reduces this tiebreak. */
 export function regularSeasonBolts(data: PitData, storeId: string): number {
-  const approved = data.jobLog.filter((e) => e.storeId === storeId && e.week <= 4 && e.status === "approved");
-  const jobs = approved.reduce((n, e) => n + (e.jobId.endsWith("-crate") ? BOLTS.crate : BOLTS.job), 0);
+  const approved = data.jobLog.filter(
+    (e) => e.storeId === storeId && e.week <= 4 && e.status === "approved",
+  );
+  const jobs = approved.reduce(
+    (n, e) => n + (e.jobId.endsWith("-crate") ? BOLTS.crate : BOLTS.job),
+    0,
+  );
   const sparks = data.sparkLog
     .filter((e) => e.storeId === storeId && e.week <= 4)
     .reduce((n, e) => n + e.correct * BOLTS.sparkCorrect, 0);
-  const picks = data.picks.filter((p) => {
-    if (p.storeId !== storeId || p.week > 4) return false;
-    const lockedAt = data.weeks.find((w) => w.number === p.week)?.lockedAt;
-    if (lockedAt && p.at > lockedAt) return false;
-    return Boolean(data.bouts.find((b) => b.id === p.boutId && b.result?.winnerIds.includes(p.pick)));
-  }).length * BOLTS.pickCorrect;
+  const picks =
+    data.picks.filter((p) => {
+      if (p.storeId !== storeId || p.week > 4) return false;
+      const lockedAt = data.weeks.find((w) => w.number === p.week)?.lockedAt;
+      if (lockedAt && p.at > lockedAt) return false;
+      return Boolean(
+        data.bouts.find((b) => b.id === p.boutId && b.result?.winnerIds.includes(p.pick)),
+      );
+    }).length * BOLTS.pickCorrect;
   return jobs + sparks + picks;
 }
 
 function headToHeadWinner(data: PitData, a: string, b: string): string | null {
   const bout = data.bouts.find(
-    (row) => row.week <= 4 && row.kind === "bout" && row.result && row.storeIds.includes(a) && row.storeIds.includes(b),
+    (row) =>
+      row.week <= 4 &&
+      row.kind === "bout" &&
+      row.result &&
+      row.storeIds.includes(a) &&
+      row.storeIds.includes(b),
   );
   return bout?.result?.winnerIds.find((id) => id === a || id === b) ?? null;
 }
@@ -263,7 +297,9 @@ function topRecordGroup(data: PitData, conference: Conference) {
   const records = stores.map((store) => ({ store, rec: regularSeasonRecordOf(data, store.id) }));
   records.sort((a, b) => b.rec.w - a.rec.w || a.rec.l - b.rec.l || a.store.seed - b.store.seed);
   const top = records[0]!.rec;
-  return records.filter((row) => row.rec.w === top.w && row.rec.l === top.l).map((row) => row.store);
+  return records
+    .filter((row) => row.rec.w === top.w && row.rec.l === top.l)
+    .map((row) => row.store);
 }
 
 /** Stores still exactly tied for a conference berth after every published non-cage tiebreak. */
@@ -314,7 +350,8 @@ export function conferenceStandings(data: PitData, conference: Conference): Stor
         const h = headToHeadWinner(data, a.id, b.id);
         if (h) return h === a.id ? -1 : 1;
       }
-      const ac = conferenceRecordOf(data, a.id), bc = conferenceRecordOf(data, b.id);
+      const ac = conferenceRecordOf(data, a.id),
+        bc = conferenceRecordOf(data, b.id);
       if (bc.w !== ac.w) return bc.w - ac.w;
       if (ac.l !== bc.l) return ac.l - bc.l;
       const nsnu = cumulativeNsnu(data, b.id) - cumulativeNsnu(data, a.id);
@@ -337,7 +374,8 @@ function regularSeasonComplete(data: PitData) {
 
 export function conferenceChampion(data: PitData, conference: Conference): string | null {
   if (!regularSeasonComplete(data)) return null;
-  const title = conference === "metro" ? "Metro Conference Tiebreaker" : "Frontier Conference Tiebreaker";
+  const title =
+    conference === "metro" ? "Metro Conference Tiebreaker" : "Frontier Conference Tiebreaker";
   const cage = data.bouts.find((b) => b.week === 4 && b.title === title && b.result);
   if (cage?.result?.winnerIds[0]) return cage.result.winnerIds[0];
   const tied = conferenceTopTie(data, conference);
@@ -351,10 +389,18 @@ export function championshipFinalists(data: PitData): string[] {
 }
 
 export function rankedStores(data: PitData) {
-  return [...conferenceStandings(data, "metro"), ...conferenceStandings(data, "frontier")].sort((a, b) => {
-    const ra = regularSeasonRecordOf(data, a.id), rb = regularSeasonRecordOf(data, b.id);
-    return rb.w - ra.w || ra.l - rb.l || cumulativeNsnu(data, b.id) - cumulativeNsnu(data, a.id) || a.name.localeCompare(b.name);
-  });
+  return [...conferenceStandings(data, "metro"), ...conferenceStandings(data, "frontier")].sort(
+    (a, b) => {
+      const ra = regularSeasonRecordOf(data, a.id),
+        rb = regularSeasonRecordOf(data, b.id);
+      return (
+        rb.w - ra.w ||
+        ra.l - rb.l ||
+        cumulativeNsnu(data, b.id) - cumulativeNsnu(data, a.id) ||
+        a.name.localeCompare(b.name)
+      );
+    },
+  );
 }
 
 /** Compatibility helper: the title field is now the two conference champions. */
@@ -372,23 +418,15 @@ export function hashString(s: string): number {
   return h >>> 0;
 }
 
-function mulberry32(seed: number) {
-  let a = seed >>> 0;
-  return () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 function clamp(n: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, n));
 }
 
 export function activeLoadout(bot: Bot, phase: PitData["phase"]): Loadout {
-  if ((phase === "locked" || phase === "fought" || phase === "inspected" || phase === "complete") && bot.locked) {
+  if (
+    (phase === "locked" || phase === "fought" || phase === "inspected" || phase === "complete") &&
+    bot.locked
+  ) {
     return bot.locked;
   }
   return bot.draft;
@@ -400,7 +438,11 @@ function wearMult(cond: Condition): number {
   return 1;
 }
 
-export function resolvePart(bot: Bot, slot: Slot, loadout: Loadout): { part: Part | null; mult: number; broken: boolean } {
+export function resolvePart(
+  bot: Bot,
+  slot: Slot,
+  loadout: Loadout,
+): { part: Part | null; mult: number; broken: boolean } {
   if (slot === "utility" && !loadout.utility) return { part: null, mult: 1, broken: false };
   const id = loadout[slot];
   const part = id ? partById(id) : undefined;
@@ -414,30 +456,62 @@ export function resolvePart(bot: Bot, slot: Slot, loadout: Loadout): { part: Par
   return { part, mult: wearMult(cond), broken: false };
 }
 
-function synergy(classId: ClassId, weapon: Part | null, drive: Part | null, utility: Part | null): number {
+function synergy(
+  classId: ClassId,
+  weapon: Part | null,
+  drive: Part | null,
+  utility: Part | null,
+  chassis: Part | null,
+  armor: Part | null,
+): number {
   let s = 0;
   const fam = weapon?.family;
   const claw = fam === "claw" || fam === "bones";
-  const speedWep = fam === "saw" || fam === "drum" || fam === "disc" || fam === "chainsaw" || fam === "slasher";
-  const smash = fam === "hammer" || fam === "wedge";
-  if (classId === "striker" && speedWep) s += fam === "disc" ? 0.16 : 0.14;
+  const speedWep =
+    fam === "saw" || fam === "drum" || fam === "disc" || fam === "flail" || fam === "chainsaw" || fam === "slasher";
+  const smash = fam === "hammer" || fam === "wedge" || fam === "piston";
+  if (classId === "striker" && speedWep)
+    s += fam === "disc" ? 0.16 : fam === "flail" || fam === "chainsaw" ? 0.1 : 0.14;
   if (classId === "striker" && smash) s -= 0.16;
   if (classId === "striker" && claw) s -= 0.06;
   if (classId === "tank" && speedWep) s -= fam === "disc" ? 0.4 : 0.28;
-  if (classId === "tank" && smash) s += 0.14;
+  if (classId === "tank" && smash) s += fam === "piston" ? 0.08 : 0.14;
   if (classId === "tank" && claw) s -= 0.08;
   if (classId === "specialist" && claw) s += 0.18;
+  if (classId === "specialist" && (fam === "flame" || fam === "tesla")) s += 0.08;
   if (classId === "specialist" && speedWep) s -= 0.14;
   if (classId === "specialist" && fam === "wedge") s -= 0.06;
   if (classId === "tank" && drive?.family === "treads") s += 0.05;
-  if (classId === "striker" && (drive?.family === "mag" || drive?.family === "flip")) s += 0.04;
+  if (classId === "tank" && drive?.family === "anchor") s += 0.04;
+  if (
+    classId === "striker" &&
+    (drive?.family === "mag" || drive?.family === "flip" || drive?.family === "swerve")
+  )
+    s += 0.04;
+  if (classId === "striker" && drive?.family === "rocket") s += 0.03;
   if (classId === "striker" && drive?.family === "ghostchaser") s += 0.03;
   if (classId === "tank" && drive?.family === "ghostchaser") s -= 0.04;
   if (classId === "specialist" && drive?.family === "omni") s += 0.05;
+  if (classId === "specialist" && drive?.family === "air") s += 0.05;
   if (utility?.family === "burn" && classId === "striker") s += 0.04;
-  if (utility?.family === "weld") s += 0.03;
+  if (utility?.family === "weld" || utility?.family === "medbay") s += 0.03;
   if (utility?.family === "crowd") s += 0.02;
   if (utility?.family === "peace") s += 0.02;
+  if (utility?.family === "leech" && classId === "specialist") s += 0.03;
+  if (utility?.family === "grapple" && classId === "specialist") s += 0.04;
+  const aff = chassis?.affinity;
+  if (aff?.classId === classId) s += 0.04;
+  const slotPart =
+    aff?.slot === "weapon"
+      ? weapon
+      : aff?.slot === "drive"
+        ? drive
+        : aff?.slot === "armor"
+          ? armor
+          : aff?.slot === "utility"
+            ? utility
+            : null;
+  if (aff?.families && slotPart && aff.families.includes(slotPart.family)) s += 0.03;
   return s;
 }
 
@@ -445,17 +519,23 @@ export function buildFit(bot: Bot, loadout: Loadout): number {
   const slots: Slot[] = ["chassis", "drive", "weapon", "armor", "brain"];
   let fit = 0.46;
   const resolved = slots.map((slot) => resolvePart(bot, slot, loadout));
-  for (const r of resolved) {
+  for (const [index, r] of resolved.entries()) {
     if (!r.part) continue;
-    fit += TIER_FIT[r.part.tier] * r.mult;
+    if (slots[index] === "brain") continue;
+    fit += (r.part.fit ?? TIER_FIT[r.part.tier] ?? 0) * r.mult;
     if (r.broken) fit -= 0.04;
   }
   const utility = resolvePart(bot, "utility", loadout);
-  if (utility.part) fit += TIER_FIT[utility.part.tier] * 0.85 * utility.mult;
+  if (utility.part)
+    fit += (utility.part.fit ?? TIER_FIT[utility.part.tier] ?? 0) * UTILITY_FIT * utility.mult;
   const weapon = resolved[2]?.part ?? null;
   const drive = resolved[1]?.part ?? null;
-  fit += synergy(bot.classId, weapon, drive, utility.part);
-  const conds = SLOTS.map((slot) => (slot === "utility" && !loadout.utility ? "clean" : bot.wear[slot]));
+  const chassis = resolved[0]?.part ?? null;
+  const armor = resolved[3]?.part ?? null;
+  fit += synergy(bot.classId, weapon, drive, utility.part, chassis, armor);
+  const conds = SLOTS.map((slot) =>
+    slot === "utility" && !loadout.utility ? "clean" : bot.wear[slot],
+  );
   const scar = conds.filter((c) => c === "scratched").length;
   const bent = conds.filter((c) => c === "bent").length;
   fit -= scar * 0.015 + bent * 0.06;
@@ -474,7 +554,11 @@ function share(classId: ClassId): StatBlock {
   return { power: 0.22, speed: 0.22, armor: 0.18, heat: 0.38 };
 }
 
-export function printedStats(bot: Bot, loadout: Loadout, weekQ: number): { stats: StatBlock; rating: number; fit: number } {
+export function printedStats(
+  bot: Bot,
+  loadout: Loadout,
+  weekQ: number,
+): { stats: StatBlock; rating: number; fit: number } {
   const fit = buildFit(bot, loadout);
   const rating = ratingOf(weekQ, fit);
   const base = share(bot.classId);
@@ -488,7 +572,7 @@ export function printedStats(bot: Bot, loadout: Loadout, weekQ: number): { stats
     const resolved = resolvePart(bot, slot, loadout);
     if (!resolved.part) continue;
     const n = resolved.part.nudge;
-    const m = resolved.mult * (slot === "chassis" ? 0.45 : 1);
+    const m = resolved.mult * (slot === "chassis" ? CHASSIS_WEIGHT : slot === "brain" ? 0 : 1);
     stats.power += n.power * m;
     stats.speed += n.speed * m;
     stats.armor += n.armor * m;
@@ -503,7 +587,9 @@ export function printedStats(bot: Bot, loadout: Loadout, weekQ: number): { stats
 }
 
 function cageParts(bot: Bot, slot: Slot): Part[] {
-  const list = partsFor(slot, bot.classId).filter((part) => part.tier === "stock" || bot.owned.includes(part.id));
+  const list = partsFor(slot, bot.classId).filter(
+    (part) => part.tier === "stock" || bot.owned.includes(part.id),
+  );
   if (slot !== "utility" && list.length === 0) return [stockPart(slot, bot.classId)];
   return list;
 }
@@ -518,7 +604,14 @@ function wearFor(bot: Bot, loadout: Loadout): Bot {
 }
 
 function lockScore(printed: { rating: number; fit: number; stats: StatBlock }) {
-  return printed.rating * 100 + printed.fit * 40 + printed.stats.power + printed.stats.speed + printed.stats.armor + printed.stats.heat;
+  return (
+    printed.rating * 100 +
+    printed.fit * 40 +
+    printed.stats.power +
+    printed.stats.speed +
+    printed.stats.armor +
+    printed.stats.heat
+  );
 }
 
 export type LockAdvice = {
@@ -534,12 +627,57 @@ export type LockAdvice = {
 export function bestLock(bot: Bot, weekQ: number): LockAdvice {
   const currentLoad: Loadout = { ...(bot.locked ?? bot.draft) };
   const current = printedStats(wearFor(bot, currentLoad), currentLoad, weekQ);
-  const chassis = cageParts(bot, "chassis");
-  const drives = cageParts(bot, "drive");
-  const weapons = cageParts(bot, "weapon");
-  const armors = cageParts(bot, "armor");
-  const utilities: (Part | null)[] = [null, ...cageParts(bot, "utility")];
-  const brains = cageParts(bot, "brain");
+  const brainAdvice: Record<string, number> = {
+    skynet: 9,
+    phoenix: 8,
+    logic: 7,
+    hunter: 6,
+    sniper: 5,
+    brawler: 4,
+    jammer: 4,
+    turtle: 3,
+    berserker: 2,
+  };
+  const tierRank: Record<string, number> = {
+    stock: 0,
+    sport: 1,
+    pro: 2,
+    super: 3,
+    championship: 4,
+  };
+  const shortlist = <T extends Part | null>(slot: Slot, parts: T[]): T[] => {
+    if (parts.length <= 6) return parts;
+    const scored = parts.map((part) => {
+      const load: Loadout = { ...currentLoad, [slot]: part ? part.id : null };
+      const printed = printedStats(wearFor(bot, load), load, weekQ);
+      const brainBias =
+        part && slot === "brain"
+          ? (tierRank[part.tier] ?? 0) * 0.001 + (brainAdvice[part.family] ?? 0) * 0.0001
+          : 0;
+      return { part, score: lockScore(printed) + brainBias };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    const seen = new Set<string>();
+    const out: T[] = [];
+    const current = parts.find((part) => (part?.id ?? null) === (currentLoad[slot] ?? null));
+    for (const part of [current, ...scored.map((row) => row.part)]) {
+      if (!part && slot !== "utility") continue;
+      const id = part?.id ?? "empty";
+      if (seen.has(id)) continue;
+      seen.add(id);
+      if (part === undefined) continue;
+      out.push(part);
+      if (out.length >= 6) break;
+    }
+    if (slot === "utility" && !out.some((part) => part == null)) out[out.length - 1] = null as T;
+    return out;
+  };
+  const chassis = shortlist("chassis", cageParts(bot, "chassis"));
+  const drives = shortlist("drive", cageParts(bot, "drive"));
+  const weapons = shortlist("weapon", cageParts(bot, "weapon"));
+  const armors = shortlist("armor", cageParts(bot, "armor"));
+  const utilities = shortlist("utility", [null, ...cageParts(bot, "utility")]);
+  const brains = shortlist("brain", cageParts(bot, "brain"));
 
   let bestLoad = currentLoad;
   let bestPrinted = current;
@@ -551,21 +689,25 @@ export function bestLock(bot: Bot, weekQ: number): LockAdvice {
         for (const armor of armors) {
           for (const utility of utilities) {
             for (const brain of brains) {
-            const loadout: Loadout = {
-              chassis: body.id,
-              drive: drive.id,
-              weapon: weapon.id,
-              armor: armor.id,
-              utility: utility?.id ?? null,
-              brain: brain.id,
-            };
-            const printed = printedStats(wearFor(bot, loadout), loadout, weekQ);
-            const score = lockScore(printed);
-            if (score > bestScore) {
-              bestScore = score;
-              bestLoad = loadout;
-              bestPrinted = printed;
-            }
+              const loadout: Loadout = {
+                chassis: body.id,
+                drive: drive.id,
+                weapon: weapon.id,
+                armor: armor.id,
+                utility: utility?.id ?? null,
+                brain: brain.id,
+              };
+              const printed = printedStats(wearFor(bot, loadout), loadout, weekQ);
+              const brainPart = partById(brain.id);
+              const score =
+                lockScore(printed) +
+                (tierRank[brainPart?.tier ?? "stock"] ?? 0) * 0.001 +
+                (brainAdvice[brainPart?.family ?? ""] ?? 0) * 0.0001;
+              if (score > bestScore) {
+                bestScore = score;
+                bestLoad = loadout;
+                bestPrinted = printed;
+              }
             }
           }
         }
@@ -622,6 +764,50 @@ const FAMILY_WORD: Record<string, string> = {
   crowd: "a crowd kit",
   weld: "a pit weld",
   scry: "a scry",
+  swerve: "swerve",
+  rocket: "a rocket boost",
+  anchor: "an anchor",
+  air: "an air cushion",
+  chaser: "Ghost Chaser",
+  flail: "a flail",
+  piston: "a piston lance",
+  flame: "a flamethrower",
+  tesla: "a tesla coil",
+  ablative: "ablative armor",
+  gel: "gel pads",
+  chain: "chainmail",
+  spike: "a spike shell",
+  ceramic: "ceramic",
+  magnet: "a magnetic field",
+  reactive: "reactive armor",
+  spotlight: "a spotlight",
+  decoy: "a decoy",
+  oil: "an oil slick",
+  medbay: "a med bay",
+  leech: "a leech",
+  tremor: "a tremor",
+  blackout: "a blackout",
+  grapple: "a grapple",
+  siren: "a siren",
+  mirror: "a mirror",
+  veil: "Ghost Veil",
+  smoke: "a smoke screen",
+  uv: "a UV lamp",
+  hover: "a hover chassis",
+  spring: "a spring chassis",
+  skeleton: "Skeleton",
+  sprinter: "Sprinter",
+  hornet: "Hornet",
+  hybrid: "Hybrid",
+  dynamo: "Dynamo",
+  reactor: "Reactor",
+  berserker: "a berserker brain",
+  turtle: "a turtle brain",
+  sniper: "a sniper brain",
+  brawler: "a brawler brain",
+  jammer: "a jammer",
+  phoenix: "Phoenix",
+  skynet: "Skynet",
 };
 
 function familyWord(family: string) {
@@ -629,13 +815,18 @@ function familyWord(family: string) {
 }
 
 function weaponTell(classId: ClassId, family: string): string | null {
-  const speed = family === "saw" || family === "drum" || family === "disc";
-  const smash = family === "hammer" || family === "wedge";
+  const speed =
+    family === "saw" ||
+    family === "drum" ||
+    family === "disc" ||
+    family === "flail" ||
+    family === "chainsaw";
+  const smash = family === "hammer" || family === "wedge" || family === "piston";
   if (classId === "tank" && family === "disc") return "A disc on a tank is a ceiling fan.";
   if (classId === "tank" && speed) return "A speed weapon on a tank. They are fighting the chassis.";
-  if (classId === "tank" && family === "claw") return "A claw on a tank. That is not the late fight.";
+  if (classId === "tank" && (family === "claw" || family === "bones")) return "A claw on a tank. That is not the late fight.";
   if (classId === "striker" && smash) return "A smash weapon on a striker. They gave up the first hit.";
-  if (classId === "striker" && family === "claw") return "A claw on a striker. Heat is not their week.";
+  if (classId === "striker" && (family === "claw" || family === "bones")) return "A claw on a striker. Heat is not their week.";
   if (classId === "specialist" && speed) return "A speed weapon on a specialist. The claw is the point.";
   if (classId === "specialist" && family === "wedge") return "A wedge on a specialist. They are not a tank.";
   if (family === "chainsaw") return "A Texas chainsaw. Loud first bite, and it bogs in thick plate.";
@@ -649,7 +840,24 @@ function weaponTell(classId: ClassId, family: string): string | null {
   return null;
 }
 
-export const WEAPON_FAMILIES = ["saw", "drum", "wedge", "hammer", "claw", "disc"] as const;
+export const WEAPON_FAMILIES = [
+  "saw",
+  "drum",
+  "wedge",
+  "hammer",
+  "claw",
+  "disc",
+  "flail",
+  "piston",
+  "flame",
+  "tesla",
+  "chainsaw",
+  "slasher",
+  "ghost",
+  "launcher",
+  "bones",
+  "broom",
+] as const;
 
 export function weaponFamilyOf(bot: Bot): string {
   const load = bot.locked ?? bot.draft;
@@ -701,7 +909,8 @@ export function spyRead(data: PitData, targetId: string, tier: Tier): SpyRead | 
   }
   if (depth >= 1 && drive) lines.push(`Drive: ${familyWord(drive.family)}.`);
   if (depth >= 2 && armor) lines.push(`Armor: ${familyWord(armor.family)}.`);
-  if (depth >= 3) lines.push(`Named iron: ${weapon?.name ?? "—"}, ${drive?.name ?? "—"}, ${armor?.name ?? "—"}.`);
+  if (depth >= 3)
+    lines.push(`Named iron: ${weapon?.name ?? "—"}, ${drive?.name ?? "—"}, ${armor?.name ?? "—"}.`);
   if (depth >= 4) lines.push(utility ? `Utility: ${utility.name}.` : "Utility slot is empty.");
   return {
     targetId,
@@ -727,12 +936,15 @@ function snapshot(data: PitData, storeId: string): FighterSnap {
   // Full Tune-Up: every job and Spark done this week. A small, earned edge.
   const tuned = Boolean(data.jobLog && tunedUp(data, storeId, data.week));
   if (tuned) {
-    for (const k of ["power", "speed", "armor", "heat"] as const) printed.stats[k] = Math.min(99, printed.stats[k] + TUNE_UP_BONUS);
+    for (const k of ["power", "speed", "armor", "heat"] as const)
+      printed.stats[k] = Math.min(99, printed.stats[k] + TUNE_UP_BONUS);
   }
   const weapon = resolvePart(bot, "weapon", locked);
   const drive = resolvePart(bot, "drive", locked);
   const armor = resolvePart(bot, "armor", locked);
   const chassis = resolvePart(bot, "chassis", locked);
+  const utility = resolvePart(bot, "utility", locked);
+  const brain = resolvePart(bot, "brain", locked);
   return {
     id: storeId,
     name: store.name,
@@ -750,6 +962,26 @@ function snapshot(data: PitData, storeId: string): FighterSnap {
     driveFamily: drive.part?.family,
     chassisFamily: chassis.part?.family,
     shows: bot.shows,
+    utilityFamily: utility.part?.family ?? null,
+    brainFamily: brain.part?.family ?? "logic",
+    batteryMax: batteryOf(chassis.part),
+    tiers: {
+      chassis: chassis.part?.tier,
+      drive: drive.part?.tier,
+      weapon: weapon.part?.tier,
+      armor: armor.part?.tier,
+      utility: utility.part?.tier,
+      brain: brain.part?.tier,
+    },
+    wearMult: {
+      chassis: chassis.mult,
+      drive: drive.mult,
+      weapon: weapon.mult,
+      armor: armor.mult,
+      utility: utility.mult,
+      brain: brain.mult,
+    },
+    affinity: chassis.part?.affinity,
     weaponName: partById(locked.weapon)?.name ?? "Bare shaft",
     driveName: partById(locked.drive)?.name ?? "—",
     armorName: partById(locked.armor)?.name ?? "—",
@@ -758,257 +990,29 @@ function snapshot(data: PitData, storeId: string): FighterSnap {
     look: bot.look ?? "plain",
     number: bot.number ?? "",
     style: bot.style,
-    brainTier: resolvePart(bot, "brain", locked).part?.tier ?? "stock",
-    brainName: resolvePart(bot, "brain", locked).part?.name ?? "Logic Board",
+    brainTier: brain.part?.tier ?? "stock",
+    brainName: brain.part?.name ?? "Logic Board",
     tuned,
     // Unrepaired damage from earlier weeks shows on the paint.
     scars: Object.values(bot.wear ?? {}).filter((w) => w && w !== "clean").length,
   };
 }
 
-function betterWeekEdge(a: FighterSnap, b: FighterSnap): number {
-  return (a.weekQ - b.weekQ) * 6;
-}
-
-function strikeDamage(attacker: FighterSnap, defender: FighterSnap, index: number, rng: () => number): { damage: number; tags: string[]; call: string } {
-  const tags: string[] = [];
-  let dmg =
-    attacker.stats.power * 1.22 +
-    attacker.stats.speed * 0.2 -
-    defender.stats.armor * 0.38 +
-    betterWeekEdge(attacker, defender);
-
-  if (index === 0 && attacker.stats.speed > defender.stats.speed + 4) {
-    const bonus = (attacker.stats.speed - defender.stats.speed) * 0.42;
-    dmg += bonus;
-    tags.push("first");
-  }
-
-  if (
-    attacker.classId === "striker" &&
-    defender.classId === "tank" &&
-    attacker.stats.speed > defender.stats.speed + 6
-  ) {
-    dmg += index === 0 ? 16 : index === 1 ? 12 : 4;
-    tags.push("pressure");
-  }
-
-  if (attacker.classId === "tank" && index === 2) {
-    dmg += 10 + attacker.stats.armor * 0.12;
-    tags.push("late");
-  }
-
-  if (
-    attacker.classId === "tank" &&
-    defender.classId === "specialist" &&
-    index > 0 &&
-    defender.stats.heat < 22
-  ) {
-    dmg += 9;
-    tags.push("smother");
-  }
-
-  if (
-    attacker.classId === "specialist" &&
-    defender.classId === "striker" &&
-    attacker.stats.heat >= defender.stats.heat + 2
-  ) {
-    dmg += 8 + Math.max(0, attacker.stats.heat - defender.stats.heat) * 0.35;
-    tags.push("heat");
-  }
-
-  if (attacker.classId === "striker" && defender.classId === "specialist" && defender.stats.heat >= attacker.stats.heat + 4) {
-    dmg *= 0.62;
-    tags.push("shutdown");
-  }
-
-  if (attacker.weaponFamily === "disc" && attacker.classId === "tank") {
-    dmg *= 0.55;
-    tags.push("ceiling-fan");
-  }
-
-  if (attacker.weaponFamily === "wedge" && attacker.classId === "striker") {
-    dmg *= 0.78;
-    tags.push("wrong-iron");
-  }
-
-  dmg = halloweenStrikeAdjust(attacker, defender, index, dmg, tags);
-
-  const variance = 0.92 + rng() * 0.16;
-  dmg = clamp(dmg * variance, 8, 58);
-
-  const call = callLine(attacker, defender, tags, index);
-  return { damage: Math.round(dmg), tags, call };
-}
-
-/**
- * Halloween parts share the normal damage number. Each one adds a single
- * trade, then the usual variance and clamp still apply. Fog and blacklight
- * are not read here.
- */
-export function halloweenStrikeAdjust(attacker: FighterSnap, defender: FighterSnap, index: number, dmg: number, tags: string[]) {
-  const w = attacker.weaponFamily;
-  if (w === "chainsaw") {
-    if (index === 0) {
-      dmg += 4;
-      tags.push("chainsaw");
-    }
-    if (attacker.stats.armor < defender.stats.armor) {
-      dmg *= 0.85;
-      tags.push("bog");
-    }
-  } else if (w === "slasher") {
-    if (attacker.stats.speed > defender.stats.speed) {
-      if (index === 0) {
-        dmg += 6;
-        tags.push("lunge");
-      }
-    } else {
-      dmg *= 0.8;
-      tags.push("late-slash");
-    }
-  } else if (w === "ghost") {
-    dmg += defender.stats.armor * 0.38 * 0.3;
-    tags.push("phase");
-    if (attacker.stats.heat < 10) {
-      dmg *= 0.72;
-      tags.push("fade");
-    }
-  } else if (w === "launcher") {
-    if (index === 0) dmg *= 0.72;
-    if (index === 1) {
-      dmg += 8;
-      tags.push("lob");
-    }
-  } else if (w === "bones") {
-    if (defender.classId === "tank") dmg *= 0.85;
-    else if (defender.classId === "striker") {
-      dmg += 2;
-      tags.push("rattle");
-    }
-  } else if (w === "broom") {
-    if (attacker.stats.heat >= defender.stats.heat) {
-      dmg += 3;
-      tags.push("staff");
-    } else {
-      dmg -= 4;
-      tags.push("broom");
-    }
-  }
-  if (attacker.chassisFamily === "pumpkin") dmg *= 0.93;
-  if (defender.chassisFamily === "pumpkin" && index === 0) dmg *= 0.94;
-  if (attacker.driveFamily === "ghostchaser" && index === 0 && attacker.stats.speed > defender.stats.speed) {
-    dmg += 3;
-    tags.push("chase");
-  }
-  if (defender.driveFamily === "ghostchaser") dmg *= 1.06;
-  return dmg;
-}
-
-function callLine(attacker: FighterSnap, defender: FighterSnap, tags: string[], index: number): string {
-  if (tags.includes("bog")) return `${attacker.botName} revs the Texas Chainsaw. The plate is thick, and the saw keeps singing.`;
-  if (tags.includes("chainsaw")) return `${attacker.botName} opens with the Texas Chainsaw. The first bite is the parade.`;
-  if (tags.includes("lunge")) return `${attacker.botName} lunges with the Slasher Blade and finds a clean line.`;
-  if (tags.includes("late-slash")) return `${attacker.botName} brings the Slasher Blade around late. A faster week would love this one.`;
-  if (tags.includes("fade")) return `The Ghost Blade thins out. More Heat and ${attacker.botName} would light the lane.`;
-  if (tags.includes("phase")) return `${attacker.botName} lets the Ghost Blade slip through the plate, trail and all.`;
-  if (tags.includes("lob")) return `${attacker.botName} lofts a pumpkin into the middle of the cage. Festive, and it counts.`;
-  if (tags.includes("rattle")) return `Skeleton Claws chatter. ${attacker.botName} keeps the grab cheerful.`;
-  if (tags.includes("staff")) return `${attacker.botName} plants the Witch's Broom like a staff and conducts the exchange.`;
-  if (tags.includes("broom")) return `${attacker.botName} is still sweeping. The broom becomes a staff when the Heat catches up.`;
-  if (tags.includes("chase")) return `Ghost Chaser closes the gap. ${attacker.botName} arrives with the lamps on.`;
-  if (tags.includes("ceiling-fan")) {
-    return `${attacker.botName} spins the disc. On that chassis it is a ceiling fan. ${defender.botName} walks through it.`;
-  }
-  if (tags.includes("pressure") && index === 0) {
-    return `${attacker.botName} is in the pocket before ${defender.storeName} finishes the handshake.`;
-  }
-  if (tags.includes("shutdown")) {
-    return `${defender.botName} cooks the exchange. ${attacker.botName} swings at air that is already hot.`;
-  }
-  if (tags.includes("heat")) {
-    return `Heat is real. ${attacker.botName} holds ${defender.botName} and does not give the saw back.`;
-  }
-  if (tags.includes("smother")) {
-    return `${attacker.botName} lays on the grapple and waits. The claw never finds a second bite.`;
-  }
-  if (tags.includes("late")) {
-    return `Late fight. ${attacker.botName} finally spends the armor it drove in with.`;
-  }
-  if (tags.includes("wrong-iron")) {
-    return `${attacker.botName} brought the wrong iron. ${defender.botName} treats it like a suggestion.`;
-  }
-  if (tags.includes("first")) {
-    return `First steel belongs to ${attacker.storeName}.`;
-  }
-  return `${attacker.botName} and ${defender.botName} trade the middle of the cage.`;
-}
-
-function exchangeOrder(a: FighterSnap, b: FighterSnap): [FighterSnap, FighterSnap, FighterSnap] {
-  const first = a.stats.speed >= b.stats.speed ? a : b;
-  const slower = first.id === a.id ? b : a;
-  let second = slower;
-  if (
-    first.classId === "striker" &&
-    slower.classId === "tank" &&
-    first.stats.speed > slower.stats.speed + 6
-  ) {
-    second = first;
-  }
-  if (
-    first.classId === "specialist" &&
-    slower.classId === "striker" &&
-    first.stats.heat >= slower.stats.heat + 2
-  ) {
-    second = first;
-  }
-  let third = a.stats.power >= b.stats.power ? a : b;
-  if (a.classId === "tank" && b.classId !== "tank") third = a;
-  if (b.classId === "tank" && a.classId !== "tank") third = b;
-  if (a.classId === "tank" && b.classId === "tank") {
-    third = a.stats.armor >= b.stats.armor ? a : b;
-  }
-  return [first, second, third];
-}
-
 function emptyWear(): Record<Slot, Condition> {
-  return { chassis: "clean", drive: "clean", weapon: "clean", armor: "clean", utility: "clean", brain: "clean" };
-}
-
-function planDuelWear(
-  winner: string,
-  loser: string,
-  method: Method,
-  blowout: boolean,
-  rng: () => number,
-): Record<string, Record<Slot, Condition>> {
-  const w = emptyWear();
-  const l = emptyWear();
-  const scratchPool: Slot[] = ["armor", "drive", "chassis", "weapon"];
-  w[scratchPool[Math.floor(rng() * scratchPool.length)]!] = "scratched";
-  if (rng() < 0.55) w[scratchPool[Math.floor(rng() * 3)]!] = "scratched";
-  if (blowout || method === "ko") {
-    l.weapon = "disabled";
-    l.drive = "disabled";
-    l.armor = "bent";
-    l.chassis = "scratched";
-  } else if (method === "dump") {
-    l.weapon = "bent";
-    l.drive = "disabled";
-    l.armor = "bent";
-    l.chassis = "scratched";
-  } else {
-    l.weapon = "bent";
-    l.armor = "scratched";
-    l.drive = "scratched";
-    l.chassis = "clean";
-  }
-  return { [winner]: w, [loser]: l };
+  return {
+    chassis: "clean",
+    drive: "clean",
+    weapon: "clean",
+    armor: "clean",
+    utility: "clean",
+    brain: "clean",
+  };
 }
 
 function combineSnaps(snaps: FighterSnap[], ids: string[]): FighterSnap {
   const team = ids.map((id) => snaps.find((s) => s.id === id)!);
-  const avg = (k: keyof StatBlock) => Math.round(team.reduce((s, f) => s + f.stats[k], 0) / team.length);
+  const avg = (k: keyof StatBlock) =>
+    Math.round(team.reduce((s, f) => s + f.stats[k], 0) / team.length);
   const lead = team[0]!;
   return {
     ...lead,
@@ -1026,72 +1030,26 @@ function combineSnaps(snaps: FighterSnap[], ids: string[]): FighterSnap {
 export function simulateDuel(data: PitData, idA: string, idB: string, seed: string): FightResult {
   const a = snapshot(data, idA);
   const b = snapshot(data, idB);
-  const rng = mulberry32(hashString(seed));
-  const order = exchangeOrder(a, b);
-  const hp: Record<string, number> = { [a.id]: 100, [b.id]: 100 };
-  const exchanges: Exchange[] = [];
-  let koAt = -1;
-  for (let i = 0; i < 3; i++) {
-    const attacker = order[i]!;
-    const defender = attacker.id === a.id ? b : a;
-    if (hp[defender.id]! <= 0 || hp[attacker.id]! <= 0) break;
-    const hit = strikeDamage(attacker, defender, i, rng);
-    hp[defender.id] = Math.max(0, hp[defender.id]! - hit.damage);
-    exchanges.push({
-      index: i + 1,
-      attackerId: attacker.id,
-      defenderId: defender.id,
-      damage: hit.damage,
-      attackerHp: hp[attacker.id]!,
-      defenderHp: hp[defender.id]!,
-      call: hit.call,
-      tags: hit.tags,
-    });
-    if (hp[defender.id] === 0) {
-      koAt = i;
-      break;
-    }
-  }
+  const fought = fightDuel(a, b, { hot: data.week === 3 });
+  const hp = fought.hp;
+  const exchanges = fought.exchanges;
+  const method = fought.method;
+  const finisher = fought.finisher;
+  const koAt = fought.koAt;
 
-  let method: Method = "decision";
-  let finisher: FightResult["finisher"] = null;
-  const ahead = hp[a.id]! === hp[b.id]! ? (a.rating >= b.rating ? a : b) : hp[a.id]! > hp[b.id]! ? a : b;
-  const behind = ahead.id === a.id ? b : a;
-
-  if (hp[a.id] === 0 || hp[b.id] === 0) {
-    method = "ko";
-  } else {
-    const winnerSnap = ahead;
-    const loserSnap = behind;
-    const heatGap = winnerSnap.stats.heat - loserSnap.stats.heat;
-    if (heatGap >= 6 && hp[loserSnap.id]! < 48) {
-      const burn = Math.round(12 + heatGap * 0.8);
-      hp[loserSnap.id] = Math.max(0, hp[loserSnap.id]! - burn);
-      finisher = {
-        by: winnerSnap.id,
-        against: loserSnap.id,
-        damage: burn,
-        call: `${winnerSnap.botName} spends the Heat. ${loserSnap.botName} does not get a fourth exchange.`,
-      };
-      if (hp[loserSnap.id] === 0) method = "ko";
-    }
-    if (method === "decision") {
-      const control = winnerSnap.weaponFamily === "wedge" || winnerSnap.weaponFamily === "claw" || winnerSnap.weaponFamily === "bones";
-      if (control && hp[loserSnap.id]! < 36 && winnerSnap.stats.power > loserSnap.stats.armor * 0.7) {
-        method = "dump";
-        hp[loserSnap.id] = Math.max(0, hp[loserSnap.id]! - 8);
-      }
-    }
-  }
-
-  const winner = hp[a.id]! === hp[b.id]! ? (a.rating >= b.rating ? a : b) : hp[a.id]! > hp[b.id]! ? a : b;
+  const winner = preferFighter(a, b, hp[a.id]!, hp[b.id]!);
   const loser = winner.id === a.id ? b : a;
   const gap = hp[winner.id]! - hp[loser.id]!;
   const blowout =
     (method === "ko" && koAt >= 0 && koAt < 2) ||
     gap >= 48 ||
     (hp[loser.id]! <= 15 && hp[winner.id]! >= 55);
-  const wear = planDuelWear(winner.id, loser.id, method, blowout, rng);
+  const wear = duelWear(
+    winner.id,
+    loser.id,
+    hp[loser.id] === 0 && method === "decision" ? "ko" : method,
+    blowout,
+  );
 
   return {
     winnerIds: [winner.id],
@@ -1108,54 +1066,35 @@ export function simulateDuel(data: PitData, idA: string, idB: string, seed: stri
 }
 
 /** Championship Saturday has no judges and no decision. Damage escalates until one bot is out. */
-export function simulateChampionshipDuel(data: PitData, idA: string, idB: string, seed: string): FightResult {
+export function simulateChampionshipDuel(
+  data: PitData,
+  idA: string,
+  idB: string,
+  seed: string,
+): FightResult {
   const a = snapshot(data, idA);
   const b = snapshot(data, idB);
-  const rng = mulberry32(hashString(seed + "|championship"));
-  const opening = exchangeOrder(a,b);
-  const first = opening[0]!;
-  const other = first.id === a.id ? b : a;
-  const hp: Record<string,number> = { [a.id]: 100, [b.id]: 100 };
-  const exchanges: Exchange[] = [];
-  let i = 0;
-  while (hp[a.id]! > 0 && hp[b.id]! > 0 && i < 40) {
-    const attacker = i < 3 ? opening[i]! : ((i - 3) % 2 === 0 ? other : first);
-    const defender = attacker.id === a.id ? b : a;
-    const base = strikeDamage(attacker, defender, Math.min(i,2), rng);
-    const round = i + 1;
-    const mult = round <= 3 ? 1 : round === 4 ? 1.1 : round === 5 ? 1.2 : 1.35;
-    const heatPush = round >= 6 ? Math.max(0, attacker.stats.heat - defender.stats.heat) * 0.25 : 0;
-    const damage = Math.max(1, Math.round(base.damage * mult + heatPush));
-    hp[defender.id] = Math.max(0, hp[defender.id]! - damage);
-    const tags = [...base.tags, ...(round >= 6 ? ["sudden-death"] : round >= 4 ? ["overtime"] : [])];
-    const call = round >= 6
-      ? `Sudden death, round ${round}. ${base.call}`
-      : round >= 4
-        ? `Overtime, round ${round}. ${base.call}`
-        : base.call;
-    exchanges.push({ index: round, attackerId: attacker.id, defenderId: defender.id, damage, attackerHp: hp[attacker.id]!, defenderHp: hp[defender.id]!, call, tags });
-    i++;
-  }
-  if (hp[a.id]! > 0 && hp[b.id]! > 0) {
-    const defender = hp[a.id]! <= hp[b.id]! ? a : b;
-    const attacker = defender.id === a.id ? b : a;
-    const damage = hp[defender.id]!;
-    hp[defender.id] = 0;
-    exchanges.push({ index: exchanges.length + 1, attackerId: attacker.id, defenderId: defender.id, damage, attackerHp: hp[attacker.id]!, defenderHp: 0, call: `The championship cannot go to the judges. ${attacker.botName} lands the last shot.`, tags:["sudden-death"] });
-  }
+  const fought = fightDuel(a, b, { hot: true, overtime: true });
+  const hp = fought.hp;
+  const exchanges = fought.exchanges;
   const winner = hp[a.id]! > 0 ? a : b;
   const loser = winner.id === a.id ? b : a;
   const last = exchanges.at(-1)!;
   return {
-    winnerIds:[winner.id],
-    loserIds:[loser.id],
-    method:"ko",
+    winnerIds: [winner.id],
+    loserIds: [loser.id],
+    method: "ko",
     blowout: exchanges.length <= 3 || hp[winner.id]! >= 60,
     exchanges,
-    finisher:{ by:winner.id, against:loser.id, damage:last.damage, call:last.call },
+    finisher: fought.finisher ?? {
+      by: winner.id,
+      against: loser.id,
+      damage: last.damage,
+      call: last.call,
+    },
     hp,
-    fighters:[a,b],
-    wear: planDuelWear(winner.id,loser.id,"ko",exchanges.length <= 3,rng),
+    fighters: [a, b],
+    wear: duelWear(winner.id, loser.id, "ko", exchanges.length <= 3),
     seed,
   };
 }
@@ -1183,14 +1122,14 @@ export function simulateBye(data: PitData, storeId: string, seed: string): Fight
     look: "plain",
     number: "",
   };
-  const rng = mulberry32(hashString(seed));
   const hp: Record<string, number> = { [storeId]: 100, house: 100 };
   const exchanges: Exchange[] = [];
   const order = [snap, house, snap];
+  const scripted = [18, 22, 16];
   for (let i = 0; i < 3; i++) {
     const attacker = order[i]!;
     const defender = attacker.id === storeId ? house : snap;
-    const damage = Math.round(14 + rng() * 10);
+    const damage = scripted[i]!;
     hp[defender.id] = Math.max(8, hp[defender.id]! - damage);
     exchanges.push({
       index: i + 1,
@@ -1220,45 +1159,27 @@ export function simulateBye(data: PitData, storeId: string, seed: string): Fight
   };
 }
 
-export function simulateTag(data: PitData, teamA: string[], teamB: string[], seed: string): FightResult {
+export function simulateTag(
+  data: PitData,
+  teamA: string[],
+  teamB: string[],
+  seed: string,
+): FightResult {
   const snaps = [...teamA, ...teamB].map((id) => snapshot(data, id));
   const a = combineSnaps(snaps, teamA);
   const b = combineSnaps(snaps, teamB);
-  const fake: PitData = data;
-  void fake;
-  const rng = mulberry32(hashString(seed));
-  const order = exchangeOrder(a, b);
-  const hp: Record<string, number> = { [a.id]: 100, [b.id]: 100 };
-  const exchanges: Exchange[] = [];
-  for (let i = 0; i < 3; i++) {
-    const attacker = order[i]!;
-    const defender = attacker.id === a.id ? b : a;
-    const hit = strikeDamage(attacker, defender, i, rng);
-    const damage = Math.round(hit.damage * 0.92);
-    hp[defender.id] = Math.max(0, hp[defender.id]! - damage);
-    exchanges.push({
-      index: i + 1,
-      attackerId: attacker.id,
-      defenderId: defender.id,
-      damage,
-      attackerHp: hp[attacker.id]!,
-      defenderHp: hp[defender.id]!,
-      call: hit.call,
-      tags: [...hit.tags, "tag"],
-    });
-    if (hp[defender.id] === 0) break;
-  }
+  const fought = fightDuel(a, b, { hot: data.week === 3, pace: 0.64 });
+  const hp = fought.hp;
+  const exchanges = fought.exchanges.map((ex) => ({ ...ex, tags: [...ex.tags, "tag"] }));
   const winner = hp[a.id]! >= hp[b.id]! ? a : b;
   const loser = winner.id === a.id ? b : a;
   const method: Method = hp[loser.id] === 0 ? "ko" : "decision";
   const winIds = winner.id === a.id ? teamA : teamB;
   const loseIds = winner.id === a.id ? teamB : teamA;
   const wear: FightResult["wear"] = {};
-  const rng2 = mulberry32(hashString(seed + ":wear"));
   for (const id of winIds) {
     const w = emptyWear();
     w.armor = "scratched";
-    if (rng2() < 0.4) w.drive = "scratched";
     wear[id] = w;
   }
   for (const id of loseIds) {
@@ -1284,19 +1205,25 @@ export function simulateTag(data: PitData, teamA: string[], teamB: string[], see
 
 export function simulateMelee(data: PitData, ids: string[], seed: string): FightResult {
   const snaps = ids.map((id) => snapshot(data, id));
-  const rng = mulberry32(hashString(seed));
   const hp: Record<string, number> = {};
   ids.forEach((id) => (hp[id] = 100));
   const exchanges: Exchange[] = [];
   const alive = () => ids.filter((id) => hp[id]! > 0);
   for (let i = 0; i < 8 && alive().length > 1; i++) {
-    const pool = alive();
-    const attacker = pool[Math.floor(rng() * pool.length)]!;
-    let defender = pool[Math.floor(rng() * pool.length)]!;
-    if (defender === attacker) defender = pool[(pool.indexOf(attacker) + 1) % pool.length]!;
+    const pool = alive()
+      .slice()
+      .sort((x, y) => {
+        const sx = snaps.find((s) => s.id === x)!;
+        const sy = snaps.find((s) => s.id === y)!;
+        return sy.rating - sx.rating || sy.stats.power - sx.stats.power || (x < y ? -1 : 1);
+      });
+    const attacker = pool[0]!;
+    const defender = pool.slice(1).sort((x, y) => hp[x]! - hp[y]! || (x < y ? -1 : 1))[0]!;
     const a = snaps.find((s) => s.id === attacker)!;
     const d = snaps.find((s) => s.id === defender)!;
-    const damage = Math.round(clamp(a.stats.power * 0.55 + rng() * 14, 10, 28));
+    const damage = Math.round(
+      clamp(a.stats.power * 0.62 + a.stats.speed * 0.08 - d.stats.armor * 0.2, 10, 36),
+    );
     hp[defender] = Math.max(0, hp[defender]! - damage);
     exchanges.push({
       index: i + 1,
@@ -1309,7 +1236,11 @@ export function simulateMelee(data: PitData, ids: string[], seed: string): Fight
       tags: ["melee"],
     });
   }
-  const order = [...ids].sort((a, b) => hp[b]! - hp[a]! || snaps.find((s) => s.id === b)!.rating - snaps.find((s) => s.id === a)!.rating);
+  const order = [...ids].sort(
+    (a, b) =>
+      hp[b]! - hp[a]! ||
+      snaps.find((s) => s.id === b)!.rating - snaps.find((s) => s.id === a)!.rating,
+  );
   const winner = order[0]!;
   const wear: FightResult["wear"] = {};
   ids.forEach((id) => {
@@ -1340,7 +1271,7 @@ function seededWheel(stores: { id: string; seed: number }[], week: number): { by
   const ring = [...stores].sort((a, b) => a.seed - b.seed).map((store) => store.id);
   const n = ring.length;
   if (n < 2) return { bye: ring[0] ?? null, pairs: [] };
-  const turns = ((week - 1) % n + n) % n;
+  const turns = (((week - 1) % n) + n) % n;
   for (let i = 0; i < turns; i++) ring.push(ring.shift()!);
   if (n % 2 === 1) {
     const bye = ring[0]!;
@@ -1355,38 +1286,91 @@ function seededWheel(stores: { id: string; seed: number }[], week: number): { by
 
 type SeedToken = `M${number}` | `F${number}`;
 const REGULAR_SCHEDULE: SeedToken[][][] = [
-  [["F0","F6"],["F1","F5"],["F2","F3"],["F4","M3"],["M0","M6"],["M1","M4"],["M2","M5"]],
-  [["F0","F4"],["F1","M6"],["F2","F5"],["F3","F6"],["M0","M4"],["M1","M5"],["M2","M3"]],
-  [["F0","F1"],["F2","M6"],["F3","M2"],["F4","F5"],["F6","M4"],["M0","M1"],["M3","M5"]],
-  [["F0","M0"],["F1","F2"],["F3","F4"],["F5","M1"],["F6","M5"],["M2","M4"],["M3","M6"]],
+  [
+    ["F0", "F6"],
+    ["F1", "F5"],
+    ["F2", "F3"],
+    ["F4", "M3"],
+    ["M0", "M6"],
+    ["M1", "M4"],
+    ["M2", "M5"],
+  ],
+  [
+    ["F0", "F4"],
+    ["F1", "M6"],
+    ["F2", "F5"],
+    ["F3", "F6"],
+    ["M0", "M4"],
+    ["M1", "M5"],
+    ["M2", "M3"],
+  ],
+  [
+    ["F0", "F1"],
+    ["F2", "M6"],
+    ["F3", "M2"],
+    ["F4", "F5"],
+    ["F6", "M4"],
+    ["M0", "M1"],
+    ["M3", "M5"],
+  ],
+  [
+    ["F0", "M0"],
+    ["F1", "F2"],
+    ["F3", "F4"],
+    ["F5", "M1"],
+    ["F6", "M5"],
+    ["M2", "M4"],
+    ["M3", "M6"],
+  ],
 ];
 
 function conferenceSchedule(data: PitData, week: number): [string, string][] | null {
-  const metro = data.stores.filter((store) => store.conference === "metro").sort((a,b) => a.seed-b.seed || a.name.localeCompare(b.name));
-  const frontier = data.stores.filter((store) => store.conference === "frontier").sort((a,b) => a.seed-b.seed || a.name.localeCompare(b.name));
+  const metro = data.stores
+    .filter((store) => store.conference === "metro")
+    .sort((a, b) => a.seed - b.seed || a.name.localeCompare(b.name));
+  const frontier = data.stores
+    .filter((store) => store.conference === "frontier")
+    .sort((a, b) => a.seed - b.seed || a.name.localeCompare(b.name));
   if (metro.length !== 7 || frontier.length !== 7 || week < 1 || week > 4) return null;
-  const resolve = (token: SeedToken) => token[0] === "M" ? metro[Number(token.slice(1))]!.id : frontier[Number(token.slice(1))]!.id;
-  return REGULAR_SCHEDULE[week-1]!.map(([a,b]) => [resolve(a!),resolve(b!)] as [string,string]);
+  const resolve = (token: SeedToken) =>
+    token[0] === "M" ? metro[Number(token.slice(1))]!.id : frontier[Number(token.slice(1))]!.id;
+  return REGULAR_SCHEDULE[week - 1]!.map(
+    ([a, b]) => [resolve(a!), resolve(b!)] as [string, string],
+  );
 }
 
 export function buildCard(data: PitData): Bout[] {
   const week = data.week;
   if (week === 5) {
     const finalists = championshipFinalists(data);
-    return finalists.length === 2 ? [makeBout(5, 1, "final", "Waterman Championship", [finalists[0]!], [finalists[1]!])] : [];
+    return finalists.length === 2
+      ? [makeBout(5, 1, "final", "Waterman Championship", [finalists[0]!], [finalists[1]!])]
+      : [];
   }
   const scheduled = conferenceSchedule(data, week);
   if (scheduled) {
-    return scheduled.map(([a,b], index) => {
-      const cross = storeFor(data,a).conference !== storeFor(data,b).conference;
-      const title = index === scheduled.length - 1 ? "Main event" : cross ? "Crossover" : "Conference";
-      return makeBout(week,index+1,"bout",title,[a],[b]);
+    return scheduled.map(([a, b], index) => {
+      const cross = storeFor(data, a).conference !== storeFor(data, b).conference;
+      const title =
+        index === scheduled.length - 1 ? "Main event" : cross ? "Crossover" : "Conference";
+      return makeBout(week, index + 1, "bout", title, [a], [b]);
     });
   }
   const { bye, pairs } = seededWheel(data.stores, week);
   const bouts: Bout[] = [];
   if (bye) bouts.push(makeBout(week, 1, "bye", "Bye", [bye], []));
-  pairs.forEach((pair,index) => bouts.push(makeBout(week,bouts.length+1,"bout",index===pairs.length-1?"Main event":"Card",[pair[0]],[pair[1]])));
+  pairs.forEach((pair, index) =>
+    bouts.push(
+      makeBout(
+        week,
+        bouts.length + 1,
+        "bout",
+        index === pairs.length - 1 ? "Main event" : "Card",
+        [pair[0]],
+        [pair[1]],
+      ),
+    ),
+  );
   return bouts;
 }
 
@@ -1416,7 +1400,8 @@ export function simulateBout(data: PitData, bout: Bout): FightResult {
   if (bout.kind === "bye") return simulateBye(data, bout.teamA[0]!, seed);
   if (bout.kind === "tag") return simulateTag(data, bout.teamA, bout.teamB, seed);
   if (bout.kind === "melee") return simulateMelee(data, bout.teamA, seed);
-  if (data.week === 5 && bout.kind === "final" && bout.title === "Waterman Championship") return simulateChampionshipDuel(data, bout.teamA[0]!, bout.teamB[0]!, seed);
+  if (data.week === 5 && bout.kind === "final" && bout.title === "Waterman Championship")
+    return simulateChampionshipDuel(data, bout.teamA[0]!, bout.teamB[0]!, seed);
   return simulateDuel(data, bout.teamA[0]!, bout.teamB[0]!, seed);
 }
 
@@ -1441,9 +1426,36 @@ const DRILL_ROWS: {
   weapon: string;
   armor: string;
 }[] = [
-  { id: "ai-striker", classId: "striker", name: "Striker drill", bot: "SHRIKE", paint: "steel", drive: "mag", weapon: "saw", armor: "angle" },
-  { id: "ai-tank", classId: "tank", name: "Tank drill", bot: "ANVIL", paint: "mud", drive: "treads", weapon: "wedge", armor: "plate" },
-  { id: "ai-specialist", classId: "specialist", name: "Specialist drill", bot: "VICE", paint: "teal", drive: "omni", weapon: "claw", armor: "cage" },
+  {
+    id: "ai-striker",
+    classId: "striker",
+    name: "Striker drill",
+    bot: "SHRIKE",
+    paint: "steel",
+    drive: "mag",
+    weapon: "saw",
+    armor: "angle",
+  },
+  {
+    id: "ai-tank",
+    classId: "tank",
+    name: "Tank drill",
+    bot: "ANVIL",
+    paint: "mud",
+    drive: "treads",
+    weapon: "wedge",
+    armor: "plate",
+  },
+  {
+    id: "ai-specialist",
+    classId: "specialist",
+    name: "Specialist drill",
+    bot: "VICE",
+    paint: "teal",
+    drive: "omni",
+    weapon: "claw",
+    armor: "cage",
+  },
 ];
 
 export type ScrimmageHit = {
@@ -1512,8 +1524,17 @@ function drillCard(row: (typeof DRILL_ROWS)[number], week: number): StoreCard {
 
 function scrimmageNote(player: FighterSnap, drill: FighterSnap, won: boolean): string {
   const wrong =
-    (player.classId === "tank" && (player.weaponFamily === "disc" || player.weaponFamily === "saw" || player.weaponFamily === "drum" || player.weaponFamily === "chainsaw" || player.weaponFamily === "slasher")) ||
-    (player.classId === "striker" && (player.weaponFamily === "wedge" || player.weaponFamily === "hammer")) ||
+    (player.classId === "tank" &&
+      (player.weaponFamily === "disc" ||
+        player.weaponFamily === "saw" ||
+        player.weaponFamily === "drum" ||
+        player.weaponFamily === "chainsaw" ||
+        player.weaponFamily === "slasher" ||
+        player.weaponFamily === "flail")) ||
+    (player.classId === "striker" &&
+      (player.weaponFamily === "wedge" ||
+        player.weaponFamily === "hammer" ||
+        player.weaponFamily === "piston")) ||
     (player.classId === "specialist" && player.weaponFamily !== "claw" && player.weaponFamily !== "bones");
   if (!won && wrong) {
     return `${player.botName} is on the wrong weapon for a ${player.classId}. The drill is stock, on a blue week, and still won. No damage was written.`;
@@ -1521,8 +1542,10 @@ function scrimmageNote(player: FighterSnap, drill: FighterSnap, won: boolean): s
   if (!won && player.weekQ + 0.05 < drill.weekQ) {
     return `The drill is only a blue week. ${player.botName} lost the range. Fix the card or the lock before Saturday close. Nothing was posted.`;
   }
-  if (!won) return `${drill.botName} kept the cage. ${player.botName} walks out clean. Change one part and run it again.`;
-  if (wrong) return `The drill fell, but the lock is still wrong for a ${player.classId}. Do not trust a scrimmage win. No damage.`;
+  if (!won)
+    return `${drill.botName} kept the cage. ${player.botName} walks out clean. Change one part and run it again.`;
+  if (wrong)
+    return `The drill fell, but the lock is still wrong for a ${player.classId}. Do not trust a scrimmage win. No damage.`;
   return `${player.botName} beats a correct stock ${drill.classId}. Scrimmage only. The trophy does not move.`;
 }
 
@@ -1544,7 +1567,11 @@ function stageScrimmage(data: PitData, storeId: string): PitData {
 }
 
 /** House drills only. Same fight math. Does not post a bout, wear, or coins. */
-export function scrimmageDrills(data: PitData, storeId: string, which: ClassId | "all" = "all"): ScrimmageHit[] {
+export function scrimmageDrills(
+  data: PitData,
+  storeId: string,
+  which: ClassId | "all" = "all",
+): ScrimmageHit[] {
   const staged = stageScrimmage(data, storeId);
   const bot = botFor(staged, storeId);
   const load = bot.locked ?? bot.draft;
@@ -1678,17 +1705,25 @@ export function runSaturday(data: PitData): Bout[] {
     bouts: [...data.bouts.filter((bout) => bout.week !== 4), ...played],
   };
   const extras: Bout[] = [];
-  for (const conference of ["metro","frontier"] as const) {
+  for (const conference of ["metro", "frontier"] as const) {
     const tied = conferenceTopTie(staged, conference);
     if (tied.length < 2) continue;
     const kind: Bout["kind"] = tied.length === 2 ? "final" : "melee";
-    const title = conference === "metro" ? "Metro Conference Tiebreaker" : "Frontier Conference Tiebreaker";
-    const tie = makeBout(4, played.length + extras.length + 1, kind, title, tied.length === 2 ? [tied[0]!.id] : tied.map((store) => store.id), tied.length === 2 ? [tied[1]!.id] : []);
-    tie.result = simulateBout(staged,tie);
+    const title =
+      conference === "metro" ? "Metro Conference Tiebreaker" : "Frontier Conference Tiebreaker";
+    const tie = makeBout(
+      4,
+      played.length + extras.length + 1,
+      kind,
+      title,
+      tied.length === 2 ? [tied[0]!.id] : tied.map((store) => store.id),
+      tied.length === 2 ? [tied[1]!.id] : [],
+    );
+    tie.result = simulateBout(staged, tie);
     extras.push(tie);
-    staged = { ...staged, bouts:[...staged.bouts,tie] };
+    staged = { ...staged, bouts: [...staged.bouts, tie] };
   }
-  return [...played,...extras];
+  return [...played, ...extras];
 }
 
 export function methodLabel(method: Method): string {
@@ -1773,7 +1808,9 @@ export function writeGazette(data: PitData, bouts: Bout[]): GazetteEntry[] {
       counter
         ? `${l.name} had the louder week on paper. ${wBot.name} had the lock. A busy garage with the wrong weapon does not get a parade.`
         : `${wBot.name} leaves the win on ${w.name}'s wall. ${lBot.name} leaves with a quote.`,
-      tag ? "Both stores on the winning side take the W. Both on the losing side take the L. Crews do not get a personal record." : "",
+      tag
+        ? "Both stores on the winning side take the W. Both on the losing side take the L. Crews do not get a personal record."
+        : "",
     ]
       .filter(Boolean)
       .join(" ");
@@ -1803,9 +1840,15 @@ export function quoteFor(bot: Bot, slot: Slot): Quote | null {
   if (!partId) return null;
   const part = partById(partId);
   if (!part) return null;
-  const repairCost = cond === "scratched" ? REPAIR_PRICE.scratched : cond === "bent" ? REPAIR_PRICE.bent : REPAIR_PRICE.disabled;
+  const repairCost =
+    cond === "scratched"
+      ? REPAIR_PRICE.scratched
+      : cond === "bent"
+        ? REPAIR_PRICE.bent
+        : REPAIR_PRICE.disabled;
   const weldCost = cond === "disabled" ? REPAIR_PRICE.weld : null;
-  const salvageScrap = part.tier === "pro" ? 2 : part.tier === "super" ? 4 : part.tier === "championship" ? 3 : null;
+  const salvageScrap =
+    part.tier === "pro" ? 2 : part.tier === "super" ? 4 : part.tier === "championship" ? 3 : null;
   const won = false;
   const crown = part.tier === "super" && cond === "disabled" && won;
   const loaner =
@@ -1836,15 +1879,15 @@ export function quotesForBot(bot: Bot, wonThisWeek: boolean): Quote[] {
     const q = quoteFor(bot, slot);
     if (!q) return null;
     const part = partById(q.partId);
-    const crown = Boolean(part && part.tier === "super" && q.condition === "disabled" && wonThisWeek);
+    const crown = Boolean(
+      part && part.tier === "super" && q.condition === "disabled" && wonThisWeek,
+    );
     return { ...q, crown };
   }).filter((q): q is Quote => Boolean(q));
 }
 
 export function wonThisWeek(data: PitData, storeId: string): boolean {
-  return data.bouts.some(
-    (b) => b.week === data.week && b.result?.winnerIds.includes(storeId),
-  );
+  return data.bouts.some((b) => b.week === data.week && b.result?.winnerIds.includes(storeId));
 }
 
 export function lastPlaceId(data: PitData): string | null {
@@ -1869,12 +1912,21 @@ export function craftScore(data: PitData, storeId: string): number {
   const card = cardFor(data, storeId);
   const q = card ? weekQuality(gradesOf(card)) : 0.4;
   const fit = buildFit(bot, loadout);
-  const fights = data.bouts.filter((b) => b.week === data.week && b.result && b.storeIds.includes(storeId) && b.kind !== "bye");
+  const fights = data.bouts.filter(
+    (b) => b.week === data.week && b.result && b.storeIds.includes(storeId) && b.kind !== "bye",
+  );
   const upset = fights.some((b) => {
     if (!b.result?.winnerIds.includes(storeId)) return false;
-    const foe = b.result.fighters.find((f) => f.id !== storeId && !b.teamA.includes(storeId) ? false : f.id !== storeId);
+    const foe = b.result.fighters.find((f) =>
+      f.id !== storeId && !b.teamA.includes(storeId) ? false : f.id !== storeId,
+    );
     void foe;
-    const opp = b.storeIds.find((id) => id !== storeId && !(b.teamA.includes(storeId) && b.teamA.includes(id)) && !(b.teamB.includes(storeId) && b.teamB.includes(id)));
+    const opp = b.storeIds.find(
+      (id) =>
+        id !== storeId &&
+        !(b.teamA.includes(storeId) && b.teamA.includes(id)) &&
+        !(b.teamB.includes(storeId) && b.teamB.includes(id)),
+    );
     if (!opp) return false;
     const oq = b.result.fighters.find((f) => f.id === opp)?.weekQ ?? 0;
     return q + 0.05 < oq;
@@ -1902,7 +1954,8 @@ export function keyForStat(stat: StatKey): KeyName {
 }
 
 export function canSeeLoadout(data: PitData, storeId: string): boolean {
-  if (data.phase === "fought" || data.phase === "inspected" || data.phase === "complete") return true;
+  if (data.phase === "fought" || data.phase === "inspected" || data.phase === "complete")
+    return true;
   if (data.session.role === "commissioner") return true;
   if (
     (data.session.role === "captain" || data.session.role === "crew") &&
@@ -1927,22 +1980,93 @@ export function ownsPart(bot: Bot, part: Part): boolean {
 
 export const RECLASS_FEE = 3;
 
+/** November 1–28, 2026, Central. Parts with no window stay on the peg. */
+export function partInWindow(part: Part, now = new Date()) {
+  if (!part.window) return true;
+  const day = centralDay(now);
+  if (day.y !== 2026) return false;
+  const key = day.m * 100 + day.d;
+  const start = part.window.start[0] * 100 + part.window.start[1];
+  const end = part.window.end[0] * 100 + part.window.end[1];
+  return key >= start && key <= end;
+}
+
+/** Kickoff color, then each completed week, oldest first. The live week has not paid yet. */
+export function gradeHistory(data: PitData, storeId: string, stat: StatKey): Grade[] {
+  const seq: Grade[] = [];
+  const kick = data.kickoff?.grades?.[storeId]?.[stat];
+  if (kick) seq.push(kick);
+  const past = data.storeCards
+    .filter((card) => card.storeId === storeId && card.week < data.week)
+    .sort((a, b) => a.week - b.week);
+  for (const card of past) seq.push(gradesOf(card)[stat]);
+  return seq;
+}
+
+export function greenRecord(grades: Grade[]) {
+  let straight = 0;
+  for (let i = grades.length - 1; i >= 0; i--) {
+    if (grades[i] === "green") straight += 1;
+    else break;
+  }
+  return { count: grades.filter((grade) => grade === "green").length, straight };
+}
+
 export function buyCheck(
   data: PitData,
   storeId: string,
   part: Part,
 ): { ok: boolean; reason: string; cost: number } {
   const bot = botFor(data, storeId);
-  if (data.phase === "open" && bot.locked) return { ok: false, reason: "This build is locked. Ask the Desk for a lock override.", cost: 0 };
-  if (!shopOpen(data)) return { ok: false, reason: data.week === 1 && !data.kickoff?.appliedAt ? "The shop opens when the desk pays the Period 11 kickoff coins." : "The shop shuts when the bots lock Saturday and reopens after the damage report.", cost: 0 };
-  if (part.tier === "championship") return { ok: false, reason: "Championship parts are never sold.", cost: 0 };
+  if (data.phase === "open" && bot.locked)
+    return {
+      ok: false,
+      reason: "This build is locked. Ask the Desk for a lock override.",
+      cost: 0,
+    };
+  if (!shopOpen(data))
+    return {
+      ok: false,
+      reason:
+        data.week === 1 && !data.kickoff?.appliedAt
+          ? "The shop opens when the desk pays the Period 11 kickoff coins."
+          : "The shop shuts when the bots lock Saturday and reopens after the damage report.",
+      cost: 0,
+    };
+  if (part.tier === "championship")
+    return { ok: false, reason: "Championship parts are never sold.", cost: 0 };
   if (part.tier === "stock") return { ok: false, reason: "Stock is already on the peg.", cost: 0 };
-  if (isPremiumHalloweenPart(part.id) && !premiumHalloweenOpen()) return { ok: false, reason: PREMIUM_CLOSED_REASON, cost: part.price };
-  if (part.classLock && part.slot !== "chassis") return { ok: false, reason: "Wrong class.", cost: 0 };
+  if (isPremiumHalloweenPart(part.id) && !premiumHalloweenOpen())
+    return { ok: false, reason: PREMIUM_CLOSED_REASON, cost: part.price };
+  if (part.classLock && part.slot !== "chassis")
+    return { ok: false, reason: "Wrong class.", cost: 0 };
   if (ownsPart(bot, part)) return { ok: false, reason: "Already in the cage.", cost: part.price };
   let cost = part.price;
-  if (part.slot === "chassis" && part.classLock && part.classLock !== bot.classId && data.week > 1) {
+  if (
+    part.slot === "chassis" &&
+    part.classLock &&
+    part.classLock !== bot.classId &&
+    data.week > 1
+  ) {
     cost += RECLASS_FEE;
+  }
+  if (part.window && !partInWindow(part)) {
+    return {
+      ok: false,
+      reason: `${part.name} is on the peg November 1 through November 28 only.`,
+      cost,
+    };
+  }
+  if (part.greenWeeks) {
+    const record = greenRecord(gradeHistory(data, storeId, part.stat));
+    const earned = part.straight ? record.straight : record.count;
+    if (earned < part.greenWeeks) {
+      const src = KEY_SOURCE[part.key];
+      const need = part.straight
+        ? `${part.greenWeeks} straight green ${src.label} weeks`
+        : `${part.greenWeeks} green ${src.label} week${part.greenWeeks === 1 ? "" : "s"}`;
+      return { ok: false, reason: `Needs ${need}. You have ${earned}.`, cost };
+    }
   }
   const have = bot.coins[part.key] ?? 0;
   if (have < cost) {
