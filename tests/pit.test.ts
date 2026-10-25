@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createStore } from "zustand/vanilla";
 import { pitCreator, sharedDoc, clientDoc, applyLeague14 } from "../src/lib/pit/store.ts";
 import { makeData } from "../src/lib/pit/seed.ts";
-import { nsnuOf, rankedStores, simulateDuel, buildCard, conferenceStandings, championshipFinalists } from "../src/lib/pit/engine.ts";
+import { nsnuOf, rankedStores, simulateDuel, buildCard, conferenceStandings, championshipFinalists, coinMath, coinsByJar, type GradeSet } from "../src/lib/pit/engine.ts";
 import { weekProgress, boltsOf } from "../src/lib/pit/week.ts";
 import { programWeek, allJobs, crateFor } from "../src/lib/pit/training.ts";
 import { eligibilityClosed } from "../src/lib/pit/eligibility.ts";
@@ -12,8 +12,8 @@ import { PRODUCT_QUIZ, productQuestion } from "../src/lib/pit/product-quiz.ts";
 import { authorize, commandArgs } from "../src/lib/pit/commands.ts";
 import { buildBeats, fightDrive } from "../src/components/pit/cage-motion.ts";
 import { Fx } from "../src/components/pit/cage-draw.ts";
-import type { Session } from "../src/lib/pit/types.ts";
-import { styleOf } from "../src/lib/pit/catalog.ts";
+import type { Grade, KeyName, Session } from "../src/lib/pit/types.ts";
+import { styleOf, GRADE_COINS, METRICS } from "../src/lib/pit/catalog.ts";
 import { createFrameLoop } from "../src/lib/pit/frame-loop.ts";
 import { sameSession, singleFlight } from "../src/lib/pit/sync-policy.ts";
 import { memoSnapshot, snapshotStorage } from "../src/lib/pit/snapshot-storage.ts";
@@ -673,4 +673,128 @@ test("KO fixtures always contain a replay and particle budgets stay bounded", ()
   for (let i = 0; i < 1000; i++) fx.dust(0, 0, 1, 1);
   fx.step(1 / 60);
   assert.ok(fx.side.length <= 360 && fx.top.length <= 200);
+});
+
+function gradesWithGreens(greens: number, rest: Grade = "red"): GradeSet {
+  const grades = {} as GradeSet;
+  METRICS.forEach((metric, index) => {
+    grades[metric.stat] = index < greens ? "green" : rest;
+  });
+  return grades;
+}
+
+function jarSum(coins: Record<KeyName, number>) {
+  return Object.values(coins).reduce((sum, n) => sum + n, 0);
+}
+
+test("pair bonus is one coin per green after the first and a sweep pays 23", () => {
+  assert.deepEqual(GRADE_COINS, { green: 3, blue: 2, orange: 1, red: 0 });
+  const cases = [
+    { greens: 0, bonus: 0, total: 0 },
+    { greens: 1, bonus: 0, total: 3 },
+    { greens: 2, bonus: 1, total: 7 },
+    { greens: 3, bonus: 2, total: 11 },
+    { greens: 6, bonus: 5, total: 23 },
+  ];
+  for (const row of cases) {
+    const grades = gradesWithGreens(row.greens);
+    const math = coinMath(grades);
+    assert.equal(math.greens, row.greens, `${row.greens} greens`);
+    assert.equal(math.bonus, row.bonus, `${row.greens} greens bonus`);
+    assert.equal(math.total, row.total, `${row.greens} greens total`);
+    for (const metric of METRICS) {
+      assert.equal(math.bySlot[metric.slot], GRADE_COINS[grades[metric.stat]]);
+    }
+    const jars = coinsByJar(grades);
+    assert.equal(jarSum(jars), math.total);
+    METRICS.forEach((metric, index) => {
+      const extra = index > 0 && index < row.greens ? 1 : 0;
+      assert.equal(jars[metric.slot], math.bySlot[metric.slot] + extra);
+    });
+  }
+  const late = Object.fromEntries(
+    METRICS.map((metric) => [metric.stat, metric.stat === "arch" || metric.stat === "ticket" ? "green" : "red"]),
+  ) as GradeSet;
+  const lateMath = coinMath(late);
+  assert.equal(lateMath.greens, 2);
+  assert.equal(lateMath.bonus, 1);
+  assert.equal(lateMath.total, 7);
+  assert.equal(lateMath.bySlot.utility, 3);
+  assert.equal(lateMath.bySlot.brain, 3);
+  const lateJars = coinsByJar(late);
+  assert.equal(lateJars.utility, 3);
+  assert.equal(lateJars.brain, 4);
+  assert.equal(jarSum(lateJars), 7);
+});
+
+test("kickoff and Monday payouts deposit the pair bonus, and a kickoff re-run pays the difference", () => {
+  const store = state("commissioner", false);
+  const paintKickoff = (storeId: string, grades: GradeSet) => {
+    for (const metric of METRICS) store.getState().setKickoffGrade(storeId, metric.stat, grades[metric.stat]);
+  };
+  for (const row of store.getState().stores) paintKickoff(row.id, gradesWithGreens(0));
+  paintKickoff("plano", gradesWithGreens(6));
+  paintKickoff("allen", gradesWithGreens(2));
+  store.getState().applyKickoff();
+
+  const coinsOf = (id: string) => store.getState().bots.find((bot) => bot.storeId === id)!.coins;
+  assert.deepEqual(coinsOf("plano"), coinsByJar(gradesWithGreens(6)));
+  assert.equal(jarSum(coinsOf("plano")), 23);
+  assert.deepEqual(coinsOf("allen"), coinsByJar(gradesWithGreens(2)));
+  assert.equal(jarSum(coinsOf("allen")), 7);
+  for (const row of store.getState().stores) {
+    if (row.id === "plano" || row.id === "allen") continue;
+    assert.equal(jarSum(coinsOf(row.id)), 0, row.id);
+  }
+
+  const spent = { ...coinsOf("plano"), chassis: coinsOf("plano").chassis - 1 };
+  store.setState({
+    bots: store.getState().bots.map((bot) => (bot.storeId === "plano" ? { ...bot, coins: spent } : bot)),
+  });
+  store.getState().applyKickoff();
+  assert.deepEqual(coinsOf("plano"), spent);
+  assert.deepEqual(coinsOf("allen"), coinsByJar(gradesWithGreens(2)));
+
+  store.getState().setKickoffGrade("plano", "ticket", "blue");
+  store.getState().applyKickoff();
+  const fiveGreens = gradesWithGreens(6);
+  fiveGreens.ticket = "blue";
+  const afterBlue = {
+    ...coinsByJar(fiveGreens),
+    chassis: coinsByJar(fiveGreens).chassis - 1,
+  };
+  assert.deepEqual(coinsOf("plano"), afterBlue);
+  assert.equal(jarSum(coinsOf("plano")), 20);
+  assert.deepEqual(coinsOf("allen"), coinsByJar(gradesWithGreens(2)));
+  store.getState().applyKickoff();
+  assert.deepEqual(coinsOf("plano"), afterBlue);
+
+  store.getState().setKickoffGrade("plano", "nsnu", "red");
+  store.getState().applyKickoff();
+  const shifted = { ...fiveGreens, nsnu: "red" as const };
+  const owed = coinsByJar(shifted);
+  assert.equal(coinMath(shifted).total, 17);
+  assert.equal(coinMath(shifted).bonus, 3);
+  assert.deepEqual(coinsOf("plano"), owed);
+  assert.equal(jarSum(coinsOf("plano")), 17);
+  const held = { ...coinsOf("plano") };
+  store.getState().applyKickoff();
+  assert.deepEqual(coinsOf("plano"), held);
+  assert.deepEqual(store.getState().kickoff.paid.plano, owed);
+
+  const monday = state("commissioner", false);
+  for (const row of monday.getState().stores) {
+    for (const metric of METRICS) monday.getState().setGrade(row.id, metric.stat, "red");
+  }
+  for (const metric of METRICS) monday.getState().setGrade("plano", metric.stat, gradesWithGreens(3)[metric.stat]);
+  monday.setState({ phase: "inspected" });
+  monday.getState().advanceWeek();
+  const mondayCoins = (id: string) => monday.getState().bots.find((bot) => bot.storeId === id)!.coins;
+  assert.equal(monday.getState().week, 2);
+  assert.deepEqual(mondayCoins("plano"), coinsByJar(gradesWithGreens(3)));
+  assert.equal(jarSum(mondayCoins("plano")), 11);
+  for (const row of monday.getState().stores) {
+    if (row.id === "plano") continue;
+    assert.equal(jarSum(mondayCoins(row.id)), 0, row.id);
+  }
 });
