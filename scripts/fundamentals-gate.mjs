@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment -- runtime JS; the gate tests cover behavior, and tsc must not typecheck this file
 // @ts-nocheck -- shared runtime JS; behavior is covered by the gate tests.
 import {
   seal,

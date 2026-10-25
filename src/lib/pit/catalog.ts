@@ -172,8 +172,6 @@ export type Part = {
   price: number;
 };
 
-const ZERO = { power: 0, speed: 0, armor: 0, heat: 0 };
-
 function nudge(
   power = 0,
   speed = 0,

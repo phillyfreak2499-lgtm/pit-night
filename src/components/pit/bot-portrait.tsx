@@ -128,6 +128,7 @@ export function BotPortrait({
     let heat = 0;
     let spin = 0;
     let visible = true;
+    // eslint-disable-next-line prefer-const -- resize() reads loop before assignment; const would throw
     let loop: ReturnType<typeof createFrameLoop> | undefined;
     const enter = () => { hot = true; loop?.invalidate(); };
     const leave = () => { hot = false; loop?.invalidate(); };

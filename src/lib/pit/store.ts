@@ -27,13 +27,11 @@ import {
   foesThisWeek,
   gradesOf,
   hashString,
-  keyForStat,
   lastPlaceId,
   mergeWear,
   quotesForBot,
   runSaturday as playCard,
   coinMath,
-  shopOpen,
   spyRead,
   WEAPON_FAMILIES,
   wonThisWeek,
@@ -654,7 +652,6 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         const main = card.filter((b) => b.kind === "bout").at(-1);
         const metroTop = ranked.filter((row) => row.store.conference === "metro").sort((a,b) => (seedOf.get(a.store.id) ?? 99) - (seedOf.get(b.store.id) ?? 99))[0]!;
         const frontierTop = ranked.filter((row) => row.store.conference === "frontier").sort((a,b) => (seedOf.get(a.store.id) ?? 99) - (seedOf.get(b.store.id) ?? 99))[0]!;
-        const top = ranked[0]!;
         const gazette = data.gazette.map((g) =>
           g.id === "g-open"
             ? {
@@ -909,6 +906,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         if (!isBoss(data) && !isCaptainOf(data, storeId)) return;
         const cleanBot = botName.trim().replace(/\s+/g, " ").toUpperCase();
         const cleanTeam = teamName.trim().replace(/\s+/g, " ");
+        // eslint-disable-next-line no-control-regex -- names may not contain C0 controls or DEL
         if (!cleanBot || cleanBot.length > 22 || !cleanTeam || cleanTeam.length > 40 || /[\u0000-\u001f\u007f]/.test(botName + teamName)) return;
         if (!data.stores.some(s => s.id === storeId)) return;
         set({
@@ -1240,7 +1238,6 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "Eight specialists is the bay cap." });
           return;
         }
-        const count = specialists.length + 1;
         set({
           crew: [...data.crew, { id: `${storeId}-crew-${Date.now().toString(36)}`, storeId, name: clean, role: "specialist" }],
           flash: `${clean} is on the clock.`,

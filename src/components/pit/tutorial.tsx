@@ -7,7 +7,7 @@ const STEPS = [
   {
     kicker: "Period 12",
     title: "Fourteen stores. Two conferences. Four fight Mondays.",
-    body: "Regular season runs October 25 through November 23. Every store fights all four Mondays: seven fights per card, no byes. Metro and Frontier each send one conference champion to Championship Saturday, November 28.",
+    body: "Regular season runs October 25 through November 28. Every store fights all four Mondays: seven fights per card, no byes. Metro and Frontier each send one conference champion to Championship Saturday, November 28.",
   },
   {
     kicker: "Sign in",

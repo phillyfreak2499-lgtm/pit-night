@@ -411,34 +411,6 @@ function CardForm({
   );
 }
 
-function Num({
-  label,
-  hint,
-  value,
-  onChange,
-  disabled,
-}: {
-  label: string;
-  hint?: string;
-  value: number;
-  onChange: (n: number) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <Field label={label} hint={hint}>
-      <TextInput
-        type="number"
-        disabled={disabled}
-        value={Number.isFinite(value) ? value : 0}
-        onChange={(e) => {
-          const n = Number(e.target.value);
-          if (Number.isFinite(n)) onChange(n);
-        }}
-      />
-    </Field>
-  );
-}
-
 const GARAGES: { id: GarageLook; label: string }[] = [
   { id: "hazard", label: "Hazard" },
   { id: "concrete", label: "Concrete" },

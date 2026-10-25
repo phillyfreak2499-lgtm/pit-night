@@ -11,7 +11,7 @@ import {
   type Part,
 } from "./catalog";
 import { BOLTS, TUNE_UP_BONUS } from "./training";
-import { boltsOf, tunedUp } from "./week";
+import { tunedUp } from "./week";
 import type {
   Bot,
   Bout,
@@ -684,8 +684,6 @@ function snapshot(data: PitData, storeId: string): FighterSnap {
   const weapon = resolvePart(bot, "weapon", locked);
   const drive = resolvePart(bot, "drive", locked);
   const armor = resolvePart(bot, "armor", locked);
-  const chassis = resolvePart(bot, "chassis", locked);
-  const utility = resolvePart(bot, "utility", locked);
   return {
     id: storeId,
     name: store.name,
@@ -1208,27 +1206,6 @@ export function simulateMelee(data: PitData, ids: string[], seed: string): Fight
     seed,
     meleeOrder: order,
   };
-}
-
-function priorPairs(data: PitData): Set<string> {
-  const set = new Set<string>();
-  for (const bout of data.bouts) {
-    if (bout.kind === "bye" || bout.kind === "melee") continue;
-    const ids = [...bout.teamA, ...bout.teamB];
-    for (let i = 0; i < ids.length; i++) {
-      for (let j = i + 1; j < ids.length; j++) {
-        const [a, b] = [ids[i]!, ids[j]!].sort();
-        if (bout.teamA.includes(a!) && bout.teamA.includes(b!)) continue;
-        if (bout.teamB.includes(a!) && bout.teamB.includes(b!)) continue;
-        set.add(`${a}|${b}`);
-      }
-    }
-  }
-  return set;
-}
-
-function pairKey(a: string, b: string) {
-  return [a, b].sort().join("|");
 }
 
 function seededWheel(stores: { id: string; seed: number }[], week: number): { bye: string | null; pairs: [string, string][] } {
