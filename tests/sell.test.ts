@@ -5,7 +5,7 @@ import { createStore } from "zustand/vanilla";
 import { pitCreator } from "../src/lib/pit/store.ts";
 import { buyCheck, sellCheck, SELL_BACK } from "../src/lib/pit/engine.ts";
 import { PARTS, partById, stockPart } from "../src/lib/pit/catalog.ts";
-import { authorize, CAPTAIN_BUILD_COMMANDS } from "../src/lib/pit/commands.ts";
+import { authorize, CAPTAIN_BUILD_COMMANDS, commandArgs } from "../src/lib/pit/commands.ts";
 import type { Session } from "../src/lib/pit/types.ts";
 
 beforeEach((t) => t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-10-27T15:00:00Z") }));
@@ -81,4 +81,26 @@ test("selling is a captain build command for the captain's own store", () => {
   assert.throws(() => authorize(data, asCaptain, "sellPart", ["waco", "x"]), /another store/);
   assert.throws(() => authorize(data, asCrew, "sellPart", ["plano", "x"]), /captain/);
   assert.ok(partById(sportWeapon(store).id));
+});
+
+test("only the Desk can give coins, 1 to 20 at a time, into one jar", () => {
+  const store = plano();
+  const data = store.getState();
+  const captain = data.crew.find((c) => c.storeId === "plano" && c.role === "captain")!;
+  const asCaptain: Session = { role: "captain", storeId: "plano", crewId: captain.id };
+  assert.throws(() => authorize(data, asCaptain, "giftCoins", ["plano", "weapon", 5]), /Only the Desk/);
+
+  const before = bot(store).coins.weapon;
+  store.getState().giftCoins("plano", "weapon", 5);
+  assert.equal(bot(store).coins.weapon, before, "a captain session cannot gift coins");
+
+  store.setState({ session: { role: "commissioner", storeId: null, crewId: null } });
+  store.getState().giftCoins("plano", "weapon", 5);
+  assert.equal(bot(store).coins.weapon, before + 5);
+  assert.match(store.getState().flash, /Plano got 5 weapon coins from the Desk/);
+  assert.match(store.getState().log[0]!, /Desk gave Plano 5 weapon coins/);
+  for (const bad of [0, -3, 21, 2.5]) store.getState().giftCoins("plano", "weapon", bad);
+  assert.equal(bot(store).coins.weapon, before + 5, "out-of-range amounts change nothing");
+  assert.ok(commandArgs.giftCoins.safeParse(["plano", "brain", 20]).success);
+  assert.ok(!commandArgs.giftCoins.safeParse(["plano", "brain", 21]).success);
 });
