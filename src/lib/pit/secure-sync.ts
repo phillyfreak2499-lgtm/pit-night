@@ -54,7 +54,8 @@ function enqueue(task: () => Promise<void>) {
 }
 function command(name: Command, args: unknown[]) {
   return enqueue(async () => {
-    const res = await mutateSeason({ data: { name, args } });
+    // Plain data only: anything else would fail to send with an unreadable "Seroval" code.
+    const res = await mutateSeason({ data: { name, args: JSON.parse(JSON.stringify(args)) as unknown[] } });
     apply(res.doc, res.rev, res.session);
     usePit.setState({ flash: res.flash });
     setStatus({ mode: res.mode });
