@@ -1,5 +1,9 @@
 import type { Affinity, Part, PartWindow } from "./catalog";
 import type { Tier } from "./types";
+import { THANKSGIVING_WINDOW } from "./thanksgiving";
+
+/** Thanksgiving peg window for the roster ladders below (Nov 24–28). */
+const TG: PartWindow = THANKSGIVING_WINDOW;
 
 /**
  * Parts added on top of the original six families per slot.
@@ -181,6 +185,15 @@ const DRIVES: Part[] = [
       },
     ],
   ),
+  ...ladder("drive", "haywagon", "demoRate", ["speed", "thanksgiving"], [
+    {
+      tier: "super",
+      name: "Hay Wagon",
+      job: "A hay-ride wagon on pit wheels. It closes steady and gives up plate to do it, and it smells faintly of a parade route. Championship Week only. Eight drive coins.",
+      nudge: n(1, 3, -2, 0),
+      window: TG,
+    },
+  ]),
 ];
 
 const WEAPONS: Part[] = [
@@ -557,6 +570,15 @@ const ARMOR: Part[] = [
       },
     ],
   ),
+  ...ladder("armor", "platter", "conv", ["armor", "thanksgiving"], [
+    {
+      tier: "super",
+      name: "Serving Platter",
+      job: "A broad steel platter that takes the serving so the bot doesn't. Spreads one big hit across the whole table. Championship Week only. Eight armor coins.",
+      nudge: n(0, 0, 4, 1),
+      window: TG,
+    },
+  ]),
 ];
 
 const CHASSIS: Part[] = [

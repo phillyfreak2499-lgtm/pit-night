@@ -30,6 +30,8 @@ export const STICKER_ART = [
   "splash",
   "champion",
   "pumpkin",
+  "turkey",
+  "wishbone",
   "roundel",
   "gear",
   "wrench",
@@ -46,12 +48,12 @@ export const STICKER_ART = [
 ] as const;
 export type StickerArt = (typeof STICKER_ART)[number];
 export type BotDecal = StickerArt | `${Exclude<StickerArt, "none">}-foil`;
-export const TOPPER_IDS = ["none", "antenna", "horns", "mohawk", "crown", "beacon", "dish", "flagpole"] as const;
+export const TOPPER_IDS = ["none", "antenna", "horns", "mohawk", "crown", "beacon", "dish", "flagpole", "pilgrimhat", "wreath"] as const;
 export type BotTopper = (typeof TOPPER_IDS)[number];
 export type BotMask = "none" | "lantern" | "hockey";
 /** Cosmetic blade only. Premium Halloween weapons are real parts, not skins. */
 export type BotWeaponSkin = "none" | "hockey-machete";
-export type ShowEffectId = "fog" | "blacklight";
+export type ShowEffectId = "fog" | "blacklight" | "leaves";
 export type BotLeds = "none" | StatKey;
 export const SMOKE_IDS = ["", "neon", "candy", "ice", "royal", "black"] as const;
 export type BotSmoke = (typeof SMOKE_IDS)[number];

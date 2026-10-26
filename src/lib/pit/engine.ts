@@ -12,6 +12,14 @@ import {
   type Part,
 } from "./catalog";
 import { showEffect } from "./halloween";
+import {
+  isThanksgivingPart,
+  thanksgivingOpen,
+  thanksgivingShowEffect,
+  THANKSGIVING_CLOSED_REASON,
+  THANKSGIVING_FINALIST_REASON,
+  THANKSGIVING_SHOW_CLOSED_REASON,
+} from "./thanksgiving";
 import { duelWear, fightDuel, preferFighter } from "./combat";
 import { centralDay } from "./time";
 export { halloweenStrikeAdjust } from "./combat";
@@ -1980,7 +1988,7 @@ export function ownsPart(bot: Bot, part: Part): boolean {
 
 export const RECLASS_FEE = 3;
 
-/** Generic purchase-window check. No current part carries a window, so everything stays on the peg. */
+/** Generic purchase-window check. Thanksgiving parts carry one; their dedicated gate in buyCheck speaks first. */
 export function partInWindow(part: Part, now = new Date()) {
   if (!part.window) return true;
   const day = centralDay(now);
@@ -2048,6 +2056,14 @@ export function buyCheck(
   ) {
     cost += RECLASS_FEE;
   }
+  if (isThanksgivingPart(part.id)) {
+    // Thanksgiving has its own gate and its own reasons. It never inherits
+    // the Halloween all-season availability: window first, then finalists.
+    if (!thanksgivingOpen()) return { ok: false, reason: THANKSGIVING_CLOSED_REASON, cost };
+    if (data.week === 5 && !championshipFinalists(data).includes(storeId)) {
+      return { ok: false, reason: THANKSGIVING_FINALIST_REASON, cost };
+    }
+  }
   if (part.window && !partInWindow(part)) {
     return {
       ok: false,
@@ -2080,11 +2096,13 @@ export function buyCheck(
 
 /** Visual show effects. Same shop clock as parts. They never enter the loadout. */
 export function showCheck(data: PitData, storeId: string, effectId: string): { ok: boolean; reason: string; cost: number } {
-  const effect = showEffect(effectId);
+  const effect = showEffect(effectId) ?? thanksgivingShowEffect(effectId);
   if (!effect) return { ok: false, reason: "That show effect is not on the peg.", cost: 0 };
   const bot = botFor(data, storeId);
   if (data.phase === "open" && bot.locked) return { ok: false, reason: "This build is locked. Ask the Desk for a lock override.", cost: 0 };
   if (!shopOpen(data)) return { ok: false, reason: data.week === 1 && !data.kickoff?.appliedAt ? "The shop opens when the desk pays the Period 11 kickoff coins." : "The shop shuts when the bots lock Saturday and reopens after the damage report.", cost: 0 };
+  // Falling Leaves keeps the Thanksgiving window; the Halloween effects stay on their own (all-season) terms.
+  if (thanksgivingShowEffect(effectId) && !thanksgivingOpen()) return { ok: false, reason: THANKSGIVING_SHOW_CLOSED_REASON, cost: effect.price };
   if (bot.shows?.includes(effect.id)) return { ok: false, reason: "Already in the rafters.", cost: effect.price };
   const have = bot.coins[effect.key] ?? 0;
   if (have < effect.price) {

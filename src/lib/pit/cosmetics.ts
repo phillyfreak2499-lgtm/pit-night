@@ -52,6 +52,21 @@ function koWins(data: PitData, storeId: string) {
 function shouts(data: PitData, storeId: string) {
   return data.shouts.filter(s=>s.storeId===storeId).length;
 }
+/** Championship Week shouts only. Thanksgiving looks are earned in Week 5 and stay unlocked after it. */
+function week5Shouts(data: PitData, storeId: string) {
+  return data.shouts.filter(s=>s.storeId===storeId && s.week===5).length;
+}
+function week5PerfectSparks(data: PitData, storeId: string) {
+  return data.sparkLog.filter((e) => e.storeId === storeId && e.week === 5 && e.total > 0 && e.correct === e.total).length;
+}
+/** A hit pick on the Week 5 title bout — the Waterman Championship final. */
+function titlePick(data: PitData, storeId: string) {
+  return data.picks.filter((pick) => {
+    if (pick.storeId !== storeId) return false;
+    const bout = data.bouts.find(b=>b.id===pick.boutId && b.week===5 && b.kind==="final" && b.result);
+    return Boolean(bout?.result?.winnerIds.includes(pick.pick));
+  }).length;
+}
 function finalist(data: PitData, storeId: string) {
   return championshipFinalists(data).includes(storeId) ? 1 : 0;
 }
@@ -154,6 +169,10 @@ export const COSMETIC_REWARDS: CosmeticReward[] = [
   { id:"reward-lantern-mask", kind:"mask", value:"lantern", label:"Lantern Mask", requirement:"Approve 2 Pit Week 1 jobs", progress:p(halloweenJobs,2) },
   { id:"reward-hockey-mask", kind:"mask", value:"hockey", label:"Hockey Mask", requirement:"Approve 4 Pit Week 1 jobs", progress:p(halloweenJobs,4) },
   { id:"reward-hockey-machete", kind:"weaponSkin", value:"hockey-machete", label:"Hockey Mask Machete", requirement:"Approve 6 Pit Week 1 jobs", progress:p(halloweenJobs,6) },
+  { id:"reward-turkey", kind:"decal", value:"turkey", label:"Turkey Sticker", requirement:"Rally in Championship Week — post 1 shout-out in Week 5", progress:p(week5Shouts,1) },
+  { id:"reward-pilgrim-hat", kind:"topper", value:"pilgrimhat", label:"Pilgrim Hat", requirement:"Post 3 shout-outs in Championship Week", progress:p(week5Shouts,3) },
+  { id:"reward-wishbone", kind:"decal", value:"wishbone", label:"Wishbone Decal", requirement:"Call the title fight — hit your pick in the Waterman Championship", progress:p(titlePick,1) },
+  { id:"reward-harvest-wreath", kind:"topper", value:"wreath", label:"Harvest Wreath", requirement:"Score a perfect Daily Spark in Championship Week", progress:p(week5PerfectSparks,1) },
   { id:"reward-gear", kind:"decal", value:"gear", label:"Gear", requirement:"Post a green NSNU grade", progress:p(greenWeeks("nsnu"),1) },
   { id:"reward-wrench", kind:"decal", value:"wrench", label:"Wrench", requirement:"Survive a repair or an emergency weld", progress:p(serviceMarks,1) },
   { id:"reward-optics", kind:"decal", value:"optics", label:"Robot Eyes", requirement:"Hit 2 Monday picks", progress:p(correctPicks,2) },
@@ -182,6 +201,8 @@ export const COSMETIC_REWARDS: CosmeticReward[] = [
 ];
 
 export const HALLOWEEN_REWARD_IDS = ["reward-pumpkin", "reward-lantern-mask", "reward-hockey-mask", "reward-hockey-machete"] as const;
+
+export const THANKSGIVING_REWARD_IDS = ["reward-turkey", "reward-pilgrim-hat", "reward-wishbone", "reward-harvest-wreath"] as const;
 
 const FREE: Record<CosmeticKind, Set<string>> = {
   finish:new Set(["factory"]),

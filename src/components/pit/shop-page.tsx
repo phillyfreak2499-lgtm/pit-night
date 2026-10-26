@@ -1,7 +1,8 @@
 import { BuildLockBanner } from "./build-lock-banner";
 import { useState } from "react";
-import { KEY_SOURCE, PARTS, SLOT_LABEL, tierWord } from "@/lib/pit/catalog";
+import { KEY_SOURCE, PARTS, SLOT_LABEL, tierWord, type Part } from "@/lib/pit/catalog";
 import { SHOW_EFFECTS } from "@/lib/pit/halloween";
+import { THANKSGIVING_SHOW_EFFECTS, isThanksgivingPart } from "@/lib/pit/thanksgiving";
 import { buyCheck, canSeeLoadout, shopOpen, showCheck } from "@/lib/pit/engine";
 import { usePit } from "@/lib/pit/store";
 import type { Slot } from "@/lib/pit/types";
@@ -10,6 +11,17 @@ import { CoinStack, KeyLadder, UpgradeHowTo } from "./key-ladder";
 import { canEnterBay, LockedBay } from "./bay-lock";
 
 const SLOTS: Slot[] = ["chassis", "drive", "weapon", "armor", "utility", "brain"];
+
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/** Render a part's actual peg window instead of assuming one season's dates. */
+function windowLabel(window: NonNullable<Part["window"]>) {
+  const [sm, sd] = window.start;
+  const [em, ed] = window.end;
+  return sm === em
+    ? `${MONTH_NAMES[sm - 1]} ${sd}–${ed} only`
+    : `${MONTH_NAMES[sm - 1]} ${sd} – ${MONTH_NAMES[em - 1]} ${ed} only`;
+}
 
 export function ShopPage({ storeId }: { storeId: string }) {
   const data = usePit();
@@ -89,7 +101,8 @@ export function ShopPage({ storeId }: { storeId: string }) {
                     </li>
                     {part.classLock ? <li className="border border-line px-2 py-1 text-muted">{part.classLock} chassis</li> : null}
                     {part.greenWeeks ? <li className="border border-line px-2 py-1 text-muted">{part.straight ? `${part.greenWeeks} straight green weeks` : `${part.greenWeeks} green week${part.greenWeeks === 1 ? "" : "s"}`}</li> : null}
-                    {part.window ? <li className="border border-line px-2 py-1 text-muted">November 1–28 only</li> : null}
+                    {part.window ? <li className="border border-line px-2 py-1 text-muted">{windowLabel(part.window)}</li> : null}
+                    {isThanksgivingPart(part.id) ? <li className="border border-amber/60 px-2 py-1 text-amber">Championship Week</li> : null}
                     {part.battery ? <li className="border border-line px-2 py-1 text-muted">Battery {part.battery}</li> : null}
                   </ul>
                   <p className={`mt-2 text-sm ${owned ? "text-ok" : check.ok ? "text-amber" : "text-muted"}`}>
@@ -120,6 +133,32 @@ export function ShopPage({ storeId }: { storeId: string }) {
             </p>
             <ul className="mt-3 flex flex-col gap-3">
               {SHOW_EFFECTS.map((effect) => {
+                const check = showCheck(data, storeId, effect.id);
+                const owned = bot.shows?.includes(effect.id) ?? false;
+                const have = bot.coins.utility ?? 0;
+                return (
+                  <li key={effect.id} className="border border-line bg-deep p-4">
+                    <h2 className="font-display text-2xl leading-none">{effect.name}</h2>
+                    <p className="mt-2 text-sm text-muted">{effect.blurb}</p>
+                    <p className="mt-2 text-sm">8 utility coins. Jar has {have}.</p>
+                    <p className={`mt-2 text-sm ${owned ? "text-ok" : check.ok ? "text-amber" : "text-muted"}`}>
+                      {owned ? "Already in the rafters." : check.reason}
+                    </p>
+                    <Btn className="mt-3" disabled={!check.ok} onClick={() => buyShow(storeId, effect.id)}>
+                      Buy
+                    </Btn>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+          <section className="mt-6 border border-line bg-surface p-4" data-testid="thanksgiving-show-shop">
+            <SectionLabel>Championship Week show</SectionLabel>
+            <p className="mt-2 text-sm text-muted">
+              Falling Leaves costs 8 utility coins, the same as a Super. It is light and paper only. On sale Championship Week, Tuesday November 24 through Saturday November 28. League-wide — finalist or not.
+            </p>
+            <ul className="mt-3 flex flex-col gap-3">
+              {THANKSGIVING_SHOW_EFFECTS.map((effect) => {
                 const check = showCheck(data, storeId, effect.id);
                 const owned = bot.shows?.includes(effect.id) ?? false;
                 const have = bot.coins.utility ?? 0;
