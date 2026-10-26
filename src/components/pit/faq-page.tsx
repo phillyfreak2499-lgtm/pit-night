@@ -147,7 +147,7 @@ export const GROUPS: Group[] = [
       ),
       faq(
         "Which parts need green weeks?",
-        "Sport armor is coins only. Pro armor wants one green Conv % week, and the Super of each new armor family wants two to four. Wrecking Ball wants two green Demo Close weeks, Impaler and Inferno three, Storm four. The battery chassis want green NSNU weeks: one for Sprinter and Hornet, two for Hybrid, Dynamo, Scorpion and Crab, three for Capacitor, Mule and Monolith. Reactor wants four straight green NSNU weeks and 12 chassis coins, which is exactly four green payouts. Three greens pay 9, so Monolith's price of 10 still needs one extra coin in the jar. Skeleton and Ghost Veil are 8 coins and only on the peg November 1 through November 28.",
+        "Sport armor is coins only. Pro armor wants one green Conv % week, and the Super of each new armor family wants two to four. Wrecking Ball wants two green Demo Close weeks, Impaler and Inferno three, Storm four. The battery chassis want green NSNU weeks: one for Sprinter and Hornet, two for Hybrid, Dynamo, Scorpion and Crab, three for Capacitor, Mule and Monolith. Reactor wants four straight green NSNU weeks and 12 chassis coins, which is exactly four green payouts. Three greens pay 9, so Monolith's price of 10 still needs one extra coin in the jar. Skeleton and Ghost Veil are 8 coins and on the peg all season.",
       ),
       faq(
         "Are there byes?",

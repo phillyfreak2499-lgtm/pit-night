@@ -116,7 +116,7 @@ export function ShopPage({ storeId }: { storeId: string }) {
           <section className="mt-6 border border-line bg-surface p-4" data-testid="halloween-show-shop">
             <SectionLabel>Show effects</SectionLabel>
             <p className="mt-2 text-sm text-muted">
-              Fog Machine and Blacklight Mode cost 8 utility coins, the same as a Super. They are light only. On sale Sunday, November 1 at midnight Central through Championship Saturday.
+              Fog Machine and Blacklight Mode cost 8 utility coins, the same as a Super. They are light only. On the peg all season.
             </p>
             <ul className="mt-3 flex flex-col gap-3">
               {SHOW_EFFECTS.map((effect) => {

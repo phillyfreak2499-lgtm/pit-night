@@ -11,7 +11,7 @@ import {
   metricFor,
   type Part,
 } from "./catalog";
-import { isPremiumHalloweenPart, PREMIUM_CLOSED_REASON, premiumHalloweenOpen, showEffect } from "./halloween";
+import { showEffect } from "./halloween";
 import { duelWear, fightDuel, preferFighter } from "./combat";
 import { centralDay } from "./time";
 export { halloweenStrikeAdjust } from "./combat";
@@ -1980,7 +1980,7 @@ export function ownsPart(bot: Bot, part: Part): boolean {
 
 export const RECLASS_FEE = 3;
 
-/** November 1–28, 2026, Central. Parts with no window stay on the peg. */
+/** Generic purchase-window check. No current part carries a window, so everything stays on the peg. */
 export function partInWindow(part: Part, now = new Date()) {
   if (!part.window) return true;
   const day = centralDay(now);
@@ -2036,8 +2036,6 @@ export function buyCheck(
   if (part.tier === "championship")
     return { ok: false, reason: "Championship parts are never sold.", cost: 0 };
   if (part.tier === "stock") return { ok: false, reason: "Stock is already on the peg.", cost: 0 };
-  if (isPremiumHalloweenPart(part.id) && !premiumHalloweenOpen())
-    return { ok: false, reason: PREMIUM_CLOSED_REASON, cost: part.price };
   if (part.classLock && part.slot !== "chassis")
     return { ok: false, reason: "Wrong class.", cost: 0 };
   if (ownsPart(bot, part)) return { ok: false, reason: "Already in the cage.", cost: part.price };
@@ -2053,7 +2051,7 @@ export function buyCheck(
   if (part.window && !partInWindow(part)) {
     return {
       ok: false,
-      reason: `${part.name} is on the peg November 1 through November 28 only.`,
+      reason: `${part.name} is not on the peg right now.`,
       cost,
     };
   }
@@ -2080,14 +2078,13 @@ export function buyCheck(
   return { ok: true, reason: "On the peg.", cost };
 }
 
-/** Visual show effects. Same shop clock and the Halloween sale window. They never enter the loadout. */
+/** Visual show effects. Same shop clock as parts. They never enter the loadout. */
 export function showCheck(data: PitData, storeId: string, effectId: string): { ok: boolean; reason: string; cost: number } {
   const effect = showEffect(effectId);
   if (!effect) return { ok: false, reason: "That show effect is not on the peg.", cost: 0 };
   const bot = botFor(data, storeId);
   if (data.phase === "open" && bot.locked) return { ok: false, reason: "This build is locked. Ask the Desk for a lock override.", cost: 0 };
   if (!shopOpen(data)) return { ok: false, reason: data.week === 1 && !data.kickoff?.appliedAt ? "The shop opens when the desk pays the Period 11 kickoff coins." : "The shop shuts when the bots lock Saturday and reopens after the damage report.", cost: 0 };
-  if (!premiumHalloweenOpen()) return { ok: false, reason: PREMIUM_CLOSED_REASON, cost: effect.price };
   if (bot.shows?.includes(effect.id)) return { ok: false, reason: "Already in the rafters.", cost: effect.price };
   const have = bot.coins[effect.key] ?? 0;
   if (have < effect.price) {

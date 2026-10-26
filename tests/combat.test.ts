@@ -289,12 +289,20 @@ test("weights, names, windows and green gates match the shop", () => {
 
   const skeleton = partById("chassis-skeleton-super")!;
   const veil = partById("utility-veil-super")!;
+  // On the peg all season (owner directive 2026-10-25): neither part carries
+  // a purchase window anymore, so partInWindow is true at every date —
+  // including the dates that used to be shut (Oct 25, Nov 29, December).
+  assert.equal(skeleton.window, undefined);
+  assert.equal(veil.window, undefined);
+  assert.equal(partInWindow(skeleton, central(2026, 10, 25)), true);
   assert.equal(partInWindow(skeleton, central(2026, 11, 1)), true);
   assert.equal(partInWindow(skeleton, central(2026, 11, 15)), true);
   assert.equal(partInWindow(skeleton, central(2026, 11, 28)), true);
-  assert.equal(partInWindow(skeleton, central(2026, 11, 29)), false);
-  assert.equal(partInWindow(skeleton, central(2026, 10, 25)), false);
+  assert.equal(partInWindow(skeleton, central(2026, 11, 29)), true);
+  assert.equal(partInWindow(skeleton, central(2026, 12, 5)), true);
+  assert.equal(partInWindow(veil, central(2026, 10, 25)), true);
   assert.equal(partInWindow(veil, central(2026, 11, 15)), true);
+  assert.equal(partInWindow(veil, central(2026, 12, 5)), true);
 
   const data = makeData();
   data.week = 4;
