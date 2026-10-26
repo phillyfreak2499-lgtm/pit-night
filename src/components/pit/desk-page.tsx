@@ -6,9 +6,9 @@ import { ScoreInputs } from "./score-card";
 import { GradeGrid } from "./grade-grid";
 import { buildCard, championshipFinalists, gradeMetric, cardValue, coinMath, gradesOf, kickoffRank } from "@/lib/pit/engine";
 import { METRICS } from "@/lib/pit/catalog";
-import type { GazetteEntry, Grade, StatKey } from "@/lib/pit/types";
-import { buildGazetteBrief, dailyGazetteId, recapEntryIds } from "@/lib/pit/gazette-ai";
-import { generateGazette } from "@/lib/pit/gazette-server";
+import type { Grade, StatKey } from "@/lib/pit/types";
+import { centralISODate, dailyGazetteId } from "@/lib/pit/gazette-ai";
+import { writeGazette } from "@/lib/pit/gazette-server";
 import { takeLeagueSeason, useSyncStatus } from "@/lib/pit/sync";
 import { DeskCodes } from "./desk-codes";
 import { ClaudeCheck } from "./claude-copy";
@@ -200,56 +200,29 @@ function DeskLive() {
 
 function GazetteWriter() {
   const data = usePit();
-  const postDailyGazette = usePit((s) => s.postDailyGazette);
-  const postRecapGazette = usePit((s) => s.postRecapGazette);
   const [busy, setBusy] = useState<"daily" | "recap" | null>(null);
   const [note, setNote] = useState("");
-  const now = new Date();
-  const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const todayISO = centralISODate(new Date());
   const hasDaily = data.gazette.some((g) => g.id === dailyGazetteId(data.week, todayISO));
-  const foughtBouts = data.bouts.filter((b) => b.week === data.week && b.result);
-  const canRecap = ["fought", "inspected", "complete"].includes(data.phase) || foughtBouts.length > 0;
+  const canRecap = data.bouts.some((b) => b.week === data.week && b.result);
 
-  const fail = (reason: string) =>
-    setNote(
-      reason === "no-key"
-        ? "Gazette writer needs the Anthropic API key on the server."
-        : "Gazette writer unavailable — the paper still runs on templates.",
-    );
-
-  const writeDaily = async () => {
-    setBusy("daily");
-    setNote("");
-    try {
-      const res = await generateGazette({ data: { brief: buildGazetteBrief(data, "daily", todayISO), mode: "daily" } });
-      if (res.ok) postDailyGazette(res.entries, todayISO);
-      else fail(res.reason);
-    } catch {
-      fail("api-error");
-    } finally {
-      setBusy(null);
-    }
+  const NOTES: Record<string, string> = {
+    "no-key": "Gazette writer needs the Anthropic API key on the server.",
+    "nothing-to-recap": "No fights are posted for this week yet.",
+    busy: "The league was busy saving. Try again.",
   };
-
-  const writeRecap = async () => {
-    setBusy("recap");
+  // The server builds the facts from the saved season, calls Claude and saves the edition.
+  const write = async (mode: "daily" | "recap") => {
+    setBusy(mode);
     setNote("");
     try {
-      const res = await generateGazette({ data: { brief: buildGazetteBrief(data, "recap", todayISO), mode: "recap" } });
+      const res = await writeGazette({ data: { mode } });
       if (res.ok) {
-        const ids = recapEntryIds(data.week, foughtBouts.map((b) => b.id));
-        const entries: GazetteEntry[] = res.entries.map((d, i) => ({
-          id: ids[i] ?? `g-${data.week}-claude-${i}`,
-          week: data.week,
-          boutId: i === 0 ? null : (foughtBouts[i - 1]?.id ?? null),
-          kicker: d.kicker,
-          headline: d.headline,
-          body: d.body,
-        }));
-        postRecapGazette(data.week, entries);
-      } else fail(res.reason);
-    } catch {
-      fail("api-error");
+        await takeLeagueSeason();
+        setNote(mode === "daily" ? "Daily Gazette posted." : "Saturday recap posted.");
+      } else setNote(NOTES[res.reason] ?? "Gazette writer unavailable — the paper still runs on templates.");
+    } catch (err) {
+      setNote(err instanceof Error ? err.message : "Gazette writer unavailable — the paper still runs on templates.");
     } finally {
       setBusy(null);
     }
@@ -262,11 +235,11 @@ function GazetteWriter() {
         Claude writes the paper from the league&apos;s own numbers — stores and bots only, trophy never belt. The daily edition takes the front page; a rewrite replaces today&apos;s.
       </p>
       <div className="mt-3 flex flex-col gap-2 md:flex-row">
-        <Btn tone="line" disabled={busy !== null} onClick={() => void writeDaily()}>
+        <Btn tone="line" disabled={busy !== null} onClick={() => void write("daily")}>
           {busy === "daily" ? "Writing…" : hasDaily ? "Rewrite today's Gazette" : "Write today's Gazette"}
         </Btn>
         {canRecap ? (
-          <Btn tone="line" disabled={busy !== null} onClick={() => void writeRecap()}>
+          <Btn tone="line" disabled={busy !== null} onClick={() => void write("recap")}>
             {busy === "recap" ? "Writing…" : "Write Saturday's recap with Claude"}
           </Btn>
         ) : null}

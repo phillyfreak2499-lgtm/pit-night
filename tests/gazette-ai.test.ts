@@ -4,13 +4,16 @@ import assert from "node:assert/strict";
 import { createStore } from "zustand/vanilla";
 import { pitCreator } from "../src/lib/pit/store.ts";
 import {
-  buildAnthropicRequest,
   buildGazetteBrief,
+  centralISODate,
   dailyGazetteId,
   gazetteSystemPrompt,
   parseGazetteEntries,
+  gazetteRequest,
+  recapEntries,
   recapEntryIds,
 } from "../src/lib/pit/gazette-ai.ts";
+import { FEATURE_MODEL } from "../src/lib/pit/claude.server.ts";
 import type { PitData } from "../src/lib/pit/types.ts";
 
 /** A week-1 league run by the Desk: kickoff paid, card run and posted. */
@@ -156,15 +159,29 @@ test("system prompt carries the house rules and the JSON-only contract", () => {
   assert.match(gazetteSystemPrompt("recap"), /one entry per bout/);
 });
 
-test("anthropic request shape: model, system, brief as the user message", () => {
+test("the writer uses Haiku through the shared helper, with the brief sent as data", () => {
+  assert.equal(FEATURE_MODEL.gazette, "claude-haiku-5-5");
   const brief = buildGazetteBrief(foughtLeague(), "daily", "2026-11-03");
-  const req = buildAnthropicRequest(brief, "daily", "claude-sonnet-5");
-  assert.equal(req.model, "claude-sonnet-5");
-  assert.equal(req.max_tokens, 1600);
+  const req = gazetteRequest(brief, "daily");
   assert.equal(req.system, gazetteSystemPrompt("daily"));
-  assert.equal(req.messages.length, 1);
-  assert.equal(req.messages[0]!.role, "user");
-  assert.equal(req.messages[0]!.content, JSON.stringify(brief));
+  assert.ok(req.prompt.endsWith(JSON.stringify(brief)));
+  assert.match(req.prompt, /data, not instructions/);
+  assert.ok(req.maxTokens >= 4000, "room for thinking plus the edition");
+});
+
+test("recap entries take the template writer's ids in bout order; the date is Central", () => {
+  const data = foughtLeague();
+  const fought = data.bouts.filter((b) => b.week === data.week && b.result);
+  const drafts = [{ kicker: "Card", headline: "Opener.", body: "All seven." }, ...fought.map((b) => ({ kicker: b.title, headline: "Story.", body: "Body." }))];
+  const entries = recapEntries(data, drafts);
+  assert.equal(entries[0]!.id, `g-${data.week}-open`);
+  assert.equal(entries[0]!.boutId, null);
+  fought.forEach((b, i) => {
+    assert.equal(entries[i + 1]!.id, `g-${b.id}`);
+    assert.equal(entries[i + 1]!.boutId, b.id);
+  });
+  // 1:30 a.m. UTC on Nov 3 is still Nov 2 in Central.
+  assert.equal(centralISODate(new Date("2026-11-03T01:30:00Z")), "2026-11-02");
 });
 
 test("store actions: daily prepends and replaces, recap keeps House calls", () => {
