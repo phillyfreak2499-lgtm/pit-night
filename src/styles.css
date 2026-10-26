@@ -137,6 +137,23 @@
   color: #fff6ea;
 }
 
+.thanksgiving-site {
+  background-image:
+    radial-gradient(ellipse at top, color-mix(in oklab, #a31621 14%, transparent), transparent 46%),
+    linear-gradient(to bottom, #170d06, var(--color-bg) 32%);
+}
+
+.thanksgiving-banner {
+  border-bottom: 1px solid #b06a28;
+  background: #241305;
+  color: #fdf3e3;
+  padding: 0.75rem 1rem;
+}
+
+.thanksgiving-banner p + p {
+  color: #fdf3e3;
+}
+
 .ooze-celebrate {
   border-bottom: 1px solid #7dff4a;
   background: #10240c;
@@ -149,6 +166,10 @@
 @media (prefers-reduced-motion: reduce) {
   .halloween-site {
     background-image: linear-gradient(to bottom, #140c08, var(--color-bg) 32%);
+  }
+
+  .thanksgiving-site {
+    background-image: linear-gradient(to bottom, #170d06, var(--color-bg) 32%);
   }
 }
 

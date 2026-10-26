@@ -21,6 +21,7 @@ import { TUTORIAL_REV, applyHulen, usePit } from "@/lib/pit/store";
 import { startSync, useSyncStatus } from "@/lib/pit/sync";
 import { setSoundMuted, soundMuted, subscribeSound } from "@/lib/pit/sound";
 import { halloweenVisuals } from "@/lib/pit/halloween";
+import { thanksgivingVisuals } from "@/lib/pit/thanksgiving";
 import { weekDeadline } from "@/lib/pit/time";
 import { formatRemain, nextLock, PERIOD_OPENS, TextInput, useNow } from "./bits";
 import { Tutorial } from "./tutorial";
@@ -71,8 +72,9 @@ export function PitShell({ children }: { children: React.ReactNode }) {
 
   const now = useNow();
   const halloween = Boolean(now && halloweenVisuals(now));
+  const thanksgiving = Boolean(now && thanksgivingVisuals(now));
   return (
-    <div className={`min-h-screen text-fg ${halloween ? "halloween-site" : ""}`}>
+    <div className={`min-h-screen text-fg ${halloween ? "halloween-site" : ""} ${thanksgiving ? "thanksgiving-site" : ""}`}>
       <div className="shell-grid md:grid md:grid-cols-[13.5rem_1fr]">
         <aside className="no-print hidden border-r border-line bg-deep md:sticky md:top-0 md:flex md:h-screen md:flex-col md:justify-between md:p-4">
           <div>
@@ -87,6 +89,7 @@ export function PitShell({ children }: { children: React.ReactNode }) {
         </aside>
         <div className="min-w-0">
           {halloween ? <HalloweenBanner /> : null}
+          {thanksgiving ? <ThanksgivingBanner /> : null}
           <OozeCelebration />
           <header className="no-print sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-line bg-deep/95 px-4 py-3 backdrop-blur md:px-6">
             <div className="md:hidden">
@@ -175,6 +178,17 @@ function useSoundMuted() {
     return subscribeSound(() => setMuted(soundMuted()));
   }, []);
   return muted;
+}
+
+function ThanksgivingBanner() {
+  return (
+    <div className="thanksgiving-banner no-print" data-testid="thanksgiving-banner" role="status">
+      <p className="font-display text-xs tracking-[0.18em] text-amber uppercase">Championship Week</p>
+      <p className="mt-1 text-sm leading-snug">
+        Championship Week — the table is set. Title fight Saturday. Thanksgiving iron is on the peg for the two title builds, and Falling Leaves is on sale for every store through Saturday.
+      </p>
+    </div>
+  );
 }
 
 function HalloweenBanner() {
