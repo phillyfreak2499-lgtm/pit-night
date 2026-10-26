@@ -6,7 +6,9 @@ import { ScoreInputs } from "./score-card";
 import { GradeGrid } from "./grade-grid";
 import { buildCard, championshipFinalists, gradeMetric, cardValue, coinMath, gradesOf, kickoffRank } from "@/lib/pit/engine";
 import { METRICS } from "@/lib/pit/catalog";
-import type { Grade, StatKey } from "@/lib/pit/types";
+import type { GazetteEntry, Grade, StatKey } from "@/lib/pit/types";
+import { buildGazetteBrief, dailyGazetteId, recapEntryIds } from "@/lib/pit/gazette-ai";
+import { generateGazette } from "@/lib/pit/gazette-server";
 import { takeLeagueSeason, useSyncStatus } from "@/lib/pit/sync";
 import { DeskCodes } from "./desk-codes";
 import { ClaudeCheck } from "./claude-copy";
@@ -150,6 +152,7 @@ function DeskLive() {
           </Btn>
         </div>
       </section>
+      <GazetteWriter />
       {data.week <= 4 ? <SundayScores /> : <ChampionshipDesk />}
       <section>
         <SectionLabel>{data.stores.length} stores</SectionLabel>
@@ -192,6 +195,84 @@ function DeskLive() {
         </div>
       </section>
     </div>
+  );
+}
+
+function GazetteWriter() {
+  const data = usePit();
+  const postDailyGazette = usePit((s) => s.postDailyGazette);
+  const postRecapGazette = usePit((s) => s.postRecapGazette);
+  const [busy, setBusy] = useState<"daily" | "recap" | null>(null);
+  const [note, setNote] = useState("");
+  const now = new Date();
+  const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const hasDaily = data.gazette.some((g) => g.id === dailyGazetteId(data.week, todayISO));
+  const foughtBouts = data.bouts.filter((b) => b.week === data.week && b.result);
+  const canRecap = ["fought", "inspected", "complete"].includes(data.phase) || foughtBouts.length > 0;
+
+  const fail = (reason: string) =>
+    setNote(
+      reason === "no-key"
+        ? "Gazette writer needs the Anthropic API key on the server."
+        : "Gazette writer unavailable — the paper still runs on templates.",
+    );
+
+  const writeDaily = async () => {
+    setBusy("daily");
+    setNote("");
+    try {
+      const res = await generateGazette({ data: { brief: buildGazetteBrief(data, "daily", todayISO), mode: "daily" } });
+      if (res.ok) postDailyGazette(res.entries, todayISO);
+      else fail(res.reason);
+    } catch {
+      fail("api-error");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const writeRecap = async () => {
+    setBusy("recap");
+    setNote("");
+    try {
+      const res = await generateGazette({ data: { brief: buildGazetteBrief(data, "recap", todayISO), mode: "recap" } });
+      if (res.ok) {
+        const ids = recapEntryIds(data.week, foughtBouts.map((b) => b.id));
+        const entries: GazetteEntry[] = res.entries.map((d, i) => ({
+          id: ids[i] ?? `g-${data.week}-claude-${i}`,
+          week: data.week,
+          boutId: i === 0 ? null : (foughtBouts[i - 1]?.id ?? null),
+          kicker: d.kicker,
+          headline: d.headline,
+          body: d.body,
+        }));
+        postRecapGazette(data.week, entries);
+      } else fail(res.reason);
+    } catch {
+      fail("api-error");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <section className="border border-line p-4">
+      <SectionLabel>Gazette writer</SectionLabel>
+      <p className="mt-2 text-sm text-muted">
+        Claude writes the paper from the league&apos;s own numbers — stores and bots only, trophy never belt. The daily edition takes the front page; a rewrite replaces today&apos;s.
+      </p>
+      <div className="mt-3 flex flex-col gap-2 md:flex-row">
+        <Btn tone="line" disabled={busy !== null} onClick={() => void writeDaily()}>
+          {busy === "daily" ? "Writing…" : hasDaily ? "Rewrite today's Gazette" : "Write today's Gazette"}
+        </Btn>
+        {canRecap ? (
+          <Btn tone="line" disabled={busy !== null} onClick={() => void writeRecap()}>
+            {busy === "recap" ? "Writing…" : "Write Saturday's recap with Claude"}
+          </Btn>
+        ) : null}
+      </div>
+      {note ? <p className="mt-2 text-sm text-warn">{note}</p> : null}
+    </section>
   );
 }
 
