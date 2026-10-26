@@ -102,16 +102,16 @@ function DeskLive() {
         </p>
       </div>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <Btn testId="lock-friday" onClick={lockFriday}>
+        <Btn testId="lock-friday" onClick={() => lockFriday()}>
           {data.week === 5 ? "Lock finalists (Fri Nov 27)" : data.week === 1 ? "Lock the bots (auto Sat Oct 31)" : "Lock the bots (Sat close)"}
         </Btn>
-        <Btn testId="run-saturday" tone="spark" onClick={runSaturday}>
+        <Btn testId="run-saturday" tone="spark" onClick={() => runSaturday()}>
           {data.week === 5 ? "Run Championship (Sat)" : "Run the card (Monday)"}
         </Btn>
-        <Btn testId="drop-damage" tone="line" onClick={dropDamage}>
+        <Btn testId="drop-damage" tone="line" onClick={() => dropDamage()}>
           Drop damage
         </Btn>
-        <Btn testId="advance-week" tone="line" onClick={advanceWeek}>
+        <Btn testId="advance-week" tone="line" onClick={() => advanceWeek()}>
           Advance week
         </Btn>
       </div>
@@ -451,7 +451,7 @@ function KickoffPanel() {
       </div>
       {open ? (
         <div className="mt-4">
-          <Btn testId="apply-kickoff" tone="spark" disabled={!ready} onClick={applyKickoff}>
+          <Btn testId="apply-kickoff" tone="spark" disabled={!ready} onClick={() => applyKickoff()}>
             {data.kickoff.appliedAt ? "Update coins and seeds" : "Pay the coins and set the seeds"}
           </Btn>
           {!ready ? <p className="mt-2 text-sm text-muted">Every store needs all six colors first.</p> : null}
