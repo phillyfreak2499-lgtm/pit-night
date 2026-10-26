@@ -68,9 +68,24 @@ async function load(options?: { deadlines?: boolean }) {
 export async function loadSeason() {
   return load();
 }
+/**
+ * Server failures reach the browser as a plain message, and results as plain data.
+ * An error the framework cannot package showed up only as "Seroval Error (step: 1)",
+ * hiding the real cause; the cause now goes to the server log and the user sees its message.
+ */
+async function plain<T>(what: string, run: () => Promise<T>): Promise<T> {
+  try {
+    return JSON.parse(JSON.stringify(await run())) as T;
+  } catch (err) {
+    console.error(`[pit] ${what} failed`, err);
+    const message = err instanceof Error && err.message ? err.message : String(err);
+    throw new Error(message.slice(0, 300) || `The ${what} failed. Try again.`);
+  }
+}
 export const pullSeason = createServerFn({ method: "POST" })
   .validator(z.object({ rev: z.number().int() }))
-  .handler(async ({ data: input }): Promise<PullResult> => {
+  .handler(async ({ data: input }): Promise<PullResult> => 
+    plain("league sync", async () => {
     const quick = await services();
     const meta = (
       await quick.sql<{ rev: number; schema_tag: string; phase: string | null }>`
@@ -95,7 +110,8 @@ export const pullSeason = createServerFn({ method: "POST" })
         input.rev === Number(s.row.rev) ? null : JSON.stringify(s.store.clientDoc(s.data, session)),
       session,
     };
-  });
+    }),
+  );
 export const signIn = createServerFn({ method: "POST" })
   .validator(
     z
@@ -107,10 +123,12 @@ export const signIn = createServerFn({ method: "POST" })
       })
       .strict(),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data }) => 
+    plain("sign-in", async () => {
     const s = await load();
     return s.auth.login(s.data, data.role, data.storeId, data.crewId, data.code);
-  });
+    }),
+  );
 export const signOut = createServerFn({ method: "POST" }).handler(async () => {
   const { logout } = await import("./session.server");
   await logout();
@@ -151,7 +169,8 @@ export const mutateSeason = createServerFn({ method: "POST" })
     const name = input.name as Command;
     return { name, args: commandArgs[name].parse(input.args) as unknown[] };
   })
-  .handler(async ({ data: input }) => {
+  .handler(async ({ data: input }) => 
+    plain("league command", async () => {
     const { authorize, captainBuildRejection } = await import("./commands");
     for (let attempt = 0; attempt < 8; attempt++) {
       const s = await load();
@@ -197,4 +216,5 @@ export const mutateSeason = createServerFn({ method: "POST" })
         };
     }
     throw new Error("The league is busy. Please try again.");
-  });
+    }),
+  );
