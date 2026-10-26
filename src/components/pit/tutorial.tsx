@@ -32,7 +32,7 @@ const STEPS = [
   {
     kicker: "The garage",
     title: "Spend coins. Build smart. Lock by Saturday close.",
-    body: "Sport parts cost 3 coins, Pro 5, Super 8, from that part's own jar. Some chassis cost more because the battery is the part, up to Reactor at 12. The top armor, weapons, and brains also want green weeks on their number. Skeleton and Ghost Veil are November 1 through 28 only. Paint and decals are just for looks. Every other part changes the fight. Bolt a Scry on the utility slot to scout, and to hit cleaner when you are behind. Whatever is on the bot at Saturday close is what fights Monday.",
+    body: "Sport parts cost 3 coins, Pro 5, Super 8, from that part's own jar. Some chassis cost more because the battery is the part, up to Reactor at 12. The top armor, weapons, and brains also want green weeks on their number. Skeleton and Ghost Veil are on the peg all season. Paint and decals are just for looks. Every other part changes the fight. Bolt a Scry on the utility slot to scout, and to hit cleaner when you are behind. Whatever is on the bot at Saturday close is what fights Monday.",
   },
   {
     kicker: "Monday morning",

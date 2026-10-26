@@ -6,7 +6,6 @@ import type { Tier } from "./types";
  * Prices outside 0/3/5/8 are set on the part. Brains here do not nudge stats.
  */
 
-const H: PartWindow = { start: [11, 1], end: [11, 28] };
 const PRICE: Record<Tier, number> = { stock: 0, sport: 3, pro: 5, super: 8, championship: 0 };
 
 type Row = {
@@ -642,10 +641,9 @@ const CHASSIS: Part[] = [
       {
         tier: "super",
         name: "Skeleton",
-        job: "Halloween chassis, Nov 1 through Nov 28. Hard to hit and erratic, and thin: the mirror of Glass Ghost. Glass Ghost's numbers are not these numbers.",
+        job: "Halloween chassis, on the peg all season. Hard to hit and erratic, and thin: the mirror of Glass Ghost. Glass Ghost's numbers are not these numbers.",
         nudge: n(0, 3, -3, 0),
         battery: 52,
-        window: H,
       },
     ],
   ),
@@ -1003,9 +1001,8 @@ const UTILITIES: Part[] = [
       {
         tier: "super",
         name: "Ghost Veil",
-        job: "Halloween utility, Nov 1 through Nov 28. Semi-transparent, with a ghostly afterimage that baits attacks and throws off aim. Support only. It deals no damage. This is the veil; there is no Poltergeist.",
+        job: "Halloween utility, on the peg all season. Semi-transparent, with a ghostly afterimage that baits attacks and throws off aim. Support only. It deals no damage. This is the veil; there is no Poltergeist.",
         nudge: n(0, 1, 0, 0),
-        window: H,
       },
     ],
   ),

@@ -73,13 +73,17 @@ test("Halloween dates follow Pit Week 1 and Championship Saturday", () => {
   assert.equal(halloweenVisuals(new Date(HALLOWEEN_VISUAL_END.getTime() - 1)), true);
   assert.equal(halloweenVisuals(HALLOWEEN_VISUAL_END), false);
 
-  assert.equal(premiumHalloweenOpen(HALLOWEEN_PIT_START), false);
-  assert.equal(premiumHalloweenOpen(oct31late), false);
-  assert.equal(premiumHalloweenOpen(new Date(PREMIUM_OPEN.getTime() - 1)), false);
+  // Halloween stock is on the peg all season (owner directive 2026-10-25):
+  // every one of these dates used to be shut or open by the calendar; all are open now.
+  assert.equal(premiumHalloweenOpen(HALLOWEEN_PIT_START), true);
+  assert.equal(premiumHalloweenOpen(oct31late), true);
+  assert.equal(premiumHalloweenOpen(new Date(PREMIUM_OPEN.getTime() - 1)), true);
   assert.equal(premiumHalloweenOpen(PREMIUM_OPEN), true);
   assert.equal(premiumHalloweenOpen(central(2026, 11, 28, 18)), true);
   assert.equal(premiumHalloweenOpen(new Date(PREMIUM_CLOSE.getTime() - 1)), true);
-  assert.equal(premiumHalloweenOpen(PREMIUM_CLOSE), false);
+  assert.equal(premiumHalloweenOpen(PREMIUM_CLOSE), true);
+  assert.equal(premiumHalloweenOpen(central(2026, 10, 26, 12)), true);
+  assert.equal(premiumHalloweenOpen(central(2026, 12, 5, 12)), true);
 });
 
 test("Pit Week 1 jobs earn Halloween looks without touching coins or the fight", () => {
@@ -143,42 +147,41 @@ test("Pit Week 1 jobs earn Halloween looks without touching coins or the fight",
   assert.equal(cosmeticUnlocked(otherWeek, "plano", "weaponSkin", "hockey-machete"), false);
 });
 
-test("premium iron and show effects cost 8 and stay shut until November 1", (t) => {
+test("premium iron and show effects cost 8 and are on the peg all season", (t) => {
   t.mock.timers.enable({ apis: ["Date"], now: HALLOWEEN_PIT_START.getTime() });
   const league = state();
   fund(league);
   const saw = partById("weapon-saw-super")!;
   const chainsaw = partById("weapon-chainsaw-super")!;
   assert.equal(buyCheck(league.getState(), "plano", saw).ok, true);
+  // October 27 (Pit Week 1 Tuesday) used to be shut; every premium part is buyable now.
   for (const id of PREMIUM_PART_IDS) {
     const part = partById(id)!;
     assert.equal(part.name, NAMES[id]);
     assert.equal(part.price, 8);
     assert.equal(part.price, TIER_PRICE.super);
     assert.equal(part.tier, "super");
-    const closed = buyCheck(league.getState(), "plano", part);
-    assert.equal(closed.ok, false);
-    assert.equal(closed.cost, 8);
-    assert.match(closed.reason, /November 1/);
+    const open = buyCheck(league.getState(), "plano", part);
+    assert.equal(open.ok, true);
+    assert.equal(open.cost, 8);
   }
   for (const effect of SHOW_EFFECTS) {
     assert.equal(effect.price, SHOW_PRICE);
     assert.equal(effect.price, 8);
-    const closed = showCheck(league.getState(), "plano", effect.id);
-    assert.equal(closed.ok, false);
-    assert.match(closed.reason, /November 1/);
+    assert.equal(showCheck(league.getState(), "plano", effect.id).ok, true);
   }
+  // Real purchases land before November: coins move, parts and shows are recorded.
   const coinsBefore = plano(league).coins.weapon;
   league.getState().buyPart("plano", chainsaw.id);
   league.getState().buyShow("plano", "fog");
-  assert.equal(plano(league).coins.weapon, coinsBefore);
-  assert.equal(plano(league).coins.utility, 40);
-  assert.equal(plano(league).owned.includes(chainsaw.id), false);
-  assert.equal(plano(league).shows, undefined);
+  assert.equal(plano(league).coins.weapon, coinsBefore - 8);
+  assert.equal(plano(league).coins.utility, 32);
+  assert.equal(plano(league).owned.includes(chainsaw.id), true);
+  assert.deepEqual(plano(league).shows, ["fog"]);
 
   t.mock.timers.setTime(central(2026, 10, 31, 23).getTime());
-  assert.equal(buyCheck(league.getState(), "plano", chainsaw).ok, false);
-  assert.equal(showCheck(league.getState(), "plano", "blacklight").ok, false);
+  assert.equal(buyCheck(league.getState(), "plano", partById("weapon-slasher-super")!).ok, true);
+  assert.equal(showCheck(league.getState(), "plano", "blacklight").ok, true);
   assert.equal(buyCheck(league.getState(), "plano", saw).ok, true);
 
   const week1 = state();
@@ -187,24 +190,22 @@ test("premium iron and show effects cost 8 and stay shut until November 1", (t) 
     bots: week1.getState().bots.map((b) => (b.storeId === "plano" ? { ...b, coins: fullCoins(40), locked: null } : b)),
   });
   assert.equal(buyCheck(week1.getState(), "plano", saw).ok, true);
-  assert.equal(buyCheck(week1.getState(), "plano", chainsaw).ok, false);
+  assert.equal(buyCheck(week1.getState(), "plano", chainsaw).ok, true);
 
   t.mock.timers.setTime(PREMIUM_OPEN.getTime());
   const beforeWeapon = plano(league).coins.weapon;
   const beforeChassis = plano(league).coins.chassis;
   const beforeDrive = plano(league).coins.drive;
   const beforeUtility = plano(league).coins.utility;
-  assert.equal(buyCheck(league.getState(), "plano", chainsaw).ok, true);
-  league.getState().buyPart("plano", "weapon-chainsaw-super");
+  assert.equal(buyCheck(league.getState(), "plano", partById("weapon-broom-super")!).ok, true);
   league.getState().buyPart("plano", "chassis-pumpkin-super");
   league.getState().buyPart("plano", "drive-ghostchaser-super");
-  league.getState().buyShow("plano", "fog");
   league.getState().buyShow("plano", "blacklight");
   const bot = plano(league);
-  assert.equal(bot.coins.weapon, beforeWeapon - 8);
+  assert.equal(bot.coins.weapon, beforeWeapon);
   assert.equal(bot.coins.chassis, beforeChassis - 8);
   assert.equal(bot.coins.drive, beforeDrive - 8);
-  assert.equal(bot.coins.utility, beforeUtility - 16);
+  assert.equal(bot.coins.utility, beforeUtility - 8);
   assert.deepEqual(bot.shows, ["fog", "blacklight"]);
   assert.equal(bot.classId, "striker");
   assert.ok(bot.owned.includes("weapon-chainsaw-super"));
@@ -216,10 +217,15 @@ test("premium iron and show effects cost 8 and stay shut until November 1", (t) 
   assert.equal(buyCheck(league.getState(), "plano", partById("weapon-slasher-super")!).ok, true);
   assert.equal(showCheck(league.getState(), "plano", "fog").ok, false);
 
+  // After the old November 29 close, and into December, the peg is still open.
   t.mock.timers.setTime(PREMIUM_CLOSE.getTime());
-  assert.equal(buyCheck(league.getState(), "plano", partById("weapon-slasher-super")!).ok, false);
+  assert.equal(buyCheck(league.getState(), "plano", partById("weapon-slasher-super")!).ok, true);
   assert.equal(showCheck(league.getState(), "plano", "fog").ok, false);
   assert.equal(buyCheck(league.getState(), "plano", saw).ok, true);
+
+  t.mock.timers.setTime(central(2026, 12, 5, 12).getTime());
+  assert.equal(buyCheck(league.getState(), "plano", partById("weapon-slasher-super")!).ok, true);
+  assert.equal(showCheck(week1.getState(), "plano", "fog").ok, true);
 
   const session = league.getState().session;
   assert.doesNotThrow(() => authorize(league.getState(), session, "buyShow", ["plano", "fog"]));

@@ -1078,7 +1078,7 @@ const FAMILIES: Family[] = [
     nudge: nudge(4, 1, -2, 0),
     names: { super: "Texas Chainsaw" },
     jobs: {
-      super: "A parade saw with a loud first bite. It bogs down when the other bot is wearing more plate. On the peg November 1 through Championship Saturday. Eight weapon coins.",
+      super: "A parade saw with a loud first bite. It bogs down when the other bot is wearing more plate. Eight weapon coins.",
     },
   },
   {
@@ -1090,7 +1090,7 @@ const FAMILIES: Family[] = [
     nudge: nudge(2, 3, -2, 0),
     names: { super: "Slasher Blade" },
     jobs: {
-      super: "A long kitchen blade. The lunge lands when you are already faster. If you are not, it is just a late swing. November 1 through Championship Saturday. Eight weapon coins.",
+      super: "A long kitchen blade. The lunge lands when you are already faster. If you are not, it is just a late swing. Eight weapon coins.",
     },
   },
   {
@@ -1102,7 +1102,7 @@ const FAMILIES: Family[] = [
     nudge: nudge(2, 2, -3, 2),
     names: { super: "Ghost Blade" },
     jobs: {
-      super: "A pale blade that slips partway through plate and leaves a light trail. Without Heat it fades. November 1 through Championship Saturday. Eight weapon coins.",
+      super: "A pale blade that slips partway through plate and leaves a light trail. Without Heat it fades. Eight weapon coins.",
     },
   },
   {
@@ -1114,7 +1114,7 @@ const FAMILIES: Family[] = [
     nudge: nudge(3, -2, 0, 1),
     names: { super: "Pumpkin Launcher" },
     jobs: {
-      super: "Lobs a pumpkin into the middle exchange. The first swing is the wind-up. November 1 through Championship Saturday. Eight weapon coins.",
+      super: "Lobs a pumpkin into the middle exchange. The first swing is the wind-up. Eight weapon coins.",
     },
   },
   {
@@ -1126,7 +1126,7 @@ const FAMILIES: Family[] = [
     nudge: nudge(0, 0, -1, 4),
     names: { super: "Skeleton Claws" },
     jobs: {
-      super: "A rattling grapple. It can still walk someone to the edge, and it likes strikers more than tanks. Less Heat than Lockjaw. November 1 through Championship Saturday. Eight weapon coins.",
+      super: "A rattling grapple. It can still walk someone to the edge, and it likes strikers more than tanks. Less Heat than Lockjaw. Eight weapon coins.",
     },
   },
   {
@@ -1138,7 +1138,7 @@ const FAMILIES: Family[] = [
     nudge: nudge(1, 2, 0, 2),
     names: { super: "Witch's Broom" },
     jobs: {
-      super: "A broom that plants like a staff when your Heat is up. Until then it is a broom. November 1 through Championship Saturday. Eight weapon coins.",
+      super: "A broom that plants like a staff when your Heat is up. Until then it is a broom. Eight weapon coins.",
     },
   },
   {
@@ -1150,7 +1150,7 @@ const FAMILIES: Family[] = [
     nudge: nudge(2, -1, 4, -2),
     names: { super: "Pumpkin Chassis" },
     jobs: {
-      super: "A round festive shell for any class. It shrugs the first bite and swings a little softer all night. It does not change your class. November 1 through Championship Saturday. Eight chassis coins.",
+      super: "A round festive shell for any class. It shrugs the first bite and swings a little softer all night. It does not change your class. Eight chassis coins.",
     },
   },
   {
@@ -1162,7 +1162,7 @@ const FAMILIES: Family[] = [
     nudge: nudge(0, 3, -2, 1),
     names: { super: "Ghost Chaser" },
     jobs: {
-      super: "A light-bar chase wagon with round lamps. It closes on a slower bot and gives up plate to do it. November 1 through Championship Saturday. Eight drive coins.",
+      super: "A light-bar chase wagon with round lamps. It closes on a slower bot and gives up plate to do it. Eight drive coins.",
     },
   },
 ];
