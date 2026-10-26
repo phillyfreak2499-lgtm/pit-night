@@ -3,7 +3,7 @@ import { useState } from "react";
 import { KEY_SOURCE, PARTS, SLOT_LABEL, tierWord, type Part } from "@/lib/pit/catalog";
 import { SHOW_EFFECTS } from "@/lib/pit/halloween";
 import { THANKSGIVING_SHOW_EFFECTS, isThanksgivingPart } from "@/lib/pit/thanksgiving";
-import { buyCheck, canSeeLoadout, shopOpen, showCheck } from "@/lib/pit/engine";
+import { SELL_BACK, buyCheck, canSeeLoadout, sellCheck, shopOpen, showCheck } from "@/lib/pit/engine";
 import { usePit } from "@/lib/pit/store";
 import type { Slot } from "@/lib/pit/types";
 import { Btn, SectionLabel } from "./bits";
@@ -26,6 +26,9 @@ function windowLabel(window: NonNullable<Part["window"]>) {
 export function ShopPage({ storeId }: { storeId: string }) {
   const data = usePit();
   const buyPart = usePit((s) => s.buyPart);
+  const sellPart = usePit((s) => s.sellPart);
+  // Two taps to sell: the first arms the button, the second sells.
+  const [selling, setSelling] = useState<string | null>(null);
   const buyShow = usePit((s) => s.buyShow);
   const propose = usePit((s) => s.propose);
   const [slot, setSlot] = useState<Slot>("weapon");
@@ -80,6 +83,7 @@ export function ShopPage({ storeId }: { storeId: string }) {
             {parts.map((part) => {
               const check = buyCheck(data, storeId, part);
               const owned = bot.owned.includes(part.id);
+              const sell = owned ? sellCheck(data, storeId, part) : null;
               const have = bot.coins[part.key] ?? 0;
               const price = Math.max(check.cost, part.price);
               const coinsOk = have >= price;
@@ -107,7 +111,7 @@ export function ShopPage({ storeId }: { storeId: string }) {
                   </ul>
                   <p className={`mt-2 text-sm ${owned ? "text-ok" : check.ok ? "text-amber" : "text-muted"}`}>
                     {owned
-                      ? "Already in the cage. Equip it from the garage."
+                      ? `Already in the cage. Equip it from the garage, or sell it back for ${SELL_BACK} ${SLOT_LABEL[part.key].toLowerCase()} coins.`
                       : check.ok
                         ? "Ready to buy."
                         : !coinsOk
@@ -118,6 +122,23 @@ export function ShopPage({ storeId }: { storeId: string }) {
                     <Btn disabled={!check.ok} onClick={() => buyPart(storeId, part.id)}>
                       Buy
                     </Btn>
+                    {sell ? (
+                      <Btn
+                        tone={selling === part.id ? "spark" : "line"}
+                        disabled={!sell.ok}
+                        testId={`sell-${part.id}`}
+                        onClick={() => {
+                          if (selling !== part.id) {
+                            setSelling(part.id);
+                            return;
+                          }
+                          setSelling(null);
+                          sellPart(storeId, part.id);
+                        }}
+                      >
+                        {selling === part.id ? `Tap again: sell for ${SELL_BACK}` : `Sell for ${SELL_BACK}`}
+                      </Btn>
+                    ) : null}
                     <Btn tone="ghost" onClick={() => propose(storeId, part.id, part.job)}>
                       Propose
                     </Btn>

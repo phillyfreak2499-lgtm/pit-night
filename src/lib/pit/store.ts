@@ -20,6 +20,8 @@ import {
   buildCard,
   kickoffRank,
   buyCheck,
+  SELL_BACK,
+  sellCheck,
   showCheck,
   cardFor,
   championshipFinalists,
@@ -82,6 +84,7 @@ export type PitState = PitData & {
   acceptProposal: (id: string) => void;
   dismissProposal: (id: string) => void;
   buyPart: (storeId: string, partId: string) => void;
+  sellPart: (storeId: string, partId: string) => void;
   buyShow: (storeId: string, effectId: ShowEffectId) => void;
   repairSlot: (storeId: string, slot: Slot, mode: "full" | "weld" | "salvage" | "crown") => void;
   nameMvp: (storeId: string, crewId: string) => void;
@@ -322,6 +325,7 @@ function fresh(): PitState {
     acceptProposal: () => {},
     dismissProposal: () => {},
     buyPart: () => {},
+    sellPart: () => {},
     buyShow: () => {},
     repairSlot: () => {},
     nameMvp: () => {},
@@ -872,6 +876,50 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         function classChangeNote(name: string, cost: number) {
           return `${name} bought for ${cost} coins.`;
         }
+      },
+      sellPart: (storeId, partId) => {
+        const data = get();
+        const championshipBlock = championshipPrepGuard(data, storeId);
+        if (championshipBlock && !isBoss(data)) { set({ flash: championshipBlock }); return; }
+        const starterBlock = starterBodyGuard(data, storeId);
+        if (starterBlock && !isBoss(data)) { set({ flash: starterBlock }); return; }
+        if (!isCaptainOf(data, storeId)) {
+          set({ flash: "The wallet answers to the captain." });
+          return;
+        }
+        const buildBlock = captainBuildBlock(data);
+        if (buildBlock) {
+          set({ flash: buildBlock });
+          return;
+        }
+        const part = partById(partId);
+        if (!part) return;
+        const check = sellCheck(data, storeId, part);
+        if (!check.ok) {
+          set({ flash: check.reason });
+          return;
+        }
+        set({
+          bots: patchBot(data.bots, storeId, (bot) => {
+            // A sold part that was on the bot leaves the slot on the stock loaner (utility goes empty).
+            const loaner = part.slot === "utility" ? null : stockPart(part.slot, bot.classId).id;
+            const onBot = bot.draft[part.slot] === part.id || bot.equipped[part.slot] === part.id;
+            const draft = bot.draft[part.slot] === part.id ? { ...bot.draft, [part.slot]: loaner } : bot.draft;
+            const equipped = bot.equipped[part.slot] === part.id ? { ...bot.equipped, [part.slot]: loaner } : bot.equipped;
+            const partWear = { ...bot.partWear };
+            delete partWear[part.id];
+            return syncWear({
+              ...bot,
+              coins: { ...bot.coins, [part.key]: (bot.coins[part.key] ?? 0) + SELL_BACK },
+              owned: bot.owned.filter((id) => id !== part.id),
+              draft,
+              equipped,
+              partWear,
+              weldForWeek: onBot ? { ...bot.weldForWeek, [part.slot]: undefined } : bot.weldForWeek,
+            });
+          }),
+          flash: `${part.name} sold. ${SELL_BACK} ${part.key} coins back in the jar.`,
+        });
       },
       buyShow: (storeId, effectId) => {
         const data = get();
