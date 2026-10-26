@@ -50,7 +50,8 @@ import { showEffect } from "./halloween";
 import { thanksgivingShowEffect } from "./thanksgiving";
 import { buildLockMessage, deadlineDue, weekDeadline } from "./time";
 import type { BotDecal, CosmeticLoadout, StickerSlot } from "./types";
-import type { Bot, BotLook, BotStyle, Condition, FightResult, GarageLook, Grade, Kickoff, Loadout, PitData, Session, ShowEffectId, Slot, StatKey, StoreCard } from "./types";
+import type { Bot, BotLook, BotStyle, Condition, FightResult, GarageLook, GazetteEntry, Grade, Kickoff, Loadout, PitData, Session, ShowEffectId, Slot, StatKey, StoreCard } from "./types";
+import { dailyGazetteId, type GazetteDraft } from "./gazette-ai";
 
 const FIELD_OF: Record<StatKey, keyof StoreCard> = { nsnu: "nsnu", conv: "conv", demoRate: "demoRate", demoClose: "demoClose", arch: "arch", ticket: "demoTicket" };
 
@@ -114,6 +115,8 @@ export type PitState = PitData & {
   setTags: (week: number, on: boolean) => void;
   setTagline: (tagline: string) => void;
   houseCall: (text: string) => void;
+  postDailyGazette: (entries: GazetteDraft[], todayISO: string) => void;
+  postRecapGazette: (week: number, entries: GazetteEntry[]) => void;
   lockFriday: () => void;
   runSaturday: () => void;
   dropDamage: () => void;
@@ -352,6 +355,8 @@ function fresh(): PitState {
     setTags: () => {},
     setTagline: () => {},
     houseCall: () => {},
+    postDailyGazette: () => {},
+    postRecapGazette: () => {},
     lockFriday: () => {},
     runSaturday: () => {},
     dropDamage: () => {},
@@ -1553,6 +1558,40 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
             ...data.gazette,
           ],
           flash: "House call posted to the gazette.",
+        });
+      },
+      postDailyGazette: (drafts, todayISO) => {
+        const data = get();
+        if (!isBoss(data)) return;
+        const clean = drafts.filter((d) => d.headline?.trim() && d.body?.trim());
+        if (!clean.length) return;
+        const base = dailyGazetteId(data.week, todayISO);
+        const entries: GazetteEntry[] = clean.map((d, i) => ({
+          id: i === 0 ? base : `${base}-${i + 1}`,
+          week: data.week,
+          boutId: null,
+          kicker: d.kicker?.trim() || "Daily Gazette",
+          headline: d.headline.trim(),
+          body: d.body.trim(),
+        }));
+        // The Gazette page features the first entry as the front page, so the
+        // daily edition goes on top; a rewrite replaces that day's entries.
+        const isOld = (g: GazetteEntry) => g.id === base || g.id.startsWith(`${base}-`);
+        set({
+          gazette: [...entries, ...data.gazette.filter((g) => !isOld(g))],
+          flash: "Daily Gazette posted.",
+        });
+      },
+      postRecapGazette: (week, entries) => {
+        const data = get();
+        if (!isBoss(data)) return;
+        const clean = entries.filter((e) => e.headline?.trim() && e.body?.trim());
+        if (!clean.length) return;
+        // Same replacement semantics as runSaturday: the week's own entries are
+        // replaced, House calls for the week are kept.
+        set({
+          gazette: [...clean, ...data.gazette.filter((g) => g.week !== week || g.kicker === "House call")],
+          flash: "Saturday recap posted.",
         });
       },
       lockFriday: () => {
