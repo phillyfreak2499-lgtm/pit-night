@@ -1,6 +1,7 @@
 import { bannerVerdict } from "../../../scripts/copy-guard.mjs";
 import { STICKER_ART, type BotBody, type BotDecal, type BotFinish, type BotLeds, type BotMask, type BotSmoke, type BotStyle, type BotTopper, type BotWeaponSkin, type ClassId, type KeyName, type Slot, type StatKey, type StickerArt, type Tier } from "./types";
 import { ROSTER_PARTS } from "./roster";
+import { THANKSGIVING_WINDOW } from "./thanksgiving";
 
 export const SCRAP_CAP = 18;
 export const VERSION = 6;
@@ -97,6 +98,8 @@ const BASE_DECALS: { id: StickerArt; label: string }[] = [
   { id: "splash", label: "Paint splash" },
   { id: "champion", label: "Champion crest" },
   { id: "pumpkin", label: "Pumpkin sticker" },
+  { id: "turkey", label: "Turkey sticker" },
+  { id: "wishbone", label: "Wishbone" },
   { id: "roundel", label: "Number roundel" },
   { id: "gear", label: "Gear" },
   { id: "wrench", label: "Wrench" },
@@ -1164,6 +1167,46 @@ const FAMILIES: Family[] = [
     jobs: {
       super: "A light-bar chase wagon with round lamps. It closes on a slower bot and gives up plate to do it. Eight drive coins.",
     },
+  },
+  {
+    slot: "weapon",
+    family: "carver",
+    stat: "demoClose",
+    key: "weapon",
+    tags: ["smash", "thanksgiving"],
+    nudge: nudge(4, 0, -1, 0),
+    names: { super: "Turkey Carver" },
+    jobs: {
+      super: "A heavy carving blade on a pit handle. All first-swing, no chase. It carves whatever stands still; a fast bot is just dinner that moved. Championship Week only. Eight weapon coins.",
+    },
+    windows: { super: THANKSGIVING_WINDOW },
+  },
+  {
+    slot: "weapon",
+    family: "yamcannon",
+    stat: "demoClose",
+    key: "weapon",
+    tags: ["heat", "thanksgiving"],
+    nudge: nudge(2, -1, 1, 2),
+    names: { super: "Sweet Potato Cannon" },
+    jobs: {
+      super: "A gourd-bore cannon that lobs a candied yam in a low arc. Slow to load, warm all night. The yam is not the dangerous part; the landing is. Championship Week only. Eight weapon coins.",
+    },
+    windows: { super: THANKSGIVING_WINDOW },
+  },
+  {
+    slot: "chassis",
+    family: "harvesttable",
+    stat: "nsnu",
+    key: "chassis",
+    tags: ["armor", "thanksgiving"],
+    nudge: nudge(1, -1, 4, -1),
+    names: { super: "Harvest Table" },
+    jobs: {
+      super: "A wide, flat feast-table shell for any class. Everything slides off it and it seats fourteen. It does not change your class. Championship Week only. Eight chassis coins.",
+    },
+    windows: { super: THANKSGIVING_WINDOW },
+    batteries: { super: 80 },
   },
 ];
 

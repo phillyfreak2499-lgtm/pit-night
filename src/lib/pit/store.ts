@@ -42,13 +42,15 @@ import { makeData } from "./seed";
 import { BOLTS, STREAK_BADGE, allJobs, crateFor, dayOpen, programWeek, type DayKey } from "./training";
 import { eligibilityClosed } from "./eligibility";
 import { blockedName } from "../../../scripts/copy-guard.mjs";
-import { bannerVerdict, cosmeticUnlocked, earnedRewardIds, HALLOWEEN_REWARD_IDS, validBodyForClass } from "./cosmetics";
+import { bannerVerdict, cosmeticUnlocked, earnedRewardIds, HALLOWEEN_REWARD_IDS, THANKSGIVING_REWARD_IDS, validBodyForClass } from "./cosmetics";
 import { boltsOf, lockerItem, sparkStreak } from "./week";
 import { checkedCosmeticLoadout } from "./cosmetic-loadout";
 import { authorize } from "./commands";
+import { showEffect } from "./halloween";
+import { thanksgivingShowEffect } from "./thanksgiving";
 import { buildLockMessage, deadlineDue, weekDeadline } from "./time";
 import type { BotDecal, CosmeticLoadout, StickerSlot } from "./types";
-import type { Bot, BotLook, BotStyle, Condition, FightResult, GarageLook, GazetteEntry, Grade, Kickoff, Loadout, PitData, Session, Slot, StatKey, StoreCard } from "./types";
+import type { Bot, BotLook, BotStyle, Condition, FightResult, GarageLook, GazetteEntry, Grade, Kickoff, Loadout, PitData, Session, ShowEffectId, Slot, StatKey, StoreCard } from "./types";
 import { dailyGazetteId, type GazetteDraft } from "./gazette-ai";
 
 const FIELD_OF: Record<StatKey, keyof StoreCard> = { nsnu: "nsnu", conv: "conv", demoRate: "demoRate", demoClose: "demoClose", arch: "arch", ticket: "demoTicket" };
@@ -80,7 +82,7 @@ export type PitState = PitData & {
   acceptProposal: (id: string) => void;
   dismissProposal: (id: string) => void;
   buyPart: (storeId: string, partId: string) => void;
-  buyShow: (storeId: string, effectId: "fog" | "blacklight") => void;
+  buyShow: (storeId: string, effectId: ShowEffectId) => void;
   repairSlot: (storeId: string, slot: Slot, mode: "full" | "weld" | "salvage" | "crown") => void;
   nameMvp: (storeId: string, crewId: string) => void;
   renameBot: (storeId: string, name: string) => void;
@@ -137,6 +139,19 @@ function newlyEarnedHalloween(data: PitData, storeId: string, before: Set<string
   const after = earnedRewardIds(data, storeId);
   const hit = HALLOWEEN_REWARD_IDS.find((id) => after.has(id) && !before.has(id));
   return hit ? HALLOWEEN_LABEL[hit] : null;
+}
+
+const THANKSGIVING_LABEL: Record<(typeof THANKSGIVING_REWARD_IDS)[number], string> = {
+  "reward-turkey": "Turkey Sticker",
+  "reward-pilgrim-hat": "Pilgrim Hat",
+  "reward-wishbone": "Wishbone Decal",
+  "reward-harvest-wreath": "Harvest Wreath",
+};
+
+function newlyEarnedThanksgiving(data: PitData, storeId: string, before: Set<string>) {
+  const after = earnedRewardIds(data, storeId);
+  const hit = THANKSGIVING_REWARD_IDS.find((id) => after.has(id) && !before.has(id));
+  return hit ? THANKSGIVING_LABEL[hit] : null;
 }
 
 /** The signed-in crew member, if any. The desk acts as nobody. */
@@ -860,8 +875,16 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
       },
       buyShow: (storeId, effectId) => {
         const data = get();
-        const championshipBlock = championshipPrepGuard(data, storeId);
-        if (championshipBlock && !isBoss(data)) { set({ flash: championshipBlock }); return; }
+        // Falling Leaves is exempt from championshipPrepGuard on purpose:
+        // a show effect is arena atmosphere, not bot work — it never enters
+        // the loadout — and Falling Leaves is sold league-wide in Week 5,
+        // finalist or not. Fog and Blacklight keep the guard, exactly as
+        // before. starterBodyGuard and captainBuildBlock still apply to
+        // every show purchase.
+        if (!thanksgivingShowEffect(effectId)) {
+          const championshipBlock = championshipPrepGuard(data, storeId);
+          if (championshipBlock && !isBoss(data)) { set({ flash: championshipBlock }); return; }
+        }
         const starterBlock = starterBodyGuard(data, storeId);
         if (starterBlock && !isBoss(data)) { set({ flash: starterBlock }); return; }
         if (!isCaptainOf(data, storeId)) {
@@ -879,13 +902,14 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           return;
         }
         const effect = effectId;
+        const effectName = showEffect(effectId)?.name ?? thanksgivingShowEffect(effectId)?.name ?? effectId;
         set({
           bots: patchBot(data.bots, storeId, (bot) => ({
             ...bot,
             coins: { ...bot.coins, utility: (bot.coins.utility ?? 0) - check.cost },
             shows: [...(bot.shows ?? []), effect],
           })),
-          flash: `${effect === "fog" ? "Fog Machine" : "Blacklight Mode"} is in the rafters. Light only. The fight does not change.`,
+          flash: `${effectName} is in the rafters. Light only. The fight does not change.`,
         });
       },
       repairSlot: (storeId, slot, mode) => {
@@ -1205,9 +1229,10 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
             : after.current > 1
               ? ` ${after.current} perfect in a row.`
               : "";
+        const unlocked = newlyEarnedThanksgiving({ ...data, sparkLog }, who.storeId, earnedRewardIds(data, who.storeId));
         set({
           sparkLog,
-          flash: `Spark done. ${correct} of ${total}. +${correct * BOLTS.sparkCorrect} bolts.${streakNote}`,
+          flash: `Spark done. ${correct} of ${total}. +${correct * BOLTS.sparkCorrect} bolts.${streakNote}${unlocked ? ` ${unlocked} unlocked. It stays on the bot after Championship Week, and it does not change the fight.` : ""}`,
         });
       },
       postShout: (to, text) => {
@@ -1220,12 +1245,17 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         const body = text.trim().slice(0, 240);
         const name = to.trim().slice(0, 60);
         if (!body || !name) return;
+        const before = earnedRewardIds(data, who.storeId);
+        const shouts = [
+          ...data.shouts,
+          { id: `${who.id}-${Date.now().toString(36)}`, week: data.week, storeId: who.storeId, fromCrewId: who.id, fromName: who.name, to: name, text: body, at: Date.now() },
+        ];
+        const unlocked = newlyEarnedThanksgiving({ ...data, shouts }, who.storeId, before);
         set({
-          shouts: [
-            ...data.shouts,
-            { id: `${who.id}-${Date.now().toString(36)}`, week: data.week, storeId: who.storeId, fromCrewId: who.id, fromName: who.name, to: name, text: body, at: Date.now() },
-          ],
-          flash: "Shout-out posted.",
+          shouts,
+          flash: unlocked
+            ? `Shout-out posted. ${unlocked} unlocked. It stays on the bot after Championship Week, and it does not change the fight.`
+            : "Shout-out posted.",
         });
       },
       removeShout: (id) => {

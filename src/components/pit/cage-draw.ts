@@ -1,6 +1,7 @@
 import { bannerVerdict } from "../../../scripts/copy-guard.mjs";
 import { EYES, LEDS, PAINT, SMOKE, TRIM, decalArt, styleOf } from "@/lib/pit/catalog";
 import { halloweenVisuals } from "@/lib/pit/halloween";
+import { thanksgivingVisuals } from "@/lib/pit/thanksgiving";
 import { armorEdges, deckHardware } from "./material-detail";
 import type { BotBody, ClassId } from "@/lib/pit/types";
 import { PIT, clamp, ease, hash, lerp, type BotState, type Drive, type Spot } from "./cage-motion";
@@ -742,7 +743,7 @@ const backdropCache = new WeakMap<
 >();
 
 function backdrop(ctx: CanvasRenderingContext2D, w: number, h: number) {
-  const decor = halloweenVisuals() ? 1 : 0;
+  const decor = thanksgivingVisuals() ? 2 : halloweenVisuals() ? 1 : 0;
   const hit = backdropCache.get(ctx);
   if (hit && hit.w === w && hit.h === h && hit.v === logoVersion && hit.decor === decor) return hit.canvas;
   const canvas = document.createElement("canvas");
@@ -1097,6 +1098,7 @@ function paintBackdrop(c: CanvasRenderingContext2D, w: number, h: number) {
   }
   c.globalCompositeOperation = "source-over";
   if (halloweenVisuals()) paintHalloweenTrim(c, w, h);
+  if (thanksgivingVisuals()) paintThanksgivingTrim(c, w, h);
 }
 
 /** Static ring dressing for Halloween week. Motion lives in the live frame, not this cache. */
@@ -1143,6 +1145,94 @@ function paintHalloweenTrim(c: CanvasRenderingContext2D, w: number, h: number) {
     }
   }
   c.restore();
+}
+
+/** Static ring dressing for Championship Week. Motion lives in the live frame, not this cache. */
+function paintThanksgivingTrim(c: CanvasRenderingContext2D, w: number, h: number) {
+  c.save();
+  // String lights along the truss, harvest palette. Decorative, not a status signal.
+  const lamps = ["#e8871e", "#a31621", "#e2a21a"];
+  for (let i = 0; i < 18; i++) {
+    const x = w * (0.06 + i * 0.05);
+    c.fillStyle = lamps[i % lamps.length]!;
+    c.beginPath();
+    c.arc(x, h * 0.07, Math.max(2, w * 0.006), 0, Math.PI * 2);
+    c.fill();
+  }
+  // Cornucopia silhouettes at the lower corners: a horn spilling round fruit.
+  for (const side of [0, 1] as const) {
+    const x = w * (side === 0 ? 0.1 : 0.9);
+    const y = h * 0.78;
+    const r = w * 0.045;
+    const flip = side === 0 ? 1 : -1;
+    c.fillStyle = "#8a5a1e";
+    c.beginPath();
+    c.moveTo(x - flip * r * 1.1, y + r * 0.5);
+    c.quadraticCurveTo(x + flip * r * 0.2, y + r * 0.9, x + flip * r * 0.9, y - r * 0.35);
+    c.quadraticCurveTo(x + flip * r * 0.1, y - r * 0.05, x - flip * r * 0.75, y - r * 0.28);
+    c.closePath();
+    c.fill();
+    for (const [ox, oy, s, col] of [
+      [-0.55, -0.5, 0.34, "#e07014"],
+      [-0.15, -0.72, 0.3, "#a31621"],
+      [-0.8, -0.18, 0.27, "#e2a21a"],
+    ] as const) {
+      c.fillStyle = col;
+      c.beginPath();
+      c.arc(x + flip * ox * r, y + oy * r, r * s, 0, Math.PI * 2);
+      c.fill();
+    }
+  }
+  // Wheat-sheaf bundles at the upper corners: a bound stalk fan.
+  for (const side of [0, 1] as const) {
+    const x = w * (side === 0 ? 0.07 : 0.93);
+    const y = h * 0.24;
+    const r = w * 0.04;
+    c.strokeStyle = "#c9973f";
+    c.lineWidth = Math.max(1.5, r * 0.09);
+    for (const a of [-0.5, -0.25, 0, 0.25, 0.5]) {
+      c.beginPath();
+      c.moveTo(x, y + r * 0.8);
+      c.lineTo(x + Math.sin(a) * r * 1.1, y - r * (0.9 - Math.abs(a) * 0.35));
+      c.stroke();
+      c.fillStyle = "#e2c268";
+      c.beginPath();
+      c.ellipse(x + Math.sin(a) * r * 1.1, y - r * (0.95 - Math.abs(a) * 0.35), r * 0.13, r * 0.26, a, 0, Math.PI * 2);
+      c.fill();
+    }
+    c.fillStyle = "#a31621";
+    c.fillRect(x - r * 0.3, y + r * 0.55, r * 0.6, r * 0.18);
+  }
+  c.restore();
+}
+
+const LEAF_COLORS = ["#e8871e", "#a31621", "#e2a21a"];
+
+/** One flat leaf. Shared by the arena dressing and the Falling Leaves show effect. */
+function drawLeaf(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, rot: number, color: string) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(0, -r);
+  ctx.quadraticCurveTo(r * 0.9, -r * 0.2, 0, r);
+  ctx.quadraticCurveTo(-r * 0.9, -r * 0.2, 0, -r);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Leaves drifting across the ring for a bot running the Falling Leaves show effect. */
+function drawFallingLeaves(ctx: CanvasRenderingContext2D, w: number, h: number, time: number, reduced: boolean) {
+  const n = reduced ? 8 : 22;
+  for (let i = 0; i < n; i++) {
+    const rx = (hash(`leafx${i}`) % 1000) / 1000;
+    const speed = 0.03 + ((hash(`leafs${i}`) % 1000) / 1000) * 0.05;
+    const phase = (hash(`leafp${i}`) % 1000) / 1000;
+    const y = (((phase + time * speed) % 1) * 1.1 - 0.05) * h;
+    const x = rx * w + Math.sin(time * 0.9 + i * 1.7) * w * 0.012;
+    drawLeaf(ctx, x, y, Math.max(3, w * 0.008), time * 0.7 + i, LEAF_COLORS[i % LEAF_COLORS.length]!);
+  }
 }
 
 function drawRingFog(ctx: CanvasRenderingContext2D, w: number, h: number, time: number, reduced: boolean) {
@@ -1859,6 +1949,7 @@ export function drawSideBot(
 
   drawFaceMask(ctx, style.mask, f, u2, top);
   if (s.bot.chassisFamily === "pumpkin") drawPumpkinShell(ctx, f, u2);
+  if (s.bot.chassisFamily === "harvesttable") drawTableShell(ctx, f, u2);
   if (s.bot.driveFamily === "ghostchaser") drawChaserLamps(ctx, f, u2, top);
 
   if (style.flag && !s.flipped)
@@ -2491,6 +2582,54 @@ function drawDecal(
       ctx.closePath();
       ctx.fill();
     }
+  } else if (art === "turkey") {
+    const cx = X(0.42);
+    const cy = Y(0.48);
+    const r = Math.min(u * 0.1, h * u * 0.4);
+    ctx.fillStyle = "#8a4b1f";
+    for (const a of [-0.7, 0, 0.7]) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(a);
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 0.95, r * 0.34, r * 0.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.fillStyle = "#b06a28";
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + r * 0.25, r * 0.78, r * 0.66, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#d8261a";
+    ctx.beginPath();
+    ctx.arc(cx + r * 0.18, cy + r * 0.05, r * 0.16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#f0a202";
+    ctx.beginPath();
+    ctx.moveTo(cx + r * 0.3, cy - r * 0.12);
+    ctx.lineTo(cx + r * 0.55, cy);
+    ctx.lineTo(cx + r * 0.28, cy + r * 0.08);
+    ctx.closePath();
+    ctx.fill();
+  } else if (art === "wishbone") {
+    const cx = X(0.45);
+    const cy = Y(0.47);
+    const r = Math.min(u * 0.1, h * u * 0.4);
+    ctx.strokeStyle = "#f3ead2";
+    ctx.lineWidth = Math.max(1.5, r * 0.16);
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(cx - r * 0.55, cy - r * 0.75);
+    ctx.quadraticCurveTo(cx - r * 0.4, cy + r * 0.1, cx, cy + r * 0.55);
+    ctx.quadraticCurveTo(cx + r * 0.4, cy + r * 0.1, cx + r * 0.55, cy - r * 0.75);
+    ctx.stroke();
+    ctx.fillStyle = "#f3ead2";
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.55, cy - r * 0.8, r * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx + r * 0.55, cy - r * 0.8, r * 0.2, 0, Math.PI * 2);
+    ctx.fill();
   } else if (art === "champion") {
     const cx=X(0.45), cy=Y(0.45), r=Math.min(u*0.095,h*u*0.4);
     ctx.fillStyle="#f6cd46"; ctx.strokeStyle="#563700"; ctx.lineWidth=Math.max(1,u*0.008);
@@ -2613,6 +2752,26 @@ function drawTopper(
     ctx.lineTo(u * 0.12, top - u * 0.24);
     ctx.closePath();
     ctx.fill();
+  } else if (topper === "pilgrimhat") {
+    ctx.fillStyle = "#1c1c22";
+    ctx.fillRect(-u * 0.2, top - u * 0.02, u * 0.4, u * 0.035);
+    ctx.fillRect(-u * 0.12, top - u * 0.24, u * 0.24, u * 0.22);
+    ctx.fillStyle = "#7a4a16";
+    ctx.fillRect(-u * 0.12, top - u * 0.09, u * 0.24, u * 0.05);
+    ctx.fillStyle = "#f6cd46";
+    ctx.fillRect(-u * 0.035, top - u * 0.095, u * 0.07, u * 0.06);
+  } else if (topper === "wreath") {
+    ctx.strokeStyle = "#2f6b22";
+    ctx.lineWidth = Math.max(1.5, u * 0.045);
+    ctx.beginPath();
+    ctx.arc(0, top - u * 0.13, u * 0.13, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "#a31621";
+    for (const a of [0.3, 1.8, 3.4, 5.0]) {
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * u * 0.13, top - u * 0.13 + Math.sin(a) * u * 0.13, u * 0.028, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
   ctx.restore();
 }
@@ -2814,6 +2973,28 @@ function drawPumpkinShell(ctx: CanvasRenderingContext2D, f: Frame, u: number) {
     ctx.beginPath();
     ctx.moveTo(x, b.top * u);
     ctx.quadraticCurveTo(x, (b.top + b.bottom) * 0.5 * u, x, b.bottom * u);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawTableShell(ctx: CanvasRenderingContext2D, f: Frame, u: number) {
+  const b = hullBounds(f);
+  ctx.save();
+  ctx.globalAlpha = 0.4;
+  ctx.strokeStyle = "#b06a28";
+  ctx.lineWidth = Math.max(1, u * 0.02);
+  // A flat feast-table top across the hull, with two legs.
+  const topY = (b.top + (b.bottom - b.top) * 0.18) * u;
+  ctx.beginPath();
+  ctx.moveTo(b.minX * u, topY);
+  ctx.lineTo(b.maxX * u, topY);
+  ctx.stroke();
+  for (const t of [0.18, 0.82]) {
+    const x = lerp(b.minX, b.maxX, t) * u;
+    ctx.beginPath();
+    ctx.moveTo(x, topY);
+    ctx.lineTo(x, b.bottom * u);
     ctx.stroke();
   }
   ctx.restore();
@@ -3603,8 +3784,9 @@ export function drawSide(
   ctx.scale(cam.z, cam.z);
   ctx.translate(-cx, -cy);
   ctx.drawImage(backdrop(ctx, w, h), 0, 0);
-  const festive = Boolean(opts.festive || halloweenVisuals());
+  const festive = Boolean(opts.festive || halloweenVisuals() || thanksgivingVisuals());
   if (drive.bots.some((bot) => bot.bot.shows?.includes("fog"))) drawRingFog(ctx, w, h, time, opts.reduced);
+  if (drive.bots.some((bot) => bot.bot.shows?.includes("leaves"))) drawFallingLeaves(ctx, w, h, time, opts.reduced);
   // Contact light belongs on the steel and floor, with falloff at arena scale.
   if (drive.impact && fx.flash > 0 && !opts.reduced) {
     const hit = project(drive.impact, w, h);
@@ -3677,7 +3859,28 @@ export function drawSide(
           for (let i = fx.tick(`stage-${s.bot.id}`, 9, dt); i > 0; i--) fx.stageSmoke(p.x, p.y, p.size);
         }
       }
-      if (s.celebrate && festive && !opts.reduced) {
+      if (s.celebrate && festive && (thanksgivingVisuals() || s.bot.shows?.includes("leaves"))) {
+        // A win shakes the tree: leaves burst around the winner and settle.
+        if (opts.reduced) {
+          ctx.save();
+          ctx.fillStyle = "rgba(232,135,30,0.4)";
+          ctx.beginPath();
+          ctx.ellipse(p.x, p.y, p.size * 0.8, p.size * 0.2, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        } else {
+          for (let i = fx.tick(`leaves-${s.bot.id}`, 10, dt); i > 0; i--) {
+            drawLeaf(
+              ctx,
+              p.x + (Math.random() - 0.5) * p.size * 1.7,
+              p.y - p.size * (0.15 + Math.random() * 0.75),
+              p.size * (0.05 + Math.random() * 0.05),
+              Math.random() * Math.PI * 2,
+              LEAF_COLORS[i % LEAF_COLORS.length]!,
+            );
+          }
+        }
+      } else if (s.celebrate && festive && !opts.reduced) {
         const glow = Boolean(s.bot.shows?.includes("blacklight"));
         for (let i = fx.tick(`ooze-${s.bot.id}`, glow ? 14 : 8, dt); i > 0; i--) fx.ooze(p.x, p.y, p.size, glow);
       } else if (s.celebrate && festive && opts.reduced) {

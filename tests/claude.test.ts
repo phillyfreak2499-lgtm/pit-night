@@ -262,7 +262,7 @@ test("the live booth generates in order, under a daily cap, and keeps the key on
   assert.equal(liveRequest(2, 5, true, true, LIVE_LIMIT_PER_DAY), "claim");
   assert.equal(liveRequest(5, 5, true, false, 0), "unavailable");
   assert.equal(liveRequest(-1, 5, true, false, 0), "unavailable");
-  assert.deepEqual(Object.keys(FEATURE_MODEL).sort(), ["bout", "hype", "live", "recap", "rules"]);
+  assert.deepEqual(Object.keys(FEATURE_MODEL).sort(), ["bout", "gazette", "hype", "live", "recap", "rules"]);
   for (const model of Object.values(FEATURE_MODEL)) assert.equal(model, HAIKU);
 
   const widget = readFileSync(new URL("../src/components/pit/claude-copy.tsx", import.meta.url), "utf8");
