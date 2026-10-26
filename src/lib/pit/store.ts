@@ -118,6 +118,7 @@ export type PitState = PitData & {
   setTags: (week: number, on: boolean) => void;
   setTagline: (tagline: string) => void;
   houseCall: (text: string) => void;
+  giftCoins: (storeId: string, slot: Slot, amount: number) => void;
   postDailyGazette: (entries: GazetteDraft[], todayISO: string) => void;
   postRecapGazette: (week: number, entries: GazetteEntry[]) => void;
   lockFriday: () => void;
@@ -359,6 +360,7 @@ function fresh(): PitState {
     setTags: () => {},
     setTagline: () => {},
     houseCall: () => {},
+    giftCoins: () => {},
     postDailyGazette: () => {},
     postRecapGazette: () => {},
     lockFriday: () => {},
@@ -1587,6 +1589,23 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
       setTagline: (tagline) => {
         if (!isBoss(get())) return;
         set({ tagline: tagline.slice(0, 180), flash: "Theme updated." });
+      },
+      giftCoins: (storeId, slot, amount) => {
+        const data = get();
+        if (!isBoss(data)) {
+          set({ flash: "Only the Desk can give coins." });
+          return;
+        }
+        const store = data.stores.find((s) => s.id === storeId);
+        if (!store || !SLOTS.includes(slot) || !Number.isInteger(amount) || amount < 1 || amount > 20) return;
+        set({
+          bots: patchBot(data.bots, storeId, (bot) => ({
+            ...bot,
+            coins: { ...bot.coins, [slot]: (bot.coins[slot] ?? 0) + amount },
+          })),
+          flash: `${store.name} got ${amount} ${slot} coin${amount === 1 ? "" : "s"} from the Desk.`,
+          log: [`Desk gave ${store.name} ${amount} ${slot} coin${amount === 1 ? "" : "s"}.`, ...data.log.slice(0, 23)],
+        });
       },
       houseCall: (text) => {
         const data = get();

@@ -5,8 +5,8 @@ import { Btn, Field, SectionLabel, TextInput } from "./bits";
 import { ScoreInputs } from "./score-card";
 import { GradeGrid } from "./grade-grid";
 import { buildCard, championshipFinalists, gradeMetric, cardValue, coinMath, gradesOf, kickoffRank } from "@/lib/pit/engine";
-import { METRICS } from "@/lib/pit/catalog";
-import type { Grade, StatKey } from "@/lib/pit/types";
+import { METRICS, SLOT_LABEL } from "@/lib/pit/catalog";
+import type { Grade, Slot, StatKey } from "@/lib/pit/types";
 import { centralISODate, dailyGazetteId } from "@/lib/pit/gazette-ai";
 import { writeGazette } from "@/lib/pit/gazette-server";
 import { takeLeagueSeason, useSyncStatus } from "@/lib/pit/sync";
@@ -123,6 +123,7 @@ function DeskLive() {
         </p>
       ) : null}
       <KickoffPanel />
+      <CoinGift />
       <ClaudeCheck />
       <SyncPanel />
       <TrainingSwitch />
@@ -245,6 +246,69 @@ function GazetteWriter() {
         ) : null}
       </div>
       {note ? <p className="mt-2 text-sm text-warn">{note}</p> : null}
+    </section>
+  );
+}
+
+const GIFT_SLOTS: Slot[] = ["chassis", "drive", "weapon", "armor", "utility", "brain"];
+
+/** Desk only: give a store extra coins in one part's jar. Logged on the paper tape. */
+function CoinGift() {
+  const data = usePit();
+  const giftCoins = usePit((s) => s.giftCoins);
+  const [storeId, setStoreId] = useState(data.stores[0]?.id ?? "");
+  const [slot, setSlot] = useState<Slot>("chassis");
+  const [amount, setAmount] = useState(1);
+  const [armed, setArmed] = useState(false);
+  const store = data.stores.find((s) => s.id === storeId);
+  const jar = data.bots.find((b) => b.storeId === storeId)?.coins[slot] ?? 0;
+  const valid = Boolean(store) && Number.isInteger(amount) && amount >= 1 && amount <= 20;
+  return (
+    <section className="border border-line p-4" data-testid="coin-gift">
+      <SectionLabel>Give coins</SectionLabel>
+      <p className="mt-2 text-sm text-muted">
+        Desk only. Adds coins to one part&apos;s jar for a store, up to 20 at a time. It shows on the paper tape.
+      </p>
+      <div className="mt-3 flex flex-wrap items-end gap-2">
+        <label className="flex flex-col text-xs text-muted">
+          Store
+          <select value={storeId} onChange={(e) => { setStoreId(e.target.value); setArmed(false); }} className="min-h-11 border border-line bg-deep px-2 text-fg">
+            {data.stores.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col text-xs text-muted">
+          Jar
+          <select value={slot} onChange={(e) => { setSlot(e.target.value as Slot); setArmed(false); }} className="min-h-11 border border-line bg-deep px-2 text-fg">
+            {GIFT_SLOTS.map((s) => (
+              <option key={s} value={s}>{SLOT_LABEL[s]}</option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col text-xs text-muted">
+          Coins
+          <input type="number" min={1} max={20} value={amount} onChange={(e) => { setAmount(Number(e.target.value)); setArmed(false); }} className="min-h-11 w-20 border border-line bg-deep px-2 text-fg" />
+        </label>
+        <Btn
+          tone={armed ? "spark" : "line"}
+          disabled={!valid}
+          testId="gift-coins"
+          onClick={() => {
+            if (!armed) {
+              setArmed(true);
+              return;
+            }
+            setArmed(false);
+            giftCoins(storeId, slot, amount);
+          }}
+        >
+          {armed ? `Tap again: give ${amount}` : "Give coins"}
+        </Btn>
+      </div>
+      <p className="mt-2 text-xs text-muted">
+        {store?.name ?? "Store"} {SLOT_LABEL[slot].toLowerCase()} jar now: {jar}
+      </p>
     </section>
   );
 }
