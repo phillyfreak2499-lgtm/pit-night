@@ -2094,6 +2094,22 @@ export function buyCheck(
   return { ok: true, reason: "On the peg.", cost };
 }
 
+/** Coins back for selling a part the store bought, whatever it cost. Paid into that part's jar. */
+export const SELL_BACK = 2;
+
+/** Whether a store may sell a bought part back right now. Same windows as buying. */
+export function sellCheck(data: PitData, storeId: string, part: Part): { ok: boolean; reason: string } {
+  const bot = botFor(data, storeId);
+  if (part.tier === "stock") return { ok: false, reason: "Stock parts are not for sale." };
+  if (part.tier === "championship") return { ok: false, reason: "Championship iron is earned, not sold." };
+  if (!bot.owned.includes(part.id)) return { ok: false, reason: "Only parts this store bought can be sold." };
+  if (data.phase === "open" && bot.locked)
+    return { ok: false, reason: "This build is locked. Ask the Desk for a lock override." };
+  if (!shopOpen(data))
+    return { ok: false, reason: "The shop shuts when the bots lock Saturday and reopens after the damage report." };
+  return { ok: true, reason: `Sell for ${SELL_BACK} ${part.key} coins.` };
+}
+
 /** Visual show effects. Same shop clock as parts. They never enter the loadout. */
 export function showCheck(data: PitData, storeId: string, effectId: string): { ok: boolean; reason: string; cost: number } {
   const effect = showEffect(effectId) ?? thanksgivingShowEffect(effectId);

@@ -101,6 +101,10 @@ export const GROUPS: Group[] = [
         "The ladder is Sport 3, Pro 5, Super 8, paid from that part's own jar. A few chassis cost more because the battery is the part: Sprinter and Hornet 5, Hybrid and Dynamo 6, Scorpion and Crab 7, Capacitor and Mule 8, Monolith 10, Reactor 12. Season-earned parts and coins carry forward if your store reaches Championship Week.",
       ),
       faq(
+        "Can we sell a part we bought?",
+        "Yes. While the shop is open, the captain can sell any part the store bought for 2 coins, whatever it cost. The coins go back into that part's jar, so you can stack them toward a better part. If the part was on the bot, that slot drops to stock. Stock and championship parts can't be sold, and a sold part costs full price to buy again.",
+      ),
+      faq(
         "When is the shop open?",
         "From the moment the desk pays Week 1 coins until Saturday lock. It shuts while the bots are locked and fighting, and reopens after the Monday damage report.",
       ),
