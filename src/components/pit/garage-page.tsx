@@ -5,7 +5,7 @@ import { EffectLockerPreview } from "./effect-locker-preview";
 import type { CosmeticLoadout, StickerSlot } from "@/lib/pit/types";
 import { BuildLockBanner } from "./build-lock-banner";
 import { Link } from "@tanstack/react-router";
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { BODY_STYLES, CLASS_META, DECALS, EYES, FINISHES, LEDS, MASKS, PAINT, SMOKE, TOPPERS, WEAPON_SKINS, batteryOf, partById, partsFor, SLOT_LABEL, styleOf, TRIM } from "@/lib/pit/catalog";
 import {
   buyCheck,
@@ -21,7 +21,8 @@ import {
 import { paintHex, usePit, type PitState } from "@/lib/pit/store";
 import { cosmeticProgress, cosmeticUnlocked, rewardFor, type CosmeticKind } from "@/lib/pit/cosmetics";
 import type { BotLook, GarageLook, Slot, StoreCard } from "@/lib/pit/types";
-import { BotPortrait, useBotLook } from "./bot-portrait";
+import { garageSpinStartsPlaying } from "@/lib/pit/turntable";
+import { BotPortrait, useBotLook, type BotLookProps } from "./bot-portrait";
 import { KeyLadder } from "./key-ladder";
 import { ScoreInputs } from "./score-card";
 import { canEnterBay, LockedBay } from "./bay-lock";
@@ -441,9 +442,89 @@ function lookLabel(look: BotLook) {
 function GarageBot({ storeId }: { storeId: string }) {
   const look = useBotLook(storeId);
   return (
-    <span data-bot-hover className="block h-36 w-40 max-w-full shrink md:h-44 md:w-80">
-      <BotPortrait look={look} facing={-1} className="h-full w-full" />
-    </span>
+    <GarageTurntable
+      look={look}
+      className="w-40 max-w-full shrink md:w-72"
+      frameClass="relative h-36 w-full md:h-44"
+      zoom={0.9}
+      testId="garage-bay-turntable"
+    />
+  );
+}
+
+/** The bay preview turns through a full circle. Pause holds the angle. No drag, no keys. */
+function GarageTurntable({
+  look,
+  className = "",
+  frameClass,
+  zoom = 1,
+  veil = false,
+  testId,
+}: {
+  look: BotLookProps | null;
+  className?: string;
+  frameClass: string;
+  zoom?: number;
+  veil?: boolean;
+  testId?: string;
+}) {
+  const yawRef = useRef(0.55);
+  const playingRef = useRef(false);
+  const seeded = useRef(false);
+  const [playing, setPlaying] = useState(false);
+  if (!seeded.current && typeof window !== "undefined") {
+    seeded.current = true;
+    playingRef.current = garageSpinStartsPlaying(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const on = garageSpinStartsPlaying(mq.matches);
+    playingRef.current = on;
+    setPlaying(on);
+    const onChange = () => {
+      if (!mq.matches) return;
+      playingRef.current = false;
+      setPlaying(false);
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  const toggle = () => {
+    const next = !playingRef.current;
+    playingRef.current = next;
+    setPlaying(next);
+  };
+  return (
+    <div className={className} data-testid={testId}>
+      <div className={frameClass}>
+        {veil ? <div className="pointer-events-none absolute inset-0 bg-deep/55" /> : null}
+        <div
+          data-bot-hover
+          tabIndex={0}
+          aria-label="Bot preview. It turns through a full circle. Hover or focus to rev."
+          className="relative h-full w-full"
+        >
+          <BotPortrait
+            look={look}
+            facing={1}
+            zoom={zoom}
+            spinning={playing}
+            spinYaw={yawRef}
+            spinPlaying={playingRef}
+            className="h-full w-full"
+          />
+        </div>
+      </div>
+      <button
+        type="button"
+        data-testid="garage-spin-toggle"
+        aria-pressed={playing}
+        onClick={toggle}
+        className="mt-2 min-h-11 w-full border border-amber bg-deep px-3 font-display text-xs tracking-wide text-amber uppercase"
+      >
+        {playing ? "Pause rotation" : "Resume rotation"}
+      </button>
+    </div>
   );
 }
 
@@ -533,7 +614,6 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
   const activeBot = data.bots.find(row => row.storeId === storeId)!;
   const [ownedOnly, setOwnedOnly] = useState(false);
   const [draft, setDraft] = useState<CosmeticLoadout | null>(null);
-  const [camera, setCamera] = useState<"left" | "right" | "top">("left");
   const live = { paint: activeStore.paint, look: activeBot.look, number: activeBot.number, style: styleOf(activeBot, activeBot.classId) };
   const current = proposalMode ? (draft ?? live) : live;
   const store = { ...activeStore, paint: current.paint };
@@ -634,12 +714,14 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
 
       <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <div className="lg:sticky lg:top-4 lg:self-start">
-          <div data-bot-hover tabIndex={0} aria-label="Bot preview; focus to rev" className={`relative h-64 overflow-hidden border border-line md:h-72 ${garageClass(store.garage)}`}>
-            <div className="absolute inset-0 bg-deep/55" />
-            <BotPortrait look={look ? { ...look, weapon: look.weapon === "hidden" ? "none" : look.weapon } : null} facing={camera === "right" ? 1 : -1} camera={camera === "top" ? "top" : "side"} zoom={0.74} className="relative h-full w-full" />
-          </div>
-          <p className="mt-2 text-xs text-muted">Hover or focus the preview to rev it. Open a category; tap any locked item to see its requirement.</p>
-          <div className="mt-2 flex flex-wrap gap-2">{(["left", "right", "top"] as const).map(view => <Chip key={view} active={camera === view} onClick={() => setCamera(view)}>{view} view</Chip>)}</div>
+          <GarageTurntable
+            look={look ? { ...look, weapon: look.weapon === "hidden" ? "none" : look.weapon } : null}
+            frameClass={`relative h-64 overflow-hidden border border-line md:h-72 ${garageClass(store.garage)}`}
+            veil
+            zoom={0.74}
+            testId="garage-turntable"
+          />
+          <p className="mt-2 text-xs text-muted">It turns through a full circle. Pause it to hold a side. Hover or focus the preview to rev it. Open a category and tap a locked item to see its requirement.</p>
         </div>
 
         <div className="flex flex-col gap-3">

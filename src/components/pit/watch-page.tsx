@@ -3,20 +3,19 @@ import { Link } from "@tanstack/react-router";
 import { Flame, HelpCircle, Maximize, Minimize, Package, Pause, Play, SkipForward, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { CLASS_META } from "@/lib/pit/catalog";
-import { botFor, recordOf } from "@/lib/pit/engine";
+import { PROGRAM_HOLD_MS, programRecords, storeNameMap } from "@/lib/pit/fight-card";
+import { recordOf } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
 import { TUNE_UP_BONUS, crateFor } from "@/lib/pit/training";
 import type { Bout, PitData } from "@/lib/pit/types";
 import { streakHolders, tunedUp } from "@/lib/pit/week";
 import { ResultLine } from "./bits";
-import { BotPortrait, useBotLook } from "./bot-portrait";
 import { armBroadcastAudio, Broadcast } from "./broadcast";
+import { FightProgram } from "./fight-program";
 import { buildTape, matchup, methodWord } from "./show-page";
 
 type Stage = "lobby" | "intro" | "fight" | "result" | "final";
 
-const INTRO_MS = 7000;
 const RESULT_MS = 6500;
 const BYE_MS = 6000;
 
@@ -49,7 +48,7 @@ export function WatchPage() {
 
   useEffect(() => {
     if (paused || stage === "lobby" || stage === "final" || stage === "fight") return;
-    const ms = stage === "intro" ? (bout?.kind === "bye" ? BYE_MS : INTRO_MS) : RESULT_MS;
+    const ms = stage === "intro" ? (bout?.kind === "bye" ? BYE_MS : PROGRAM_HOLD_MS) : RESULT_MS;
     const id = window.setTimeout(next, ms);
     return () => window.clearTimeout(id);
   }, [stage, index, paused, next, bout]);
@@ -261,61 +260,15 @@ function Lobby({
   );
 }
 
-function Corner({ storeId, facing, seen, tuned, center = false }: { storeId: string; facing: 1 | -1; seen: PitData; tuned: boolean; center?: boolean }) {
-  const data = usePit();
-  const look = useBotLook(storeId);
-  const store = data.stores.find((s) => s.id === storeId);
-  if (!store) return null;
-  const bot = botFor(data, storeId);
-  const rec = recordOf(seen, storeId);
-  const color = paintHex(store.paint);
-  return (
-    <div className={`flex w-full min-w-0 flex-1 flex-col ${center ? "items-center text-center" : facing === 1 ? "items-start text-left" : "items-end text-right"}`}>
-      <div className="relative h-44 w-full md:h-64">
-        <BotPortrait look={look} facing={facing} zoom={1} className="h-full w-full" />
-      </div>
-      <span className="mt-2 h-1.5 w-24" style={{ background: color }} />
-      <p className="mt-2 text-xs tracking-[0.25em] text-muted uppercase">
-        {CLASS_META[bot.classId].label} · Bay {bot.number}
-      </p>
-      <p className="font-display text-4xl leading-none md:text-6xl">{bot.name}</p>
-      <p className="font-display text-xl text-muted md:text-2xl">{store.name}</p>
-      <p className="mt-1 font-display text-2xl tabular-nums">
-        {rec.w}–{rec.l}
-      </p>
-      {tuned ? (
-        <span className="tuned-glow mt-2 inline-flex items-center gap-1 border border-spark px-2 py-1 font-display text-sm tracking-widest text-spark uppercase">
-          <Flame size={14} aria-hidden /> Tuned +{TUNE_UP_BONUS}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
 function Intro({ data, bout, seen, order, total }: { data: PitData; bout: Bout; seen: PitData; order: number; total: number }) {
-  const tunedId = (id: string) => Boolean(bout.result?.fighters.find((f) => f.id === id)?.tuned) || tunedUp(data, id, bout.week);
-  const left = bout.teamA[0];
-  const right = bout.teamB[0];
   return (
-    <div className="watch-in mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center gap-4 py-4">
-      <p className="text-center font-display text-sm tracking-[0.35em] text-amber uppercase">
-        {order === total ? "Main event" : `Fight ${order} of ${total}`} · {bout.title}
-      </p>
-      {bout.kind === "bye" && left ? (
-        <div className="mx-auto flex w-full max-w-xl flex-col items-center text-center">
-          <Corner storeId={left} facing={1} seen={seen} tuned={tunedId(left)} center />
-          <p className="mt-6 font-display text-5xl text-amber">BYE</p>
-          <p className="text-lg text-muted">No opponent this week. A bye counts as a win.</p>
-        </div>
-      ) : bout.kind === "melee" ? (
-        <p className="text-center font-display text-5xl">{matchup(data, bout)}</p>
-      ) : (
-        <div className="flex items-center gap-2 md:gap-6">
-          {left ? <Corner storeId={left} facing={1} seen={seen} tuned={tunedId(left)} /> : null}
-          <p className="vs-pop shrink-0 font-display text-5xl text-amber md:text-8xl">VS</p>
-          {right ? <Corner storeId={right} facing={-1} seen={seen} tuned={tunedId(right)} /> : null}
-        </div>
-      )}
+    <div className="watch-in mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center py-2">
+      <FightProgram
+        bout={bout}
+        records={programRecords(seen, bout)}
+        storeNames={storeNameMap(data)}
+        kicker={order === total ? `Main event · fight ${order} of ${total}` : `Fight ${order} of ${total}`}
+      />
     </div>
   );
 }

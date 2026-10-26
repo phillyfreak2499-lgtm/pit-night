@@ -1,8 +1,9 @@
 import { createFrameLoop } from "@/lib/pit/frame-loop";
-import { useEffect, useRef } from "react";
-import { partById } from "@/lib/pit/catalog";
+import { useEffect, useRef, type RefObject } from "react";
+import { EYES, partById } from "@/lib/pit/catalog";
 import { weaponFamilyOf } from "@/lib/pit/engine";
 import { usePit } from "@/lib/pit/store";
+import { garagePlateMix, garagePose, garageYawStep } from "@/lib/pit/turntable";
 import type { BotLook, BotStyle, ClassId, FighterSnap, Tier } from "@/lib/pit/types";
 import { drawSideBot, drawTopBot, drawCosmeticEffect, Fx, paintOf, shade } from "./cage-draw";
 import type { BotState } from "./cage-motion";
@@ -107,6 +108,9 @@ export function BotPortrait({
   zoom = 1,
   effect = "",
   camera = "side",
+  spinning = false,
+  spinYaw,
+  spinPlaying,
 }: {
   look: BotLookProps | null;
   facing?: 1 | -1;
@@ -115,6 +119,11 @@ export function BotPortrait({
   zoom?: number;
   effect?: string;
   camera?: "side" | "top";
+  /** React mirror of spinPlaying, so pause and resume restart the frame loop. */
+  spinning?: boolean;
+  /** Garage turntable yaw, radians. The portrait advances it while spinPlaying is set. */
+  spinYaw?: RefObject<number>;
+  spinPlaying?: RefObject<boolean>;
 }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const key = look
@@ -166,16 +175,25 @@ export function BotPortrait({
         const w = canvas.width;
         const h = canvas.height;
         const u = Math.min(w * 0.62, h * 1.25) * zoom;
-        const gx = w / 2 - facing * u * 0.08;
+        const turntable = Boolean(spinYaw && spinPlaying);
+        if (turntable && spinPlaying?.current && spinYaw) {
+          spinYaw.current = (spinYaw.current + garageYawStep(dt)) % (Math.PI * 2);
+        }
+        const yaw = spinYaw?.current ?? 0;
+        const pose = turntable ? garagePose(yaw) : null;
+        const plate = pose ? garagePlateMix(pose.end) : 0;
+        const facingNow = pose ? pose.facing : facing;
+        const gx = pose ? w / 2 : w / 2 - facing * u * 0.08;
         const gy = h * 0.82;
         ctx.clearRect(0, 0, w, h);
         if (floor) {
+          const spread = pose ? 0.55 + 0.45 * pose.side : 1;
           const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, u * 0.9);
           g.addColorStop(0, `rgba(255,220,150,${0.1 + heat * 0.12})`);
           g.addColorStop(1, "rgba(255,220,150,0)");
           ctx.fillStyle = g;
           ctx.beginPath();
-          ctx.ellipse(gx, gy, u * 0.9, u * 0.2, 0, 0, Math.PI * 2);
+          ctx.ellipse(gx, gy, u * 0.9 * spread, u * 0.2, 0, 0, Math.PI * 2);
           ctx.fill();
         }
         const t = now / 1000;
@@ -198,10 +216,29 @@ export function BotPortrait({
                 ? 24
                 : 0;
         if (!reduced) spin += rate * state.rev * dt;
-        if (camera === "top") drawTopBot(ctx, state, { x: w / 2, y: h / 2 }, Math.min(w, h) * 4 * zoom, spin, reduced ? 0 : t);
-        else drawSideBot(ctx, state, gx, gy, u, reduced ? 0 : t, spin, facing);
+        if (floor && pose) {
+          const ringX = u * 0.78;
+          const ringY = u * 0.17;
+          ctx.strokeStyle = "rgba(240,162,2,0.45)";
+          ctx.lineWidth = Math.max(1.5, u * 0.012);
+          ctx.beginPath();
+          ctx.ellipse(gx, gy, ringX, ringY, 0, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.fillStyle = "#f0a202";
+          ctx.beginPath();
+          ctx.arc(gx + Math.cos(yaw) * ringX, gy + Math.sin(yaw) * ringY, Math.max(3, u * 0.02), 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.save();
+        ctx.globalAlpha *= 1 - plate * 0.82;
+        if (camera === "top") {
+          if (pose) state.heading = yaw;
+          drawTopBot(ctx, state, { x: w / 2, y: h / 2 }, Math.min(w, h) * 4 * zoom, spin, reduced ? 0 : t);
+        } else drawSideBot(ctx, state, gx, gy, u, reduced ? 0 : t, spin, facingNow);
+        if (look.weapon === "hidden") drawTarp(ctx, look, gx, gy, u, facingNow, reduced ? 0 : t, heat);
+        ctx.restore();
+        if (pose && plate > 0.01 && camera !== "top") drawEndPlate(ctx, look, gx, gy, u, plate, pose.rear, reduced ? 0 : t);
         if (effect && !reduced) drawCosmeticEffect(ctx, fx, effect, gx, gy, u * 0.65, w, h, dt, paintOf(look.paint));
-        if (look.weapon === "hidden") drawTarp(ctx, look, gx, gy, u, facing, reduced ? 0 : t, heat);
       }
       const living =
         Boolean(look.style?.smoke) ||
@@ -209,7 +246,7 @@ export function BotPortrait({
         Boolean(look.style?.leds && look.style.leds !== "none") ||
         look.style?.topper === "beacon" ||
         look.style?.topper === "flagpole";
-      return !reduced && (hot || heat > 0 || Boolean(effect) || living);
+      return (!reduced && (hot || heat > 0 || Boolean(effect) || living)) || Boolean(spinPlaying?.current);
     };
     loop = createFrameLoop(draw);
     const visibility = () => loop?.setVisible(visible && !document.hidden);
@@ -227,10 +264,83 @@ export function BotPortrait({
     };
     // `key` captures every field of `look` that changes the picture.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, facing, floor, zoom, effect, camera]);
+  }, [key, facing, floor, zoom, effect, camera, spinning]);
 
   if (!look) return null;
   return <canvas ref={ref} aria-hidden className={`block ${className}`} />;
+}
+
+/** Nose or tail, drawn over the squashed side view so a full turn reads as a turn. */
+function drawEndPlate(
+  ctx: CanvasRenderingContext2D,
+  look: BotLookProps,
+  x: number,
+  y: number,
+  u: number,
+  alpha: number,
+  rear: boolean,
+  time: number,
+) {
+  const paint = paintOf(look.paint);
+  const s = u * (look.classId === "tank" ? 1.06 : look.classId === "specialist" ? 0.94 : 1);
+  const height = look.classId === "tank" ? 0.52 : look.classId === "specialist" ? 0.46 : 0.4;
+  const width = look.classId === "tank" ? 0.46 : look.classId === "specialist" ? 0.32 : 0.36;
+  const top = -height * s;
+  const half = width * s * 0.5;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.globalAlpha *= alpha;
+  ctx.fillStyle = "rgba(0,0,0,0.4)";
+  ctx.beginPath();
+  ctx.ellipse(0, 0, half * 0.95, 0.055 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  const body = ctx.createLinearGradient(-half, top, half, 0);
+  body.addColorStop(0, shade(paint, -48));
+  body.addColorStop(0.38, shade(paint, 36));
+  body.addColorStop(1, shade(paint, -62));
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.moveTo(-half * 0.9, -0.02 * s);
+  ctx.lineTo(-half, top + 0.1 * s);
+  ctx.lineTo(-half * 0.7, top);
+  ctx.lineTo(half * 0.7, top);
+  ctx.lineTo(half, top + 0.1 * s);
+  ctx.lineTo(half * 0.9, -0.02 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.55)";
+  ctx.lineWidth = Math.max(1, s * 0.012);
+  ctx.stroke();
+  ctx.fillStyle = shade(paint, 18);
+  ctx.fillRect(-half * 0.55, top + 0.08 * s, half * 1.1, 0.045 * s);
+  if (!rear) {
+    const eye = EYES[look.style?.eye ?? "green"] ?? EYES.green!;
+    ctx.shadowColor = eye;
+    ctx.shadowBlur = Math.max(6, s * 0.04);
+    ctx.fillStyle = eye;
+    for (const ex of [-0.14, 0.14]) {
+      ctx.fillRect(ex * s - 0.04 * s, top + 0.18 * s, 0.08 * s, 0.045 * s);
+    }
+    ctx.shadowBlur = 0;
+  } else {
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.fillRect(-half * 0.5, top + 0.2 * s, half, 0.07 * s);
+    const glow = 0.35 + 0.25 * Math.sin(time * 7);
+    ctx.fillStyle = `rgba(255,120,40,${glow})`;
+    for (const ex of [-0.08, 0.08]) {
+      ctx.beginPath();
+      ctx.arc(ex * s, top + 0.235 * s, 0.028 * s, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  if (look.number && s >= 90) {
+    ctx.fillStyle = "rgba(243,239,230,0.92)";
+    ctx.font = `700 ${Math.max(11, s * 0.08)}px Oswald, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(look.number, 0, top * 0.48);
+  }
+  ctx.restore();
 }
 
 /** A cover thrown over the weapon mount. Hull, paint and number show; the weapon does not. */

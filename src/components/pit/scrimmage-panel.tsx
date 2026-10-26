@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
 import { CLASS_META, SLOT_LABEL } from "@/lib/pit/catalog";
+import { programRecords, storeNameMap } from "@/lib/pit/fight-card";
 import { bestLock, cardFor, gradesOf, methodLabel, scrimmageDrills, weekQuality, type LockAdvice, type ScrimmageHit, cardKey } from "@/lib/pit/engine";
 import { usePit } from "@/lib/pit/store";
 import type { ClassId, StatBlock } from "@/lib/pit/types";
 import { Broadcast } from "./broadcast";
 import { Btn, SectionLabel } from "./bits";
+import { FightProgram } from "./fight-program";
 
 const ORDER = ["ai-striker", "ai-tank", "ai-specialist"];
 const STATS: (keyof StatBlock)[] = ["power", "speed", "armor", "heat"];
@@ -165,7 +167,13 @@ export function ScrimmagePanel({ storeId }: { storeId: string }) {
         })}
       </ul>
       {watching?.bout.result ? (
-        <div className="mt-4">
+        <div className="mt-4 flex flex-col gap-4">
+          <FightProgram
+            bout={watching.bout}
+            records={programRecords(data, { ...watching.bout, id: `scrimmage-card-${watching.id}` })}
+            storeNames={storeNameMap(data)}
+            kicker="Scrimmage · nothing posts"
+          />
           <Broadcast bout={watching.bout} kicker="SCRIMMAGE · NO DAMAGE" noDamage />
         </div>
       ) : null}
