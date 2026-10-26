@@ -76,7 +76,7 @@ export const commandArgs = {
   acceptProposal: z.tuple([id]),
   dismissProposal: z.tuple([id]),
   buyPart: z.tuple([id, id]),
-  buyShow: z.tuple([id, z.enum(["fog", "blacklight"])]),
+  buyShow: z.tuple([id, z.enum(["fog", "blacklight", "leaves"])]),
   repairSlot: z.tuple([id, slot, z.enum(["full", "weld", "salvage", "crown"])]),
   nameMvp: z.tuple([id, id]),
   renameBot: z.tuple([id, text]),
