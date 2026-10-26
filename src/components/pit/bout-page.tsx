@@ -1,12 +1,15 @@
 import { TaleOfTape } from "./tale-of-tape";
 import { Link } from "@tanstack/react-router";
+import { programRecords, storeNameMap } from "@/lib/pit/fight-card";
 import { usePit } from "@/lib/pit/store";
 import { ResultLine, SectionLabel, StatStrip } from "./bits";
 import { Broadcast } from "./broadcast";
 import { ClaudeCopy, LiveCall } from "./claude-copy";
+import { FightProgram } from "./fight-program";
 
 export function BoutPage({ boutId }: { boutId: string }) {
-  const bout = usePit((s) => s.bouts.find((b) => b.id === boutId));
+  const data = usePit();
+  const bout = data.bouts.find((b) => b.id === boutId);
   if (!bout || !bout.result) {
     return (
       <div>
@@ -28,6 +31,12 @@ export function BoutPage({ boutId }: { boutId: string }) {
           <ResultLine bout={bout} />
         </h1>
       </div>
+      <FightProgram
+        bout={bout}
+        records={programRecords(data, bout)}
+        storeNames={storeNameMap(data)}
+        kicker={`Week ${bout.week} · record going in`}
+      />
       <Broadcast bout={bout} />
       <TaleOfTape bout={bout} />
       <ClaudeCopy kind="bout" id={bout.id} label="Ringside call" />

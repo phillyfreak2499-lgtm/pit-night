@@ -1,24 +1,22 @@
 import { TaleOfTape } from "./tale-of-tape";
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { PROGRAM_HOLD_MS, programRecords, programSegments, storeNameMap, type ProgramSegment } from "@/lib/pit/fight-card";
 import { previewSaturday, cardKey } from "@/lib/pit/engine";
 import { usePit } from "@/lib/pit/store";
 import type { Bout, PitData } from "@/lib/pit/types";
 import { ResultLine, SectionLabel } from "./bits";
 import { armBroadcastAudio, Broadcast } from "./broadcast";
+import { FightProgram } from "./fight-program";
 
-type Segment =
-  | { id: string; kind: "open" }
-  | { id: string; kind: "fight"; bout: Bout }
-  | { id: string; kind: "sting"; bout: Bout }
-  | { id: string; kind: "close" };
+type Segment = ProgramSegment<Bout>;
 
 export function ShowPage() {
   const data = usePit();
   const [weekPick, setWeekPick] = useState(data.week);
   const key = tapeSignature(data, weekPick);
   const tape = useMemo(() => buildTape(data, weekPick), [key]);
-  const segments = useMemo(() => buildSegments(tape.bouts), [tape]);
+  const segments = useMemo(() => programSegments(tape.bouts), [tape]);
   const [index, setIndex] = useState(0);
   const [rolling, setRolling] = useState(false);
   const [speed, setSpeed] = useState(2);
@@ -32,7 +30,16 @@ export function ShowPage() {
 
   const segment = segments[index] ?? segments[0]!;
   const fightCount = tape.bouts.length;
-  const fightOrdinal = segment.kind === "fight" || segment.kind === "sting" ? tape.bouts.indexOf(segment.bout) + 1 : 0;
+  const fightOrdinal = segment.kind === "fight" || segment.kind === "sting" || segment.kind === "card" ? tape.bouts.indexOf(segment.bout) + 1 : 0;
+
+  useEffect(() => {
+    const current = segments[index];
+    if (!rolling || current?.kind !== "card") return;
+    const id = window.setTimeout(() => {
+      setIndex((i) => Math.min(segments.length - 1, i + 1));
+    }, PROGRAM_HOLD_MS);
+    return () => window.clearTimeout(id);
+  }, [rolling, index, segments]);
 
   useEffect(() => {
     const current = segments[index];
@@ -64,7 +71,9 @@ export function ShowPage() {
   const start = () => {
     armBroadcastAudio();
     if (segment.kind === "open" || segment.kind === "close") {
-      const first = segments.findIndex((item) => item.kind === "fight");
+      const card = segments.findIndex((item) => item.kind === "card");
+      const fight = segments.findIndex((item) => item.kind === "fight");
+      const first = card >= 0 ? card : fight;
       setIndex(first >= 0 ? first : 0);
       setRolling(first >= 0);
       return;
@@ -163,14 +172,19 @@ export function ShowPage() {
 
       <div className="flex gap-2 overflow-x-auto pb-1">
         {segments.map((item, i) =>
-          item.kind === "sting" ? null : (
+          item.kind === "sting" || item.kind === "card" ? null : (
             <button
               key={item.id}
               type="button"
-              className={`min-h-11 shrink-0 border px-3 font-display text-sm tracking-wide uppercase ${i === index || (item.kind === "fight" && segment.kind === "sting" && segment.bout.id === item.bout.id) ? "border-amber text-amber" : "border-line text-muted"}`}
+              className={`min-h-11 shrink-0 border px-3 font-display text-sm tracking-wide uppercase ${i === index || (item.kind === "fight" && segment.kind !== "open" && segment.kind !== "close" && segment.bout.id === item.bout.id) ? "border-amber text-amber" : "border-line text-muted"}`}
               onClick={() => {
+                if (item.kind === "fight") {
+                  const cardAt = segments.findIndex((row) => row.kind === "card" && row.bout.id === item.bout.id);
+                  setIndex(cardAt >= 0 ? cardAt : i);
+                  setRolling(true);
+                  return;
+                }
                 setIndex(i);
-                if (item.kind === "fight") setRolling(true);
               }}
             >
               {railLabel(data, item)}
@@ -180,6 +194,14 @@ export function ShowPage() {
       </div>
 
       {segment.kind === "open" ? <ColdOpen data={data} bouts={tape.bouts} live={tape.live} /> : null}
+      {segment.kind === "card" ? (
+        <FightProgram
+          bout={segment.bout}
+          records={programRecords(data, segment.bout)}
+          storeNames={storeNameMap(data)}
+          kicker={tape.live ? "Posted card. Record going in." : "House tape. Record going in. Not posted yet."}
+        />
+      ) : null}
       {segment.kind === "fight" ? (
         <Broadcast
           key={segment.bout.id}
@@ -301,16 +323,6 @@ export function buildTape(data: PitData, week: number): { live: boolean; bouts: 
   return { live: false, bouts: previewSaturday(data) };
 }
 
-function buildSegments(bouts: Bout[]): Segment[] {
-  const segments: Segment[] = [{ id: "open", kind: "open" }];
-  for (const bout of bouts) {
-    segments.push({ id: `f-${bout.id}`, kind: "fight", bout });
-    segments.push({ id: `s-${bout.id}`, kind: "sting", bout });
-  }
-  segments.push({ id: "close", kind: "close" });
-  return segments;
-}
-
 function tapeSignature(data: PitData, week: number) {
   const posted = data.bouts.filter((b) => b.week === week && b.result);
   if (posted.length) return `p:${week}:${posted.map((b) => b.result?.seed ?? b.id).join(",")}`;
@@ -362,6 +374,7 @@ export function matchup(data: PitData, bout: Bout) {
 function railLabel(data: PitData, segment: Segment) {
   if (segment.kind === "open") return "Open";
   if (segment.kind === "close") return "Sign-off";
+  if (segment.kind === "card") return "Program";
   if (segment.kind === "sting") return "Call";
   if (segment.bout.kind === "bye") return "Bye";
   if (segment.bout.kind === "melee") return "Melee";
