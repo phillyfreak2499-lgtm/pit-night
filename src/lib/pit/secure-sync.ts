@@ -1,4 +1,4 @@
-import { sameSession, singleFlight } from "./sync-policy";
+import { leagueArgs, sameSession, singleFlight } from "./sync-policy";
 import { useSyncExternalStore } from "react";
 import { commandArgs, type Command } from "./commands";
 import { usePit, type PitState } from "./store";
@@ -109,7 +109,7 @@ export function startSync() {
   const overrides: Partial<PitState> = { session: { role: "public", storeId: null, crewId: null } };
   for (const name of Object.keys(commandArgs) as Command[]) {
     (overrides as Record<string, unknown>)[name] = (...args: unknown[]) => {
-      void command(name, args);
+      void command(name, leagueArgs(args));
     };
   }
   overrides.signCaptain = (storeId, code) => login("captain", storeId, null, code);

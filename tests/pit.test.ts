@@ -19,7 +19,7 @@ import type { Bout, FightResult, Grade, KeyName, Session, StatKey, StoreCard } f
 import { STICKER_ART } from "../src/lib/pit/types.ts";
 import { DECALS, styleOf, GRADE_COINS, METRICS } from "../src/lib/pit/catalog.ts";
 import { createFrameLoop } from "../src/lib/pit/frame-loop.ts";
-import { sameSession, singleFlight } from "../src/lib/pit/sync-policy.ts";
+import { leagueArgs, sameSession, singleFlight } from "../src/lib/pit/sync-policy.ts";
 import { memoSnapshot, snapshotStorage } from "../src/lib/pit/snapshot-storage.ts";
 test("transient state updates neither project nor serialize unchanged persisted data", () => {
   let projections=0,writes=0,serializations=0;
@@ -53,6 +53,13 @@ test("unchanged sessions compare by identity and overlapping polls share one req
   const poll=singleFlight(async()=>{calls++;await new Promise<void>(resolve=>{release=resolve;});});
   const one=poll(),two=poll();assert.equal(one,two);assert.equal(calls,1);release();await one;
   const three=poll();assert.equal(calls,2);release();await three;
+});
+test("Desk buttons never send their click event as a league command argument", () => {
+  // A React click event cannot be sent to the server ("Seroval Error (step: 1)").
+  const click = { nativeEvent: {}, type: "click", preventDefault() {} };
+  assert.deepEqual(leagueArgs([click]), []);
+  assert.deepEqual(leagueArgs(["plano", "nsnu", "green"]), ["plano", "nsnu", "green"]);
+  assert.deepEqual(leagueArgs(["plano", { paint: "amber" }, null, 3]), ["plano", { paint: "amber" }, null, 3]);
 });
 beforeEach((t) => t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-10-01T12:00:00Z") }));
 
