@@ -2,6 +2,7 @@ import { bannerVerdict } from "../../../scripts/copy-guard.mjs";
 import { STICKER_ART, type BotBody, type BotDecal, type BotFinish, type BotLeds, type BotMask, type BotSmoke, type BotStyle, type BotTopper, type BotWeaponSkin, type ClassId, type KeyName, type Slot, type StatKey, type StickerArt, type Tier } from "./types";
 import { ROSTER_PARTS } from "./roster";
 import { THANKSGIVING_WINDOW } from "./thanksgiving";
+import { ELECTION_WINDOW } from "./election";
 
 export const SCRAP_CAP = 18;
 export const VERSION = 6;
@@ -100,6 +101,9 @@ const BASE_DECALS: { id: StickerArt; label: string }[] = [
   { id: "pumpkin", label: "Pumpkin sticker" },
   { id: "turkey", label: "Turkey sticker" },
   { id: "wishbone", label: "Wishbone" },
+  { id: "ivoted", label: "I Voted sticker" },
+  { id: "ballot", label: "Ballot box" },
+  { id: "capitol", label: "Capitol dome" },
   { id: "roundel", label: "Number roundel" },
   { id: "gear", label: "Gear" },
   { id: "wrench", label: "Wrench" },
@@ -1193,6 +1197,19 @@ const FAMILIES: Family[] = [
       super: "A gourd-bore cannon that lobs a candied yam in a low arc. Slow to load, warm all night. The yam is not the dangerous part; the landing is. Championship Week only. Eight weapon coins.",
     },
     windows: { super: THANKSGIVING_WINDOW },
+  },
+  {
+    slot: "weapon",
+    family: "axe",
+    stat: "demoClose",
+    key: "weapon",
+    tags: ["smash", "election"],
+    nudge: nudge(4, 1, -1, -1),
+    names: { super: "Cherry Tree Axe" },
+    jobs: {
+      super: "A felling axe on a cherry-wood handle, after the old George Washington story. An honest overhead chop: it cannot tell a lie and it cannot hit twice fast. Election Week only. Eight weapon coins.",
+    },
+    windows: { super: ELECTION_WINDOW },
   },
   {
     slot: "chassis",

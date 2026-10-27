@@ -654,3 +654,24 @@
     display: none;
   }
 }
+
+/* Election Week: civic gold, parchment and laurel. Deliberately no party red or blue. */
+.election-site {
+  background-image:
+    radial-gradient(ellipse at top, color-mix(in oklab, #e3b341 12%, transparent), transparent 46%),
+    linear-gradient(to bottom, #15130c, var(--color-bg) 32%);
+}
+.election-banner {
+  border-bottom: 1px solid #a8783a;
+  background: repeating-linear-gradient(90deg, #1d1a10 0 2.5rem, #221f13 2.5rem 5rem);
+  color: #efe3c2;
+  padding: 0.75rem 1rem;
+}
+.election-banner p:first-child {
+  color: #e3b341;
+}
+@media (prefers-reduced-motion: reduce) {
+  .election-site {
+    background-image: linear-gradient(to bottom, #15130c, var(--color-bg) 32%);
+  }
+}

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { KEY_SOURCE, PARTS, SLOT_LABEL, partById, tierWord, type Part } from "@/lib/pit/catalog";
 import { SHOW_EFFECTS } from "@/lib/pit/halloween";
 import { THANKSGIVING_SHOW_EFFECTS, isThanksgivingPart } from "@/lib/pit/thanksgiving";
+import { isElectionPart } from "@/lib/pit/election";
 import { SELL_BACK, buyCheck, canSeeLoadout, sellCheck, shopOpen, showCheck } from "@/lib/pit/engine";
 import { usePit } from "@/lib/pit/store";
 import type { Slot } from "@/lib/pit/types";
@@ -120,6 +121,7 @@ export function ShopPage({ storeId }: { storeId: string }) {
                     {part.classLock ? <li className="border border-line px-2 py-1 text-muted">{part.classLock} chassis</li> : null}
                     {part.greenWeeks ? <li className="border border-line px-2 py-1 text-muted">{part.straight ? `${part.greenWeeks} straight green weeks` : `${part.greenWeeks} green week${part.greenWeeks === 1 ? "" : "s"}`}</li> : null}
                     {part.window ? <li className="border border-line px-2 py-1 text-muted">{windowLabel(part.window)}</li> : null}
+                    {isElectionPart(part.id) ? <li className="border border-amber/60 px-2 py-1 text-amber">Election Week</li> : null}
                     {isThanksgivingPart(part.id) ? <li className="border border-amber/60 px-2 py-1 text-amber">Championship Week</li> : null}
                     {part.battery ? <li className="border border-line px-2 py-1 text-muted">Battery {part.battery}</li> : null}
                   </ul>

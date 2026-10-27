@@ -22,7 +22,7 @@ function shapeOf(part: Part): Shape {
     if (["saw", "chainsaw"].includes(f)) return "saw";
     if (f === "drum") return "drum";
     if (f === "disc") return "disc";
-    if (["hammer", "carver"].includes(f)) return "hammer";
+    if (["hammer", "carver", "axe"].includes(f)) return "hammer";
     if (f === "wedge") return "wedge";
     if (["claw", "bones"].includes(f)) return "claw";
     if (f === "flail") return "flail";

@@ -22,6 +22,7 @@ import { startSync, useSyncStatus } from "@/lib/pit/sync";
 import { setSoundMuted, soundMuted, subscribeSound } from "@/lib/pit/sound";
 import { halloweenVisuals } from "@/lib/pit/halloween";
 import { thanksgivingVisuals } from "@/lib/pit/thanksgiving";
+import { electionVisuals } from "@/lib/pit/election";
 import { weekDeadline } from "@/lib/pit/time";
 import { formatRemain, nextLock, PERIOD_OPENS, TextInput, useNow } from "./bits";
 import { Tutorial } from "./tutorial";
@@ -74,8 +75,9 @@ export function PitShell({ children }: { children: React.ReactNode }) {
   const now = useNow();
   const halloween = Boolean(now && halloweenVisuals(now));
   const thanksgiving = Boolean(now && thanksgivingVisuals(now));
+  const election = Boolean(now && electionVisuals(now));
   return (
-    <div className={`min-h-screen text-fg ${halloween ? "halloween-site" : ""} ${thanksgiving ? "thanksgiving-site" : ""}`}>
+    <div className={`min-h-screen text-fg ${halloween ? "halloween-site" : ""} ${thanksgiving ? "thanksgiving-site" : ""} ${election ? "election-site" : ""}`}>
       <div className="shell-grid md:grid md:grid-cols-[13.5rem_1fr]">
         <aside className="no-print hidden border-r border-line bg-deep md:sticky md:top-0 md:flex md:h-screen md:flex-col md:justify-between md:p-4">
           <div>
@@ -91,6 +93,7 @@ export function PitShell({ children }: { children: React.ReactNode }) {
         <div className="min-w-0">
           {halloween ? <HalloweenBanner /> : null}
           {thanksgiving ? <ThanksgivingBanner /> : null}
+          {election ? <ElectionBanner /> : null}
           <OozeCelebration />
           <header className="no-print sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-line bg-deep/95 px-4 py-3 backdrop-blur md:px-6">
             <div className="md:hidden">
@@ -180,6 +183,17 @@ function useSoundMuted() {
     return subscribeSound(() => setMuted(soundMuted()));
   }, []);
   return muted;
+}
+
+function ElectionBanner() {
+  return (
+    <div className="election-banner no-print" data-testid="election-banner" role="status">
+      <p className="font-display text-xs tracking-[0.18em] uppercase">Election Week · Sunday Nov 1 – Saturday Nov 7</p>
+      <p className="mt-1 text-sm leading-snug">
+        Election Day is Tuesday. Cast your vote on the Week 2 card for an I Voted sticker. Approve Pit Week 2 jobs for the Ballot Box sticker and the Top Hat, and ace a Daily Spark for the Capitol Dome. The Cherry Tree Axe is on the peg all week. The looks stay after the week and never change the fight.
+      </p>
+    </div>
+  );
 }
 
 function ThanksgivingBanner() {
