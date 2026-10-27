@@ -259,8 +259,9 @@ export function Broadcast({
 
 
   if (!result) return null;
-  const left = result.fighters[0];
-  const right = result.fighters[1];
+  const group = result.fighters.length > 2;
+  const left = group ? undefined : result.fighters[0];
+  const right = group ? undefined : result.fighters[1];
   const beats = buildBeats(result);
   const total = beats.reduce((m, b) => Math.max(m, b.t + b.dur), 0);
 
@@ -270,6 +271,22 @@ export function Broadcast({
         <p className="font-display text-sm tracking-[0.18em] text-amber uppercase">{kicker ?? "Live cage"}</p>
         <p className="font-display text-sm text-muted">{clock} / {Math.round(total)}s</p>
       </div>
+      {group ? (
+        <div className="grid grid-cols-2 gap-3 border-b border-line p-3" aria-label="All fighters' health">
+          {result.fighters.map((fighter) => (
+            <div key={fighter.id} data-testid={`group-health-${fighter.id}`}>
+              <Health
+                name={fighter.botName}
+                store={fighter.teamName ? `${fighter.storeName} · ${fighter.teamName}` : fighter.storeName}
+                hp={hp[fighter.id] ?? 100}
+                paint={fighter.paint}
+                align="left"
+                tuned={fighter.tuned}
+              />
+            </div>
+          ))}
+        </div>
+      ) : null}
       <div className="grid gap-px bg-line lg:grid-cols-[minmax(0,1.55fr)_minmax(190px,0.72fr)]">
         <div className="relative min-w-0 bg-deep">
           <canvas ref={canvasRef} aria-label="Battle arena animation" className="aspect-[4/3] w-full bg-deep sm:aspect-video" />
@@ -379,7 +396,7 @@ function Health({
 
 function captionFor(result: FightResult, bout: Bout, beat: Beat, noDamage: boolean) {
   if (beat.kind === "bumper" && bout.kind === "bye") return "Bye. It counts as a win. The bot does not take damage.";
-  if (beat.kind === "bumper") return noDamage ? "Bay scrimmage. The house drill. Nothing posts." : `${bout.title}. Fourteen stores. This cage holds ${bout.kind === "melee" ? "the tie" : "two"}.`;
+  if (beat.kind === "bumper") return noDamage ? "Bay scrimmage. The house drill. Nothing posts." : `${bout.title}. Fourteen stores. This cage holds ${bout.kind === "melee" ? "the tie" : result.fighters.length > 2 ? `${result.fighters.length} bots` : "two"}.`;
   if (beat.kind === "intro") {
     const f = result.fighters[beat.side];
     if (!f) return "";

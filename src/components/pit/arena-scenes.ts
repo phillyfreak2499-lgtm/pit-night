@@ -59,8 +59,8 @@ export function hazardCallout(arena: ArenaId, kind: string, damage: number): { t
   if (kind === "pit") return { text: `${names.pit.toUpperCase()} -${damage}`, hit: true };
   if (kind === "water") return { text: `${names.water.toUpperCase()}: SLOWED`, hit: true };
   if (kind === "swerve") return { text: damage > 0 ? `SWERVED: ONLY -${damage}` : "SWERVED IT", hit: damage > 0 };
-  if (kind === "hover") return { text: `HOVERED OVER ${names.pit.toUpperCase().replace(/^THE /, "")}`, hit: false };
-  if (kind === "air") return { text: "AIR CUSHION: NO EFFECT", hit: false };
+  if (kind === "hover") return { text: damage > 0 ? `HOVER: HAZARD -${damage}` : "HOVERED OVER HAZARD", hit: damage > 0 };
+  if (kind === "air") return { text: damage > 0 ? `AIR CUSHION: HAZARD -${damage}` : "AIR CUSHION: CLEAR", hit: damage > 0 };
   return null;
 }
 

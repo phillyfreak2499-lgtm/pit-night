@@ -5,6 +5,7 @@ import {
   EYES,
   FINISHES,
   PAINT,
+  PARTS,
   TOPPERS,
   TRIM,
   batteryOf,
@@ -27,7 +28,7 @@ import {
   THANKSGIVING_FINALIST_REASON,
   THANKSGIVING_SHOW_CLOSED_REASON,
 } from "./thanksgiving";
-import { duelWear, fightDuel, preferFighter, type DuelOpts } from "./combat";
+import { buildScore, duelWear, fightDuel, fightGroup, preferFighter, type DuelOpts } from "./combat";
 import { centralDay } from "./time";
 export { halloweenStrikeAdjust } from "./combat";
 import { BOLTS, TUNE_UP_BONUS } from "./training";
@@ -474,6 +475,14 @@ function wearMult(cond: Condition): number {
   return 1;
 }
 
+function conditionOf(bot: Bot, slot: Slot, loadout: Loadout): Condition {
+  const id = loadout[slot];
+  if (!id) return "clean";
+  // Scars belong to the part. Slot wear is only a legacy fallback for that
+  // same equipped part, never for replacement iron being considered.
+  return bot.partWear?.[id] ?? (bot.equipped[slot] === id ? bot.wear[slot] : "clean");
+}
+
 export function resolvePart(
   bot: Bot,
   slot: Slot,
@@ -482,7 +491,7 @@ export function resolvePart(
   if (slot === "utility" && !loadout.utility) return { part: null, mult: 1, broken: false };
   const id = loadout[slot];
   const part = id ? partById(id) : undefined;
-  const cond = bot.wear[slot];
+  const cond = conditionOf(bot, slot, loadout);
   if (!part) return { part: null, mult: 1, broken: false };
   if (cond === "disabled") {
     if (slot === "utility") return { part: null, mult: 1, broken: true };
@@ -504,8 +513,8 @@ function synergy(
   const fam = weapon?.family;
   const claw = fam === "claw" || fam === "bones";
   const speedWep =
-    fam === "saw" || fam === "drum" || fam === "disc" || fam === "flail" || fam === "chainsaw" || fam === "slasher";
-  const smash = fam === "hammer" || fam === "wedge" || fam === "piston";
+    fam === "saw" || fam === "drum" || fam === "disc" || fam === "flail" || fam === "chainsaw" || fam === "slasher" || fam === "rivetgun";
+  const smash = fam === "hammer" || fam === "wedge" || fam === "piston" || fam === "crusher";
   if (classId === "striker" && speedWep)
     s += fam === "disc" ? 0.16 : fam === "flail" || fam === "chainsaw" ? 0.1 : 0.14;
   if (classId === "striker" && smash) s -= 0.16;
@@ -569,9 +578,7 @@ export function buildFit(bot: Bot, loadout: Loadout): number {
   const chassis = resolved[0]?.part ?? null;
   const armor = resolved[3]?.part ?? null;
   fit += synergy(bot.classId, weapon, drive, utility.part, chassis, armor);
-  const conds = SLOTS.map((slot) =>
-    slot === "utility" && !loadout.utility ? "clean" : bot.wear[slot],
-  );
+  const conds = SLOTS.map((slot) => conditionOf(bot, slot, loadout));
   const scar = conds.filter((c) => c === "scratched").length;
   const bent = conds.filter((c) => c === "bent").length;
   fit -= scar * 0.015 + bent * 0.06;
@@ -633,8 +640,7 @@ function cageParts(bot: Bot, slot: Slot): Part[] {
 function wearFor(bot: Bot, loadout: Loadout): Bot {
   const wear = { ...bot.wear };
   for (const slot of SLOTS) {
-    const id = loadout[slot];
-    wear[slot] = id ? (bot.partWear[id] ?? "clean") : "clean";
+    wear[slot] = conditionOf(bot, slot, loadout);
   }
   return { ...bot, wear };
 }
@@ -858,8 +864,10 @@ function weaponTell(classId: ClassId, family: string): string | null {
     family === "drum" ||
     family === "disc" ||
     family === "flail" ||
-    family === "chainsaw";
-  const smash = family === "hammer" || family === "wedge" || family === "piston";
+    family === "chainsaw" ||
+    family === "slasher" ||
+    family === "rivetgun";
+  const smash = family === "hammer" || family === "wedge" || family === "piston" || family === "crusher";
   if (classId === "tank" && family === "disc") return "A disc on a tank is a ceiling fan.";
   if (classId === "tank" && speed) return "A speed weapon on a tank. They are fighting the chassis.";
   if (classId === "tank" && (family === "claw" || family === "bones")) return "A claw on a tank. That is not the late fight.";
@@ -881,23 +889,8 @@ function weaponTell(classId: ClassId, family: string): string | null {
 }
 
 export const WEAPON_FAMILIES = [
-  "saw",
-  "drum",
-  "wedge",
-  "hammer",
-  "claw",
-  "disc",
-  "flail",
-  "piston",
-  "flame",
-  "tesla",
-  "chainsaw",
-  "slasher",
-  "ghost",
-  "launcher",
-  "bones",
-  "broom",
-] as const;
+  ...new Set(PARTS.filter((part) => part.slot === "weapon").map((part) => part.family)),
+];
 
 export function weaponFamilyOf(bot: Bot): string {
   const load = bot.locked ?? bot.draft;
@@ -1022,6 +1015,14 @@ function snapshot(data: PitData, storeId: string): FighterSnap {
       brain: brain.mult,
     },
     affinity: chassis.part?.affinity,
+    parts: {
+      chassis: chassis.part?.id ?? null,
+      drive: drive.part?.id ?? null,
+      weapon: weapon.part?.id ?? null,
+      armor: armor.part?.id ?? null,
+      utility: utility.part?.id ?? null,
+      brain: brain.part?.id ?? null,
+    },
     weaponName: partById(locked.weapon)?.name ?? "Bare shaft",
     driveName: partById(locked.drive)?.name ?? "—",
     armorName: partById(locked.armor)?.name ?? "—",
@@ -1046,24 +1047,6 @@ function emptyWear(): Record<Slot, Condition> {
     armor: "clean",
     utility: "clean",
     brain: "clean",
-  };
-}
-
-function combineSnaps(snaps: FighterSnap[], ids: string[]): FighterSnap {
-  const team = ids.map((id) => snaps.find((s) => s.id === id)!);
-  const avg = (k: keyof StatBlock) =>
-    Math.round(team.reduce((s, f) => s + f.stats[k], 0) / team.length);
-  const lead = team[0]!;
-  return {
-    ...lead,
-    id: ids.join("+"),
-    name: team.map((t) => t.storeName).join(" / "),
-    storeName: team.map((t) => t.storeName).join(" / "),
-    botName: team.map((t) => t.botName).join(" + "),
-    stats: { power: avg("power"), speed: avg("speed"), armor: avg("armor"), heat: avg("heat") },
-    rating: Math.round(team.reduce((s, f) => s + f.rating, 0) / team.length),
-    fit: team.reduce((s, f) => s + f.fit, 0) / team.length,
-    weekQ: team.reduce((s, f) => s + f.weekQ, 0) / team.length,
   };
 }
 
@@ -1131,6 +1114,7 @@ export function simulateChampionshipDuel(
       against: loser.id,
       damage: last.damage,
       call: last.call,
+      combat: last.combat,
     },
     hp,
     fighters: [a, b],
@@ -1205,17 +1189,24 @@ export function simulateTag(
   teamB: string[],
   seed: string,
 ): FightResult {
-  const snaps = [...teamA, ...teamB].map((id) => snapshot(data, id));
-  const a = combineSnaps(snaps, teamA);
-  const b = combineSnaps(snaps, teamB);
-  const fought = fightDuel(a, b, { hot: data.week === 3, pace: 0.64 });
+  const snaps: FighterSnap[] = [];
+  for (let i = 0; i < Math.max(teamA.length, teamB.length); i++) {
+    if (teamA[i]) snaps.push(snapshot(data, teamA[i]!));
+    if (teamB[i]) snaps.push(snapshot(data, teamB[i]!));
+  }
+  const fought = fightGroup(snaps, [teamA, teamB], { hot: data.week === 3, pace: 0.64 });
   const hp = fought.hp;
   const exchanges = fought.exchanges.map((ex) => ({ ...ex, tags: [...ex.tags, "tag"] }));
-  const winner = hp[a.id]! >= hp[b.id]! ? a : b;
-  const loser = winner.id === a.id ? b : a;
-  const method: Method = hp[loser.id] === 0 ? "ko" : "decision";
-  const winIds = winner.id === a.id ? teamA : teamB;
-  const loseIds = winner.id === a.id ? teamB : teamA;
+  const health = (team: string[]) => team.reduce((sum, id) => sum + hp[id]!, 0);
+  const build = (team: string[]) => team.reduce((sum, id) => sum + buildScore(snaps.find((snap) => snap.id === id)!), 0);
+  const aWins = health(teamA) !== health(teamB)
+    ? health(teamA) > health(teamB)
+    : health(teamA) === 0
+      ? teamA.includes(fought.order[0]!)
+      : build(teamA) >= build(teamB);
+  const winIds = aWins ? teamA : teamB;
+  const loseIds = aWins ? teamB : teamA;
+  const method: Method = health(loseIds) === 0 ? "ko" : "decision";
   const wear: FightResult["wear"] = {};
   for (const id of winIds) {
     const w = emptyWear();
@@ -1233,11 +1224,11 @@ export function simulateTag(
     winnerIds: winIds,
     loserIds: loseIds,
     method,
-    blowout: method === "ko" && hp[winner.id]! > 50,
+    blowout: method === "ko" && health(winIds) / winIds.length > 50,
     exchanges,
     finisher: null,
     hp,
-    fighters: [a, b],
+    fighters: snaps,
     wear,
     seed,
   };
@@ -1245,42 +1236,10 @@ export function simulateTag(
 
 export function simulateMelee(data: PitData, ids: string[], seed: string): FightResult {
   const snaps = ids.map((id) => snapshot(data, id));
-  const hp: Record<string, number> = {};
-  ids.forEach((id) => (hp[id] = 100));
-  const exchanges: Exchange[] = [];
-  const alive = () => ids.filter((id) => hp[id]! > 0);
-  for (let i = 0; i < 8 && alive().length > 1; i++) {
-    const pool = alive()
-      .slice()
-      .sort((x, y) => {
-        const sx = snaps.find((s) => s.id === x)!;
-        const sy = snaps.find((s) => s.id === y)!;
-        return sy.rating - sx.rating || sy.stats.power - sx.stats.power || (x < y ? -1 : 1);
-      });
-    const attacker = pool[0]!;
-    const defender = pool.slice(1).sort((x, y) => hp[x]! - hp[y]! || (x < y ? -1 : 1))[0]!;
-    const a = snaps.find((s) => s.id === attacker)!;
-    const d = snaps.find((s) => s.id === defender)!;
-    const damage = Math.round(
-      clamp(a.stats.power * 0.62 + a.stats.speed * 0.08 - d.stats.armor * 0.2, 10, 36),
-    );
-    hp[defender] = Math.max(0, hp[defender]! - damage);
-    exchanges.push({
-      index: i + 1,
-      attackerId: attacker,
-      defenderId: defender,
-      damage,
-      attackerHp: hp[attacker]!,
-      defenderHp: hp[defender]!,
-      call: `${a.botName} finds ${d.botName} in the scrum.`,
-      tags: ["melee"],
-    });
-  }
-  const order = [...ids].sort(
-    (a, b) =>
-      hp[b]! - hp[a]! ||
-      snaps.find((s) => s.id === b)!.rating - snaps.find((s) => s.id === a)!.rating,
-  );
+  const fought = fightGroup(snaps, null, { hot: data.week === 3 });
+  const hp = fought.hp;
+  const exchanges = fought.exchanges.map((exchange) => ({ ...exchange, tags: [...exchange.tags, "melee"] }));
+  const order = fought.order;
   const winner = order[0]!;
   const wear: FightResult["wear"] = {};
   ids.forEach((id) => {

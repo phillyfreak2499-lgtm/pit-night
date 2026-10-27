@@ -102,7 +102,10 @@ test("each week has its arena, and hazard hits are recorded per bot with arena n
   assert.deepEqual([1, 2, 3, 4, 5].map(arenaForWeek), ["pit", "ring", "warehouse", "junkyard", "grand"]);
   assert.deepEqual(hazardCallout("ring", "water", 0), { text: "OIL SLICK: SLOWED", hit: true });
   assert.deepEqual(hazardCallout("junkyard", "pit", 7), { text: "THE CRUSHER -7", hit: true });
-  assert.equal(hazardCallout("grand", "hover", 0)!.hit, false, "a dodge is not a hit");
+  assert.deepEqual(hazardCallout("grand", "hover", 0), { text: "HOVERED OVER HAZARD", hit: false });
+  assert.deepEqual(hazardCallout("grand", "hover", 7), { text: "HOVER: HAZARD -7", hit: true });
+  assert.deepEqual(hazardCallout("grand", "air", 7), { text: "AIR CUSHION: HAZARD -7", hit: true });
+  assert.deepEqual(hazardCallout("grand", "air", 0), { text: "AIR CUSHION: CLEAR", hit: false });
 
   // A Hunter brain charges into the saws; the mark names the bot that took it.
   const { playgroundTape } = await import("../src/lib/pit/engine.ts");
@@ -121,4 +124,14 @@ test("each week has its arena, and hazard hits are recorded per bot with arena n
   const r = playgroundTape([build(hunter.id), build(stockPart("brain", "striker").id)], 3, "h").result!;
   const marks = r.exchanges.flatMap((e) => e.tags.filter((t) => t.startsWith("haz:")));
   assert.ok(marks.some((m) => m.startsWith(`haz:${r.fighters[0]!.id}:saw:`)), `hunter hit a saw: ${marks.join(", ")}`);
+
+  const { fightDuel } = await import("../src/lib/pit/combat.ts");
+  const hovering = { ...r.fighters[0]!, chassisFamily: "hover", utilityFamily: undefined };
+  const foe = r.fighters[1]!;
+  const clear = fightDuel(hovering, foe).exchanges[0]!;
+  const dark = fightDuel(hovering, { ...foe, utilityFamily: "blackout" }).exchanges[0]!;
+  assert.equal(clear.combat![hovering.id]!.hazardDamage, 0);
+  assert.equal(dark.combat![hovering.id]!.hazardDamage, 7, "Blackout keeps its existing hazard damage");
+  assert.ok(dark.tags.includes(`haz:${hovering.id}:saw:7`), "damage overrides the avoided-hazard mark");
+  assert.ok(dark.tags.includes("hover"), "the chassis tag remains available for combat calls");
 });

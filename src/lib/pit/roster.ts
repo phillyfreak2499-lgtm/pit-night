@@ -224,7 +224,7 @@ const WEAPONS: Part[] = [
       {
         tier: "super",
         name: "Wrecking Ball",
-        job: "The momentum weapon at full mass. Gel pads hate it. A still bot wastes it.",
+        job: "The momentum weapon at full mass. Gel pads blunt the impact. A still bot wastes it.",
         nudge: n(5, 3, -1, 0),
         greenWeeks: 2,
       },
@@ -272,13 +272,13 @@ const WEAPONS: Part[] = [
       {
         tier: "stock",
         name: "Flamethrower",
-        job: "Fire sticks. The foe takes burn after the hit, and their heat goes up.",
+        job: "Fire sticks. The foe takes burn after the hit, while your bot builds Heat for its next attack.",
         nudge: n(1, 0, 0, 2),
       },
       {
         tier: "sport",
         name: "Sport Flame",
-        job: "A longer burn. Heat keeps climbing after the exchange.",
+        job: "A longer burn on the foe. Your bot's Heat keeps climbing after the exchange.",
         nudge: n(2, 0, 0, 3),
       },
       {
@@ -290,7 +290,7 @@ const WEAPONS: Part[] = [
       {
         tier: "super",
         name: "Inferno",
-        job: "Burn damage over time, and the other bot's heat spikes. Gel does not drink this.",
+        job: "Burn damage over time on the foe, and a Heat boost for your own bot. Gel does not drink this.",
         nudge: n(3, 0, -1, 6),
         greenWeeks: 3,
       },
@@ -925,7 +925,7 @@ const UTILITIES: Part[] = [
       {
         tier: "pro",
         name: "Med Bay",
-        job: "Between exchanges, a little health comes back. It does not raise the four printed numbers.",
+        job: "Between exchanges, a little health comes back. The reinforced bay also adds Armor to the printed build.",
         nudge: n(0, 0, 2, 0),
       },
     ],

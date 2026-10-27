@@ -942,9 +942,9 @@ function meleeDrive(result: FightResult, beat: Beat, local: number, time: number
   }
 
   if (beat.kind === "decision") {
-    const winner = result.winnerIds[0];
+    const winners = new Set(result.winnerIds);
     states.forEach((s) => {
-      if (s.bot.id === winner) {
+      if (winners.has(s.bot.id) && s.hp > 0) {
         s.celebrate = local > 0.25;
         s.spot = mix(s.spot, center, ease(local * 2));
         s.heading += ease(clamp((local - 0.3) / 0.6, 0, 1)) * Math.PI * 4;
