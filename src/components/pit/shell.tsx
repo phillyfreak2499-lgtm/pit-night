@@ -2,6 +2,7 @@ import { Modal } from "./modal";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   ClipboardCheck,
+  FlaskConical,
   HelpCircle,
   Newspaper,
   Play,
@@ -36,6 +37,7 @@ const NAV = [
   { to: "/week", label: "Pit Week", icon: ClipboardCheck },
   { to: "/broadcast", label: "Fight Day", icon: Swords },
   { to: "/preview", label: "Preview", icon: Play },
+  { to: "/playground", label: "Playground", icon: FlaskConical },
   { to: "/damage", label: "Damage", icon: Wrench },
   { to: "/gazette", label: "Gazette", icon: Newspaper },
   { to: "/honors", label: "Honors", icon: Trophy },

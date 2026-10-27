@@ -68,3 +68,31 @@ test("hits sound like the weapon that landed them", async () => {
   assert.equal(hitVoice("launcher"), "boom");
   assert.equal(hitVoice("mystery"), "punch");
 });
+
+test("Playground fights any two builds, respects the rounds, and allows every part", async () => {
+  const { playgroundTape } = await import("../src/lib/pit/engine.ts");
+  const { PARTS, stockPart } = await import("../src/lib/pit/catalog.ts");
+  const build = (classId: "striker" | "tank" | "specialist", weapon: string) => ({
+    name: classId.toUpperCase(),
+    classId,
+    loadout: { chassis: stockPart("chassis", classId).id, drive: stockPart("drive", classId).id, weapon, armor: stockPart("armor", classId).id, utility: null, brain: stockPart("brain", classId).id },
+    style: { finish: "chrome" as const, decal: "none" as const, trim: "steel", eye: "green", flag: false },
+    paint: "amber",
+    look: "plain" as const,
+    number: "7",
+    week: "blue" as const,
+  });
+  const champ = PARTS.find((p) => p.slot === "weapon" && p.tier === "championship")!;
+  const axe = PARTS.find((p) => p.id === "weapon-axe-super")!;
+  const pair: [ReturnType<typeof build>, ReturnType<typeof build>] = [build("striker", champ.id), build("tank", axe.id)];
+  for (const rounds of [1, 5, 10]) {
+    const r = playgroundTape(pair, rounds, "t").result!;
+    assert.ok(r.exchanges.length <= rounds + 1, `${rounds} rounds ran ${r.exchanges.length} exchanges`);
+    assert.equal(r.fighters.length, 2);
+  }
+  const ko = playgroundTape(pair, "ko", "t").result!;
+  assert.equal(ko.method, "ko", "until knockout always ends in a knockout");
+  assert.equal(ko.fighters[0]!.weaponName, champ.name, "championship iron is unlocked here");
+  assert.equal(ko.fighters[1]!.weaponName, axe.name);
+  assert.deepEqual(ko.wear, {}, "Playground fights never damage anything");
+});

@@ -18,6 +18,7 @@ import { Route as FaqRouteImport } from './routes/faq'
 import { Route as GazetteRouteImport } from './routes/gazette'
 import { Route as HonorsRouteImport } from './routes/honors'
 import { Route as MapRouteImport } from './routes/map'
+import { Route as PlaygroundRouteImport } from './routes/playground'
 import { Route as PreviewRouteImport } from './routes/preview'
 import { Route as RulesRouteImport } from './routes/rules'
 import { Route as WatchRouteImport } from './routes/watch'
@@ -72,6 +73,11 @@ const HonorsRoute = HonorsRouteImport.update({
 const MapRoute = MapRouteImport.update({
   id: '/map',
   path: '/map',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlaygroundRoute = PlaygroundRouteImport.update({
+  id: '/playground',
+  path: '/playground',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewRoute = PreviewRouteImport.update({
@@ -135,6 +141,7 @@ export interface FileRoutesByFullPath {
   '/gazette': typeof GazetteRoute
   '/honors': typeof HonorsRoute
   '/map': typeof MapRoute
+  '/playground': typeof PlaygroundRoute
   '/preview': typeof PreviewRoute
   '/rules': typeof RulesRoute
   '/watch': typeof WatchRoute
@@ -156,6 +163,7 @@ export interface FileRoutesByTo {
   '/gazette': typeof GazetteRoute
   '/honors': typeof HonorsRoute
   '/map': typeof MapRoute
+  '/playground': typeof PlaygroundRoute
   '/preview': typeof PreviewRoute
   '/rules': typeof RulesRoute
   '/watch': typeof WatchRoute
@@ -178,6 +186,7 @@ export interface FileRoutesById {
   '/gazette': typeof GazetteRoute
   '/honors': typeof HonorsRoute
   '/map': typeof MapRoute
+  '/playground': typeof PlaygroundRoute
   '/preview': typeof PreviewRoute
   '/rules': typeof RulesRoute
   '/watch': typeof WatchRoute
@@ -201,6 +210,7 @@ export interface FileRouteTypes {
     | '/gazette'
     | '/honors'
     | '/map'
+    | '/playground'
     | '/preview'
     | '/rules'
     | '/watch'
@@ -222,6 +232,7 @@ export interface FileRouteTypes {
     | '/gazette'
     | '/honors'
     | '/map'
+    | '/playground'
     | '/preview'
     | '/rules'
     | '/watch'
@@ -243,6 +254,7 @@ export interface FileRouteTypes {
     | '/gazette'
     | '/honors'
     | '/map'
+    | '/playground'
     | '/preview'
     | '/rules'
     | '/watch'
@@ -265,6 +277,7 @@ export interface RootRouteChildren {
   GazetteRoute: typeof GazetteRoute
   HonorsRoute: typeof HonorsRoute
   MapRoute: typeof MapRoute
+  PlaygroundRoute: typeof PlaygroundRoute
   PreviewRoute: typeof PreviewRoute
   RulesRoute: typeof RulesRoute
   WatchRoute: typeof WatchRoute
@@ -340,6 +353,13 @@ declare module '@tanstack/react-router' {
       path: '/map'
       fullPath: '/map'
       preLoaderRoute: typeof MapRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/playground': {
+      id: '/playground'
+      path: '/playground'
+      fullPath: '/playground'
+      preLoaderRoute: typeof PlaygroundRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview': {
@@ -425,6 +445,7 @@ const rootRouteChildren: RootRouteChildren = {
   GazetteRoute: GazetteRoute,
   HonorsRoute: HonorsRoute,
   MapRoute: MapRoute,
+  PlaygroundRoute: PlaygroundRoute,
   PreviewRoute: PreviewRoute,
   RulesRoute: RulesRoute,
   WatchRoute: WatchRoute,
