@@ -6,6 +6,7 @@ import { TOPPER_IDS, type ClassId, type Grade, type Loadout, type Slot } from "@
 import { Btn, SectionLabel } from "./bits";
 import { BotPortrait, type BotLookProps } from "./bot-portrait";
 import { Broadcast } from "./broadcast";
+import { ARENAS, ARENA_IDS, HAZARD_NAMES, type ArenaId } from "./arena-scenes";
 
 const SLOTS: Slot[] = ["chassis", "drive", "weapon", "armor", "utility", "brain"];
 const CLASSES: ClassId[] = ["striker", "tank", "specialist"];
@@ -244,10 +245,11 @@ export function PlaygroundPage() {
   const [left, setLeft] = useState(() => starter("striker", "LEFTY", "amber"));
   const [right, setRight] = useState(() => starter("tank", "RIGHTY", "teal"));
   const [rounds, setRounds] = useState<number | "ko">(3);
+  const [arena, setArena] = useState<ArenaId>("pit");
   const [fight, setFight] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [done, setDone] = useState(false);
-  const [snapshot, setSnapshot] = useState<{ left: PlaygroundBuild; right: PlaygroundBuild; rounds: number | "ko" } | null>(null);
+  const [snapshot, setSnapshot] = useState<{ left: PlaygroundBuild; right: PlaygroundBuild; rounds: number | "ko"; arena: ArenaId } | null>(null);
   const bout = useMemo(
     () => (snapshot ? playgroundTape([snapshot.left, snapshot.right], snapshot.rounds, `${fight}`) : null),
     [snapshot, fight],
@@ -275,11 +277,21 @@ export function PlaygroundPage() {
             ))}
           </select>
         </Field>
+        <Field label="Arena">
+          <select value={arena} onChange={(e) => setArena(e.target.value as ArenaId)} className={SELECT} data-testid="pg-arena">
+            {ARENA_IDS.map((a) => (
+              <option key={a} value={a}>{ARENAS[a].name}</option>
+            ))}
+          </select>
+        </Field>
+        <p className="max-w-sm text-xs text-muted">
+          {ARENAS[arena].blurb} Hazards: {HAZARD_NAMES[arena].saw}, {HAZARD_NAMES[arena].pit}, {HAZARD_NAMES[arena].water}.
+        </p>
         <Btn
           testId="pg-fight"
           onClick={() => {
             armSound();
-            setSnapshot({ left, right, rounds });
+            setSnapshot({ left, right, rounds, arena });
             setFight((n) => n + 1);
             setPlaying(true);
             setDone(false);
@@ -303,8 +315,9 @@ export function PlaygroundPage() {
           playing={playing}
           onPlayingChange={setPlaying}
           onComplete={() => setDone(true)}
-          kicker="PLAYGROUND · NOTHING COUNTS"
+          kicker={`PLAYGROUND · ${ARENAS[snapshot?.arena ?? "pit"].name.toUpperCase()} · NOTHING COUNTS`}
           noDamage
+          arena={snapshot?.arena}
         />
       ) : null}
     </div>

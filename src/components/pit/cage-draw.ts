@@ -3,6 +3,7 @@ import { EYES, LEDS, PAINT, SMOKE, TRIM, decalArt, styleOf } from "@/lib/pit/cat
 import { halloweenVisuals } from "@/lib/pit/halloween";
 import { thanksgivingVisuals } from "@/lib/pit/thanksgiving";
 import { ELECTION_COLORS, electionVisuals } from "@/lib/pit/election";
+import { drawArenaHazards, drawArenaTopScene, paintArenaScene, type ArenaId } from "./arena-scenes";
 import { armorEdges, deckHardware } from "./material-detail";
 import type { BotBody, ClassId } from "@/lib/pit/types";
 import { PIT, clamp, ease, hash, lerp, type BotState, type Drive, type Spot } from "./cage-motion";
@@ -740,19 +741,27 @@ const LOGO = { x: 0.5, y: 0.56, w: 0.46 };
 
 const backdropCache = new WeakMap<
   CanvasRenderingContext2D,
-  { w: number; h: number; v: number; decor: number; canvas: HTMLCanvasElement }
+  { w: number; h: number; v: number; decor: number; arena: ArenaId; canvas: HTMLCanvasElement }
 >();
 
-function backdrop(ctx: CanvasRenderingContext2D, w: number, h: number) {
+function backdrop(ctx: CanvasRenderingContext2D, w: number, h: number, arena: ArenaId = "pit") {
   const decor = thanksgivingVisuals() ? 2 : halloweenVisuals() ? 1 : electionVisuals() ? 3 : 0;
   const hit = backdropCache.get(ctx);
-  if (hit && hit.w === w && hit.h === h && hit.v === logoVersion && hit.decor === decor) return hit.canvas;
+  if (hit && hit.w === w && hit.h === h && hit.v === logoVersion && hit.decor === decor && hit.arena === arena) return hit.canvas;
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
   const c = canvas.getContext("2d");
-  if (c) paintBackdrop(c, w, h);
-  backdropCache.set(ctx, { w, h, v: logoVersion, decor, canvas });
+  if (c) {
+    if (arena === "pit") paintBackdrop(c, w, h);
+    else {
+      paintArenaScene(c, w, h, arena, project);
+      if (halloweenVisuals()) paintHalloweenTrim(c, w, h);
+      if (thanksgivingVisuals()) paintThanksgivingTrim(c, w, h);
+      if (electionVisuals()) paintElectionTrim(c, w, h);
+    }
+  }
+  backdropCache.set(ctx, { w, h, v: logoVersion, decor, arena, canvas });
   return canvas;
 }
 
@@ -3604,6 +3613,8 @@ export type SideOpts = {
   festive?: boolean;
   /** 0..1 slow-motion zoom-and-hold on the finishing blow. */
   finish?: number;
+  /** Which weekly arena to draw. Defaults to the Pit. */
+  arena?: ArenaId;
 };
 
 function drawInstalledSide(
@@ -3968,7 +3979,7 @@ export function drawSide(
   );
   ctx.scale(cam.z, cam.z);
   ctx.translate(-cx, -cy);
-  ctx.drawImage(backdrop(ctx, w, h), 0, 0);
+  ctx.drawImage(backdrop(ctx, w, h, opts.arena ?? "pit"), 0, 0);
   const festive = Boolean(opts.festive || halloweenVisuals() || thanksgivingVisuals());
   if (drive.bots.some((bot) => bot.bot.shows?.includes("fog"))) drawRingFog(ctx, w, h, time, opts.reduced);
   if (drive.bots.some((bot) => bot.bot.shows?.includes("leaves"))) drawFallingLeaves(ctx, w, h, time, opts.reduced);
@@ -3982,7 +3993,8 @@ export function drawSide(
     ctx.fillRect(hit.x - hit.size * 2, hit.y - hit.size * 2, hit.size * 4, hit.size * 3);
   }
   if (!opts.reduced) crowdFlashes(ctx, w, h, time, opts.hype + (opts.ko ? 1 : 0));
-  drawArenaFloor(ctx, w, h, time);
+  if ((opts.arena ?? "pit") === "pit") drawArenaFloor(ctx, w, h, time);
+  else drawArenaHazards(ctx, w, h, time, opts.arena!, project);
   if (opts.hazards) drawHazards(ctx, w, h, fx, time, dt, opts.reduced);
   drawWreck(ctx, fx.wreck);
 
@@ -4630,6 +4642,7 @@ export function drawTop(
   time: number,
   dt: number,
   reduced: boolean,
+  arena: ArenaId = "pit",
 ) {
   const g = topGeom(w, h);
   ctx.save();
@@ -4638,7 +4651,8 @@ export function drawTop(
   ctx.beginPath();
   ctx.rect(g.x0, g.y0, g.s, g.s);
   ctx.clip();
-  drawArenaTop(ctx, g, time);
+  if (arena === "pit") drawArenaTop(ctx, g, time);
+  else drawArenaTopScene(ctx, g, time, arena);
 
   // Skid marks.
   for (const s of drive.bots) {

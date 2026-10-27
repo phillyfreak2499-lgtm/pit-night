@@ -49,6 +49,10 @@ export const RULES: { title: string; text: string }[] = [
     title: "Damage",
     text: "Clean, scratched, bent, disabled. Bent is half effect. Disabled falls back to a stock loaner until you pay (a dead utility just goes empty). Winners still scratch. Blowouts can kill weapon and drive. Repairs come out of that part's jar: scratched 1 coin, bent 2, disabled 4. An emergency weld turns Disabled into Bent for one week for 1 coin. Salvage strips a rare part for a few coins back and drops the slot to stock.",
   },
+  {
+    title: "Arenas and hazards",
+    text: "Each week fights somewhere new: Week 1 in the Pit, Week 2 at the Ring (outdoors at dusk), Week 3 in the Warehouse, Week 4 in the Junkyard, and Championship Saturday in the Grand Arena. Every arena has the same three kinds of floor hazard under different names. A saw-type hazard (floor saw, tire bumper, conveyor belt, scrap spikes, pop-up hammer) bites a bot that charges or chases for up to 8 damage; a Swerve drive dodges most of it and a Hover chassis rides over it. A pit-type hazard (the pit, sand trap, pallet pit, the crusher, the trapdoor) costs 7 and slows the bot; Hover and Air Cushion pass over it. A water-type hazard (water strip, oil slick, steam grate, rust puddle, slick floor) slows the bot; an Air Cushion skates through it. Careful brains like Logic and Sniper stay off hazards; Hunter, Berserker and fast chase drives run into them. Week 3 adds flame jets on the last exchange. The broadcast calls out every hazard hit and every dodge.",
+  },
 ];
 
 export function RulesPage() {
