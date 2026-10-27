@@ -189,6 +189,7 @@ test("championship sudden death and finishers retain the final state and damage"
   assert.equal(last.combat[last.defenderId]!.before.hp, last.damage);
   assert.equal(last.combat[last.defenderId]!.after.hp, 0);
   assert.equal(last.combat[last.attackerId]!.damageDealt, last.damage);
+  assert.equal(last.combat[last.attackerId]!.hitCount, 1);
   assert.equal(result.hp[last.defenderId], 0);
 });
 

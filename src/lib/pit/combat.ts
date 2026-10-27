@@ -216,6 +216,7 @@ function hazardOf(kit: Kit, which: ReturnType<typeof lane>, foe: Kit, index: num
   if (air && (which === "pit" || which === "water")) damage = which === "water" ? 0 : damage;
   if (foe.utility === "blackout" && !lit(kit)) {
     damage = which === "safe" ? damage : Math.max(damage, which === "saw" ? 8 : damage);
+    if (which === "saw" && damage > 0 && !tags.includes("saw")) tags.push("saw");
   }
   let mult = brainHazard(kit);
   if (
@@ -1134,6 +1135,7 @@ export function fightDuel(a: FighterSnap, b: FighterSnap, opts: DuelOpts = {}): 
     const damage = hp[defender.id]!;
     const combat = startTrace([a, b], state);
     combat[attacker.id]!.damageDealt = damage;
+    combat[attacker.id]!.hitCount = 1;
     hp[defender.id] = 0;
     method = "ko";
     const call = `The championship cannot go to the judges. ${attacker.botName} lands the last shot.`;
