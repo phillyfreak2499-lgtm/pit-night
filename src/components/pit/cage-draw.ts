@@ -2,6 +2,7 @@ import { bannerVerdict } from "../../../scripts/copy-guard.mjs";
 import { EYES, LEDS, PAINT, SMOKE, TRIM, decalArt, styleOf } from "@/lib/pit/catalog";
 import { halloweenVisuals } from "@/lib/pit/halloween";
 import { thanksgivingVisuals } from "@/lib/pit/thanksgiving";
+import { ELECTION_COLORS, electionVisuals } from "@/lib/pit/election";
 import { armorEdges, deckHardware } from "./material-detail";
 import type { BotBody, ClassId } from "@/lib/pit/types";
 import { PIT, clamp, ease, hash, lerp, type BotState, type Drive, type Spot } from "./cage-motion";
@@ -743,7 +744,7 @@ const backdropCache = new WeakMap<
 >();
 
 function backdrop(ctx: CanvasRenderingContext2D, w: number, h: number) {
-  const decor = thanksgivingVisuals() ? 2 : halloweenVisuals() ? 1 : 0;
+  const decor = thanksgivingVisuals() ? 2 : halloweenVisuals() ? 1 : electionVisuals() ? 3 : 0;
   const hit = backdropCache.get(ctx);
   if (hit && hit.w === w && hit.h === h && hit.v === logoVersion && hit.decor === decor) return hit.canvas;
   const canvas = document.createElement("canvas");
@@ -1099,6 +1100,48 @@ function paintBackdrop(c: CanvasRenderingContext2D, w: number, h: number) {
   c.globalCompositeOperation = "source-over";
   if (halloweenVisuals()) paintHalloweenTrim(c, w, h);
   if (thanksgivingVisuals()) paintThanksgivingTrim(c, w, h);
+  if (electionVisuals()) paintElectionTrim(c, w, h);
+}
+
+/** Election Week: civic bunting and ballot boxes. Gold, parchment and laurel only; no party colors. */
+function paintElectionTrim(c: CanvasRenderingContext2D, w: number, h: number) {
+  const { gold, parchment, laurel, bronze, ink } = ELECTION_COLORS;
+  c.save();
+  // Pennant bunting along the truss.
+  const flags = [gold, parchment, laurel];
+  const top = h * 0.06;
+  c.strokeStyle = bronze;
+  c.lineWidth = Math.max(1, w * 0.0015);
+  c.beginPath();
+  c.moveTo(w * 0.04, top);
+  c.lineTo(w * 0.96, top);
+  c.stroke();
+  for (let i = 0; i < 30; i++) {
+    const x = w * (0.05 + i * 0.03);
+    const sag = Math.sin(((i % 4) / 4) * Math.PI) * h * 0.012;
+    c.fillStyle = flags[i % flags.length]!;
+    c.beginPath();
+    c.moveTo(x - w * 0.011, top + sag);
+    c.lineTo(x + w * 0.011, top + sag);
+    c.lineTo(x, top + sag + h * 0.04);
+    c.closePath();
+    c.fill();
+  }
+  // Ballot boxes at the lower corners, a ballot halfway in.
+  for (const side of [0, 1] as const) {
+    const x = w * (side === 0 ? 0.08 : 0.92);
+    const y = h * 0.78;
+    const s = w * 0.045;
+    c.fillStyle = parchment;
+    c.fillRect(x - s * 0.4, y - s * 1.25, s * 0.8, s * 0.6);
+    c.fillStyle = bronze;
+    c.fillRect(x - s, y - s * 0.7, s * 2, s * 1.4);
+    c.fillStyle = ink;
+    c.fillRect(x - s * 0.6, y - s * 0.72, s * 1.2, s * 0.12);
+    c.fillStyle = gold;
+    c.fillRect(x - s * 0.9, y - s * 0.1, s * 1.8, s * 0.18);
+  }
+  c.restore();
 }
 
 /** Static ring dressing for Halloween week. Motion lives in the live frame, not this cache. */
@@ -2582,6 +2625,55 @@ function drawDecal(
       ctx.closePath();
       ctx.fill();
     }
+  } else if (art === "ivoted") {
+    // Round "I VOTED" sticker: parchment with a gold rim and a check mark. No party colors.
+    const cx = X(0.46);
+    const cy = Y(0.48);
+    const r = Math.min(u * 0.12, h * u * 0.42);
+    ctx.fillStyle = ELECTION_COLORS.parchment;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r * 1.25, r, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = ELECTION_COLORS.gold;
+    ctx.lineWidth = Math.max(1, r * 0.16);
+    ctx.stroke();
+    ctx.fillStyle = ELECTION_COLORS.ink;
+    ctx.font = `bold ${Math.max(5, r * 0.5)}px Oswald, Impact, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("I VOTED", cx, cy - r * 0.12);
+    ctx.strokeStyle = ELECTION_COLORS.laurel;
+    ctx.lineWidth = Math.max(1, r * 0.14);
+    ctx.beginPath();
+    ctx.moveTo(cx - r * 0.3, cy + r * 0.45);
+    ctx.lineTo(cx - r * 0.08, cy + r * 0.65);
+    ctx.lineTo(cx + r * 0.35, cy + r * 0.3);
+    ctx.stroke();
+  } else if (art === "ballot") {
+    const cx = X(0.46);
+    const cy = Y(0.55);
+    const r = Math.min(u * 0.1, h * u * 0.4);
+    ctx.fillStyle = ELECTION_COLORS.parchment;
+    ctx.fillRect(cx - r * 0.45, cy - r * 1.25, r * 0.9, r * 0.8);
+    ctx.fillStyle = ELECTION_COLORS.bronze;
+    ctx.fillRect(cx - r, cy - r * 0.55, r * 2, r * 1.3);
+    ctx.fillStyle = ELECTION_COLORS.ink;
+    ctx.fillRect(cx - r * 0.55, cy - r * 0.58, r * 1.1, r * 0.12);
+    ctx.fillStyle = ELECTION_COLORS.gold;
+    ctx.fillRect(cx - r * 0.8, cy + r * 0.05, r * 1.6, r * 0.16);
+  } else if (art === "capitol") {
+    const cx = X(0.46);
+    const base = Y(0.78);
+    const r = Math.min(u * 0.11, h * u * 0.42);
+    ctx.fillStyle = ELECTION_COLORS.parchment;
+    ctx.fillRect(cx - r * 1.2, base - r * 0.2, r * 2.4, r * 0.2);
+    for (let i = -2; i <= 2; i++) ctx.fillRect(cx + i * r * 0.42 - r * 0.07, base - r * 0.75, r * 0.14, r * 0.55);
+    ctx.fillRect(cx - r * 1.05, base - r * 0.85, r * 2.1, r * 0.12);
+    ctx.fillStyle = ELECTION_COLORS.gold;
+    ctx.beginPath();
+    ctx.arc(cx, base - r * 0.85, r * 0.6, Math.PI, 0);
+    ctx.fill();
+    ctx.fillRect(cx - r * 0.05, base - r * 1.75, r * 0.1, r * 0.35);
   } else if (art === "turkey") {
     const cx = X(0.42);
     const cy = Y(0.48);
@@ -2760,6 +2852,15 @@ function drawTopper(
     ctx.fillRect(-u * 0.12, top - u * 0.09, u * 0.24, u * 0.05);
     ctx.fillStyle = "#f6cd46";
     ctx.fillRect(-u * 0.035, top - u * 0.095, u * 0.07, u * 0.06);
+  } else if (topper === "tophat") {
+    // Tall black top hat with a gold band. Civic, not a party costume.
+    ctx.fillStyle = "#16151a";
+    ctx.fillRect(-u * 0.22, top - u * 0.02, u * 0.44, u * 0.035);
+    ctx.fillRect(-u * 0.13, top - u * 0.34, u * 0.26, u * 0.32);
+    ctx.fillStyle = ELECTION_COLORS.gold;
+    ctx.fillRect(-u * 0.13, top - u * 0.1, u * 0.26, u * 0.05);
+    ctx.fillStyle = "rgba(255,255,255,0.12)";
+    ctx.fillRect(-u * 0.1, top - u * 0.33, u * 0.04, u * 0.22);
   } else if (topper === "wreath") {
     ctx.strokeStyle = "#2f6b22";
     ctx.lineWidth = Math.max(1.5, u * 0.045);
@@ -3138,6 +3239,37 @@ function weaponBack(ctx: CanvasRenderingContext2D, s: BotState, f: Frame, u: num
     ctx.beginPath();
     ctx.arc(px, py, 0.05 * u, 0, Math.PI * 2);
     ctx.fill();
+  } else if (fam === "axe") {
+    // Cherry Tree Axe: the hammer's overhead chop on a wood handle with a steel bit.
+    // Rests raised over the deck so the bit reads; chops down and forward.
+    const a = lerp(-0.5, 0.35, s.stroke);
+    const px = -0.12 * u;
+    const py = f.deck * u - 0.02 * u;
+    const len = 0.46 * u;
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(a);
+    ctx.fillStyle = "#7b4a2a";
+    ctx.fillRect(0, -0.022 * u, len, 0.044 * u);
+    ctx.fillStyle = steel(ctx, len - 0.05 * u, -0.14 * u, len + 0.1 * u, 0.06 * u);
+    ctx.beginPath();
+    ctx.moveTo(len - 0.06 * u, -0.05 * u);
+    ctx.lineTo(len + 0.04 * u, -0.15 * u);
+    ctx.quadraticCurveTo(len + 0.13 * u, -0.05 * u, len + 0.04 * u, 0.06 * u);
+    ctx.lineTo(len - 0.06 * u, 0.03 * u);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = s.stroke > 0.8 ? "#ffd27a" : "#efe8da";
+    ctx.lineWidth = Math.max(1, 0.012 * u);
+    ctx.beginPath();
+    ctx.moveTo(len + 0.04 * u, -0.15 * u);
+    ctx.quadraticCurveTo(len + 0.13 * u, -0.05 * u, len + 0.04 * u, 0.06 * u);
+    ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = "#26241f";
+    ctx.beginPath();
+    ctx.arc(px, py, 0.05 * u, 0, Math.PI * 2);
+    ctx.fill();
   } else if (fam === "saw") {
     const a = lerp(-0.55, 0.28, s.stroke);
     const px = -0.12 * u;
@@ -3344,7 +3476,7 @@ function weaponFront(
     ctx.beginPath();
     ctx.arc(px, py, 0.045 * u, 0, Math.PI * 2);
     ctx.fill();
-  } else if (fam !== "hammer" && fam !== "saw" && fam !== "hidden" && fam !== "none") {
+  } else if (fam !== "hammer" && fam !== "axe" && fam !== "saw" && fam !== "hidden" && fam !== "none") {
     // Ram spike.
     const cy = f.deck * u * 0.5;
     ctx.fillStyle = steel(ctx, fx, cy - 0.05 * u, fx, cy + 0.05 * u);
@@ -4863,6 +4995,18 @@ function topWeapon(
     ctx.strokeStyle = "rgba(0,0,0,0.5)";
     ctx.lineWidth = 1;
     ctx.stroke();
+  } else if (fam === "axe") {
+    const reach = len * (0.1 + s.stroke * 0.55);
+    ctx.fillStyle = "#7b4a2a";
+    ctx.fillRect(-len * 0.05, -wid * 0.05, reach, wid * 0.1);
+    ctx.fillStyle = s.stroke > 0.8 ? "#ffd27a" : "#d9d5cc";
+    ctx.beginPath();
+    ctx.moveTo(reach - len * 0.06, -wid * 0.12);
+    ctx.lineTo(reach + len * 0.06, -wid * 0.34);
+    ctx.lineTo(reach + len * 0.06, wid * 0.34);
+    ctx.lineTo(reach - len * 0.06, wid * 0.12);
+    ctx.closePath();
+    ctx.fill();
   } else if (fam === "hammer") {
     const reach = len * (0.1 + s.stroke * 0.55);
     ctx.fillStyle = "#8e8a82";

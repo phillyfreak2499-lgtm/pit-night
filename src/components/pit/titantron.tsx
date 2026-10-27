@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { CLASS_META } from "@/lib/pit/catalog";
 import { useEffect, useMemo, useState } from "react";
-import { botFor, buildCard, championshipFinalists, conferenceStandings, randomHouseTape, regularSeasonRecordOf } from "@/lib/pit/engine";
+import { botFor, buildCard, championshipFinalists, conferenceStandings, fightStreak, randomHouseTape, regularSeasonRecordOf } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
 import { programWeek } from "@/lib/pit/training";
 import { weekDeadline } from "@/lib/pit/time";
@@ -161,16 +161,20 @@ export function Titantron() {
                         to="/stores/$storeId"
                         params={{ storeId: store.id }}
                         data-bot-hover
-                        className={`grid grid-cols-[auto_1fr_auto] items-center gap-3 border-b border-line px-3 py-2 last:border-b-0 ${finalist ? "bg-amber/10" : ""}`}
+                        className={`grid grid-cols-[auto_auto_1fr_auto] items-center gap-3 border-b border-line px-3 py-2 last:border-b-0 ${finalist ? "bg-amber/10" : ""}`}
                       >
                         <span className="w-6 font-display text-xl text-muted">{index + 1}</span>
+                        <MiniBot storeId={store.id} />
                         <span className="min-w-0">
                           <span className="block font-display">{store.name}</span>
                           <span className="block text-xs text-muted">
                             {bot.name}{finalist ? " · CONFERENCE CHAMPION" : ""}
                           </span>
                         </span>
-                        <span className="font-display text-xl">{rec.w}–{rec.l}</span>
+                        <span className="flex items-center gap-2">
+                          <StreakBadge streak={fightStreak(data, store.id)} />
+                          <span className="font-display text-xl">{rec.w}–{rec.l}</span>
+                        </span>
                       </Link>
                     </li>
                   );
@@ -241,5 +245,30 @@ function PitWeekCallout() {
         <span className="bg-amber px-4 py-2 text-sm tracking-wide text-deep uppercase">{plan.week === 5 ? "Open Championship Week" : "Open Pit Week"}</span>
       </span>
     </Link>
+  );
+}
+
+/** The store's bot, small, for a standings row. */
+function MiniBot({ storeId }: { storeId: string }) {
+  const look = useBotLook(storeId);
+  return (
+    <span className="relative block h-10 w-14 overflow-hidden border border-line bg-deep" aria-hidden>
+      <BotPortrait look={look} zoom={0.9} className="absolute inset-0 h-full w-full" />
+    </span>
+  );
+}
+
+/** Two or more straight: a flame for wins, frost for losses. */
+function StreakBadge({ streak }: { streak: { kind: "W" | "L"; n: number } | null }) {
+  if (!streak || streak.n < 2) return null;
+  const hot = streak.kind === "W";
+  return (
+    <span
+      className={`streak-badge px-1.5 py-0.5 font-display text-xs tracking-wider ${hot ? "bg-spark/20 text-spark" : "bg-white/10 text-muted"}`}
+      title={`${streak.n} ${hot ? "wins" : "losses"} in a row`}
+    >
+      {hot ? "🔥" : "❄"} {streak.kind}
+      {streak.n}
+    </span>
   );
 }
