@@ -26,6 +26,7 @@ import { weekDeadline } from "@/lib/pit/time";
 import { formatRemain, nextLock, PERIOD_OPENS, TextInput, useNow } from "./bits";
 import { Tutorial } from "./tutorial";
 import { StreakBadge } from "./streak-badge";
+import { Celebrate } from "./celebrate";
 
 const NAV = [
   { to: "/", label: "Titantron", icon: Tv },
@@ -139,6 +140,7 @@ export function PitShell({ children }: { children: React.ReactNode }) {
             </div>
           </header>
           <Flash />
+          <Celebrate />
           {ready ? (
             <main key={pathname} className="page-in px-4 pt-5 pb-28 md:px-6 md:pb-10">
               {children}

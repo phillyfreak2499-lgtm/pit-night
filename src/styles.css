@@ -576,3 +576,81 @@
     animation: none;
   }
 }
+
+/* Shop part drawings: tinted by tier. */
+.part-icon .plate {
+  fill: color-mix(in oklab, var(--tint) 14%, var(--color-deep));
+  stroke: color-mix(in oklab, var(--tint) 45%, transparent);
+  stroke-width: 1.5;
+}
+.part-icon .art > * ,
+.part-icon .art g > * {
+  fill: var(--tint);
+}
+.part-icon .art .hole {
+  fill: var(--color-deep);
+}
+.part-icon .art .line {
+  fill: none;
+  stroke: var(--tint);
+  stroke-linecap: round;
+}
+
+/* Fight-card poster. */
+.vs-badge {
+  text-shadow: 0 0 18px color-mix(in oklab, var(--color-spark) 70%, transparent);
+  animation: vs-pop 0.6s ease-out both;
+}
+
+/* Celebrations: coins drop into the jar, a new part slides in. */
+.celebrate {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+}
+.celebrate-card {
+  animation: celebrate-pop 1.9s ease-out forwards;
+}
+.celebrate-coin {
+  position: absolute;
+  top: -8vh;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 9999px;
+  animation: coin-drop 1.4s cubic-bezier(0.3, 0.6, 0.4, 1) forwards;
+}
+.celebrate-part {
+  animation: part-slide 1.9s ease-out forwards;
+}
+@keyframes celebrate-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  15% { transform: scale(1.08); opacity: 1; }
+  25% { transform: scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-10px); }
+}
+@keyframes coin-drop {
+  0% { transform: translateY(0) rotate(0); opacity: 0; }
+  10% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateY(62vh) rotate(540deg); opacity: 0; }
+}
+@keyframes part-slide {
+  0% { transform: translateX(-60vw) rotate(-12deg); opacity: 0; }
+  30% { transform: translateX(0) rotate(0); opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vs-badge,
+  .celebrate-coin,
+  .celebrate-part {
+    animation: none;
+  }
+  .celebrate-coin {
+    display: none;
+  }
+}

@@ -10,6 +10,7 @@ import { Btn, SectionLabel } from "./bits";
 import { CoinStack, KeyLadder, UpgradeHowTo } from "./key-ladder";
 import { canEnterBay, LockedBay } from "./bay-lock";
 import { PartDetails, TryOnPanel } from "./try-on";
+import { PartIcon, TIER_STYLE } from "./part-icon";
 
 const SLOTS: Slot[] = ["chassis", "drive", "weapon", "armor", "utility", "brain"];
 
@@ -85,7 +86,7 @@ export function ShopPage({ storeId }: { storeId: string }) {
           {trying && partById(trying)?.slot === slot ? (
             <TryOnPanel data={data} storeId={storeId} part={partById(trying)!} onClose={() => setTrying(null)} />
           ) : null}
-          <ul className="mt-4 flex flex-col gap-3">
+          <ul className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {parts.map((part) => {
               const check = buyCheck(data, storeId, part);
               const owned = bot.owned.includes(part.id);
@@ -95,10 +96,16 @@ export function ShopPage({ storeId }: { storeId: string }) {
               const coinsOk = have >= price;
               const src = KEY_SOURCE[part.key];
               return (
-                <li key={part.id} className={`border p-4 ${owned ? "border-ok/50 bg-surface" : check.ok ? "border-amber/60 bg-surface" : "border-line bg-deep"}`}>
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <h2 className="font-display text-2xl leading-none">{part.name}</h2>
-                    <p className="font-display text-sm tracking-widest text-amber uppercase">{tierWord(part.tier)}</p>
+                <li key={part.id} className={`lift flex flex-col border p-4 ${owned ? "border-ok/50 bg-surface" : check.ok ? "border-amber/60 bg-surface" : "border-line bg-deep"}`}>
+                  <div className="flex items-start gap-3">
+                    <PartIcon part={part} />
+                    <div className="min-w-0 flex-1">
+                      <span className={`inline-block px-2 py-0.5 font-display text-xs tracking-widest uppercase ${TIER_STYLE[part.tier].badge}`}>
+                        {tierWord(part.tier)}
+                      </span>
+                      {owned ? <span className="ml-2 inline-block bg-ok/20 px-2 py-0.5 font-display text-xs tracking-widest text-ok uppercase">Owned</span> : null}
+                      <h2 className="mt-1 font-display text-2xl leading-none">{part.name}</h2>
+                    </div>
                   </div>
                   <p className="mt-2 max-w-3xl text-sm text-muted">{part.job}</p>
                   <PartDetails part={part} />

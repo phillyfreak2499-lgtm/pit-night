@@ -223,6 +223,26 @@ export function recordOf(data: PitData, storeId: string): { w: number; l: number
   return { w, l };
 }
 
+/**
+ * The run a store is on: consecutive regular-season wins or losses, newest first.
+ * `null` before its first posted fight.
+ */
+export function fightStreak(data: PitData, storeId: string): { kind: "W" | "L"; n: number } | null {
+  const fights = data.bouts
+    .filter((b) => b.result && b.kind === "bout" && b.storeIds.includes(storeId))
+    .sort((a, b) => b.week - a.week || b.slot - a.slot);
+  let kind: "W" | "L" | null = null;
+  let n = 0;
+  for (const bout of fights) {
+    const won = bout.result!.winnerIds.includes(storeId);
+    const k = won ? "W" : "L";
+    if (kind && k !== kind) break;
+    kind = k;
+    n += 1;
+  }
+  return kind ? { kind, n } : null;
+}
+
 /** Standings tiebreak: actual NSNU dollars only. */
 export function nsnuOf(data: PitData, storeId: string, week: number): number {
   const card = data.storeCards.find((c) => c.storeId === storeId && c.week === week);
