@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { answerMatches, handleFundamentalsRequest } from "./fundamentals-gate.mjs";
-import { seal, open, entryAllowed, internalDestination } from "./entry-crypto.mjs";
+import { seal, open, entryAllowed, internalDestination, platformPath } from "./entry-crypto.mjs";
 import { buildEntryMiddleware } from "./build-entry-middleware.mjs";
 import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -166,4 +166,10 @@ test("generated Vercel middleware protects CDN files before filesystem lookup", 
     else process.env.PIT_CODE_VAULT_KEY = previous;
     await rm(dir, { recursive: true, force: true });
   }
+});
+test("only the reminder cron route skips the entrance; it checks its own secret", async () => {
+  assert.equal(platformPath("/api/cron/nudges"), true);
+  for (const path of ["/api/cron/nudges/x", "/api/cron/other", "/api/cron", "/desk"]) assert.equal(platformPath(path), false, path);
+  const blocked = await handleFundamentalsRequest(new Request("https://thewatermangames.live/api/cron/other"), { secret, now: 1000 });
+  assert.equal(blocked?.status, 401);
 });

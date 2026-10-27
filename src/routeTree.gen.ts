@@ -18,6 +18,7 @@ import { Route as FaqRouteImport } from './routes/faq'
 import { Route as GazetteRouteImport } from './routes/gazette'
 import { Route as HonorsRouteImport } from './routes/honors'
 import { Route as MapRouteImport } from './routes/map'
+import { Route as PlaygroundRouteImport } from './routes/playground'
 import { Route as PreviewRouteImport } from './routes/preview'
 import { Route as RulesRouteImport } from './routes/rules'
 import { Route as WatchRouteImport } from './routes/watch'
@@ -27,6 +28,7 @@ import { Route as GarageStoreIdRouteImport } from './routes/garage.$storeId'
 import { Route as RecapStoreIdRouteImport } from './routes/recap.$storeId'
 import { Route as ShopStoreIdRouteImport } from './routes/shop.$storeId'
 import { Route as StoresStoreIdRouteImport } from './routes/stores.$storeId'
+import { Route as ApiCronNudgesRouteImport } from './routes/api/cron/nudges'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -71,6 +73,11 @@ const HonorsRoute = HonorsRouteImport.update({
 const MapRoute = MapRouteImport.update({
   id: '/map',
   path: '/map',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlaygroundRoute = PlaygroundRouteImport.update({
+  id: '/playground',
+  path: '/playground',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewRoute = PreviewRouteImport.update({
@@ -118,6 +125,11 @@ const StoresStoreIdRoute = StoresStoreIdRouteImport.update({
   path: '/stores/$storeId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCronNudgesRoute = ApiCronNudgesRouteImport.update({
+  id: '/api/cron/nudges',
+  path: '/api/cron/nudges',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -129,6 +141,7 @@ export interface FileRoutesByFullPath {
   '/gazette': typeof GazetteRoute
   '/honors': typeof HonorsRoute
   '/map': typeof MapRoute
+  '/playground': typeof PlaygroundRoute
   '/preview': typeof PreviewRoute
   '/rules': typeof RulesRoute
   '/watch': typeof WatchRoute
@@ -138,6 +151,7 @@ export interface FileRoutesByFullPath {
   '/recap/$storeId': typeof RecapStoreIdRoute
   '/shop/$storeId': typeof ShopStoreIdRoute
   '/stores/$storeId': typeof StoresStoreIdRoute
+  '/api/cron/nudges': typeof ApiCronNudgesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -149,6 +163,7 @@ export interface FileRoutesByTo {
   '/gazette': typeof GazetteRoute
   '/honors': typeof HonorsRoute
   '/map': typeof MapRoute
+  '/playground': typeof PlaygroundRoute
   '/preview': typeof PreviewRoute
   '/rules': typeof RulesRoute
   '/watch': typeof WatchRoute
@@ -158,6 +173,7 @@ export interface FileRoutesByTo {
   '/recap/$storeId': typeof RecapStoreIdRoute
   '/shop/$storeId': typeof ShopStoreIdRoute
   '/stores/$storeId': typeof StoresStoreIdRoute
+  '/api/cron/nudges': typeof ApiCronNudgesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -170,6 +186,7 @@ export interface FileRoutesById {
   '/gazette': typeof GazetteRoute
   '/honors': typeof HonorsRoute
   '/map': typeof MapRoute
+  '/playground': typeof PlaygroundRoute
   '/preview': typeof PreviewRoute
   '/rules': typeof RulesRoute
   '/watch': typeof WatchRoute
@@ -179,6 +196,7 @@ export interface FileRoutesById {
   '/recap/$storeId': typeof RecapStoreIdRoute
   '/shop/$storeId': typeof ShopStoreIdRoute
   '/stores/$storeId': typeof StoresStoreIdRoute
+  '/api/cron/nudges': typeof ApiCronNudgesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -192,6 +210,7 @@ export interface FileRouteTypes {
     | '/gazette'
     | '/honors'
     | '/map'
+    | '/playground'
     | '/preview'
     | '/rules'
     | '/watch'
@@ -201,6 +220,7 @@ export interface FileRouteTypes {
     | '/recap/$storeId'
     | '/shop/$storeId'
     | '/stores/$storeId'
+    | '/api/cron/nudges'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -212,6 +232,7 @@ export interface FileRouteTypes {
     | '/gazette'
     | '/honors'
     | '/map'
+    | '/playground'
     | '/preview'
     | '/rules'
     | '/watch'
@@ -221,6 +242,7 @@ export interface FileRouteTypes {
     | '/recap/$storeId'
     | '/shop/$storeId'
     | '/stores/$storeId'
+    | '/api/cron/nudges'
   id:
     | '__root__'
     | '/'
@@ -232,6 +254,7 @@ export interface FileRouteTypes {
     | '/gazette'
     | '/honors'
     | '/map'
+    | '/playground'
     | '/preview'
     | '/rules'
     | '/watch'
@@ -241,6 +264,7 @@ export interface FileRouteTypes {
     | '/recap/$storeId'
     | '/shop/$storeId'
     | '/stores/$storeId'
+    | '/api/cron/nudges'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -253,6 +277,7 @@ export interface RootRouteChildren {
   GazetteRoute: typeof GazetteRoute
   HonorsRoute: typeof HonorsRoute
   MapRoute: typeof MapRoute
+  PlaygroundRoute: typeof PlaygroundRoute
   PreviewRoute: typeof PreviewRoute
   RulesRoute: typeof RulesRoute
   WatchRoute: typeof WatchRoute
@@ -262,6 +287,7 @@ export interface RootRouteChildren {
   RecapStoreIdRoute: typeof RecapStoreIdRoute
   ShopStoreIdRoute: typeof ShopStoreIdRoute
   StoresStoreIdRoute: typeof StoresStoreIdRoute
+  ApiCronNudgesRoute: typeof ApiCronNudgesRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -329,6 +355,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MapRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/playground': {
+      id: '/playground'
+      path: '/playground'
+      fullPath: '/playground'
+      preLoaderRoute: typeof PlaygroundRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/preview': {
       id: '/preview'
       path: '/preview'
@@ -392,6 +425,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StoresStoreIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/cron/nudges': {
+      id: '/api/cron/nudges'
+      path: '/api/cron/nudges'
+      fullPath: '/api/cron/nudges'
+      preLoaderRoute: typeof ApiCronNudgesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -405,6 +445,7 @@ const rootRouteChildren: RootRouteChildren = {
   GazetteRoute: GazetteRoute,
   HonorsRoute: HonorsRoute,
   MapRoute: MapRoute,
+  PlaygroundRoute: PlaygroundRoute,
   PreviewRoute: PreviewRoute,
   RulesRoute: RulesRoute,
   WatchRoute: WatchRoute,
@@ -414,6 +455,7 @@ const rootRouteChildren: RootRouteChildren = {
   RecapStoreIdRoute: RecapStoreIdRoute,
   ShopStoreIdRoute: ShopStoreIdRoute,
   StoresStoreIdRoute: StoresStoreIdRoute,
+  ApiCronNudgesRoute: ApiCronNudgesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

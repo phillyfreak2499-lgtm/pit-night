@@ -27,7 +27,7 @@ import {
   THANKSGIVING_FINALIST_REASON,
   THANKSGIVING_SHOW_CLOSED_REASON,
 } from "./thanksgiving";
-import { duelWear, fightDuel, preferFighter } from "./combat";
+import { duelWear, fightDuel, preferFighter, type DuelOpts } from "./combat";
 import { centralDay } from "./time";
 export { halloweenStrikeAdjust } from "./combat";
 import { BOLTS, TUNE_UP_BONUS } from "./training";
@@ -1063,10 +1063,10 @@ function combineSnaps(snaps: FighterSnap[], ids: string[]): FighterSnap {
   };
 }
 
-export function simulateDuel(data: PitData, idA: string, idB: string, seed: string): FightResult {
+export function simulateDuel(data: PitData, idA: string, idB: string, seed: string, duel: DuelOpts = {}): FightResult {
   const a = snapshot(data, idA);
   const b = snapshot(data, idB);
-  const fought = fightDuel(a, b, { hot: data.week === 3 });
+  const fought = fightDuel(a, b, { hot: data.week === 3, ...duel });
   const hp = fought.hp;
   const exchanges = fought.exchanges;
   const method = fought.method;
@@ -1789,6 +1789,41 @@ export function randomHouseTape(seed: number): Bout {
   });
   const bout = makeBout(1, 1, "bout", "House drill", [ids[0]], [ids[1]]);
   const result = simulateDuel(world, ids[0], ids[1], `house|random|${seed}`);
+  result.wear = {};
+  bout.result = result;
+  return bout;
+}
+
+/** One side of a Playground fight: any class, any parts, any looks. Nothing here touches a store. */
+export type PlaygroundBuild = {
+  name: string;
+  classId: ClassId;
+  loadout: Loadout;
+  style: BotStyle;
+  paint: string;
+  look: Bot["look"];
+  number: string;
+  /** The week of colors behind the bot, which sets its rating. */
+  week: Grade;
+};
+
+/** Every part is allowed in the Playground, championship and holiday iron included. */
+export function playgroundTape(builds: [PlaygroundBuild, PlaygroundBuild], rounds: number | "ko", seed: string): Bout {
+  const world = houseWorld();
+  const ids = ["ai-striker", "ai-tank"] as const;
+  ids.forEach((id, i) => {
+    const b = builds[i]!;
+    world.stores = world.stores.map((s) => (s.id === id ? { ...s, paint: b.paint, name: i === 0 ? "Left corner" : "Right corner" } : s));
+    world.bots = world.bots.map((bot) =>
+      bot.storeId === id
+        ? { ...bot, name: b.name.trim().slice(0, 18) || (i === 0 ? "LEFTY" : "RIGHTY"), classId: b.classId, equipped: { ...b.loadout }, draft: { ...b.loadout }, locked: { ...b.loadout }, style: b.style, look: b.look, number: b.number.slice(0, 3) }
+        : bot,
+    );
+    world.storeCards = world.storeCards.map((c) => (c.storeId === id ? { ...c, grades: Object.fromEntries(METRICS.map((m) => [m.stat, b.week])) } : c));
+  });
+  const bout = makeBout(1, 1, "bout", "Playground", [ids[0]], [ids[1]]);
+  const opts: DuelOpts = rounds === "ko" ? { overtime: true } : { rounds };
+  const result = simulateDuel(world, ids[0], ids[1], `playground|${seed}`, opts);
   result.wear = {};
   bout.result = result;
   return bout;

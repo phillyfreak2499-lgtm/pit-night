@@ -37,7 +37,8 @@ type Mem = {
   slow: Record<string, number>;
 };
 
-export type DuelOpts = { hot?: boolean; overtime?: boolean; pace?: number };
+/** `rounds` sets how many exchanges a fight may run (default 3; overtime fights go to 12). */
+export type DuelOpts = { hot?: boolean; overtime?: boolean; pace?: number; rounds?: number };
 
 export type DuelCore = {
   exchanges: Exchange[];
@@ -775,7 +776,7 @@ export function fightDuel(a: FighterSnap, b: FighterSnap, opts: DuelOpts = {}): 
   const mem = emptyMem(a, b);
   const exchanges: Exchange[] = [];
   let koAt = -1;
-  const limit = opts.overtime ? 12 : 3;
+  const limit = Math.max(1, Math.min(12, opts.rounds ?? (opts.overtime ? 12 : 3)));
   const bots = [a, b];
 
   for (let i = 0; i < limit && hp[a.id]! > 0 && hp[b.id]! > 0; i++) {
