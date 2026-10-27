@@ -7,6 +7,7 @@ import {
   Play,
   Radio,
   ScrollText,
+  ShoppingCart,
   Swords,
   Trophy,
   Tv,
@@ -76,13 +77,15 @@ export function PitShell({ children }: { children: React.ReactNode }) {
   const halloween = Boolean(now && halloweenVisuals(now));
   const thanksgiving = Boolean(now && thanksgivingVisuals(now));
   const election = Boolean(now && electionVisuals(now));
+  const myStore = usePit((s) => (s.session.role === "captain" || s.session.role === "crew" ? s.session.storeId : null));
   return (
     <div className={`min-h-screen text-fg ${halloween ? "halloween-site" : ""} ${thanksgiving ? "thanksgiving-site" : ""} ${election ? "election-site" : ""}`}>
       <div className="shell-grid md:grid md:grid-cols-[13.5rem_1fr]">
         <aside className="no-print hidden border-r border-line bg-deep md:sticky md:top-0 md:flex md:h-screen md:flex-col md:justify-between md:p-4">
           <div>
             <Brand />
-            <nav className="mt-8 flex flex-col gap-1">
+            <MyShopButton />
+            <nav className="mt-6 flex flex-col gap-1">
               {NAV.map((item) => (
                 <NavLink key={item.to} to={item.to} label={item.label} icon={item.icon} />
               ))}
@@ -151,12 +154,13 @@ export function PitShell({ children }: { children: React.ReactNode }) {
           ) : (
             <Boot />
           )}
-          <nav className="no-print fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-line bg-deep md:hidden">
+          <nav className={`no-print fixed inset-x-0 bottom-0 z-20 grid border-t border-line bg-deep md:hidden ${myStore ? "grid-cols-6" : "grid-cols-5"}`}>
             {NAV.filter((item) =>
               ["/", "/map", "/week", "/broadcast"].includes(item.to),
             ).map((item) => (
               <NavLink key={item.to} to={item.to} label={item.label} icon={item.icon} compact />
             ))}
+            {myStore ? <MyShopButton compact /> : null}
             <button type="button" aria-haspopup="dialog" aria-expanded={more} onClick={() => setMore(true)} className={`min-h-16 font-display text-xs uppercase ${!["/", "/map", "/week", "/broadcast"].includes(pathname) ? "text-amber" : "text-muted"}`}>☰<span className="block">More</span></button>
           </nav>
         </div>
@@ -250,6 +254,47 @@ function Brand({ compact = false }: { compact?: boolean }) {
           </p>
         </>
       )}
+    </Link>
+  );
+}
+
+/** The signed-in store's Shop, always one tap away, with the coins waiting in its jars. */
+function MyShopButton({ compact = false }: { compact?: boolean }) {
+  const storeId = usePit((s) => (s.session.role === "captain" || s.session.role === "crew" ? s.session.storeId : null));
+  const coins = usePit((s) => {
+    const bot = s.bots.find((b) => b.storeId === storeId);
+    return bot ? Object.values(bot.coins).reduce((sum, n) => sum + (n ?? 0), 0) : 0;
+  });
+  const path = useRouterState({ select: (s) => s.location.pathname });
+  if (!storeId) return null;
+  const here = path.startsWith("/shop/");
+  if (compact)
+    return (
+      <Link
+        to="/shop/$storeId"
+        params={{ storeId }}
+        data-testid="nav-shop"
+        className={`relative flex min-h-16 flex-col items-center justify-center gap-0.5 font-display text-[0.65rem] uppercase ${here ? "bg-amber text-deep" : "bg-amber/15 text-amber"}`}
+      >
+        <ShoppingCart className="size-4" aria-hidden />
+        Shop
+        {coins > 0 ? (
+          <span className="absolute top-1 right-1 min-w-5 rounded-full bg-amber px-1 text-center text-[0.6rem] leading-5 text-deep">{coins}</span>
+        ) : null}
+      </Link>
+    );
+  return (
+    <Link
+      to="/shop/$storeId"
+      params={{ storeId }}
+      data-testid="sidebar-shop"
+      className={`mt-6 flex min-h-12 items-center justify-between gap-2 px-3 font-display tracking-wide uppercase ${here ? "bg-amber text-deep" : "bg-amber text-deep hover:brightness-110"}`}
+    >
+      <span className="flex items-center gap-2">
+        <ShoppingCart className="size-4" aria-hidden />
+        My Shop
+      </span>
+      <span className="text-sm">{coins} coins</span>
     </Link>
   );
 }

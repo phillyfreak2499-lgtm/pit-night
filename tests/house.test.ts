@@ -53,3 +53,18 @@ test("fight streaks count consecutive wins or losses, newest first", async () =>
   const extra = { ...bout, id: "w2-extra", week: 2 };
   assert.deepEqual(fightStreak({ ...data, bouts: [...data.bouts, extra] }, w!), { kind: "W", n: 2 });
 });
+
+test("hits sound like the weapon that landed them", async () => {
+  const { hitVoice } = await import("../src/lib/pit/sound.ts");
+  assert.equal(hitVoice("saw"), "whine");
+  assert.equal(hitVoice("disc"), "whine");
+  assert.equal(hitVoice("hammer"), "clang");
+  assert.equal(hitVoice("axe"), "chop");
+  assert.equal(hitVoice("wedge"), "scrape");
+  assert.equal(hitVoice("claw"), "crunch");
+  assert.equal(hitVoice("flame"), "whoosh");
+  assert.equal(hitVoice("tesla"), "zap");
+  assert.equal(hitVoice("flail"), "thud");
+  assert.equal(hitVoice("launcher"), "boom");
+  assert.equal(hitVoice("mystery"), "punch");
+});
