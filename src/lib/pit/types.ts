@@ -35,6 +35,12 @@ export const STICKER_ART = [
   "ivoted",
   "ballot",
   "capitol",
+  "dogtags",
+  "medal",
+  "yellowribbon",
+  "recycle",
+  "bottlecap",
+  "sprout",
   "roundel",
   "gear",
   "wrench",
@@ -51,7 +57,7 @@ export const STICKER_ART = [
 ] as const;
 export type StickerArt = (typeof STICKER_ART)[number];
 export type BotDecal = StickerArt | `${Exclude<StickerArt, "none">}-foil`;
-export const TOPPER_IDS = ["none", "antenna", "horns", "mohawk", "crown", "beacon", "dish", "flagpole", "pilgrimhat", "wreath", "tophat"] as const;
+export const TOPPER_IDS = ["none", "antenna", "horns", "mohawk", "crown", "beacon", "dish", "flagpole", "pilgrimhat", "wreath", "tophat", "bugle", "tincan"] as const;
 export type BotTopper = (typeof TOPPER_IDS)[number];
 export type BotMask = "none" | "lantern" | "hockey";
 /** Cosmetic blade only. Premium Halloween weapons are real parts, not skins. */

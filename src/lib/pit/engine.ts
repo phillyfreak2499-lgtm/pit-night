@@ -782,6 +782,8 @@ const FAMILY_WORD: Record<string, string> = {
   broom: "a witch's broom",
   pumpkin: "a pumpkin chassis",
   ghostchaser: "a ghost chaser",
+  rivetgun: "a rivet gun",
+  crusher: "a can crusher",
   drum: "a drum",
   wedge: "a wedge",
   hammer: "a hammer",
@@ -873,6 +875,8 @@ function weaponTell(classId: ClassId, family: string): string | null {
   if (family === "broom") return "Witch's Broom. A staff when Heat is up, a broom until then.";
   if (family === "ghostchaser") return "Ghost Chaser. It closes on a slower bot and gives up plate.";
   if (family === "pumpkin") return "Pumpkin Chassis. A round shell that shrugs the first bite and swings softer.";
+  if (family === "rivetgun") return "Rivet Gun. Three quick rivets a shot: light, fast, hard to step away from.";
+  if (family === "crusher") return "Can Crusher. A straight-down press that flattens whatever sits under it.";
   return null;
 }
 

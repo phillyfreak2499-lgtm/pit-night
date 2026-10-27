@@ -4,6 +4,8 @@ import { KEY_SOURCE, PARTS, SLOT_LABEL, partById, tierWord, type Part } from "@/
 import { SHOW_EFFECTS } from "@/lib/pit/halloween";
 import { THANKSGIVING_SHOW_EFFECTS, isThanksgivingPart } from "@/lib/pit/thanksgiving";
 import { isElectionPart } from "@/lib/pit/election";
+import { isVeteransPart } from "@/lib/pit/veterans";
+import { isRecyclesPart } from "@/lib/pit/recycles";
 import { SELL_BACK, buyCheck, canSeeLoadout, sellCheck, shopOpen, showCheck } from "@/lib/pit/engine";
 import { usePit } from "@/lib/pit/store";
 import type { Slot } from "@/lib/pit/types";
@@ -123,6 +125,8 @@ export function ShopPage({ storeId }: { storeId: string }) {
                     {part.window ? <li className="border border-line px-2 py-1 text-muted">{windowLabel(part.window)}</li> : null}
                     {isElectionPart(part.id) ? <li className="border border-amber/60 px-2 py-1 text-amber">Election Week</li> : null}
                     {isThanksgivingPart(part.id) ? <li className="border border-amber/60 px-2 py-1 text-amber">Championship Week</li> : null}
+                    {isVeteransPart(part.id) ? <li className="border border-amber/60 px-2 py-1 text-amber">Veterans Day week</li> : null}
+                    {isRecyclesPart(part.id) ? <li className="border border-amber/60 px-2 py-1 text-amber">America Recycles Day week</li> : null}
                     {part.battery ? <li className="border border-line px-2 py-1 text-muted">Battery {part.battery}</li> : null}
                   </ul>
                   <p className={`mt-2 text-sm ${owned ? "text-ok" : check.ok ? "text-amber" : "text-muted"}`}>

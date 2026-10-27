@@ -96,3 +96,29 @@ test("Playground fights any two builds, respects the rounds, and allows every pa
   assert.equal(ko.fighters[1]!.weaponName, axe.name);
   assert.deepEqual(ko.wear, {}, "Playground fights never damage anything");
 });
+
+test("each week has its arena, and hazard hits are recorded per bot with arena names", async () => {
+  const { arenaForWeek, hazardCallout } = await import("../src/components/pit/arena-scenes.ts");
+  assert.deepEqual([1, 2, 3, 4, 5].map(arenaForWeek), ["pit", "ring", "warehouse", "junkyard", "grand"]);
+  assert.deepEqual(hazardCallout("ring", "water", 0), { text: "OIL SLICK: SLOWED", hit: true });
+  assert.deepEqual(hazardCallout("junkyard", "pit", 7), { text: "THE CRUSHER -7", hit: true });
+  assert.equal(hazardCallout("grand", "hover", 0)!.hit, false, "a dodge is not a hit");
+
+  // A Hunter brain charges into the saws; the mark names the bot that took it.
+  const { playgroundTape } = await import("../src/lib/pit/engine.ts");
+  const { stockPart, PARTS } = await import("../src/lib/pit/catalog.ts");
+  const hunter = PARTS.find((p) => p.slot === "brain" && p.family === "hunter")!;
+  const build = (brain: string) => ({
+    name: "B",
+    classId: "striker" as const,
+    loadout: { chassis: stockPart("chassis", "striker").id, drive: stockPart("drive", "striker").id, weapon: stockPart("weapon", "striker").id, armor: stockPart("armor", "striker").id, utility: null, brain },
+    style: { finish: "factory" as const, decal: "none" as const, trim: "steel", eye: "green", flag: false },
+    paint: "amber",
+    look: "plain" as const,
+    number: "1",
+    week: "blue" as const,
+  });
+  const r = playgroundTape([build(hunter.id), build(stockPart("brain", "striker").id)], 3, "h").result!;
+  const marks = r.exchanges.flatMap((e) => e.tags.filter((t) => t.startsWith("haz:")));
+  assert.ok(marks.some((m) => m.startsWith(`haz:${r.fighters[0]!.id}:saw:`)), `hunter hit a saw: ${marks.join(", ")}`);
+});

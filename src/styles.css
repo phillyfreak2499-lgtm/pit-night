@@ -655,6 +655,45 @@
   }
 }
 
+/* Veterans Day week: flag navy with a gold rule and a thin red-white-blue stripe. */
+.veterans-site {
+  background-image:
+    radial-gradient(ellipse at top, color-mix(in oklab, #24325c 22%, transparent), transparent 46%),
+    linear-gradient(to bottom, #0f121b, var(--color-bg) 32%);
+}
+.veterans-banner {
+  border-bottom: 3px solid transparent;
+  border-image: linear-gradient(90deg, #b22234 0 33%, #f4f1ea 33% 66%, #24325c 66%) 1;
+  background: #141a2b;
+  color: #f4f1ea;
+  padding: 0.75rem 1rem;
+}
+.veterans-banner p:first-child {
+  color: #e3b341;
+}
+
+/* America Recycles Day week: kraft and recycling green. */
+.recycles-site {
+  background-image:
+    radial-gradient(ellipse at top, color-mix(in oklab, #2f9e57 14%, transparent), transparent 46%),
+    linear-gradient(to bottom, #0e140f, var(--color-bg) 32%);
+}
+.recycles-banner {
+  border-bottom: 1px solid #2f9e57;
+  background: repeating-linear-gradient(135deg, #131a14 0 1.25rem, #172018 1.25rem 2.5rem);
+  color: #e8efe6;
+  padding: 0.75rem 1rem;
+}
+.recycles-banner p:first-child {
+  color: #7ccf6a;
+}
+@media (prefers-reduced-motion: reduce) {
+  .veterans-site,
+  .recycles-site {
+    background-image: linear-gradient(to bottom, #111412, var(--color-bg) 32%);
+  }
+}
+
 /* Election Week: civic gold, parchment and laurel. Deliberately no party red or blue. */
 .election-site {
   background-image:

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { PAINT } from "@/lib/pit/catalog";
 import type { FightResult } from "@/lib/pit/types";
 import { Fx, drawSide, impactPoints, stepBots } from "./cage-draw";
+import type { ArenaId } from "./arena-scenes";
 import {
   beatAt,
   buildBeats,
@@ -21,9 +22,12 @@ export function ArenaHero({
   result,
   className = "",
   onLap,
+  arena = "pit",
 }: {
   result: FightResult | null;
   className?: string;
+  /** Which weekly arena to draw. */
+  arena?: ArenaId;
   /** Called each time the tape finishes a loop, so the page can swap in another fight. */
   onLap?: () => void;
 }) {
@@ -146,6 +150,7 @@ export function ArenaHero({
         hype: drive.impact ? 1 : 0.35,
         reduced,
         shake,
+        arena,
       });
       raf = requestAnimationFrame(frame);
     };
@@ -155,7 +160,7 @@ export function ArenaHero({
       ro.disconnect();
       io.disconnect();
     };
-  }, [result]);
+  }, [result, arena]);
 
   if (!result) return null;
   return <canvas ref={ref} aria-hidden className={`block ${className}`} />;

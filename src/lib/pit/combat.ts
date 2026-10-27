@@ -149,6 +149,15 @@ function brainHazard(kit: Kit) {
   return 0.7;
 }
 
+/**
+ * Per-bot hazard marks for the broadcast: `haz:<botId>:<kind>:<damage>`. Labels only;
+ * they record what hazardOf already decided and never feed back into the math.
+ */
+function hazardMarks(botId: string, haz: { damage: number; tags: string[] }) {
+  const kind = ["jet", "saw", "pit", "water", "swerve", "hover", "air"].find((k) => haz.tags.includes(k));
+  return kind ? [`haz:${botId}:${kind}:${Math.round(haz.damage)}`] : [];
+}
+
 function hazardOf(kit: Kit, which: ReturnType<typeof lane>, foe: Kit, index: number) {
   let damage = 0;
   let slow = 1;
@@ -820,7 +829,7 @@ export function fightDuel(a: FighterSnap, b: FighterSnap, opts: DuelOpts = {}): 
         attackerHp: hp[live.id]!,
         defenderHp: 0,
         call: `${dead.botName} takes the arena. ${hazA.tags.concat(hazB.tags).includes("saw") ? "The saw" : "The hazard"} ends the exchange.`,
-        tags: ["hazard", ...hazA.tags, ...hazB.tags, `hazard:${a.id}`, `hazard:${b.id}`],
+        tags: ["hazard", ...hazA.tags, ...hazB.tags, `hazard:${a.id}`, `hazard:${b.id}`, ...hazardMarks(a.id, hazA), ...hazardMarks(b.id, hazB)],
       });
       break;
     }
@@ -867,7 +876,7 @@ export function fightDuel(a: FighterSnap, b: FighterSnap, opts: DuelOpts = {}): 
     const attacker = featureA ? a : b;
     const defender = featureA ? b : a;
     const blow = featureA ? blowA : blowB;
-    const hazTags = [...hazA.tags, ...hazB.tags];
+    const hazTags = [...hazA.tags, ...hazB.tags, ...hazardMarks(a.id, hazA), ...hazardMarks(b.id, hazB)];
     const tags = [...blow.tags, ...hazTags, ...(opts.overtime && i >= 3 ? ["overtime"] : [])];
     if (hazA.damage || hazB.damage) tags.push("hazard");
     exchanges.push({

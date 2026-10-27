@@ -10,7 +10,7 @@ export const TIER_STYLE: Record<Part["tier"], { badge: string; tint: string; lab
 };
 
 type Shape =
-  | "saw" | "drum" | "disc" | "hammer" | "wedge" | "claw" | "flail" | "lance" | "flame" | "tesla" | "blade" | "launcher"
+  | "saw" | "drum" | "disc" | "hammer" | "wedge" | "claw" | "flail" | "lance" | "flame" | "tesla" | "blade" | "launcher" | "rivet" | "press"
   | "wheel" | "tread" | "caster" | "hover" | "rocket" | "anchor"
   | "shield" | "spike" | "cage" | "field"
   | "chassis" | "gadget" | "chip";
@@ -30,6 +30,8 @@ function shapeOf(part: Part): Shape {
     if (f === "flame") return "flame";
     if (f === "tesla") return "tesla";
     if (["launcher", "yamcannon"].includes(f)) return "launcher";
+    if (f === "rivetgun") return "rivet";
+    if (f === "crusher") return "press";
     return "blade";
   }
   if (part.slot === "drive") {
@@ -113,6 +115,26 @@ function Drawing({ shape }: { shape: Shape }) {
         <g>
           <rect x="8" y="34" width="40" height="12" rx="3" transform="rotate(-25 28 40)" />
           <circle cx="50" cy="16" r="7" />
+        </g>
+      );
+    case "rivet":
+      return (
+        <g>
+          <rect x="6" y="24" width="30" height="16" rx="4" />
+          <rect x="36" y="28" width="10" height="8" />
+          <circle cx="22" cy="18" r="6" />
+          <path d="M50 29 h6 a3 3 0 0 1 0 6 h-6 Z M58 29 h3 v6 h-3 Z" />
+        </g>
+      );
+    case "press":
+      return (
+        <g>
+          <rect x="10" y="8" width="44" height="6" rx="1" />
+          <rect x="10" y="8" width="5" height="48" />
+          <rect x="49" y="8" width="5" height="48" />
+          <rect x="30" y="14" width="4" height="12" />
+          <rect x="18" y="26" width="28" height="6" />
+          <path d="M22 56 L22 46 L42 44 L42 56 Z" />
         </g>
       );
     case "blade":

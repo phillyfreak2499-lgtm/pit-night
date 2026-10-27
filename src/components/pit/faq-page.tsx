@@ -105,6 +105,10 @@ export const GROUPS: Group[] = [
         "Yes. While the shop is open, the captain can sell any part the store bought for 2 coins, whatever it cost. The coins go back into that part's jar, so you can stack them toward a better part. If the part was on the bot, that slot drops to stock. Stock and championship parts can't be sold, and a sold part costs full price to buy again.",
       ),
       faq(
+        "Do the arena hazards do anything?",
+        "Yes, every week. Saw-type hazards bite a bot that charges in (up to 8 damage), pit-type hazards cost 7 and slow it, and water-type hazards slow it. Each arena gives them its own name, like the oil slick at the Ring or the crusher in the Junkyard. Swerve drives dodge saws, Hover and Air Cushion pass over pits, Air Cushion skates through water, and careful brains like Logic and Sniper stay clear. Watch for the orange callouts during a fight.",
+      ),
+      faq(
         "When is the shop open?",
         "From the moment the desk pays Week 1 coins until Saturday lock. It shuts while the bots are locked and fighting, and reopens after the Monday damage report.",
       ),
