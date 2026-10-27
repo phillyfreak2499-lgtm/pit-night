@@ -32,6 +32,24 @@ numbers, lighting/show effects, walkouts, victory effects, banners, and other
 Bolt Locker presentation rewards do not change combat. The actual chassis/weapon
 part is separate from its visual body/skin.
 
+The weekly arena scenes and holiday dressing are presentation. Their saw, pit,
+and water hazards use the same backend rules under different visual names;
+Week 3 still adds the existing flame-jet hazard. New Veterans Day and America
+Recycles Day decals and toppers remain cosmetic.
+
+The latest seasonal catalog adds two real Super weapons, each costing eight
+weapon coins. The Rivet Gun's catalog nudges are +2 Power, +3 Speed, and -1 Heat;
+the Can Crusher's are +4 Power, -1 Speed, +2 Armor, and -1 Heat. These enter the
+same printed-stat and combat snapshot path as every other weapon. Their purchase
+windows are November 8–14 and November 15–21 respectively; already owned weapons
+remain usable after the shop window closes.
+
+The Rivet Gun resolves three light projectile hits as one recorded burst, gains
+reach against distant opponents, and is countered by magnetic armor. Its chip
+hits do not trigger Reactive Armor as a single heavy blow. The Can Crusher
+alternates a heavy press and a weaker recovery exchange; Gel Pads absorb its
+impact and magnetic armor deflects its metal weapon.
+
 ## What is stored
 
 `mutateSeason` validates the command, authorizes the server session, loads the
@@ -45,9 +63,11 @@ capacity and affinity. Disabled parts record the effective stock loaner ID.
 
 New `Exchange.combat[fighterId]` records both participants independently:
 
-- `before` and `after`: HP, battery, effective heat, pending burn, stun multiplier,
+- `before` and `after`: HP, battery, effective heat, pending burn, stun and terrain movement multipliers,
   and whether Phoenix has been used.
 - `damageDealt`: direct attack damage, before the target's remaining-HP cap.
+- `hitCount`: the number of weapon hits, including the Rivet Gun's three-projectile
+  burst; hazard-only turns record zero.
 - `reflectedDamageTaken`: damage returned by armor/utility counters, separated
   from the opponent's direct weapon damage.
 - `hazardDamage`, `burnDamage`, `healing`, and `revived`.
@@ -66,12 +86,15 @@ out melee fighters.
 
 ## Audit and regression checks
 
-`npm run test:combat` covers all 231 catalog parts: 41 stock choices and 190
+`npm run test:combat` covers all 233 catalog parts: 41 stock choices and 192
 purchasable/title parts, including adjacent tiers on builds at the fit cap.
 Comparisons use numerical HP/damage outcomes, not item names, commentary, tags,
 or the tier tiebreak. Targeted regressions cover armor repair direction, utility
 tier scaling, worn defensive effects, seasonal timing, Flip Kit finishes,
 multi-bot equipment, part-specific wear, and persisted battle traces.
+The newest seasonal regressions isolate the Rivet Gun's burst, range and armor
+counters and the Can Crusher's press/recovery timing and impact counter while
+holding the fighters' printed stats constant.
 
 The persistence test performs purchase, lock and card-resolution actions and
 round-trips the saved document through a disposable Postgres-compatible PGlite

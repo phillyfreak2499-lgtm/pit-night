@@ -5,6 +5,7 @@ import {
   EYES,
   FINISHES,
   PAINT,
+  PARTS,
   TOPPERS,
   TRIM,
   batteryOf,
@@ -512,8 +513,8 @@ function synergy(
   const fam = weapon?.family;
   const claw = fam === "claw" || fam === "bones";
   const speedWep =
-    fam === "saw" || fam === "drum" || fam === "disc" || fam === "flail" || fam === "chainsaw" || fam === "slasher";
-  const smash = fam === "hammer" || fam === "wedge" || fam === "piston";
+    fam === "saw" || fam === "drum" || fam === "disc" || fam === "flail" || fam === "chainsaw" || fam === "slasher" || fam === "rivetgun";
+  const smash = fam === "hammer" || fam === "wedge" || fam === "piston" || fam === "crusher";
   if (classId === "striker" && speedWep)
     s += fam === "disc" ? 0.16 : fam === "flail" || fam === "chainsaw" ? 0.1 : 0.14;
   if (classId === "striker" && smash) s -= 0.16;
@@ -787,6 +788,8 @@ const FAMILY_WORD: Record<string, string> = {
   broom: "a witch's broom",
   pumpkin: "a pumpkin chassis",
   ghostchaser: "a ghost chaser",
+  rivetgun: "a rivet gun",
+  crusher: "a can crusher",
   drum: "a drum",
   wedge: "a wedge",
   hammer: "a hammer",
@@ -861,8 +864,10 @@ function weaponTell(classId: ClassId, family: string): string | null {
     family === "drum" ||
     family === "disc" ||
     family === "flail" ||
-    family === "chainsaw";
-  const smash = family === "hammer" || family === "wedge" || family === "piston";
+    family === "chainsaw" ||
+    family === "slasher" ||
+    family === "rivetgun";
+  const smash = family === "hammer" || family === "wedge" || family === "piston" || family === "crusher";
   if (classId === "tank" && family === "disc") return "A disc on a tank is a ceiling fan.";
   if (classId === "tank" && speed) return "A speed weapon on a tank. They are fighting the chassis.";
   if (classId === "tank" && (family === "claw" || family === "bones")) return "A claw on a tank. That is not the late fight.";
@@ -878,27 +883,14 @@ function weaponTell(classId: ClassId, family: string): string | null {
   if (family === "broom") return "Witch's Broom. A staff when Heat is up, a broom until then.";
   if (family === "ghostchaser") return "Ghost Chaser. It closes on a slower bot and gives up plate.";
   if (family === "pumpkin") return "Pumpkin Chassis. A round shell that shrugs the first bite and swings softer.";
+  if (family === "rivetgun") return "Rivet Gun. Three quick rivets a shot: light, fast, hard to step away from.";
+  if (family === "crusher") return "Can Crusher. A straight-down press that flattens whatever sits under it.";
   return null;
 }
 
 export const WEAPON_FAMILIES = [
-  "saw",
-  "drum",
-  "wedge",
-  "hammer",
-  "claw",
-  "disc",
-  "flail",
-  "piston",
-  "flame",
-  "tesla",
-  "chainsaw",
-  "slasher",
-  "ghost",
-  "launcher",
-  "bones",
-  "broom",
-] as const;
+  ...new Set(PARTS.filter((part) => part.slot === "weapon").map((part) => part.family)),
+];
 
 export function weaponFamilyOf(bot: Bot): string {
   const load = bot.locked ?? bot.draft;

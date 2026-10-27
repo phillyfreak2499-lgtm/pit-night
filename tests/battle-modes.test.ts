@@ -1,13 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createStore } from "zustand/vanilla";
 import { makeData } from "../src/lib/pit/seed.ts";
+import { pitCreator } from "../src/lib/pit/store.ts";
 import {
+  buildFit,
+  foesThisWeek,
   printedStats,
   resolvePart,
   simulateDuel,
   simulateMelee,
   simulateTag,
 } from "../src/lib/pit/engine.ts";
+import { PARTS } from "../src/lib/pit/catalog.ts";
 import { fightDuel } from "../src/lib/pit/combat.ts";
 import type { Loadout, PitData } from "../src/lib/pit/types.ts";
 
@@ -185,4 +190,87 @@ test("championship sudden death and finishers retain the final state and damage"
   assert.equal(last.combat[last.defenderId]!.after.hp, 0);
   assert.equal(last.combat[last.attackerId]!.damageDealt, last.damage);
   assert.equal(result.hp[last.defenderId], 0);
+});
+
+test("duel, tag and melee hazards identify the affected bot and survive a replay save", () => {
+  const data = world();
+  data.week = 3;
+  data.storeCards = data.storeCards.map((card) => ({ ...card, week: 3 }));
+  for (const id of IDS) equip(data, id, { brain: "brain-berserker-sport", drive: "drive-rocket-super" });
+  const results = [
+    simulateDuel(data, IDS[0]!, IDS[1]!, "hazards"),
+    simulateTag(data, IDS.slice(0, 2), IDS.slice(2), "hazards"),
+    simulateMelee(data, IDS.slice(0, 3), "hazards"),
+  ];
+  for (const result of results) {
+    const replay: typeof result = JSON.parse(JSON.stringify(result));
+    const marks = replay.exchanges.flatMap((exchange) =>
+      exchange.tags.filter((tag) => tag.startsWith("haz:")).map((tag) => ({ tag, exchange })),
+    );
+    assert.ok(marks.length > 0);
+    assert.ok(marks.some(({ tag }) => tag.includes(":pit:")));
+    for (const { tag, exchange } of marks) {
+      const [, id, , rawDamage] = tag.split(":");
+      assert.ok(replay.fighters.some((fighter) => fighter.id === id));
+      assert.ok(exchange.combat?.[id!]);
+      if (Number(rawDamage) > 0) assert.ok(exchange.combat[id!]!.hazardDamage > 0);
+    }
+    for (const exchange of replay.exchanges) {
+      assert.ok(exchange.combat);
+      const left = exchange.combat[exchange.attackerId]!;
+      const right = exchange.combat[exchange.defenderId]!;
+      assert.equal(left.after.hp, Math.max(0, left.before.hp - left.hazardDamage - right.damageDealt));
+      assert.equal(right.after.hp, Math.max(0, right.before.hp - right.hazardDamage - left.damageDealt));
+    }
+  }
+});
+
+test("terrain speed changes are recorded for each fighter in duels and group battles", () => {
+  const data = world();
+  equip(data, IDS[0]!, { drive: "drive-air-super", brain: "brain-sniper-pro" });
+  for (const result of [
+    simulateDuel(data, IDS[0]!, IDS[1]!, "terrain"),
+    simulateTag(data, IDS.slice(0, 2), IDS.slice(2), "terrain"),
+    simulateMelee(data, IDS.slice(0, 3), "terrain"),
+  ]) {
+    const trace = result.exchanges.find((exchange) => exchange.combat?.[IDS[0]!])!.combat![IDS[0]!]!;
+    assert.equal(trace.before.slow, 1);
+    assert.ok(trace.after.slow > 1, "Air Cushion gets its actual water-lane speed boost");
+    assert.ok(result.exchanges.some((exchange) => exchange.tags.some((tag) => tag.startsWith(`haz:${IDS[0]}:air:`))));
+  }
+});
+
+test("new speed and smash weapons obey the same class-fit rules as their established peers", () => {
+  const data = world();
+  const bot = data.bots.find((row) => row.storeId === IDS[0])!;
+  for (const classId of ["striker", "tank", "specialist"] as const) {
+    bot.classId = classId;
+    for (const [weapon, peer] of [
+      ["weapon-rivetgun-super", "weapon-saw-super"],
+      ["weapon-crusher-super", "weapon-hammer-super"],
+    ]) {
+      assert.equal(
+        buildFit(bot, { ...STOCK, weapon }),
+        buildFit(bot, { ...STOCK, weapon: peer }),
+        `${weapon} follows ${peer}'s ${classId} class fit`,
+      );
+    }
+  }
+});
+
+test("scouting accepts every weapon family in the current catalog", () => {
+  const weapons = [...new Map(PARTS.filter((part) => part.slot === "weapon").map((part) => [part.family, part])).values()];
+  for (const weapon of weapons) {
+    const data = world();
+    const targetId = foesThisWeek(data, IDS[0]!)[0]!;
+    assert.ok(targetId);
+    equip(data, IDS[0]!, { utility: "utility-scry-super" });
+    equip(data, targetId, { weapon: weapon.id });
+    const store = createStore(pitCreator);
+    store.setState({ ...data, session: { role: "captain", storeId: IDS[0]!, crewId: null } });
+    store.getState().callSpy(IDS[0]!, targetId, weapon.family);
+    assert.equal(store.getState().intel[0]?.guess, weapon.family);
+    store.getState().pullSpy(IDS[0]!, targetId);
+    assert.ok(store.getState().intel[0]!.lines.some((line) => line.includes(weapon.name)), weapon.name);
+  }
 });

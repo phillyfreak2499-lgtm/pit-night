@@ -16,10 +16,10 @@
     "preview:stop": "node scripts/preview.mjs stop",
     "typecheck": "tsc --noEmit",
     "check:auth": "node scripts/check-auth-invariant.mjs",
-    "test": "node --test \"scripts/**/*.test.mjs\" && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts && node --experimental-strip-types --import ./scripts/register-pit-loader.mjs --test tests/pit.test.ts tests/claude.test.ts tests/sell.test.ts tests/house.test.ts tests/election.test.ts tests/halloween.test.ts tests/thanksgiving.test.ts tests/combat.test.ts tests/showpiece.test.ts tests/gazette-ai.test.ts tests/combat-effects.test.ts tests/gameplay-effects.test.ts tests/battle-modes.test.ts tests/battle-persistence.test.ts tests/battle-repairs.test.ts tests/group-replay.test.ts tests/nudge.test.ts",
+    "test": "node --test \"scripts/**/*.test.mjs\" && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts && node --experimental-strip-types --import ./scripts/register-pit-loader.mjs --test tests/pit.test.ts tests/claude.test.ts tests/sell.test.ts tests/house.test.ts tests/election.test.ts tests/halloween.test.ts tests/thanksgiving.test.ts tests/combat.test.ts tests/showpiece.test.ts tests/gazette-ai.test.ts tests/combat-effects.test.ts tests/gameplay-effects.test.ts tests/battle-modes.test.ts tests/battle-persistence.test.ts tests/battle-repairs.test.ts tests/group-replay.test.ts tests/new-items-effects.test.ts tests/nudge.test.ts tests/fall-weeks.test.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test:combat": "node --experimental-strip-types --import ./scripts/register-pit-loader.mjs --test tests/combat.test.ts tests/combat-effects.test.ts tests/gameplay-effects.test.ts tests/battle-modes.test.ts tests/battle-persistence.test.ts tests/battle-repairs.test.ts tests/group-replay.test.ts"
+    "test:combat": "node --experimental-strip-types --import ./scripts/register-pit-loader.mjs --test tests/combat.test.ts tests/combat-effects.test.ts tests/gameplay-effects.test.ts tests/battle-modes.test.ts tests/battle-persistence.test.ts tests/battle-repairs.test.ts tests/group-replay.test.ts tests/new-items-effects.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.1.0",

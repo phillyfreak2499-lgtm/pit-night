@@ -107,6 +107,8 @@ const THREATS: Array<{ classId: ClassId; patch: Partial<Loadout> }> = [
     classId: "specialist",
     patch: { weapon: "weapon-flame-super", utility: "utility-blackout-pro" },
   },
+  { classId: "striker", patch: { weapon: "weapon-rivetgun-super", brain: "brain-sniper-pro" } },
+  { classId: "tank", patch: { weapon: "weapon-crusher-super", drive: "drive-anchor-super" } },
 ];
 
 function changedCombat(part: Part, prior: Part, saturated: boolean): boolean {
@@ -155,6 +157,7 @@ test("every catalog part survives the backend battle snapshot with real numeric 
     equip(data, B, "tank", loadout("tank"));
     const result = simulateDuel(data, A, B, "catalog-snapshot");
     const snap = result.fighters.find((row) => row.id === A)!;
+    assert.equal(snap.parts?.[part.slot], part.id, part.id);
     assert.equal(snap[`${part.slot}Family` as keyof FighterSnap], part.family, part.id);
     assert.equal(snap.tiers?.[part.slot], part.tier, part.id);
     assert.equal(snap.wearMult?.[part.slot], 1, part.id);

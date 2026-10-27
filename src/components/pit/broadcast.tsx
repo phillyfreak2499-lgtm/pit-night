@@ -2,11 +2,10 @@ import { createFrameLoop } from "@/lib/pit/frame-loop";
 import { useEffect, useRef, useState } from "react";
 import { PAINT } from "@/lib/pit/catalog";
 import { methodLabel } from "@/lib/pit/engine";
-import { halloweenVisuals } from "@/lib/pit/halloween";
-import { thanksgivingVisuals } from "@/lib/pit/thanksgiving";
 import { armSound, playBell, playClank, playCount, playDecision, playFinisher, playWeaponHit } from "@/lib/pit/sound";
 import type { Bout, Exchange, FightResult } from "@/lib/pit/types";
-import { Fx, drawSide, drawTop, impactPoints, stepBots } from "./cage-draw";
+import { Fx, drawSide, drawTop, impactPoints, project, stepBots } from "./cage-draw";
+import { arenaForWeek, arenaTheme, hazardCallout, type ArenaId } from "./arena-scenes";
 import { beatAt, buildBeats, fightDrive, lerp, type Beat, type Spot } from "./cage-motion";
 
 const ROUND_SHOW = 0.22;
@@ -21,6 +20,7 @@ export function Broadcast({
   chromeless = false,
   kicker,
   noDamage = false,
+  arena: arenaProp,
 }: {
   bout: Bout;
   playing?: boolean;
@@ -33,6 +33,8 @@ export function Broadcast({
   kicker?: string;
   /** Scrimmage tape. The decision line must not invent a damage quote. */
   noDamage?: boolean;
+  /** Override the week's arena (the Playground picks its own). */
+  arena?: ArenaId;
 }) {
   // Sync hands us fresh copies of the same bout; keep one object per tape so playback never restarts.
   const tapeKey = `${boutProp.id}|${boutProp.result?.seed ?? ""}|${boutProp.result ? "r" : ""}`;
@@ -98,6 +100,9 @@ export function Broadcast({
     let countSaid = -1;
     const mainEvent = bout.title === "Main event" || bout.kind === "final";
     const hazards = bout.week === 3 && bout.kind !== "bye";
+    const arena: ArenaId = arenaProp ?? arenaForWeek(bout.week);
+    // Hazard callouts fire once per round, over the bot that hit (or dodged) one.
+    let hazardSaid = "";
 
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 600 ? 1.5 : 2);
@@ -147,6 +152,22 @@ export function Broadcast({
         playCount(drive.countdown);
       }
       if (drive.countdown == null) countSaid = -1;
+      if (playing && (beat.kind === "clash" || beat.kind === "exchange") && local > 0.12 && hazardSaid !== `h-${beat.index}`) {
+        hazardSaid = `h-${beat.index}`;
+        let anyHit = false;
+        for (const mark of result.exchanges[beat.index]?.tags ?? []) {
+          if (!mark.startsWith("haz:")) continue;
+          const [, botId, kind, dmg] = mark.split(":");
+          const callout = hazardCallout(arena, kind ?? "", Number(dmg) || 0);
+          const bot = drive.bots.find((row) => row.bot.id === botId);
+          if (!callout || !bot) continue;
+          const at = project(bot.spot, canvas.width, canvas.height);
+          fx.popText(at.x, at.y - at.size * 0.55, callout.text, callout.hit ? "#ff9a3c" : "#9fe0b0", at.size * 0.16, 1.8);
+          if (callout.hit && !reduced) fx.burst(at.x, at.y, at.y, at.size, 0.3, "#8a7a64", "hazard", reduced);
+          anyHit ||= callout.hit;
+        }
+        if (anyHit) playClank();
+      }
       if (playing && drive.hitKey && local >= drive.hitAt && local < drive.hitAt + 0.2 && hitRef.current !== drive.hitKey) {
         hitRef.current = drive.hitKey;
         const at = impactPoints(drive, canvas.width, canvas.height, top.width, top.height);
@@ -202,10 +223,11 @@ export function Broadcast({
         combo: combo.n >= 2 && time - combo.at < 2.5 ? { n: combo.n, t: (time - combo.at) / 2.5, color: combo.color } : null,
         hazards,
         beams: heroSide ? (PAINT[heroSide.paint] ?? null) : beat.kind === "bumper" && mainEvent ? "#f0a202" : null,
-        festive: halloweenVisuals() || thanksgivingVisuals() || bout.week === 1,
+        festive: arenaTheme(arena) === "halloween" || arenaTheme(arena) === "thanksgiving",
         finish: hold > 0 ? Math.min(1, hold / 0.4) : 0,
+        arena,
       });
-      drawTop(topCtx, top.width, top.height, drive, fx, trails, time, dt, reduced);
+      drawTop(topCtx, top.width, top.height, drive, fx, trails, time, dt, reduced, arena);
       setCaption(captionFor(result, bout, beat, noDamage));
       // The bars follow the bots on screen; the replay shows where the fight ended.
       const bars = hpFor(result, beat, local);
@@ -233,7 +255,7 @@ export function Broadcast({
       document.removeEventListener("visibilitychange", visibility);
       observer.disconnect();
     };
-  }, [bout, playing, result, speed, noDamage, seek]);
+  }, [bout, playing, result, speed, noDamage, seek, arenaProp]);
 
 
   if (!result) return null;

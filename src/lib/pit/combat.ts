@@ -166,6 +166,15 @@ function brainHazard(kit: Kit) {
   return 0.7;
 }
 
+/**
+ * Per-bot hazard marks for the broadcast: `haz:<botId>:<kind>:<damage>`. Labels only;
+ * they record what hazardOf already decided and never feed back into the math.
+ */
+function hazardMarks(botId: string, haz: { damage: number; tags: string[] }) {
+  const kind = ["jet", "swerve", "saw", "pit", "water", "hover", "air"].find((k) => haz.tags.includes(k));
+  return kind ? [`haz:${botId}:${kind}:${Math.round(haz.damage)}`] : [];
+}
+
 function hazardOf(kit: Kit, which: ReturnType<typeof lane>, foe: Kit, index: number) {
   let damage = 0;
   let slow = 1;
@@ -287,6 +296,8 @@ function weaponMod(atk: Kit, foe: Kit, foeLane: ReturnType<typeof lane>, index: 
   if (fam === "carver") m *= index === 0 ? 1.16 : 0.94;
   if (fam === "yamcannon") m *= index === 0 ? 0.8 : index === 1 ? 1.15 : 1.08;
   if (fam === "axe") m *= index % 2 === 0 ? 1.15 : 0.88;
+  if (fam === "rivetgun") m *= far ? 1.08 : 1;
+  if (fam === "crusher") m *= index % 2 === 0 ? 1.16 : 0.84;
   if (fam === "wedge") m *= 1.02;
   if (fam === "claw") m *= 1.03;
   if (atk.weapon === "flail") {
@@ -316,12 +327,15 @@ function armorMod(atk: Kit, foe: Kit, index: number) {
     cut ||
     atk.weapon === "flail" ||
     atk.weapon === "tesla" ||
+    atk.weapon === "rivetgun" ||
+    atk.weapon === "crusher" ||
     atk.weapon === "piston" ||
     atk.weapon === "hammer";
   const impact =
     atk.weapon === "flail" ||
     atk.weapon === "hammer" ||
     atk.weapon === "piston" ||
+    atk.weapon === "crusher" ||
     atk.weapon === "wedge";
   if (foe.armor === "plate") m *= 0.97;
   if (foe.armor === "skirt" && (atk.weapon === "wedge" || atk.drive === "flip")) m *= 0.75;
@@ -425,6 +439,7 @@ function utilityIn(atk: Kit, foe: Kit) {
 
 type Swing = {
   damage: number;
+  hits: number;
   reflect: number;
   tags: string[];
   call: string;
@@ -556,7 +571,10 @@ function oneWay(
     );
     tags.push("spike");
   }
-  const chip = ak.weapon === "flame";
+  // A three-rivet burst is three light projectiles, not one reactive-armor
+  // trigger. Each projectile is rounded before the burst is totaled.
+  const hits = ak.weapon === "rivetgun" ? 3 : 1;
+  const chip = ak.weapon === "flame" || ak.weapon === "rivetgun";
   if (dk.armor === "reactive" && !chip && dmg >= 22) {
     reflect += Math.round((dk.armorTier === "super" ? 12 : 8) * (dk.wear.armor ?? 1));
     dmg *= 1 - (dk.armorTier === "super" ? 0.26 : 0.18) * (dk.wear.armor ?? 1);
@@ -571,6 +589,8 @@ function oneWay(
     tags.push("burn");
   }
   if (ak.weapon === "tesla") tags.push("stun");
+  if (ak.weapon === "rivetgun") tags.push("rivet-burst");
+  if (ak.weapon === "crusher") tags.push(index % 2 === 0 ? "crusher-press" : "crusher-recover");
   if (ak.utility === "leech") tags.push("leech");
   if ((mem.spike[atk.id] ?? 1) > 1) tags.push("phoenix-spike");
 
@@ -593,7 +613,8 @@ function oneWay(
     (ak.utility === "leech" ? 4 : 0) +
     (ak.armor === "cage" ? 1 : 0);
   return {
-    damage: Math.round(dmg),
+    damage: Math.round(dmg / hits) * hits,
+    hits,
     reflect,
     tags,
     call: callFor(atk, def, tags, index, stam),
@@ -623,6 +644,12 @@ function affinityOn(snap: FighterSnap, kit: Kit) {
 }
 
 function callFor(atk: FighterSnap, def: FighterSnap, tags: string[], index: number, stam: number) {
+  if (tags.includes("rivet-burst"))
+    return `${atk.botName} fires a three-rivet burst. ${def.botName} cannot simply back out of range.`;
+  if (tags.includes("crusher-press"))
+    return `${atk.botName} drops the Can Crusher's heavy press.`;
+  if (tags.includes("crusher-recover"))
+    return `${atk.botName} lifts the Can Crusher for its next press. This exchange lands lighter.`;
   if (tags.includes("carver-dodge"))
     return `${def.botName} outruns the Turkey Carver. ${atk.botName} catches only the edge.`;
   if (tags.includes("carver"))
@@ -846,6 +873,7 @@ function combatState(bot: FighterSnap, state: BattleState): CombatState {
     heat: bot.stats.heat + (state.mem.heat[bot.id] ?? 0),
     burn: state.mem.burn[bot.id] ?? 0,
     stun: state.mem.stun[bot.id] ?? 1,
+    slow: state.mem.slow[bot.id] ?? 1,
     phoenixUsed: state.mem.phoenix[bot.id] ?? false,
   };
 }
@@ -860,6 +888,7 @@ function startTrace(bots: FighterSnap[], state: BattleState): Record<string, Com
           before,
           after: before,
           damageDealt: 0,
+          hitCount: 0,
           reflectedDamageTaken: 0,
           hazardDamage: 0,
           burnDamage: 0,
@@ -961,7 +990,7 @@ function stepExchange(
       attackerHp: hp[live.id]!,
       defenderHp: 0,
       call: `${dead.botName} takes the arena. ${hazA.tags.concat(hazB.tags).includes("saw") ? "The saw" : "The hazard"} ends the exchange.`,
-      tags: ["hazard", ...hazA.tags, ...hazB.tags, `hazard:${a.id}`, `hazard:${b.id}`],
+      tags: ["hazard", ...hazA.tags, ...hazB.tags, `hazard:${a.id}`, `hazard:${b.id}`, ...hazardMarks(a.id, hazA), ...hazardMarks(b.id, hazB)],
       combat: finishTrace(),
     });
     return;
@@ -978,6 +1007,8 @@ function stepExchange(
   const directB = blowA.reflect > 0 ? Math.min(dmgB, Math.round(blowB.damage * pace * ot)) : dmgB;
   combat[a.id]!.damageDealt = directA;
   combat[b.id]!.damageDealt = directB;
+  combat[a.id]!.hitCount = blowA.hits;
+  combat[b.id]!.hitCount = blowB.hits;
   combat[a.id]!.reflectedDamageTaken = dmgB - directB;
   combat[b.id]!.reflectedDamageTaken = dmgA - directA;
   hp[b.id] = Math.max(0, hp[b.id]! - dmgA);
@@ -1017,7 +1048,7 @@ function stepExchange(
   const attacker = featureA ? a : b;
   const defender = featureA ? b : a;
   const blow = featureA ? blowA : blowB;
-  const hazTags = [...hazA.tags, ...hazB.tags];
+  const hazTags = [...hazA.tags, ...hazB.tags, ...hazardMarks(a.id, hazA), ...hazardMarks(b.id, hazB)];
   const tags = [...blow.tags, ...hazTags, ...(opts.overtime && i >= 3 ? ["overtime"] : [])];
   if (hazA.damage || hazB.damage) tags.push("hazard");
   exchanges.push({

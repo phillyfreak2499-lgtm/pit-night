@@ -31,6 +31,18 @@ function electionPicks(data: PitData, storeId: string) {
 function electionPerfectSparks(data: PitData, storeId: string) {
   return data.sparkLog.filter((e) => e.storeId === storeId && e.week === 2 && e.total > 0 && e.correct === e.total).length;
 }
+/** One week's approved jobs, Monday picks and perfect Sparks. Seasonal looks earned that week stay unlocked after it. */
+function jobsInWeek(week: number) {
+  return (data: PitData, storeId: string) =>
+    data.jobLog.filter((e) => e.storeId === storeId && e.week === week && e.status === "approved" && !e.jobId.endsWith("-crate")).length;
+}
+function picksInWeek(week: number) {
+  return (data: PitData, storeId: string) => data.picks.filter((p) => p.storeId === storeId && p.week === week).length;
+}
+function perfectSparksInWeek(week: number) {
+  return (data: PitData, storeId: string) =>
+    data.sparkLog.filter((e) => e.storeId === storeId && e.week === week && e.total > 0 && e.correct === e.total).length;
+}
 function crates(data: PitData, storeId: string) {
   return data.jobLog.filter((e) => e.storeId === storeId && e.status === "approved" && e.jobId.endsWith("-crate")).length;
 }
@@ -187,6 +199,14 @@ export const COSMETIC_REWARDS: CosmeticReward[] = [
   { id:"reward-ballot", kind:"decal", value:"ballot", label:"Ballot Box Sticker", requirement:"Approve 2 Pit Week 2 jobs (Election Week)", progress:p(electionJobs,2) },
   { id:"reward-capitol", kind:"decal", value:"capitol", label:"Capitol Dome Sticker", requirement:"Score a perfect Daily Spark in Election Week", progress:p(electionPerfectSparks,1) },
   { id:"reward-tophat", kind:"topper", value:"tophat", label:"Top Hat", requirement:"Approve 4 Pit Week 2 jobs (Election Week)", progress:p(electionJobs,4) },
+  { id:"reward-dogtags", kind:"decal", value:"dogtags", label:"Dog Tags", requirement:"Make a Monday pick on the Week 3 card (Veterans Day week)", progress:p(picksInWeek(3),1) },
+  { id:"reward-yellowribbon", kind:"decal", value:"yellowribbon", label:"Yellow Ribbon", requirement:"Approve 2 Pit Week 3 jobs (Veterans Day week)", progress:p(jobsInWeek(3),2) },
+  { id:"reward-medal", kind:"decal", value:"medal", label:"Service Medal", requirement:"Score a perfect Daily Spark in Veterans Day week", progress:p(perfectSparksInWeek(3),1) },
+  { id:"reward-bugle", kind:"topper", value:"bugle", label:"Bugle", requirement:"Approve 4 Pit Week 3 jobs (Veterans Day week)", progress:p(jobsInWeek(3),4) },
+  { id:"reward-recycle", kind:"decal", value:"recycle", label:"Recycling Arrows", requirement:"Make a Monday pick on the Week 4 card (America Recycles Day week)", progress:p(picksInWeek(4),1) },
+  { id:"reward-bottlecap", kind:"decal", value:"bottlecap", label:"Bottle Cap", requirement:"Approve 2 Pit Week 4 jobs (America Recycles Day week)", progress:p(jobsInWeek(4),2) },
+  { id:"reward-sprout", kind:"decal", value:"sprout", label:"Sprout", requirement:"Score a perfect Daily Spark in America Recycles Day week", progress:p(perfectSparksInWeek(4),1) },
+  { id:"reward-tincan", kind:"topper", value:"tincan", label:"Tin Can Hat", requirement:"Approve 4 Pit Week 4 jobs (America Recycles Day week)", progress:p(jobsInWeek(4),4) },
   { id:"reward-gear", kind:"decal", value:"gear", label:"Gear", requirement:"Post a green NSNU grade", progress:p(greenWeeks("nsnu"),1) },
   { id:"reward-wrench", kind:"decal", value:"wrench", label:"Wrench", requirement:"Survive a repair or an emergency weld", progress:p(serviceMarks,1) },
   { id:"reward-optics", kind:"decal", value:"optics", label:"Robot Eyes", requirement:"Hit 2 Monday picks", progress:p(correctPicks,2) },
@@ -219,6 +239,10 @@ export const HALLOWEEN_REWARD_IDS = ["reward-pumpkin", "reward-lantern-mask", "r
 export const THANKSGIVING_REWARD_IDS = ["reward-turkey", "reward-pilgrim-hat", "reward-wishbone", "reward-harvest-wreath"] as const;
 
 export const ELECTION_REWARD_IDS = ["reward-ivoted", "reward-ballot", "reward-capitol", "reward-tophat"] as const;
+
+export const VETERANS_REWARD_IDS = ["reward-dogtags", "reward-yellowribbon", "reward-medal", "reward-bugle"] as const;
+
+export const RECYCLES_REWARD_IDS = ["reward-recycle", "reward-bottlecap", "reward-sprout", "reward-tincan"] as const;
 
 const FREE: Record<CosmeticKind, Set<string>> = {
   finish:new Set(["factory"]),
