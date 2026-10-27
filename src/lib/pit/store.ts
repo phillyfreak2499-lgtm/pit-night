@@ -239,7 +239,26 @@ export function applyDueLock<T extends PitData>(data: T, now: Date): T | null {
 }
 
 function patchBot(bots: Bot[], storeId: string, fn: (bot: Bot) => Bot): Bot[] {
-  return bots.map((bot) => (bot.storeId === storeId ? fn(bot) : bot));
+  return bots.map((bot) => (bot.storeId === storeId ? fn(partWelds(bot)) : bot));
+}
+
+/** Bind old slot-based welds before any equipment change can move them. */
+function partWelds(bot: Bot): Bot {
+  if (!Object.values(bot.weldForWeek ?? {}).some((week) => week != null)) return bot;
+  const weldedParts = { ...bot.weldedParts };
+  for (const slot of SLOTS) {
+    const week = bot.weldForWeek[slot];
+    const id = bot.equipped[slot];
+    if (week != null && id && weldedParts[id] == null) weldedParts[id] = week;
+  }
+  return { ...bot, weldedParts, weldForWeek: {}, services: Math.max(bot.services ?? 0, 1) };
+}
+
+function clearPartWeld(bot: Bot, partId: string): Bot {
+  const normalized = partWelds(bot);
+  const weldedParts = { ...normalized.weldedParts };
+  delete weldedParts[partId];
+  return { ...normalized, weldedParts };
 }
 
 function syncWear(bot: Bot): Bot {
@@ -410,7 +429,7 @@ export function clientDoc(state: PitData, session: Session): SharedDoc {
   out.bots = out.bots.map(bot => {
     if (session.role !== "public" && session.storeId === bot.storeId) return bot;
     const stock = { chassis: stockPart("chassis", bot.classId).id, armor: stockPart("armor", bot.classId).id, drive: stockPart("drive", bot.classId).id, weapon: stockPart("weapon", bot.classId).id, utility: null, brain: stockPart("brain", bot.classId).id };
-    return { ...bot, draft: stock, equipped: stock, locked: bot.locked ? stock : null, owned: [], partWear: {}, weldForWeek: {}, coins: { chassis: 0, armor: 0, drive: 0, weapon: 0, utility: 0, brain: 0 }, voucher: 0, repairSpent: 0, shows: [] };
+    return { ...bot, draft: stock, equipped: stock, locked: bot.locked ? stock : null, owned: [], partWear: {}, weldForWeek: {}, weldedParts: {}, coins: { chassis: 0, armor: 0, drive: 0, weapon: 0, utility: 0, brain: 0 }, voucher: 0, repairSpent: 0, shows: [] };
   });
   return out;
 }
@@ -559,13 +578,13 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "Week 1 class is locked. You can change class after the first fight (3 chassis coins)." });
           return;
         }
-        let next = bot;
+        let next = partWelds(bot);
         if (part.classLock && part.classLock !== bot.classId) {
           if ((bot.coins.chassis ?? 0) < RECLASS_FEE) {
             set({ flash: `Reclass costs ${RECLASS_FEE} chassis coins.` });
             return;
           }
-          next = { ...bot, coins: { ...bot.coins, chassis: bot.coins.chassis - RECLASS_FEE }, classId: part.classLock, style: { ...styleOf(bot, part.classLock), body: starterBodies(part.classLock)[0]!.id } };
+          next = { ...next, coins: { ...bot.coins, chassis: bot.coins.chassis - RECLASS_FEE }, classId: part.classLock, style: { ...styleOf(bot, part.classLock), body: starterBodies(part.classLock)[0]!.id } };
         }
         const draft: Loadout = { ...next.draft, [slot]: part.id };
         set({
@@ -911,7 +930,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
             const partWear = { ...bot.partWear };
             delete partWear[part.id];
             return syncWear({
-              ...bot,
+              ...clearPartWeld(bot, part.id),
               coins: { ...bot.coins, [part.key]: (bot.coins[part.key] ?? 0) + SELL_BACK },
               owned: bot.owned.filter((id) => id !== part.id),
               draft,
@@ -981,8 +1000,9 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "Repairs are closed while the card is locked or running." });
           return;
         }
-        const current = data.bots.find((b) => b.storeId === storeId);
-        if (!current) return;
+        const found = data.bots.find((b) => b.storeId === storeId);
+        if (!found) return;
+        const current = partWelds(found);
         if (data.phase === "open" && current.locked) {
           set({ flash: "This build is locked. Ask the Desk for a lock override." });
           return;
@@ -1010,7 +1030,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({
             bots: patchBot(data.bots, storeId, () =>
               setPartWear(
-                { ...paid, services: (paid.services ?? 0) + 1, weldForWeek: { ...paid.weldForWeek, [slot]: week } },
+                { ...paid, services: (paid.services ?? 0) + 1, weldedParts: { ...paid.weldedParts, [partId]: week } },
                 partId,
                 "bent",
               ),
@@ -1032,7 +1052,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
               const partWear = { ...bot.partWear };
               delete partWear[partId];
               return syncWear({
-                ...bot,
+                ...clearPartWeld(bot, partId),
                 coins: { ...bot.coins, [slot]: (bot.coins[slot] ?? 0) + refund },
                 owned: bot.owned.filter((id) => id !== partId),
                 draft,
@@ -1062,7 +1082,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
               delete partWear[partId];
               partWear[champ.id] = "clean";
               return syncWear({
-                ...bot,
+                ...clearPartWeld(clearPartWeld(bot, partId), champ.id),
                 owned: [...bot.owned.filter((id) => id !== partId), champ.id],
                 draft,
                 equipped: { ...draft },
@@ -1081,9 +1101,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         }
         set({
           bots: patchBot(data.bots, storeId, () => {
-            const weldForWeek = { ...paid.weldForWeek };
-            delete weldForWeek[slot];
-            return setPartWear({ ...paid, services: (paid.services ?? 0) + 1, weldForWeek }, partId, "clean");
+            return setPartWear({ ...clearPartWeld(paid, partId), services: (paid.services ?? 0) + 1 }, partId, "clean");
           }),
           flash: `${part.name} is clean. ${cost} ${slot} coins.`,
         });
@@ -1811,20 +1829,20 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           return;
         }
         const last = lastPlaceId(data);
-        const bots = data.bots.map((bot) => {
+        const bots = data.bots.map((raw) => {
+          const bot = partWelds(raw);
           const card = cardFor(data, bot.storeId);
           if (!card) return bot;
           const grades = gradesOf(card);
           const paid = coinsByJar(grades);
           const coins = { ...bot.coins };
           for (const slot of SLOTS) coins[slot] = (coins[slot] ?? 0) + paid[slot];
-          const weldForWeek = { ...bot.weldForWeek };
+          const weldedParts = { ...bot.weldedParts };
           let partWear = { ...bot.partWear };
-          for (const slot of SLOTS) {
-            if (weldForWeek[slot] === data.week) {
-              const id = bot.equipped[slot];
-              if (id && (partWear[id] ?? "clean") === "bent") partWear = { ...partWear, [id]: "disabled" };
-              delete weldForWeek[slot];
+          for (const [id, week] of Object.entries(weldedParts)) {
+            if (week <= data.week) {
+              if (partWear[id] === "bent") partWear = { ...partWear, [id]: "disabled" };
+              delete weldedParts[id];
             }
           }
           return syncWear({
@@ -1833,7 +1851,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
             repairSpent: 0,
             coins,
             partWear,
-            weldForWeek,
+            weldedParts,
             locked: null,
           });
         });
@@ -2090,7 +2108,7 @@ export function applyLeague14<T extends Partial<PitData>>(data: T): T {
   }
   const oldBots = data.bots ?? [];
   const bots = fresh.bots.map((bot) => {
-    const old = oldBots.find((row) => row.storeId === bot.storeId) ?? bot;
+    const old = partWelds(oldBots.find((row) => row.storeId === bot.storeId) ?? bot);
     // Preserve the one-time starter choice: migration must not invent a body for an unchosen bot.
     return old.style ? { ...old, style: { ...old.style, stickers: styleOf(old).stickers } } : old;
   });

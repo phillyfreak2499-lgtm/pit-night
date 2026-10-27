@@ -1,4 +1,13 @@
-import type { Exchange, FighterSnap, Method, Slot, Tier } from "./types";
+import type {
+  CombatState,
+  CombatTrace,
+  Exchange,
+  FighterSnap,
+  FightResult,
+  Method,
+  Slot,
+  Tier,
+} from "./types";
 
 /**
  * Both bots act every exchange. The card shows the heavier blow.
@@ -19,6 +28,7 @@ type Kit = {
   brainTier: Tier;
   weaponTier: Tier;
   armorTier: Tier;
+  utilityTier: Tier;
   driveTier: Tier;
   chassisTier: Tier;
   batteryMax: number;
@@ -43,7 +53,7 @@ export type DuelOpts = { hot?: boolean; overtime?: boolean; pace?: number; round
 export type DuelCore = {
   exchanges: Exchange[];
   hp: Record<string, number>;
-  finisher: { by: string; against: string; damage: number; call: string } | null;
+  finisher: FightResult["finisher"];
   method: Method;
   koAt: number;
 };
@@ -69,6 +79,7 @@ export function kitOf(snap: FighterSnap): Kit {
     brainTier: snap.brainTier ?? "stock",
     weaponTier: tierOf(snap, "weapon"),
     armorTier: tierOf(snap, "armor"),
+    utilityTier: tierOf(snap, "utility"),
     driveTier: tierOf(snap, "drive"),
     chassisTier: tierOf(snap, "chassis"),
     batteryMax: snap.batteryMax && snap.batteryMax > 0 ? snap.batteryMax : STOCK_BATTERY,
@@ -78,6 +89,12 @@ export function kitOf(snap: FighterSnap): Kit {
 
 function q(tier: Tier) {
   return TIER_Q[tier] ?? 0;
+}
+
+/** Tiered utilities keep their former Super effect, with a real ladder below/above it. */
+function utilityStrength(kit: Kit) {
+  const tiered = ["burn", "peace", "crowd", "weld", "scry"].includes(kit.utility ?? "");
+  return (tiered ? (q(kit.utilityTier) + 1) / 4 : 1) * (kit.wear.utility ?? 1);
 }
 
 function stamina(max: number, left: number) {
@@ -198,7 +215,7 @@ function hazardOf(kit: Kit, which: ReturnType<typeof lane>, foe: Kit, index: num
   )
     mult = Math.max(mult, 0.85);
   if (kit.utility === "uv") mult *= 0.7;
-  if (kit.utility === "peace") mult *= 0.65;
+  if (kit.utility === "peace") mult *= 1 - 0.35 * utilityStrength(kit);
   if (spring && index === 0 && which !== "jet") tags.push("spring");
   return { damage: Math.round(clamp(damage * mult, 0, 14)), slow, tags };
 }
@@ -225,7 +242,12 @@ function aim(kit: Kit, foe: Kit, foeLane: ReturnType<typeof lane>) {
   if (kit.brain === "berserker" && (foe.brain === "sniper" || foe.brain === "phoenix")) n += 0.18;
   if (foe.brain === "turtle" && kit.brain === "brawler") n += 0.08;
   if ((foe.brain === "jammer" || foe.utility === "siren") && !lit(kit)) {
-    if (kit.brain === "logic" || kit.brain === "skynet" || kit.brain === "sniper" || kit.brain === "hunter")
+    if (
+      kit.brain === "logic" ||
+      kit.brain === "skynet" ||
+      kit.brain === "sniper" ||
+      kit.brain === "hunter"
+    )
       n *= 0.94;
   }
   return n * (kit.wear.brain ?? 1);
@@ -262,6 +284,9 @@ function weaponMod(atk: Kit, foe: Kit, foeLane: ReturnType<typeof lane>, index: 
   if (fam === "chainsaw") m *= far ? 0.9 : 1.12;
   if (fam === "disc") m *= 1.04;
   if (fam === "hammer") m *= index === 0 ? 0.9 : index === 2 ? 1.12 : 1;
+  if (fam === "carver") m *= index === 0 ? 1.16 : 0.94;
+  if (fam === "yamcannon") m *= index === 0 ? 0.8 : index === 1 ? 1.15 : 1.08;
+  if (fam === "axe") m *= index % 2 === 0 ? 1.15 : 0.88;
   if (fam === "wedge") m *= 1.02;
   if (fam === "claw") m *= 1.03;
   if (atk.weapon === "flail") {
@@ -310,10 +335,12 @@ function armorMod(atk: Kit, foe: Kit, index: number) {
     m *= index === 0 ? (foe.armorTier === "super" ? 0.48 : 0.58) : index >= 2 ? 1.12 : 1;
   if (foe.armor === "magnet" && metal && atk.weapon !== "flame")
     m *= foe.armorTier === "super" ? 0.68 : 0.8;
-  if (foe.armor === "magnet" && atk.weapon === "tesla")
-    m *= foe.armorTier === "super" ? 0.5 : 0.82;
+  if (foe.armor === "magnet" && atk.weapon === "tesla") m *= foe.armorTier === "super" ? 0.5 : 0.82;
   if (foe.armor === "reactive") m *= 0.96;
-  return m * (foe.wear.armor ?? 1);
+  if (foe.armor === "platter" && index === 0) m *= 0.78;
+  // Wear weakens protection toward an unarmored hit; it must never halve
+  // incoming damage merely because the armor is bent.
+  return 1 + (m - 1) * (foe.wear.armor ?? 1);
 }
 
 function driveMod(atk: Kit, foe: Kit, index: number) {
@@ -379,8 +406,9 @@ function skeletonSlip(atk: Kit, foe: Kit, index: number) {
 
 function utilityOut(atk: Kit, index: number) {
   let m = 1;
-  if (atk.utility === "burn") m *= index === 0 ? 1.12 : index === 2 ? 0.94 : 1;
-  if (atk.utility === "crowd") m *= 1.04;
+  if (atk.utility === "burn")
+    m *= index === 0 ? 1 + 0.12 * utilityStrength(atk) : index === 2 ? 0.94 : 1;
+  if (atk.utility === "crowd") m *= 1 + 0.04 * utilityStrength(atk);
   if (atk.utility === "leech") m *= 1.04;
   if (atk.utility === "grapple" && index === 0) m *= 1.06;
   return m * (atk.utility ? (atk.wear.utility ?? 1) : 1);
@@ -388,10 +416,10 @@ function utilityOut(atk: Kit, index: number) {
 
 function utilityIn(atk: Kit, foe: Kit) {
   let m = 1;
-  if (foe.utility === "veil" && !lit(atk)) m *= 0.84;
-  if (foe.utility === "decoy" && !lit(atk)) m *= 0.9;
-  if (foe.utility === "mirror") m *= 0.9;
-  if (foe.utility === "peace") m *= 0.96;
+  if (foe.utility === "veil" && !lit(atk)) m *= 1 - 0.16 * utilityStrength(foe);
+  if (foe.utility === "decoy" && !lit(atk)) m *= 1 - 0.1 * utilityStrength(foe);
+  if (foe.utility === "mirror") m *= 1 - 0.1 * utilityStrength(foe);
+  if (foe.utility === "peace") m *= 1 - 0.04 * utilityStrength(foe);
   return m;
 }
 
@@ -413,6 +441,7 @@ function oneWay(
   mem: Mem,
   foeLane: ReturnType<typeof lane>,
   hot: boolean,
+  defenderIndex = index,
 ): Swing {
   const ak = kitOf(atk);
   const dk = kitOf(def);
@@ -471,10 +500,17 @@ function oneWay(
     tags.push("wrong-iron");
   }
 
-  dmg = halloweenStrikeAdjust(atk, def, index, dmg, tags);
+  dmg = halloweenStrikeAdjust(atk, def, index, dmg, tags, defenderIndex);
+  if (ak.weapon === "carver" && def.stats.speed > atk.stats.speed) {
+    dmg *= 0.88;
+    tags.push("carver-dodge");
+  }
+  if (ak.weapon === "carver" && index === 0) tags.push("carver");
+  if (ak.weapon === "yamcannon") tags.push(index === 0 ? "yam-load" : "yam-impact");
+  if (ak.weapon === "axe") tags.push(index % 2 === 0 ? "axe-chop" : "axe-recover");
   // A stock logic board does not read a hunter's line. Tuned logic still does.
   if (ak.brain === "hunter" && dk.brain === "logic" && q(dk.brainTier) === 0) dmg += 3;
-  const slip = skeletonSlip(ak, dk, index);
+  const slip = skeletonSlip(ak, dk, defenderIndex);
   if (slip < 1) {
     dmg *= slip;
     tags.push(slip <= 0.4 ? "miss" : "evade");
@@ -482,7 +518,7 @@ function oneWay(
 
   let mod =
     weaponMod(ak, dk, foeLane, index) *
-    armorMod(ak, dk, index) *
+    armorMod(ak, dk, defenderIndex) *
     driveMod(ak, dk, index) *
     chassisMod(ak, dk, index) *
     utilityOut(ak, index) *
@@ -490,7 +526,7 @@ function oneWay(
     aim(ak, dk, foeLane) *
     guard(dk) *
     focusOf(ak, dk, mem, atk.id);
-  if (dk.utility === "grapple" && index === 0 && !mem.grapple[def.id]) {
+  if (dk.utility === "grapple" && defenderIndex === 0 && !mem.grapple[def.id]) {
     mod *= 0.55;
     tags.push("grapple");
   }
@@ -499,7 +535,7 @@ function oneWay(
     tags.push("tremor");
   }
   if (ak.utility === "scry" && atk.weekQ + 0.02 < def.weekQ) {
-    mod *= 1.07;
+    mod *= 1 + 0.07 * utilityStrength(ak);
     tags.push("scry");
   }
   dmg *= clamp(mod, 0.42, 1.72);
@@ -515,18 +551,20 @@ function oneWay(
     ak.brain === "hunter" ||
     ak.brain === "berserker";
   if (dk.armor === "spike" && close) {
-    reflect += 4 + Math.round(dmg * (dk.armorTier === "super" ? 0.28 : 0.16));
+    reflect += Math.round(
+      (4 + dmg * (dk.armorTier === "super" ? 0.28 : 0.16)) * (dk.wear.armor ?? 1),
+    );
     tags.push("spike");
   }
   const chip = ak.weapon === "flame";
   if (dk.armor === "reactive" && !chip && dmg >= 22) {
-    reflect += dk.armorTier === "super" ? 12 : 8;
-    dmg *= dk.armorTier === "super" ? 0.74 : 0.82;
+    reflect += Math.round((dk.armorTier === "super" ? 12 : 8) * (dk.wear.armor ?? 1));
+    dmg *= 1 - (dk.armorTier === "super" ? 0.26 : 0.18) * (dk.wear.armor ?? 1);
     tags.push("reactive");
   }
   if (dk.armor === "reactive" && chip) tags.push("chip");
   if (dk.utility === "mirror") {
-    reflect += Math.round(dmg * 0.22);
+    reflect += Math.round(dmg * 0.22 * utilityStrength(dk));
     tags.push("mirror");
   }
   if (ak.weapon === "flame") {
@@ -543,7 +581,7 @@ function oneWay(
     if (dk.armorTier === "super") {
       stun = 1;
       drain = 0;
-      reflect += 8;
+      reflect += Math.round(8 * (dk.wear.armor ?? 1));
       tags.push("lodestone");
     } else {
       stun = Math.max(stun, 0.92);
@@ -585,6 +623,18 @@ function affinityOn(snap: FighterSnap, kit: Kit) {
 }
 
 function callFor(atk: FighterSnap, def: FighterSnap, tags: string[], index: number, stam: number) {
+  if (tags.includes("carver-dodge"))
+    return `${def.botName} outruns the Turkey Carver. ${atk.botName} catches only the edge.`;
+  if (tags.includes("carver"))
+    return `${atk.botName} brings the Turkey Carver down hard on the opening swing.`;
+  if (tags.includes("yam-load"))
+    return `${atk.botName} loads the Sweet Potato Cannon. The heavy landing comes next.`;
+  if (tags.includes("yam-impact"))
+    return `${atk.botName} lands the Sweet Potato Cannon's heavy shot.`;
+  if (tags.includes("axe-chop"))
+    return `${atk.botName} lands an overhead chop with the Cherry Tree Axe.`;
+  if (tags.includes("axe-recover"))
+    return `${atk.botName} recovers the Cherry Tree Axe. This swing arrives lighter.`;
   if (tags.includes("bog"))
     return `${atk.botName} revs the Texas Chainsaw. The plate is thick, and the saw keeps singing.`;
   if (tags.includes("chainsaw"))
@@ -650,6 +700,7 @@ export function halloweenStrikeAdjust(
   index: number,
   dmg: number,
   tags: string[],
+  defenderIndex = index,
 ) {
   const w = attacker.weaponFamily;
   if (w === "chainsaw") {
@@ -700,7 +751,7 @@ export function halloweenStrikeAdjust(
     }
   }
   if (attacker.chassisFamily === "pumpkin") dmg *= 0.93;
-  if (defender.chassisFamily === "pumpkin" && index === 0) dmg *= 0.94;
+  if (defender.chassisFamily === "pumpkin" && defenderIndex === 0) dmg *= 0.94;
   if (
     attacker.driveFamily === "ghostchaser" &&
     index === 0 &&
@@ -720,28 +771,18 @@ export function buildScore(snap: FighterSnap): number {
 }
 
 /** Higher health, then the fuller build, then rating. A true mirror keeps the first name. */
-export function preferFighter(a: FighterSnap, b: FighterSnap, hpA: number, hpB: number): FighterSnap {
+export function preferFighter(
+  a: FighterSnap,
+  b: FighterSnap,
+  hpA: number,
+  hpB: number,
+): FighterSnap {
   if (hpA !== hpB) return hpA > hpB ? a : b;
   const qa = buildScore(a);
   const qb = buildScore(b);
   if (qa !== qb) return qa > qb ? a : b;
   if (a.rating !== b.rating) return a.rating > b.rating ? a : b;
   return a;
-}
-
-function emptyMem(a: FighterSnap, b: FighterSnap): Mem {
-  const ka = kitOf(a);
-  const kb = kitOf(b);
-  return {
-    burn: {},
-    stun: {},
-    phoenix: {},
-    spike: {},
-    grapple: {},
-    heat: {},
-    battery: { [a.id]: ka.batteryMax, [b.id]: kb.batteryMax },
-    slow: {},
-  };
 }
 
 function revive(snap: FighterSnap, hp: number, mem: Mem) {
@@ -762,129 +803,247 @@ function drainAmt(kit: Kit) {
   return d;
 }
 
-function healAmt(kit: Kit) {
+function healAmt(kit: Kit, index = 0) {
   let h = 0;
   if (kit.utility === "medbay") h += 6;
-  if (kit.utility === "weld") h += 3;
-  return Math.round(h * (kit.wear.utility ?? 1));
+  if (kit.utility === "weld") h += 3 * ((q(kit.utilityTier) + 1) / 4);
+  h *= kit.wear.utility ?? 1;
+  // Carry sub-point healing between exchanges while keeping displayed HP whole.
+  return Math.round(h * (index + 1)) - Math.round(h * index);
+}
+
+type BattleState = {
+  hp: Record<string, number>;
+  mem: Mem;
+  turns: Record<string, number>;
+  exchanges: Exchange[];
+  koAt: number;
+};
+
+function battleState(bots: FighterSnap[]): BattleState {
+  return {
+    hp: Object.fromEntries(bots.map((bot) => [bot.id, 100])),
+    mem: {
+      burn: {},
+      stun: {},
+      phoenix: {},
+      spike: {},
+      grapple: {},
+      heat: {},
+      slow: {},
+      battery: Object.fromEntries(bots.map((bot) => [bot.id, kitOf(bot).batteryMax])),
+    },
+    turns: {},
+    exchanges: [],
+    koAt: -1,
+  };
+}
+
+function combatState(bot: FighterSnap, state: BattleState): CombatState {
+  return {
+    hp: state.hp[bot.id]!,
+    battery: state.mem.battery[bot.id] ?? 0,
+    heat: bot.stats.heat + (state.mem.heat[bot.id] ?? 0),
+    burn: state.mem.burn[bot.id] ?? 0,
+    stun: state.mem.stun[bot.id] ?? 1,
+    phoenixUsed: state.mem.phoenix[bot.id] ?? false,
+  };
+}
+
+function startTrace(bots: FighterSnap[], state: BattleState): Record<string, CombatTrace> {
+  return Object.fromEntries(
+    bots.map((bot) => {
+      const before = combatState(bot, state);
+      return [
+        bot.id,
+        {
+          before,
+          after: before,
+          damageDealt: 0,
+          reflectedDamageTaken: 0,
+          hazardDamage: 0,
+          burnDamage: 0,
+          healing: 0,
+          revived: false,
+        },
+      ];
+    }),
+  );
+}
+
+function endTrace(bots: FighterSnap[], state: BattleState, combat: Record<string, CombatTrace>) {
+  for (const bot of bots) {
+    const trace = combat[bot.id]!;
+    trace.after = combatState(bot, state);
+    trace.revived = !trace.before.phoenixUsed && trace.after.phoenixUsed;
+  }
+  return combat;
+}
+
+/** One exchange, shared by duels, tag teams and conference melees. */
+function stepExchange(
+  a: FighterSnap,
+  b: FighterSnap,
+  state: BattleState,
+  i: number,
+  opts: DuelOpts,
+) {
+  const { hp, mem, exchanges } = state;
+  const pace = opts.pace ?? PACE;
+  const hot = Boolean(opts.hot);
+  const bots = [a, b];
+  const ai = state.turns[a.id] ?? 0;
+  const bi = state.turns[b.id] ?? 0;
+  state.turns[a.id] = ai + 1;
+  state.turns[b.id] = bi + 1;
+  const combat = startTrace(bots, state);
+  const finishTrace = () => endTrace(bots, state, combat);
+  const tryRevive = (bot: FighterSnap) => {
+    const before = hp[bot.id]!;
+    hp[bot.id] = revive(bot, before, mem);
+    if (hp[bot.id]! > before) combat[bot.id]!.revived = true;
+  };
+  for (const bot of bots) {
+    const pending = mem.burn[bot.id] ?? 0;
+    if (pending > 0) {
+      combat[bot.id]!.burnDamage = Math.min(hp[bot.id]!, pending);
+      hp[bot.id] = Math.max(0, hp[bot.id]! - pending);
+      mem.burn[bot.id] = Math.max(0, pending - 2);
+    }
+  }
+  for (const bot of bots) tryRevive(bot);
+  if (hp[a.id]! <= 0 || hp[b.id]! <= 0) {
+    state.koAt = i;
+    const dead = hp[a.id]! <= 0 ? a : b;
+    const live = dead.id === a.id ? b : a;
+    exchanges.push({
+      index: i + 1,
+      attackerId: live.id,
+      defenderId: dead.id,
+      damage: combat[dead.id]!.burnDamage,
+      attackerHp: hp[live.id]!,
+      defenderHp: 0,
+      call: `${dead.botName} cannot survive the lingering burn.`,
+      tags: ["burn"],
+      combat: finishTrace(),
+    });
+    return;
+  }
+
+  const ka = kitOf(a);
+  const kb = kitOf(b);
+  const laneA = lane(ka, ai, hot);
+  const laneB = lane(kb, bi, hot);
+  const hazA = hazardOf(ka, laneA, kb, ai);
+  const hazB = hazardOf(kb, laneB, ka, bi);
+  const preHazardA = hp[a.id]!;
+  const preHazardB = hp[b.id]!;
+  if (kb.utility === "tremor" && ka.chassis !== "hover" && ka.drive !== "air")
+    hp[a.id] = Math.max(0, hp[a.id]! - 4);
+  if (ka.utility === "tremor" && kb.chassis !== "hover" && kb.drive !== "air")
+    hp[b.id] = Math.max(0, hp[b.id]! - 4);
+  hp[a.id] = Math.max(0, hp[a.id]! - hazA.damage);
+  hp[b.id] = Math.max(0, hp[b.id]! - hazB.damage);
+  combat[a.id]!.hazardDamage = preHazardA - hp[a.id]!;
+  combat[b.id]!.hazardDamage = preHazardB - hp[b.id]!;
+  mem.slow[a.id] = hazA.slow;
+  mem.slow[b.id] = hazB.slow;
+  for (const bot of bots) tryRevive(bot);
+  if (hp[a.id]! <= 0 || hp[b.id]! <= 0) {
+    state.koAt = i;
+    const dead = hp[a.id]! <= 0 ? a : b;
+    const live = dead.id === a.id ? b : a;
+    exchanges.push({
+      index: i + 1,
+      attackerId: live.id,
+      defenderId: dead.id,
+      damage: dead.id === a.id ? hazA.damage : hazB.damage,
+      attackerHp: hp[live.id]!,
+      defenderHp: 0,
+      call: `${dead.botName} takes the arena. ${hazA.tags.concat(hazB.tags).includes("saw") ? "The saw" : "The hazard"} ends the exchange.`,
+      tags: ["hazard", ...hazA.tags, ...hazB.tags, `hazard:${a.id}`, `hazard:${b.id}`],
+      combat: finishTrace(),
+    });
+    return;
+  }
+
+  const blowA = oneWay(a, b, ai, mem, laneB, hot, bi);
+  const blowB = oneWay(b, a, bi, mem, laneA, hot, ai);
+  const ot = !opts.overtime || i < 3 ? 1 : i === 3 ? 1.1 : i === 4 ? 1.2 : 1.35;
+  const dmgA = Math.max(1, Math.round((blowA.damage + blowB.reflect) * pace * ot));
+  const dmgB = Math.max(1, Math.round((blowB.damage + blowA.reflect) * pace * ot));
+  // Round the existing combined hit once, then attribute its components.
+  // Reflected damage belongs to the attacker taking it, not their opponent's weapon.
+  const directA = blowB.reflect > 0 ? Math.min(dmgA, Math.round(blowA.damage * pace * ot)) : dmgA;
+  const directB = blowA.reflect > 0 ? Math.min(dmgB, Math.round(blowB.damage * pace * ot)) : dmgB;
+  combat[a.id]!.damageDealt = directA;
+  combat[b.id]!.damageDealt = directB;
+  combat[a.id]!.reflectedDamageTaken = dmgB - directB;
+  combat[b.id]!.reflectedDamageTaken = dmgA - directA;
+  hp[b.id] = Math.max(0, hp[b.id]! - dmgA);
+  hp[a.id] = Math.max(0, hp[a.id]! - dmgB);
+  for (const bot of bots) tryRevive(bot);
+  for (const bot of bots) {
+    const before = hp[bot.id]!;
+    if (hp[bot.id]! > 0)
+      hp[bot.id] = Math.min(100, hp[bot.id]! + healAmt(kitOf(bot), bot.id === a.id ? ai : bi));
+    combat[bot.id]!.healing = hp[bot.id]! - before;
+  }
+
+  mem.burn[b.id] = (mem.burn[b.id] ?? 0) + blowA.burn;
+  mem.burn[a.id] = (mem.burn[a.id] ?? 0) + blowB.burn;
+  if (blowA.stun < 1) mem.stun[b.id] = blowA.stun;
+  else delete mem.stun[b.id];
+  if (blowB.stun < 1) mem.stun[a.id] = blowB.stun;
+  else delete mem.stun[a.id];
+  mem.heat[a.id] = (mem.heat[a.id] ?? 0) + blowA.heat - (blowB.tags.includes("leech") ? 4 : 0);
+  mem.heat[b.id] = (mem.heat[b.id] ?? 0) + blowB.heat - (blowA.tags.includes("leech") ? 4 : 0);
+  mem.battery[b.id] = Math.max(0, (mem.battery[b.id] ?? 0) - blowA.drain);
+  mem.battery[a.id] = Math.max(0, (mem.battery[a.id] ?? 0) - blowB.drain);
+  for (const [bot, kit] of [
+    [a, ka],
+    [b, kb],
+  ] as const) {
+    mem.battery[bot.id] = Math.max(0, (mem.battery[bot.id] ?? 0) - drainAmt(kit));
+  }
+  if (blowA.tags.includes("grapple") || blowB.tags.includes("grapple")) {
+    mem.grapple[a.id] = true;
+    mem.grapple[b.id] = true;
+  }
+  if ((mem.spike[a.id] ?? 1) > 1 && blowA.tags.includes("phoenix-spike")) mem.spike[a.id] = 1;
+  if ((mem.spike[b.id] ?? 1) > 1 && blowB.tags.includes("phoenix-spike")) mem.spike[b.id] = 1;
+
+  const featureA = dmgA >= dmgB;
+  const attacker = featureA ? a : b;
+  const defender = featureA ? b : a;
+  const blow = featureA ? blowA : blowB;
+  const hazTags = [...hazA.tags, ...hazB.tags];
+  const tags = [...blow.tags, ...hazTags, ...(opts.overtime && i >= 3 ? ["overtime"] : [])];
+  if (hazA.damage || hazB.damage) tags.push("hazard");
+  exchanges.push({
+    index: i + 1,
+    attackerId: attacker.id,
+    defenderId: defender.id,
+    damage: featureA ? dmgA : dmgB,
+    attackerHp: hp[attacker.id]!,
+    defenderHp: hp[defender.id]!,
+    call: opts.overtime && i >= 3 ? `Overtime, round ${i + 1}. ${blow.call}` : blow.call,
+    tags,
+    combat: finishTrace(),
+  });
+  if (hp[a.id] === 0 || hp[b.id] === 0) {
+    state.koAt = i;
+    return;
+  }
 }
 
 export function fightDuel(a: FighterSnap, b: FighterSnap, opts: DuelOpts = {}): DuelCore {
-  const pace = opts.pace ?? PACE;
-  const hot = Boolean(opts.hot);
-  const hp: Record<string, number> = { [a.id]: 100, [b.id]: 100 };
-  const mem = emptyMem(a, b);
-  const exchanges: Exchange[] = [];
-  let koAt = -1;
+  const state = battleState([a, b]);
+  const { hp, mem, exchanges } = state;
   const limit = Math.max(1, Math.min(12, opts.rounds ?? (opts.overtime ? 12 : 3)));
-  const bots = [a, b];
-
-  for (let i = 0; i < limit && hp[a.id]! > 0 && hp[b.id]! > 0; i++) {
-    for (const bot of bots) {
-      const pending = mem.burn[bot.id] ?? 0;
-      if (pending > 0) {
-        hp[bot.id] = Math.max(0, hp[bot.id]! - pending);
-        mem.burn[bot.id] = Math.max(0, pending - 2);
-      }
-    }
-    for (const bot of bots) hp[bot.id] = revive(bot, hp[bot.id]!, mem);
-    if (hp[a.id]! <= 0 || hp[b.id]! <= 0) {
-      koAt = i;
-      break;
-    }
-
-    const ka = kitOf(a);
-    const kb = kitOf(b);
-    const laneA = lane(ka, i, hot);
-    const laneB = lane(kb, i, hot);
-    const hazA = hazardOf(ka, laneA, kb, i);
-    const hazB = hazardOf(kb, laneB, ka, i);
-    if (kb.utility === "tremor" && ka.chassis !== "hover" && ka.drive !== "air")
-      hp[a.id] = Math.max(0, hp[a.id]! - 4);
-    if (ka.utility === "tremor" && kb.chassis !== "hover" && kb.drive !== "air")
-      hp[b.id] = Math.max(0, hp[b.id]! - 4);
-    hp[a.id] = Math.max(0, hp[a.id]! - hazA.damage);
-    hp[b.id] = Math.max(0, hp[b.id]! - hazB.damage);
-    mem.slow[a.id] = hazA.slow;
-    mem.slow[b.id] = hazB.slow;
-    for (const bot of bots) hp[bot.id] = revive(bot, hp[bot.id]!, mem);
-    if (hp[a.id]! <= 0 || hp[b.id]! <= 0) {
-      koAt = i;
-      const dead = hp[a.id]! <= 0 ? a : b;
-      const live = dead.id === a.id ? b : a;
-      exchanges.push({
-        index: i + 1,
-        attackerId: live.id,
-        defenderId: dead.id,
-        damage: dead.id === a.id ? hazA.damage : hazB.damage,
-        attackerHp: hp[live.id]!,
-        defenderHp: 0,
-        call: `${dead.botName} takes the arena. ${hazA.tags.concat(hazB.tags).includes("saw") ? "The saw" : "The hazard"} ends the exchange.`,
-        tags: ["hazard", ...hazA.tags, ...hazB.tags, `hazard:${a.id}`, `hazard:${b.id}`],
-      });
-      break;
-    }
-
-    const blowA = oneWay(a, b, i, mem, laneB, hot);
-    const blowB = oneWay(b, a, i, mem, laneA, hot);
-    const ot = !opts.overtime || i < 3 ? 1 : i === 3 ? 1.1 : i === 4 ? 1.2 : 1.35;
-    const dmgA = Math.max(1, Math.round((blowA.damage + blowB.reflect) * pace * ot));
-    const dmgB = Math.max(1, Math.round((blowB.damage + blowA.reflect) * pace * ot));
-    hp[b.id] = Math.max(0, hp[b.id]! - dmgA);
-    hp[a.id] = Math.max(0, hp[a.id]! - dmgB);
-    for (const bot of bots) {
-      const before = hp[bot.id]!;
-      hp[bot.id] = revive(bot, before, mem);
-    }
-    for (const bot of bots) {
-      if (hp[bot.id]! > 0) hp[bot.id] = Math.min(100, hp[bot.id]! + healAmt(kitOf(bot)));
-    }
-
-    mem.burn[b.id] = (mem.burn[b.id] ?? 0) + blowA.burn;
-    mem.burn[a.id] = (mem.burn[a.id] ?? 0) + blowB.burn;
-    if (blowA.stun < 1) mem.stun[b.id] = blowA.stun;
-    else delete mem.stun[b.id];
-    if (blowB.stun < 1) mem.stun[a.id] = blowB.stun;
-    else delete mem.stun[a.id];
-    mem.heat[a.id] = (mem.heat[a.id] ?? 0) + blowA.heat - (blowB.tags.includes("leech") ? 4 : 0);
-    mem.heat[b.id] = (mem.heat[b.id] ?? 0) + blowB.heat - (blowA.tags.includes("leech") ? 4 : 0);
-    mem.battery[b.id] = Math.max(0, (mem.battery[b.id] ?? 0) - blowA.drain);
-    mem.battery[a.id] = Math.max(0, (mem.battery[a.id] ?? 0) - blowB.drain);
-    for (const [bot, kit] of [
-      [a, ka],
-      [b, kb],
-    ] as const) {
-      mem.battery[bot.id] = Math.max(0, (mem.battery[bot.id] ?? 0) - drainAmt(kit));
-    }
-    if (blowA.tags.includes("grapple") || blowB.tags.includes("grapple")) {
-      mem.grapple[a.id] = true;
-      mem.grapple[b.id] = true;
-    }
-    if ((mem.spike[a.id] ?? 1) > 1 && blowA.tags.includes("phoenix-spike")) mem.spike[a.id] = 1;
-    if ((mem.spike[b.id] ?? 1) > 1 && blowB.tags.includes("phoenix-spike")) mem.spike[b.id] = 1;
-
-    const featureA = dmgA >= dmgB;
-    const attacker = featureA ? a : b;
-    const defender = featureA ? b : a;
-    const blow = featureA ? blowA : blowB;
-    const hazTags = [...hazA.tags, ...hazB.tags];
-    const tags = [...blow.tags, ...hazTags, ...(opts.overtime && i >= 3 ? ["overtime"] : [])];
-    if (hazA.damage || hazB.damage) tags.push("hazard");
-    exchanges.push({
-      index: i + 1,
-      attackerId: attacker.id,
-      defenderId: defender.id,
-      damage: featureA ? dmgA : dmgB,
-      attackerHp: hp[attacker.id]!,
-      defenderHp: hp[defender.id]!,
-      call: opts.overtime && i >= 3 ? `Overtime, round ${i + 1}. ${blow.call}` : blow.call,
-      tags,
-    });
-    if (hp[a.id] === 0 || hp[b.id] === 0) {
-      koAt = i;
-      break;
-    }
-  }
+  for (let i = 0; i < limit && hp[a.id]! > 0 && hp[b.id]! > 0; i++)
+    stepExchange(a, b, state, i, opts);
+  let koAt = state.koAt;
 
   let method: Method = "decision";
   let finisher: DuelCore["finisher"] = null;
@@ -897,12 +1056,15 @@ export function fightDuel(a: FighterSnap, b: FighterSnap, opts: DuelOpts = {}): 
     const gap = winnerHeat - loserHeat;
     if (gap >= 6 && hp[behind.id]! < 48) {
       const burn = Math.round(12 + gap * 0.8);
+      const combat = startTrace([a, b], state);
+      combat[ahead.id]!.damageDealt = burn;
       hp[behind.id] = revive(behind, Math.max(0, hp[behind.id]! - burn), mem);
       finisher = {
         by: ahead.id,
         against: behind.id,
         damage: burn,
         call: `${ahead.botName} spends the Heat. ${behind.botName} does not get a fourth exchange.`,
+        combat: endTrace([a, b], state, combat),
       };
       if (hp[behind.id] === 0) method = "ko";
     }
@@ -910,7 +1072,8 @@ export function fightDuel(a: FighterSnap, b: FighterSnap, opts: DuelOpts = {}): 
       const control =
         kitOf(ahead).weapon === "wedge" ||
         kitOf(ahead).weapon === "claw" ||
-        kitOf(ahead).weapon === "bones";
+        kitOf(ahead).weapon === "bones" ||
+        kitOf(ahead).drive === "flip";
       const planted = kitOf(behind).drive === "anchor";
       if (
         control &&
@@ -919,7 +1082,16 @@ export function fightDuel(a: FighterSnap, b: FighterSnap, opts: DuelOpts = {}): 
         ahead.stats.power > behind.stats.armor * 0.7
       ) {
         method = "dump";
+        const combat = finisher?.combat ?? startTrace([a, b], state);
+        combat[ahead.id]!.damageDealt += 8;
         hp[behind.id] = revive(behind, Math.max(0, hp[behind.id]! - 8), mem);
+        finisher = {
+          by: ahead.id,
+          against: behind.id,
+          damage: (finisher?.damage ?? 0) + 8,
+          call: `${finisher ? `${finisher.call} ` : ""}${ahead.botName} lifts ${behind.botName} out of the fight.`,
+          combat: endTrace([a, b], state, combat),
+        };
         if (hp[behind.id] === 0) method = "ko";
       }
     }
@@ -929,6 +1101,8 @@ export function fightDuel(a: FighterSnap, b: FighterSnap, opts: DuelOpts = {}): 
     const defender = hp[a.id]! <= hp[b.id]! ? a : b;
     const attacker = defender.id === a.id ? b : a;
     const damage = hp[defender.id]!;
+    const combat = startTrace([a, b], state);
+    combat[attacker.id]!.damageDealt = damage;
     hp[defender.id] = 0;
     method = "ko";
     const call = `The championship cannot go to the judges. ${attacker.botName} lands the last shot.`;
@@ -941,12 +1115,55 @@ export function fightDuel(a: FighterSnap, b: FighterSnap, opts: DuelOpts = {}): 
       defenderHp: 0,
       call,
       tags: ["sudden-death"],
+      combat: endTrace([a, b], state, combat),
     });
-    finisher = { by: attacker.id, against: defender.id, damage, call };
+    finisher = { by: attacker.id, against: defender.id, damage, call, combat };
     koAt = exchanges.length - 1;
   }
 
   return { exchanges, hp, finisher, method, koAt };
+}
+
+/**
+ * Each living bot keeps its own kit and combat memory. Rotating the order gives
+ * an odd fighter its turn in the next round; tag partners never attack each other.
+ */
+export function fightGroup(
+  fighters: FighterSnap[],
+  teams: string[][] | null,
+  opts: DuelOpts = {},
+): Pick<DuelCore, "hp" | "exchanges"> & { order: string[] } {
+  const state = battleState(fighters);
+  const ordered = [...fighters].sort((a, b) => a.id.localeCompare(b.id));
+  const eliminatedAt: Record<string, number> = {};
+  const sameTeam = (a: string, b: string) =>
+    teams?.some((team) => team.includes(a) && team.includes(b)) ?? false;
+  for (let round = 0; round < 12; round++) {
+    const alive = ordered.filter((bot) => state.hp[bot.id]! > 0);
+    if (alive.length < 2 || alive.every((bot) => sameTeam(alive[0]!.id, bot.id))) break;
+    const offset = round % alive.length;
+    const queue = [...alive.slice(offset), ...alive.slice(0, offset)];
+    while (queue.length > 1) {
+      const a = queue.shift()!;
+      const opponent = queue.findIndex((bot) => !sameTeam(a.id, bot.id));
+      if (opponent < 0) continue;
+      const [b] = queue.splice(opponent, 1);
+      const before = state.exchanges.length;
+      stepExchange(a, b!, state, round, { ...opts, overtime: true });
+      for (const exchange of state.exchanges.slice(before)) exchange.index = before + 1;
+      for (const bot of [a, b!]) if (state.hp[bot.id] === 0) eliminatedAt[bot.id] = round;
+    }
+  }
+  const order = [...ordered]
+    .sort(
+      (a, b) =>
+        state.hp[b.id]! - state.hp[a.id]! ||
+        (eliminatedAt[b.id] ?? 12) - (eliminatedAt[a.id] ?? 12) ||
+        buildScore(b) - buildScore(a) ||
+        a.id.localeCompare(b.id),
+    )
+    .map((bot) => bot.id);
+  return { hp: state.hp, exchanges: state.exchanges, order };
 }
 
 export function duelWear(winnerId: string, loserId: string, method: Method, blowout: boolean) {

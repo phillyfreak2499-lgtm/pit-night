@@ -158,6 +158,8 @@ export type Bot = {
   locked: Loadout | null;
   /** Week number whose Saturday the emergency weld covers. */
   weldForWeek: Partial<Record<Slot, number>>;
+  /** Emergency-weld expiry by part ID, so swapping slots cannot move the repair. */
+  weldedParts?: Record<string, number>;
   /** Successful full repairs and emergency welds. Cosmetic progress only. Old saves omit it. */
   services?: number;
   look: BotLook;
@@ -192,6 +194,32 @@ export type StoreCard = {
   grades?: Partial<Record<StatKey, Grade>>;
 };
 
+/** Server-calculated state, recorded with each exchange for battle inspection. */
+export type CombatState = {
+  hp: number;
+  battery: number;
+  /** Printed heat plus the heat gained or lost during the fight. */
+  heat: number;
+  /** Burn damage queued for the next exchange. */
+  burn: number;
+  /** Attack multiplier from a pending stun; 1 means unaffected. */
+  stun: number;
+  phoenixUsed: boolean;
+};
+
+export type CombatTrace = {
+  before: CombatState;
+  after: CombatState;
+  /** Direct attack damage before the target's remaining-HP cap. */
+  damageDealt: number;
+  /** Counter damage returned by the opponent's armor or utility. */
+  reflectedDamageTaken: number;
+  hazardDamage: number;
+  burnDamage: number;
+  healing: number;
+  revived: boolean;
+};
+
 export type Exchange = {
   index: number;
   attackerId: string;
@@ -201,6 +229,8 @@ export type Exchange = {
   defenderHp: number;
   call: string;
   tags: string[];
+  /** Keyed by fighter ID. Optional so historical replays remain readable. */
+  combat?: Record<string, CombatTrace>;
 };
 
 export type FighterSnap = {
@@ -244,6 +274,8 @@ export type FighterSnap = {
   batteryMax?: number;
   /** Tier of each installed part. Stock when the field is missing. */
   tiers?: Partial<Record<Slot, Tier>>;
+  /** Effective part IDs at the bell, including stock loaners for disabled parts. */
+  parts?: Partial<Record<Slot, string | null>>;
   /** Bent and scratched parts fight at a fraction. */
   wearMult?: Partial<Record<Slot, number>>;
   /** Chassis class/slot synergy copied off the part. */
@@ -256,7 +288,7 @@ export type FightResult = {
   method: Method;
   blowout: boolean;
   exchanges: Exchange[];
-  finisher: { by: string; against: string; damage: number; call: string } | null;
+  finisher: { by: string; against: string; damage: number; call: string; combat?: Record<string, CombatTrace> } | null;
   hp: Record<string, number>;
   fighters: FighterSnap[];
   wear: Record<string, Record<Slot, Condition>>;
