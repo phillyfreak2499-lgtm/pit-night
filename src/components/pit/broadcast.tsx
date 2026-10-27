@@ -2,12 +2,10 @@ import { createFrameLoop } from "@/lib/pit/frame-loop";
 import { useEffect, useRef, useState } from "react";
 import { PAINT } from "@/lib/pit/catalog";
 import { methodLabel } from "@/lib/pit/engine";
-import { halloweenVisuals } from "@/lib/pit/halloween";
-import { thanksgivingVisuals } from "@/lib/pit/thanksgiving";
 import { armSound, playBell, playClank, playCount, playDecision, playFinisher, playWeaponHit } from "@/lib/pit/sound";
 import type { Bout, Exchange, FightResult } from "@/lib/pit/types";
 import { Fx, drawSide, drawTop, impactPoints, project, stepBots } from "./cage-draw";
-import { arenaForWeek, hazardCallout, type ArenaId } from "./arena-scenes";
+import { arenaForWeek, arenaTheme, hazardCallout, type ArenaId } from "./arena-scenes";
 import { beatAt, buildBeats, fightDrive, lerp, type Beat, type Spot } from "./cage-motion";
 
 const ROUND_SHOW = 0.22;
@@ -225,7 +223,7 @@ export function Broadcast({
         combo: combo.n >= 2 && time - combo.at < 2.5 ? { n: combo.n, t: (time - combo.at) / 2.5, color: combo.color } : null,
         hazards,
         beams: heroSide ? (PAINT[heroSide.paint] ?? null) : beat.kind === "bumper" && mainEvent ? "#f0a202" : null,
-        festive: halloweenVisuals() || thanksgivingVisuals() || bout.week === 1,
+        festive: arenaTheme(arena) === "halloween" || arenaTheme(arena) === "thanksgiving",
         finish: hold > 0 ? Math.min(1, hold / 0.4) : 0,
         arena,
       });

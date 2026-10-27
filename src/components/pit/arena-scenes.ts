@@ -18,6 +18,12 @@ export const ARENAS: Record<ArenaId, { name: string; blurb: string }> = {
 
 export const ARENA_IDS = Object.keys(ARENAS) as ArenaId[];
 
+/** The holiday dressing that belongs to each arena's week, so a replay keeps its own week's theme. */
+export type ArenaTheme = "halloween" | "election" | "thanksgiving" | null;
+export function arenaTheme(arena: ArenaId): ArenaTheme {
+  return arena === "pit" ? "halloween" : arena === "ring" ? "election" : arena === "grand" ? "thanksgiving" : null;
+}
+
 /** Which arena a league week fights in. */
 export function arenaForWeek(week: number): ArenaId {
   return week === 2 ? "ring" : week === 3 ? "warehouse" : week === 4 ? "junkyard" : week === 5 ? "grand" : "pit";
