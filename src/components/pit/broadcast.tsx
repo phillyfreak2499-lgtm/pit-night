@@ -4,7 +4,7 @@ import { PAINT } from "@/lib/pit/catalog";
 import { methodLabel } from "@/lib/pit/engine";
 import { halloweenVisuals } from "@/lib/pit/halloween";
 import { thanksgivingVisuals } from "@/lib/pit/thanksgiving";
-import { armSound, playBell, playClank, playCount, playCrit, playDecision, playFinisher, playHit } from "@/lib/pit/sound";
+import { armSound, playBell, playClank, playCount, playDecision, playFinisher, playWeaponHit } from "@/lib/pit/sound";
 import type { Bout, Exchange, FightResult } from "@/lib/pit/types";
 import { Fx, drawSide, drawTop, impactPoints, stepBots } from "./cage-draw";
 import { beatAt, buildBeats, fightDrive, lerp, type Beat, type Spot } from "./cage-motion";
@@ -91,6 +91,8 @@ export function Broadcast({
     let shook = 0;
     // Hit-stop: the tape holds for a beat when steel meets steel.
     let freeze = 0;
+    // The finishing blow: slow motion and a held close-up for a beat.
+    let hold = 0;
     // Same bot landing again and again.
     let combo = { id: "", n: 0, at: -99, color: "#f0a202" };
     let countSaid = -1;
@@ -115,8 +117,9 @@ export function Broadcast({
 
     const frame = (_now: number, dt: number) => {
       const before = timeRef.current;
-      if (playing && freeze <= 0) timeRef.current = Math.min(total, timeRef.current + dt * speed);
+      if (playing && freeze <= 0) timeRef.current = Math.min(total, timeRef.current + dt * speed * (hold > 0 ? 0.3 : 1));
       if (freeze > 0) freeze -= dt;
+      if (hold > 0) hold -= dt;
       const time = timeRef.current;
       const jumped = Math.abs(time - before) > 1;
       if (jumped) {
@@ -158,6 +161,7 @@ export function Broadcast({
           shook = reduced ? 0 : (blocked ? 3 : 6 + drive.power * 14 + (crit ? 10 : 0)) * (canvas.width / 1200);
           freeze = reduced ? 0 : blocked ? 0.04 : crit ? 0.28 : 0.06 + drive.power * 0.08;
           fx.punch = reduced ? 0 : blocked ? 0.15 : crit ? 1 : 0.45;
+          if (beat.kind === "finisher" && !blocked && !reduced) hold = 1.1;
           const s = at.side.scale;
           if (!drive.replay) {
             if (blocked) fx.popText(at.side.x, at.side.y - s * 0.35, "BLOCKED", "#8eafc9", s * 0.2, 1.1);
@@ -175,8 +179,7 @@ export function Broadcast({
           } else if (blocked) combo = { ...combo, id: "", n: 0 };
         }
         if (blocked) playClank();
-        else if (crit) playCrit();
-        else playHit();
+        else playWeaponHit(attackerWeapon(result, drive.attacker ?? undefined) ?? drive.weapon ?? "", drive.power, crit);
       }
       if (shook > 0) shook *= Math.exp(-dt * 9);
       stepBots(drive, fx, trails, playing ? dt * speed : 0, reduced);
@@ -200,6 +203,7 @@ export function Broadcast({
         hazards,
         beams: heroSide ? (PAINT[heroSide.paint] ?? null) : beat.kind === "bumper" && mainEvent ? "#f0a202" : null,
         festive: halloweenVisuals() || thanksgivingVisuals() || bout.week === 1,
+        finish: hold > 0 ? Math.min(1, hold / 0.4) : 0,
       });
       drawTop(topCtx, top.width, top.height, drive, fx, trails, time, dt, reduced);
       setCaption(captionFor(result, bout, beat, noDamage));
@@ -437,4 +441,9 @@ function decisionWord(result: FightResult) {
   if (result.method === "dump") return "INTO THE PIT";
   if (result.method === "melee") return "LAST BOT MOVING";
   return "DECISION";
+}
+
+/** The landing bot's weapon family, so the hit sounds like that weapon. */
+function attackerWeapon(result: FightResult, attacker: string | undefined) {
+  return attacker ? result.fighters.find((f) => f.id === attacker)?.weaponFamily : undefined;
 }

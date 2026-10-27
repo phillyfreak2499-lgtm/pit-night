@@ -1532,13 +1532,14 @@ export function drawSideBot(
   const scale = u * (s.bot.classId === "tank" ? 1.06 : s.bot.classId === "specialist" ? 0.94 : 1);
   const liftPx = s.lift * scale;
 
-  // Shadow stays on the floor.
+  // Shadow stays on the floor: it shrinks and fades as the bot rises, and lies flat and wide on a flip.
   if (s.gone < 1) {
-    const spread = 1 + clamp(s.lift, 0, 1.2) * 0.22;
+    const air = clamp(s.lift, 0, 1.2);
+    const spread = (1 - air * 0.28) * (s.flipped ? 1.18 : 1);
     ctx.save();
-    ctx.globalAlpha = (1 - s.gone) * clamp(1 - s.lift * 0.6, 0.25, 1);
+    ctx.globalAlpha = (1 - s.gone) * clamp(1 - air * 0.7, 0.2, 1);
     ctx.translate(x + liftPx * 0.12, y);
-    ctx.scale(1, 0.18);
+    ctx.scale(1, s.flipped ? 0.14 : 0.18);
     const radius = scale * 0.62 * spread;
     const g = ctx.createRadialGradient(0, 0, radius * 0.12, 0, 0, radius);
     g.addColorStop(0, "rgba(0,0,0,0.82)");
@@ -1549,6 +1550,20 @@ export function drawSideBot(
     ctx.arc(0, 0, radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
+    // Contact patches: hard, dark, right where rubber or hull meets the floor. Gone the moment it lifts.
+    const touch = clamp(1 - air * 4, 0, 1) * (1 - s.gone);
+    if (touch > 0) {
+      ctx.save();
+      ctx.globalAlpha = touch * 0.85;
+      ctx.fillStyle = "rgba(0,0,0,0.9)";
+      const spots = s.flipped ? [0] : [-0.32, 0.32];
+      for (const sx of spots) {
+        ctx.beginPath();
+        ctx.ellipse(x + sx * scale * facing, y + scale * 0.004, scale * (s.flipped ? 0.42 : 0.15), scale * 0.028, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
   }
 
   ctx.save();
@@ -1731,6 +1746,39 @@ export function drawSideBot(
       const gy = top + i * f.height * u2 / 20;
       ctx.beginPath(); ctx.moveTo(-0.4 * u2, gy); ctx.lineTo(0.4 * u2, gy - u2 * 0.01); ctx.stroke();
     }
+  }
+  // Overhead rig: the flanks curve away from the light and the belly sits in shade.
+  const flank = ctx.createLinearGradient(-0.55 * u2, 0, 0.55 * u2, 0);
+  flank.addColorStop(0, "rgba(0,0,0,0.34)");
+  flank.addColorStop(0.2, "rgba(0,0,0,0)");
+  flank.addColorStop(0.8, "rgba(0,0,0,0)");
+  flank.addColorStop(1, "rgba(0,0,0,0.34)");
+  ctx.fillStyle = flank;
+  ctx.fillRect(-0.6 * u2, top, 1.2 * u2, f.height * u2);
+  const belly = ctx.createLinearGradient(0, top, 0, top + f.height * u2);
+  belly.addColorStop(0, "rgba(255,248,232,0.10)");
+  belly.addColorStop(0.12, "rgba(255,248,232,0)");
+  belly.addColorStop(0.62, "rgba(0,0,0,0)");
+  belly.addColorStop(1, "rgba(0,0,0,0.42)");
+  ctx.fillStyle = belly;
+  ctx.fillRect(-0.6 * u2, top, 1.2 * u2, f.height * u2);
+  // Arena lights slide across glossy paint as the bot moves, so it reads as metal in motion.
+  const gloss =
+    style.finish === "chrome" ? 0.42 : style.finish === "gold" ? 0.34 : style.finish === "iridescent" || style.finish === "holographic" ? 0.26 :
+    style.finish === "factory" ? 0.2 : style.finish === "satin" ? 0.12 : 0;
+  if (gloss > 0) {
+    ctx.globalCompositeOperation = "lighter";
+    for (const [lane, width] of [[0, 0.11], [0.43, 0.05]] as const) {
+      const pos = ((x / Math.max(1, u * 5) + time * 0.04 + lane + (hash(s.bot.id) % 7) / 7) % 1 + 1) % 1;
+      const gx = (-0.62 + pos * 1.24) * u2;
+      const glint = ctx.createLinearGradient(gx - width * u2, 0, gx + width * u2, 0);
+      glint.addColorStop(0, "rgba(255,252,240,0)");
+      glint.addColorStop(0.5, `rgba(255,252,240,${gloss * (lane ? 0.6 : 1)})`);
+      glint.addColorStop(1, "rgba(255,252,240,0)");
+      ctx.fillStyle = glint;
+      ctx.fillRect(gx - width * u2, top, width * 2 * u2, f.height * u2 * 0.7);
+    }
+    ctx.globalCompositeOperation = "source-over";
   }
   // Specular sheen, by finish.
   if (style.finish !== "matte") {
@@ -3554,6 +3602,8 @@ export type SideOpts = {
   beams?: string | null;
   /** Green ooze on a win. Week 1 tapes stay festive after the decorations come down. */
   festive?: boolean;
+  /** 0..1 slow-motion zoom-and-hold on the finishing blow. */
+  finish?: number;
 };
 
 function drawInstalledSide(
@@ -3888,7 +3938,10 @@ export function drawSide(
     pts.length > 1 ? Math.max(...pts.map((p) => p.x)) - Math.min(...pts.map((p) => p.x)) : w * 0.3;
   const wantZ = opts.reduced
     ? 1
-    : clamp(1 + drive.tight * 0.28 - clamp(spread / w - 0.3, 0, 0.5) * 0.4, 1, 1.32) + fx.punch * 0.28 + (opts.replay ? 0.18 : 0);
+    : clamp(1 + drive.tight * 0.32 - clamp(spread / w - 0.3, 0, 0.5) * 0.4 + clamp(0.24 - spread / w, 0, 0.24) * 0.6, 1, 1.42) +
+      fx.punch * 0.28 +
+      (opts.replay ? 0.18 : 0) +
+      (opts.finish ?? 0) * 0.32;
   const wantX = lerp(w / 2, focus.x, 0.55);
   const wantY = lerp(h * 0.55, focus.y - focus.size * 0.3, 0.45);
   const cam = fx.cam;
@@ -3901,7 +3954,7 @@ export function drawSide(
   const k = 1 - Math.exp(-dt * 2.2);
   cam.x = lerp(cam.x, wantX, k);
   cam.y = lerp(cam.y, wantY, k);
-  cam.z = lerp(cam.z, wantZ, 1 - Math.exp(-dt * (wantZ > cam.z ? (fx.punch > 0.2 ? 14 : 4) : 1.5)));
+  cam.z = lerp(cam.z, wantZ, 1 - Math.exp(-dt * (wantZ > cam.z ? (fx.punch > 0.2 || (opts.finish ?? 0) > 0 ? 14 : 4) : 1.5)));
   const half = w / 2 / cam.z;
   const halfH = h / 2 / cam.z;
   const cx = clamp(cam.x, half, w - half);

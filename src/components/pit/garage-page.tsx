@@ -124,8 +124,13 @@ export function GaragePage({ storeId }: { storeId: string }) {
       <section>
         <div className="mb-2 flex items-end justify-between gap-3">
           <SectionLabel>Coin jars</SectionLabel>
-          <Link to="/shop/$storeId" params={{ storeId }} className="text-sm text-amber">
-            Open the shop →
+          <Link
+            to="/shop/$storeId"
+            params={{ storeId }}
+            data-testid="garage-shop"
+            className="inline-flex min-h-11 items-center gap-2 bg-amber px-4 font-display tracking-wide text-deep uppercase hover:brightness-110"
+          >
+            Open the Shop →
           </Link>
         </div>
         <KeyLadder coins={bot.coins} />
