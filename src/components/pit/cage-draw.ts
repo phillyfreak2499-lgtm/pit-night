@@ -2,6 +2,7 @@ import { bannerVerdict } from "../../../scripts/copy-guard.mjs";
 import { EYES, LEDS, PAINT, SMOKE, TRIM, decalArt, styleOf } from "@/lib/pit/catalog";
 import { ELECTION_COLORS } from "@/lib/pit/election";
 import { arenaTheme, drawArenaHazards, drawArenaTopScene, paintArenaScene, type ArenaId, type ArenaTheme } from "./arena-scenes";
+import { drawFallSticker, drawFallTopper, drawFallWeapon, drawFallWeaponTop } from "./fall-art";
 import { armorEdges, deckHardware } from "./material-detail";
 import type { BotBody, ClassId } from "@/lib/pit/types";
 import { PIT, clamp, ease, hash, lerp, type BotState, type Drive, type Spot } from "./cage-motion";
@@ -768,7 +769,7 @@ function floorPt(x: number, y: number, w: number, h: number) {
   return [p.x, p.y] as const;
 }
 
-function paintBackdrop(c: CanvasRenderingContext2D, w: number, h: number, theme: ArenaTheme = null) {
+function paintBackdrop(c: CanvasRenderingContext2D, w: number, h: number, theme: ArenaTheme = "halloween") {
   const rnd = seeded(77);
   // Deep house.
   const sky = c.createLinearGradient(0, 0, 0, h);
@@ -2464,6 +2465,7 @@ function drawDecal(
   const Y = (t: number) => (b.top + h * t) * u;
   const art = decalArt(decal).art;
   if (drawFreshSticker(ctx, art, X, Y, u, w, h, number, readable)) return;
+  if (drawFallSticker(ctx, art, X(0.46), Y(0.5), Math.min(u * 0.1, h * u * 0.4))) return;
   if (art === "flames") {
     const layers: [string, string, number][] = [
       ["#ffd23a", "#d8261a", 1],
@@ -2803,6 +2805,10 @@ function drawTopper(
   if (!topper || topper === "none") return;
   ctx.save();
   ctx.lineCap = "round";
+  if (drawFallTopper(ctx, topper, top, u, time)) {
+    ctx.restore();
+    return;
+  }
   if (topper === "antenna") {
     ctx.strokeStyle = "#b8c2cc";
     ctx.lineWidth = Math.max(1.2, u * 0.009);
@@ -3367,6 +3373,10 @@ function weaponFront(
   }
   if (fam === "chainsaw" || fam === "slasher" || fam === "ghost" || fam === "launcher" || fam === "bones" || fam === "broom") {
     drawHalloweenWeapon(ctx, fam, f, u, spin, s.stroke);
+    return;
+  }
+  if (fam === "rivetgun" || fam === "crusher") {
+    drawFallWeapon(ctx, fam, fx, f.deck * u, u, s.stroke);
     return;
   }
   if (fam === "flip") {
@@ -5004,6 +5014,10 @@ function topWeapon(
   const fam = s.bot.weaponFamily;
   const skin = styleOf(s.bot).weaponSkin;
   ctx.fillStyle = "#cfcac0";
+  if (fam === "rivetgun" || fam === "crusher") {
+    drawFallWeaponTop(ctx, fam, len, wid, s.stroke);
+    return;
+  }
   if (skin === "hockey-machete" || fam === "slasher" || fam === "ghost" || fam === "chainsaw" || fam === "launcher" || fam === "bones" || fam === "broom") {
     ctx.fillStyle = fam === "ghost" ? "#d9ffe4" : fam === "launcher" ? "#e07014" : fam === "broom" ? "#c4a15a" : "#f4f1ea";
     ctx.fillRect(len * 0.35, -wid * 0.1, len * 0.42, wid * 0.2);

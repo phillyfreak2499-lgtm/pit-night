@@ -167,10 +167,10 @@ function sweep(at: number, dur: number, peak: number, type: OscillatorType, from
 /** Which family of sound a weapon makes. */
 export function hitVoice(weapon: string): "whine" | "clang" | "chop" | "scrape" | "crunch" | "whoosh" | "zap" | "thud" | "boom" | "punch" {
   if (["saw", "drum", "disc", "chainsaw", "thresher"].some((w) => weapon.includes(w))) return "whine";
-  if (["hammer", "carver"].includes(weapon)) return "clang";
+  if (["hammer", "carver", "rivetgun"].includes(weapon)) return "clang";
   if (["axe", "slasher", "ghost", "blade", "machete"].includes(weapon)) return "chop";
   if (["wedge", "flip", "broom"].includes(weapon)) return "scrape";
-  if (["claw", "bones"].includes(weapon)) return "crunch";
+  if (["claw", "bones", "crusher"].includes(weapon)) return "crunch";
   if (["flame", "burn"].includes(weapon)) return "whoosh";
   if (weapon === "tesla") return "zap";
   if (["flail", "piston"].includes(weapon)) return "thud";

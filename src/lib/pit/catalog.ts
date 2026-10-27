@@ -3,6 +3,8 @@ import { STICKER_ART, type BotBody, type BotDecal, type BotFinish, type BotLeds,
 import { ROSTER_PARTS } from "./roster";
 import { THANKSGIVING_WINDOW } from "./thanksgiving";
 import { ELECTION_WINDOW } from "./election";
+import { VETERANS_WINDOW } from "./veterans";
+import { RECYCLES_WINDOW } from "./recycles";
 
 export const SCRAP_CAP = 18;
 export const VERSION = 6;
@@ -104,6 +106,12 @@ const BASE_DECALS: { id: StickerArt; label: string }[] = [
   { id: "ivoted", label: "I Voted sticker" },
   { id: "ballot", label: "Ballot box" },
   { id: "capitol", label: "Capitol dome" },
+  { id: "dogtags", label: "Dog tags" },
+  { id: "yellowribbon", label: "Yellow ribbon" },
+  { id: "medal", label: "Service medal" },
+  { id: "recycle", label: "Recycling arrows" },
+  { id: "bottlecap", label: "Bottle cap" },
+  { id: "sprout", label: "Sprout" },
   { id: "roundel", label: "Number roundel" },
   { id: "gear", label: "Gear" },
   { id: "wrench", label: "Wrench" },
@@ -326,6 +334,11 @@ export const TOPPERS: { id: BotTopper; label: string }[] = [
   { id: "beacon", label: "Beacon" },
   { id: "dish", label: "Satellite dish" },
   { id: "flagpole", label: "Flag pole" },
+  { id: "tophat", label: "Top hat" },
+  { id: "bugle", label: "Bugle" },
+  { id: "tincan", label: "Tin can hat" },
+  { id: "pilgrimhat", label: "Pilgrim hat" },
+  { id: "wreath", label: "Harvest wreath" },
 ];
 
 export function bodyStyle(id: string | undefined) {
@@ -1210,6 +1223,32 @@ const FAMILIES: Family[] = [
       super: "A felling axe on a cherry-wood handle, after the old George Washington story. An honest overhead chop: it cannot tell a lie and it cannot hit twice fast. Election Week only. Eight weapon coins.",
     },
     windows: { super: ELECTION_WINDOW },
+  },
+  {
+    slot: "weapon",
+    family: "rivetgun",
+    stat: "demoClose",
+    key: "weapon",
+    tags: ["speed", "veterans"],
+    nudge: nudge(2, 3, 0, -1),
+    names: { super: "Rivet Gun" },
+    jobs: {
+      super: "A pneumatic rivet gun off a home-front factory floor, with a pressure gauge and an air hose. It fires a quick burst of three rivets: light, fast and hard to step away from. Veterans Day week only (Nov 8–14). Eight weapon coins.",
+    },
+    windows: { super: VETERANS_WINDOW },
+  },
+  {
+    slot: "weapon",
+    family: "crusher",
+    stat: "demoClose",
+    key: "weapon",
+    tags: ["smash", "recycles"],
+    nudge: nudge(4, -1, 2, -1),
+    names: { super: "Can Crusher" },
+    jobs: {
+      super: "A two-post can press with a hazard-striped plate. It drops straight down and flattens whatever is under it, then lifts slowly for the next one. Reuse, rebuild, battle. America Recycles Day week only (Nov 15–21). Eight weapon coins.",
+    },
+    windows: { super: RECYCLES_WINDOW },
   },
   {
     slot: "chassis",

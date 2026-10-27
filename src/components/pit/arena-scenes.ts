@@ -5,6 +5,9 @@
  * same floor area and the fight math never reads the arena.
  */
 import type { Spot } from "./cage-motion";
+import { chasingArrows, flatFlag, star } from "./fall-art";
+import { RECYCLES_COLORS } from "@/lib/pit/recycles";
+import { VETERANS_COLORS } from "@/lib/pit/veterans";
 
 export type ArenaId = "pit" | "ring" | "warehouse" | "junkyard" | "grand";
 
@@ -19,9 +22,17 @@ export const ARENAS: Record<ArenaId, { name: string; blurb: string }> = {
 export const ARENA_IDS = Object.keys(ARENAS) as ArenaId[];
 
 /** The holiday dressing that belongs to each arena's week, so a replay keeps its own week's theme. */
-export type ArenaTheme = "halloween" | "election" | "thanksgiving" | null;
+export type ArenaTheme = "halloween" | "election" | "veterans" | "recycles" | "thanksgiving";
 export function arenaTheme(arena: ArenaId): ArenaTheme {
-  return arena === "pit" ? "halloween" : arena === "ring" ? "election" : arena === "grand" ? "thanksgiving" : null;
+  return arena === "pit"
+    ? "halloween"
+    : arena === "ring"
+      ? "election"
+      : arena === "warehouse"
+        ? "veterans"
+        : arena === "junkyard"
+          ? "recycles"
+          : "thanksgiving";
 }
 
 /** Which arena a league week fights in. */
@@ -289,6 +300,7 @@ function paintWarehouse(c: CanvasRenderingContext2D, w: number, h: number, P: Pr
     c.ellipse(q.fl.x + rnd() * (q.fr.x - q.fl.x), q.bl.y + rnd() * (q.fl.y - q.bl.y), w * (0.02 + rnd() * 0.03), h * 0.008, 0, 0, Math.PI * 2);
     c.fill();
   }
+  paintVeteransDay(c, w, h, q, rnd);
   // Hanging shop lamps with light cones.
   for (let i = 0; i < 4; i++) {
     const x = w * (0.2 + i * 0.2);
@@ -316,6 +328,170 @@ function paintWarehouse(c: CanvasRenderingContext2D, w: number, h: number, P: Pr
     c.lineTo(x - w * 0.12, h * 0.85);
     c.fill();
   }
+}
+
+/** Where the flag hangs on the Warehouse wall, shared by the static scene and the live ripple. */
+function warehouseFlag(w: number, h: number, q: ReturnType<typeof floorQuad>) {
+  const y = h * 0.17;
+  const fh = Math.max(h * 0.05, Math.min((w * 0.3) / 1.9, (warehouseBanner(w, h, q).y - y) * 0.9));
+  const fw = fh * 1.9;
+  return { x: w / 2 - fw / 2, y, w: fw, h: fh };
+}
+
+/** The thank-you banner hangs low on the wall, where the fight camera always sees it. */
+function warehouseBanner(w: number, h: number, q: ReturnType<typeof floorQuad>) {
+  const bh = Math.max(10, h * 0.034);
+  return { x: w * 0.3, y: q.bl.y - bh - h * 0.012, w: w * 0.4, h: bh };
+}
+
+/** Veterans Day: the flag on the wall, a thank-you banner, bunting on the racks and stenciled crates. */
+function paintVeteransDay(c: CanvasRenderingContext2D, w: number, h: number, q: ReturnType<typeof floorQuad>, rnd: () => number) {
+  const { red, white, navy, gold, olive } = VETERANS_COLORS;
+  const flag = warehouseFlag(w, h, q);
+  c.fillStyle = "rgba(0,0,0,0.35)";
+  c.fillRect(flag.x + w * 0.006, flag.y + h * 0.008, flag.w, flag.h);
+  flatFlag(c, flag.x, flag.y, flag.w, flag.h);
+  c.fillStyle = "#2a2f36";
+  c.fillRect(flag.x - w * 0.01, flag.y - h * 0.008, flag.w + w * 0.02, h * 0.008);
+
+  // Banner low across the wall under the flag.
+  const { x: bx, y: by, w: bw, h: bh } = warehouseBanner(w, h, q);
+  c.fillStyle = navy;
+  c.fillRect(bx, by, bw, bh);
+  c.strokeStyle = gold;
+  c.lineWidth = Math.max(1, bh * 0.08);
+  c.strokeRect(bx + bh * 0.1, by + bh * 0.1, bw - bh * 0.2, bh - bh * 0.2);
+  c.fillStyle = white;
+  c.font = `bold ${Math.round(bh * 0.62)}px Oswald, Impact, sans-serif`;
+  c.textAlign = "center";
+  c.textBaseline = "middle";
+  c.fillText("THANK YOU, VETERANS", w / 2, by + bh * 0.54);
+  c.fillStyle = gold;
+  star(c, bx + bh * 0.7, by + bh / 2, bh * 0.3);
+  star(c, bx + bw - bh * 0.7, by + bh / 2, bh * 0.3);
+
+  // Pleated bunting fans on the wall either side of the flag.
+  for (const fx of [w * 0.27, w * 0.73]) {
+    const fy = flag.y + h * 0.01;
+    const r = w * 0.055;
+    for (const [rr, col] of [[1, red], [0.78, white], [0.56, red], [0.36, navy]] as const) {
+      c.fillStyle = col;
+      c.beginPath();
+      c.moveTo(fx - r * rr, fy);
+      c.arc(fx, fy, r * rr, 0, Math.PI);
+      c.closePath();
+      c.fill();
+    }
+    c.fillStyle = white;
+    for (let i = 0; i < 3; i++) star(c, fx - r * 0.2 + i * r * 0.2, fy + r * 0.12, r * 0.05);
+    c.strokeStyle = "rgba(0,0,0,0.16)";
+    c.lineWidth = 1;
+    for (let i = 1; i < 8; i++) {
+      const a = (i / 8) * Math.PI;
+      c.beginPath();
+      c.moveTo(fx, fy);
+      c.lineTo(fx + Math.cos(a) * r, fy + Math.sin(a) * r);
+      c.stroke();
+    }
+  }
+
+  // Olive supply crates with a stenciled star, stacked by the wall.
+  for (const x0 of [w * 0.215, w * 0.705]) {
+    for (const [dx, lvl] of [[0, 0], [0.042, 0], [0.021, 1]] as const) {
+      const s = w * 0.04;
+      const x = x0 + w * dx;
+      const y = q.bl.y - s * (lvl + 1) * 0.8;
+      c.fillStyle = olive;
+      c.fillRect(x, y, s, s * 0.8);
+      c.fillStyle = `rgba(0,0,0,${0.18 + rnd() * 0.12})`;
+      c.fillRect(x, y + s * 0.7, s, s * 0.1);
+      c.strokeStyle = "rgba(0,0,0,0.4)";
+      c.lineWidth = 1;
+      c.strokeRect(x, y, s, s * 0.8);
+      c.fillStyle = "rgba(244,241,234,0.8)";
+      star(c, x + s / 2, y + s * 0.38, s * 0.2);
+    }
+  }
+}
+
+/** America Recycles Day: sorting bins, a hand-painted sign, can bales and a neon sign on a pole. */
+function paintRecyclesDay(c: CanvasRenderingContext2D, w: number, h: number, q: ReturnType<typeof floorQuad>, rnd: () => number) {
+  const { green, bin, yellow, kraft } = RECYCLES_COLORS;
+  const ground = q.bl.y;
+  // Three sorting bins in front of the fence.
+  [bin, green, yellow].forEach((col, i) => {
+    const bw = w * 0.055;
+    const bh = h * 0.075;
+    const x = w * (0.19 + i * 0.065);
+    c.fillStyle = col;
+    c.beginPath();
+    c.moveTo(x, ground - bh);
+    c.lineTo(x + bw, ground - bh);
+    c.lineTo(x + bw * 0.92, ground);
+    c.lineTo(x + bw * 0.08, ground);
+    c.closePath();
+    c.fill();
+    c.fillStyle = "rgba(0,0,0,0.3)";
+    c.fillRect(x - bw * 0.04, ground - bh - h * 0.012, bw * 1.08, h * 0.014);
+    c.fillStyle = "rgba(0,0,0,0.18)";
+    c.fillRect(x + bw * 0.08, ground - h * 0.012, bw * 0.84, h * 0.012);
+    chasingArrows(c, x + bw / 2, ground - bh * 0.52, bw * 0.22, 0, "#f4f1ea", Math.max(1, bw * 0.06));
+  });
+
+  // Hand-painted plank sign nailed to the fence.
+  const sx = w * 0.38;
+  const sw = w * 0.24;
+  const sh = h * 0.05;
+  const sy = ground - h * 0.045 - sh * 0.75;
+  c.save();
+  c.translate(sx + sw / 2, sy + sh / 2);
+  c.rotate(-0.025);
+  c.fillStyle = kraft;
+  c.fillRect(-sw / 2, -sh / 2, sw, sh);
+  c.fillStyle = "rgba(0,0,0,0.15)";
+  for (let i = 1; i < 3; i++) c.fillRect(-sw / 2, -sh / 2 + (sh * i) / 3, sw, 1);
+  c.fillStyle = "#3a3834";
+  for (const [x, y] of [[-0.46, -0.3], [0.46, -0.3], [-0.46, 0.3], [0.46, 0.3]] as const) {
+    c.beginPath();
+    c.arc(x * sw, y * sh, Math.max(1, sh * 0.06), 0, Math.PI * 2);
+    c.fill();
+  }
+  c.fillStyle = "#17532c";
+  c.font = `bold ${Math.round(sh * 0.56)}px Oswald, Impact, sans-serif`;
+  c.textAlign = "center";
+  c.textBaseline = "middle";
+  c.fillText("REUSE · REBUILD · BATTLE", 0, sh * 0.04);
+  c.restore();
+
+  // Bales of crushed cans by the crane.
+  const tones = ["#c4c9cf", "#b0453a", "#2f9e57", "#d9b64a", "#3d6fb0", "#8e9399"];
+  for (const [bx, lvl] of [[0.72, 0], [0.76, 0], [0.8, 0], [0.74, 1], [0.78, 1]] as const) {
+    const s = w * 0.038;
+    const x = w * bx;
+    const y = ground - s * (lvl + 1) * 0.85;
+    c.fillStyle = "#5b5650";
+    c.fillRect(x, y, s, s * 0.85);
+    for (let k = 0; k < 26; k++) {
+      c.fillStyle = tones[Math.floor(rnd() * tones.length)]!;
+      c.fillRect(x + rnd() * s * 0.9, y + rnd() * s * 0.78, s * 0.12, s * 0.07);
+    }
+    c.fillStyle = "#1b1b1b";
+    c.fillRect(x, y + s * 0.25, s, Math.max(1, s * 0.04));
+    c.fillRect(x, y + s * 0.6, s, Math.max(1, s * 0.04));
+  }
+
+  // The neon sign's pole and dark backing. The glow is drawn live.
+  const n = recyclesNeon(w, h, q);
+  c.fillStyle = "#2a2d31";
+  c.fillRect(n.x - w * 0.003, n.y, w * 0.006, ground - n.y);
+  c.fillStyle = "#14161a";
+  c.beginPath();
+  c.arc(n.x, n.y, n.r * 1.35, 0, Math.PI * 2);
+  c.fill();
+}
+
+function recyclesNeon(w: number, h: number, q: ReturnType<typeof floorQuad>) {
+  return { x: w * 0.7, y: Math.min(h * 0.26, q.bl.y - h * 0.12), r: w * 0.03 };
 }
 
 function paintJunkyard(c: CanvasRenderingContext2D, w: number, h: number, P: Project) {
@@ -398,6 +574,7 @@ function paintJunkyard(c: CanvasRenderingContext2D, w: number, h: number, P: Pro
     c.fillStyle = `rgba(${90 + rnd() * 60},${80 + rnd() * 40},${60 + rnd() * 30},0.5)`;
     c.fillRect(rnd() * w, q.bl.y + rnd() * (h - q.bl.y), 1.5, 1.5);
   }
+  paintRecyclesDay(c, w, h, q, rnd);
 }
 
 function paintGrand(c: CanvasRenderingContext2D, w: number, h: number, P: Project) {
@@ -517,6 +694,14 @@ export function drawArenaHazards(ctx: CanvasRenderingContext2D, w: number, h: nu
       }
     }
   } else if (arena === "warehouse") {
+    // The flag ripples: moving light and shade over the static flag.
+    const flag = warehouseFlag(w, h, floorQuad(P, w, h));
+    const cols = 20;
+    for (let i = 0; i < cols; i++) {
+      const k = Math.sin(i * 0.55 - time * 2.2);
+      ctx.fillStyle = k > 0 ? `rgba(255,255,255,${0.09 * k})` : `rgba(0,0,0,${-0.16 * k})`;
+      ctx.fillRect(flag.x + (flag.w * i) / cols, flag.y, flag.w / cols + 0.5, flag.h);
+    }
     // A conveyor belt across the back, steam grates, and a pallet pit.
     const l = at(0.18, 0.3);
     const r = at(0.82, 0.3);
@@ -560,6 +745,14 @@ export function drawArenaHazards(ctx: CanvasRenderingContext2D, w: number, h: nu
     ctx.lineWidth = Math.max(1, pit.size * 0.02);
     ctx.strokeRect(pit.x - pit.size * 0.3, pit.y - pit.size * 0.06, pit.size * 0.6, pit.size * 0.12);
   } else if (arena === "junkyard") {
+    // Neon recycling sign: a slow turn, a buzz and the odd flicker.
+    const n = recyclesNeon(w, h, floorQuad(P, w, h));
+    ctx.save();
+    ctx.globalAlpha = Math.sin(time * 37) > 0.97 ? 0.35 : 1;
+    ctx.shadowColor = RECYCLES_COLORS.leaf;
+    ctx.shadowBlur = n.r * 0.8;
+    chasingArrows(ctx, n.x, n.y, n.r, time * 0.5, RECYCLES_COLORS.leaf, Math.max(1.5, n.r * 0.22));
+    ctx.restore();
     // A crusher plate with a pumping ram, rust puddles, and scrap spikes.
     const plate = at(0.5, 0.56);
     ctx.fillStyle = "#4a4640";
@@ -685,7 +878,11 @@ export function drawArenaTopScene(
     ctx.strokeStyle = "#e3b23c";
     ctx.lineWidth = Math.max(1, g.s * 0.008);
     ctx.strokeRect(g.x0 + 2, g.y0 + 2, g.s - 4, g.s - 4);
+    // A worn white star stenciled on the concrete.
+    ctx.fillStyle = "rgba(244,241,234,0.14)";
+    star(ctx, g.x0 + g.s * 0.5, g.y0 + g.s * 0.5, g.s * 0.16);
   } else if (arena === "junkyard") {
+    chasingArrows(ctx, g.x0 + g.s * 0.16, g.y0 + g.s * 0.16, g.s * 0.07, time * 0.3, "rgba(124,207,106,0.4)", Math.max(1, g.s * 0.014));
     const p = at(0.5, 0.56);
     const lift = (Math.sin(time * 1.6) + 1) / 2;
     ctx.fillStyle = lift < 0.1 ? "#7a7468" : "#4a4640";
