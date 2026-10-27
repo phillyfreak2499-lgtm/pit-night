@@ -1,6 +1,6 @@
 import { BuildLockBanner } from "./build-lock-banner";
 import { useState } from "react";
-import { KEY_SOURCE, PARTS, SLOT_LABEL, tierWord, type Part } from "@/lib/pit/catalog";
+import { KEY_SOURCE, PARTS, SLOT_LABEL, partById, tierWord, type Part } from "@/lib/pit/catalog";
 import { SHOW_EFFECTS } from "@/lib/pit/halloween";
 import { THANKSGIVING_SHOW_EFFECTS, isThanksgivingPart } from "@/lib/pit/thanksgiving";
 import { SELL_BACK, buyCheck, canSeeLoadout, sellCheck, shopOpen, showCheck } from "@/lib/pit/engine";
@@ -9,6 +9,7 @@ import type { Slot } from "@/lib/pit/types";
 import { Btn, SectionLabel } from "./bits";
 import { CoinStack, KeyLadder, UpgradeHowTo } from "./key-ladder";
 import { canEnterBay, LockedBay } from "./bay-lock";
+import { PartDetails, TryOnPanel } from "./try-on";
 
 const SLOTS: Slot[] = ["chassis", "drive", "weapon", "armor", "utility", "brain"];
 
@@ -29,6 +30,8 @@ export function ShopPage({ storeId }: { storeId: string }) {
   const sellPart = usePit((s) => s.sellPart);
   // Two taps to sell: the first arms the button, the second sells.
   const [selling, setSelling] = useState<string | null>(null);
+  // Try a part on before buying: a side-by-side preview, nothing is spent.
+  const [trying, setTrying] = useState<string | null>(null);
   const buyShow = usePit((s) => s.buyShow);
   const propose = usePit((s) => s.propose);
   const [slot, setSlot] = useState<Slot>("weapon");
@@ -79,6 +82,9 @@ export function ShopPage({ storeId }: { storeId: string }) {
               </button>
             ))}
           </div>
+          {trying && partById(trying)?.slot === slot ? (
+            <TryOnPanel data={data} storeId={storeId} part={partById(trying)!} onClose={() => setTrying(null)} />
+          ) : null}
           <ul className="mt-4 flex flex-col gap-3">
             {parts.map((part) => {
               const check = buyCheck(data, storeId, part);
@@ -95,6 +101,7 @@ export function ShopPage({ storeId }: { storeId: string }) {
                     <p className="font-display text-sm tracking-widest text-amber uppercase">{tierWord(part.tier)}</p>
                   </div>
                   <p className="mt-2 max-w-3xl text-sm text-muted">{part.job}</p>
+                  <PartDetails part={part} />
                   <ul className="mt-3 flex flex-wrap gap-2 text-sm">
                     <li className={`flex items-center gap-2 border px-2 py-1 ${coinsOk ? "border-ok/50 text-ok" : "border-line text-muted"}`}>
                       <span>{coinsOk ? "✓" : "✗"}</span>
@@ -139,6 +146,13 @@ export function ShopPage({ storeId }: { storeId: string }) {
                         {selling === part.id ? `Tap again: sell for ${SELL_BACK}` : `Sell for ${SELL_BACK}`}
                       </Btn>
                     ) : null}
+                    <Btn
+                      tone={trying === part.id ? "spark" : "line"}
+                      testId={`try-${part.id}`}
+                      onClick={() => setTrying(trying === part.id ? null : part.id)}
+                    >
+                      {trying === part.id ? "Take it off" : "Try on"}
+                    </Btn>
                     <Btn tone="ghost" onClick={() => propose(storeId, part.id, part.job)}>
                       Propose
                     </Btn>
