@@ -20,11 +20,16 @@ import {
 export function ArenaHero({
   result,
   className = "",
+  onLap,
 }: {
   result: FightResult | null;
   className?: string;
+  /** Called each time the tape finishes a loop, so the page can swap in another fight. */
+  onLap?: () => void;
 }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
+  const lapRef = useRef(onLap);
+  lapRef.current = onLap;
 
   useEffect(() => {
     const canvas = ref.current;
@@ -82,6 +87,7 @@ export function ArenaHero({
       if (thisLap !== lap) {
         lap = thisLap;
         trails.clear();
+        lapRef.current?.();
       }
       const time = start + inLoop;
       let drive: Drive;

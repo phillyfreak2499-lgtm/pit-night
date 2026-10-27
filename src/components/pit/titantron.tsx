@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { CLASS_META } from "@/lib/pit/catalog";
-import { useMemo } from "react";
-import { botFor, buildCard, championshipFinalists, conferenceStandings, houseTape, regularSeasonRecordOf } from "@/lib/pit/engine";
+import { useEffect, useMemo, useState } from "react";
+import { botFor, buildCard, championshipFinalists, conferenceStandings, randomHouseTape, regularSeasonRecordOf } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
 import { programWeek } from "@/lib/pit/training";
 import { weekDeadline } from "@/lib/pit/time";
@@ -25,7 +25,10 @@ export function Titantron() {
     buildCard(data).find((b) => b.kind === "final" || b.title === "Main event");
   const boss = data.session.role === "commissioner";
   const replay = featured?.result && featured.result.fighters.length === 2 ? featured.result : null;
-  const house = useMemo(() => houseTape("saw-wedge")?.result ?? null, []);
+  // Between real cards the screen runs house fights: a new pair of random builds and looks every loop.
+  const [houseSeed, setHouseSeed] = useState(1);
+  useEffect(() => setHouseSeed(Math.floor(Math.random() * 1_000_000_000) + 1), []);
+  const house = useMemo(() => randomHouseTape(houseSeed).result, [houseSeed]);
   const heroTape = replay ?? house;
 
   return (
@@ -33,7 +36,7 @@ export function Titantron() {
       <section className="cage-floor relative overflow-hidden border border-line bg-deep">
         <div className="hazard h-2" />
         <div className="relative lg:min-h-[25rem]">
-          <ArenaHero result={heroTape} className="aspect-video w-full lg:absolute lg:inset-y-0 lg:right-0 lg:aspect-auto lg:h-full lg:w-[64%]" />
+          <ArenaHero result={heroTape} onLap={replay ? undefined : () => setHouseSeed((s) => s + 1)} className="aspect-video w-full lg:absolute lg:inset-y-0 lg:right-0 lg:aspect-auto lg:h-full lg:w-[64%]" />
           <div className="pointer-events-none absolute inset-y-0 left-[36%] hidden w-48 bg-gradient-to-r from-deep to-transparent lg:block" />
           <span className="absolute top-3 right-3 flex items-center gap-2 bg-deep/80 px-2 py-1 font-display text-xs tracking-widest text-fg uppercase">
             <span className="live-dot h-2 w-2 rounded-full bg-spark" />

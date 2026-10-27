@@ -1,5 +1,12 @@
 import {
+  BODY_STYLES,
   CLASS_META,
+  DECALS,
+  EYES,
+  FINISHES,
+  PAINT,
+  TOPPERS,
+  TRIM,
   batteryOf,
   partById,
   partsFor,
@@ -27,6 +34,7 @@ import { BOLTS, TUNE_UP_BONUS } from "./training";
 import { tunedUp } from "./week";
 import type {
   Bot,
+  BotStyle,
   Bout,
   ClassId,
   Condition,
@@ -1687,6 +1695,80 @@ export function houseTape(cardId: string): Bout | null {
   const world = houseWorld();
   const bout = makeBout(1, 1, "bout", card.title, [card.a], [card.b]);
   const result = simulateDuel(world, card.a, card.b, `house|${card.id}`);
+  result.wear = {};
+  bout.result = result;
+  return bout;
+}
+
+const HOUSE_NAMES = [
+  "RIVET", "SPARKPLUG", "GRINDSTONE", "TORQUE", "BULLDOZER", "HAYMAKER", "VOLTAGE", "LUGNUT",
+  "SCRAPPER", "IRONSIDE", "WRECKSAW", "TURBINE", "CLAMPDOWN", "DYNAMO", "BACKFIRE", "PISTON",
+];
+const HOUSE_GRADES: Grade[] = ["green", "blue", "blue", "orange", "red"];
+
+/** Small seeded generator so a given seed always draws the same random house fight. */
+function seededRandom(seed: number) {
+  let s = seed >>> 0 || 1;
+  return () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * A house fight between two randomly built bots: random class, buyable parts in every
+ * slot, paint, finish, stickers, trim, eyes and topper, and a random week of colors.
+ * It never touches a store. The home screen cycles through these between real cards.
+ */
+export function randomHouseTape(seed: number): Bout {
+  const rand = seededRandom(seed);
+  const pick = <T,>(list: readonly T[]): T => list[Math.floor(rand() * list.length)]!;
+  const world = houseWorld();
+  const ids = ["ai-striker", "ai-tank"] as const;
+  const names = [...HOUSE_NAMES].sort(() => rand() - 0.5);
+  const colors = Object.keys(PAINT);
+  const decals = DECALS.map((d) => d.id).filter((id) => !String(id).startsWith("champion"));
+  ids.forEach((id, i) => {
+    const classId = pick<ClassId>(["striker", "tank", "specialist"]);
+    const gear = (slot: Slot) => {
+      const options = partsFor(slot, classId).filter((p) => p.tier !== "championship" && (slot !== "chassis" || !p.classLock || p.classLock === classId));
+      return pick(options).id;
+    };
+    const loadout: Loadout = {
+      chassis: gear("chassis"),
+      drive: gear("drive"),
+      weapon: gear("weapon"),
+      armor: gear("armor"),
+      utility: rand() < 0.25 ? null : gear("utility"),
+      brain: gear("brain"),
+    };
+    const bodies = BODY_STYLES.filter((b) => b.classId === classId);
+    const sticker = () => pick(decals);
+    const style: BotStyle = {
+      body: pick(bodies).id,
+      finish: pick(FINISHES.filter((f) => f.id !== "gold")).id,
+      decal: sticker(),
+      stickers: { left: sticker(), right: sticker(), hood: sticker(), rear: sticker() },
+      trim: pick(Object.keys(TRIM)),
+      eye: pick(Object.keys(EYES)),
+      flag: rand() < 0.5,
+      topper: pick(TOPPERS).id,
+    };
+    world.stores = world.stores.map((s) => (s.id === id ? { ...s, paint: pick(colors), name: `House ${i + 1}` } : s));
+    world.bots = world.bots.map((b) =>
+      b.storeId === id
+        ? { ...b, name: names[i]!, classId, equipped: { ...loadout }, draft: { ...loadout }, locked: { ...loadout }, style, look: pick(["plain", "stripe", "chevron", "rivets"] as const), number: String(1 + Math.floor(rand() * 99)) }
+        : b,
+    );
+    world.storeCards = world.storeCards.map((c) =>
+      c.storeId === id ? { ...c, grades: Object.fromEntries(METRICS.map((m) => [m.stat, pick(HOUSE_GRADES)])) } : c,
+    );
+  });
+  const bout = makeBout(1, 1, "bout", "House drill", [ids[0]], [ids[1]]);
+  const result = simulateDuel(world, ids[0], ids[1], `house|random|${seed}`);
   result.wear = {};
   bout.result = result;
   return bout;
