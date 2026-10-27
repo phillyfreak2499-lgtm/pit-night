@@ -12,6 +12,7 @@ import { writeGazette } from "@/lib/pit/gazette-server";
 import { takeLeagueSeason, useSyncStatus } from "@/lib/pit/sync";
 import { DeskCodes } from "./desk-codes";
 import { ClaudeCheck } from "./claude-copy";
+import { RemindersPanel } from "./reminders-panel";
 
 export function DeskPage() {
   const data = usePit();
@@ -125,6 +126,7 @@ function DeskLive() {
       <KickoffPanel />
       <CoinGift />
       <ClaudeCheck />
+      <RemindersPanel />
       <SyncPanel />
       <TrainingSwitch />
       <HousePin />
