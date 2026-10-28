@@ -5,6 +5,7 @@ import {
   ClipboardCheck,
   FlaskConical,
   HelpCircle,
+  LogOut,
   Newspaper,
   Play,
   Radio,
@@ -53,6 +54,7 @@ export function PitShell({ children }: { children: React.ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [ready, setReady] = useState(false);
   const [passOpen, setPassOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   useEffect(() => {
     const open = () => setPassOpen(true);
     window.addEventListener("pit:open-clipboard", open);
@@ -64,6 +66,18 @@ export function PitShell({ children }: { children: React.ReactNode }) {
   const dismissTutorial = usePit((s) => s.dismissTutorial);
   const showTutorial = usePit((s) => s.showTutorial);
   const muted = useSoundMuted();
+  const session = usePit((s) => s.session);
+  const signPublic = usePit((s) => s.signPublic);
+  const sync = useSyncStatus();
+  useEffect(() => {
+    if (!loggingOut) return;
+    if (session.role === "public") {
+      setLoggingOut(false);
+      setPassOpen(true);
+    } else if (sync.state === "error") {
+      setLoggingOut(false);
+    }
+  }, [loggingOut, session.role, sync.state]);
   useEffect(() => {
     let live = true;
     void Promise.resolve(usePit.persist.rehydrate()).finally(() => {
@@ -107,7 +121,7 @@ export function PitShell({ children }: { children: React.ReactNode }) {
           {veterans ? <VeteransBanner /> : null}
           {recycles ? <RecyclesBanner /> : null}
           <OozeCelebration />
-          <header className="no-print sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-line bg-deep/95 px-4 py-3 backdrop-blur md:px-6">
+          <header className="no-print sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-line bg-deep/95 px-4 py-3 backdrop-blur md:px-6">
             <div className="md:hidden">
               <Brand compact />
             </div>
@@ -153,6 +167,28 @@ export function PitShell({ children }: { children: React.ReactNode }) {
                 Clipboard
               </button>
             </div>
+            {ready && session.role !== "public" ? (
+              <div className="flex w-full items-center justify-between gap-3 border-t border-line pt-3">
+                <p className="min-w-0 text-sm text-muted">
+                  Signed in as <span className="font-semibold text-fg">{ROLE_WORD[session.role]}</span>
+                </p>
+                <button
+                  type="button"
+                  data-testid="log-out"
+                  disabled={loggingOut || sync.state === "saving"}
+                  className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 border-2 border-amber bg-amber px-4 font-display text-sm tracking-wide text-deep uppercase hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber disabled:cursor-wait disabled:opacity-60"
+                  onClick={() => {
+                    setLoggingOut(true);
+                    signPublic();
+                    setMore(false);
+                    setGuide(false);
+                  }}
+                >
+                  <LogOut className="size-4" aria-hidden />
+                  {loggingOut ? "Logging out…" : "Log Out"}
+                </button>
+              </div>
+            ) : null}
           </header>
           <Flash />
           <Celebrate />
@@ -648,13 +684,13 @@ function PassSheet({ onClose }: { onClose: () => void }) {
         </form>
         <button
           type="button"
-          className="mt-4 min-h-11 text-sm text-muted"
+          className="mt-4 min-h-12 w-full border-2 border-amber bg-amber px-4 font-display tracking-wide text-deep uppercase hover:brightness-110"
           onClick={() => {
             signPublic();
             onClose();
           }}
         >
-          Sign out to the public side
+          Log Out
         </button>
       </div>
     </Modal>
