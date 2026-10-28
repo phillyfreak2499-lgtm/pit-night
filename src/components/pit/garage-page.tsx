@@ -20,13 +20,12 @@ import {
 } from "@/lib/pit/engine";
 import { paintHex, usePit, type PitState } from "@/lib/pit/store";
 import { cosmeticProgress, cosmeticUnlocked, rewardFor, type CosmeticKind } from "@/lib/pit/cosmetics";
-import type { BotLook, GarageLook, Slot, StoreCard } from "@/lib/pit/types";
+import type { BotLook, GarageLook, Slot } from "@/lib/pit/types";
 import { garageSpinStartsPlaying } from "@/lib/pit/turntable";
 import { BotPortrait, useBotLook, type BotLookProps } from "./bot-portrait";
 import { KeyLadder } from "./key-ladder";
-import { ScoreInputs } from "./score-card";
 import { canEnterBay, LockedBay } from "./bay-lock";
-import { Btn, Field, GradeRow, SectionLabel, StatStrip, TextInput } from "./bits";
+import { Btn, Field, SectionLabel, StatStrip, TextInput } from "./bits";
 import { ScrimmagePanel } from "./scrimmage-panel";
 import { SpyPanel } from "./spy-panel";
 import { StreakBadge } from "./streak-badge";
@@ -39,7 +38,6 @@ export function GaragePage({ storeId }: { storeId: string }) {
   const signCaptain = usePit((s) => s.signCaptain);
   const lockStore = usePit((s) => s.lockStore);
   const setDraftPart = usePit((s) => s.setDraftPart);
-  const updateCard = usePit((s) => s.updateCard);
   const nameMvp = usePit((s) => s.nameMvp);
   const renameCrew = usePit((s) => s.renameCrew);
   const addCrew = usePit((s) => s.addCrew);
@@ -233,16 +231,6 @@ export function GaragePage({ storeId }: { storeId: string }) {
         <p className="text-sm text-muted">Sign in with the bay code to test this build against the house drills. The tape does not damage the bot.</p>
       )}
 
-      {card && captain ? <CardForm storeId={storeId} card={card} frozen={data.phase !== "open" && data.session.role !== "commissioner"} onChange={(patch) => updateCard(storeId, patch)} /> : null}
-      {card && !captain ? (
-        <section className="border border-line p-4">
-          <SectionLabel>This week's card</SectionLabel>
-          <div className="mt-3">
-            <GradeRow card={card} />
-          </div>
-        </section>
-      ) : null}
-
       {quotes.length ? (
         <section className="border border-line p-4">
           <SectionLabel>Repair quotes</SectionLabel>
@@ -385,35 +373,6 @@ function Meter({ label, value, hint }: { label: string; value: string; hint: str
       <p className="font-display text-2xl leading-none">{value}</p>
       <p className="mt-2 text-xs text-muted">{hint}</p>
     </div>
-  );
-}
-
-function CardForm({
-  storeId,
-  card,
-  frozen,
-  onChange,
-}: {
-  storeId: string;
-  card: StoreCard;
-  frozen: boolean;
-  onChange: (patch: Partial<StoreCard>) => void;
-}) {
-  return (
-    <section className="border border-line bg-surface p-4">
-      <SectionLabel>Weekly store card</SectionLabel>
-      <p className="mt-2 text-sm text-muted">Six numbers. Each one pays coins to one part of the bot: green 3, blue 2, orange 1, red 0.</p>
-      <div className="mt-3">
-        <GradeRow card={card} />
-      </div>
-      <div className="mt-4">
-        <ScoreInputs card={card} disabled={frozen} onChange={onChange} />
-      </div>
-      {card.projected ? <p className="mt-3 text-sm text-amber">House projection. The desk clicks in the official colors Sunday, before Monday's fights.</p> : null}
-      <p className="mt-2 text-xs text-muted" data-testid={`card-${storeId}`}>
-        NSNU → chassis · Conv → armor · Demo Rate → drive · Demo Close → weapon · Arch Supports → utility · Demo Ticket → brain.
-      </p>
-    </section>
   );
 }
 
