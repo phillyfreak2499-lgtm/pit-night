@@ -84,5 +84,5 @@ export function PitMap() {
 
 function DoorBot({ storeId }: { storeId: string }) {
   const look = useBotLook(storeId);
-  return <BotPortrait look={look} zoom={0.78} className="absolute inset-0 h-full w-full" />;
+  return <BotPortrait look={look} zoom={0.64} className="absolute inset-0 h-full w-full" />;
 }
