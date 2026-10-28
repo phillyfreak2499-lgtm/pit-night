@@ -11,6 +11,25 @@ import { PIT, clamp, ease, hash, lerp, type BotState, type Drive, type Spot } fr
 /* Colour helpers                                                      */
 /* ------------------------------------------------------------------ */
 
+function drawJanelleFlag(ctx: CanvasRenderingContext2D, topper: string, x: number, y: number, size: number) {
+  const colors: Record<string, string> = { pink: "#ec4899", red: "#dc2626", purple: "#9333ea", blue: "#2563eb", teal: "#0f766e", gold: "#fbbf24" };
+  ctx.save(); ctx.translate(x, y); ctx.scale(size, size);
+  ctx.strokeStyle = "#f3efe6"; ctx.lineWidth = 0.025;
+  ctx.beginPath(); ctx.moveTo(-0.4, 0.9); ctx.lineTo(-0.4, -0.4); ctx.stroke();
+  ctx.fillStyle = colors[topper.slice(8)] ?? colors.pink;
+  ctx.beginPath(); ctx.moveTo(0, 0.52);
+  ctx.bezierCurveTo(-0.18, 0.35, -0.65, 0.04, -0.48, -0.25);
+  ctx.bezierCurveTo(-0.35, -0.48, -0.1, -0.38, 0, -0.22);
+  ctx.bezierCurveTo(0.1, -0.38, 0.35, -0.48, 0.48, -0.25);
+  ctx.bezierCurveTo(0.65, 0.04, 0.18, 0.35, 0, 0.52);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = topper === "janelle-gold" ? "#241b12" : "#ffffff";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.font = "bold 0.15px sans-serif";
+  ctx.fillText("TEAM", 0, -0.08); ctx.fillText("JANELLE", 0, 0.1);
+  ctx.restore();
+}
+
 function rgb(hex: string) {
   const raw = hex.replace("#", "");
   const full =
@@ -2894,6 +2913,8 @@ function drawTopper(
     ctx.beginPath();
     ctx.arc(u * 0.05, top - u * 0.3, u * 0.014, 0, Math.PI * 2);
     ctx.fill();
+  } else if (topper?.startsWith("janelle-")) {
+    drawJanelleFlag(ctx, topper, u * 0.15, top - u * 0.34, u * 0.42);
   } else if (topper === "flagpole") {
     ctx.strokeStyle = "#f3efe6";
     ctx.lineWidth = Math.max(1.2, u * 0.01);
@@ -4964,9 +4985,11 @@ function drawTopperPlan(
   time: number,
   eye: string,
 ) {
-  if (!topper || topper === "none" || !["beacon", "dish", "flagpole"].includes(topper)) return;
+  if (!topper || topper === "none" || (!["beacon", "dish", "flagpole"].includes(topper) && !topper.startsWith("janelle-"))) return;
   ctx.save();
-  if (topper === "beacon") {
+  if (topper.startsWith("janelle-")) {
+    drawJanelleFlag(ctx, topper, 0, -wid * 0.3, wid * 0.75);
+  } else if (topper === "beacon") {
     const pulse = 0.55 + Math.sin(time * 6) * 0.35;
     ctx.fillStyle = `rgba(255,70,40,${0.45 * pulse})`;
     ctx.beginPath();
