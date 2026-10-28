@@ -1,3 +1,4 @@
+import { GameReminders } from "./game-reminders";
 import { Modal } from "./modal";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
@@ -157,6 +158,7 @@ export function PitShell({ children }: { children: React.ReactNode }) {
           <Celebrate />
           {ready ? (
             <main key={pathname} className="page-in px-4 pt-5 pb-28 md:px-6 md:pb-10">
+              <GameReminders />
               {children}
             </main>
           ) : (

@@ -1,3 +1,4 @@
+import { gameReminders } from "../src/lib/pit/game-reminders.ts";
 /** Daily 8 a.m. store reminders: what they say, when they go, and never twice a day. */
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -95,4 +96,13 @@ test("each store is emailed at most once a day; a failed send retries on the nex
   assert.equal(paused.sent, 0);
   delete process.env.RESEND_API_KEY;
   delete process.env.NUDGE_FROM;
+});
+
+test('in-game reminders start at 5pm and yesterday follow-ups at 9am Central',()=>{
+ const data=league();
+ assert.equal(gameReminders(data,'plano',new Date('2026-10-28T13:59:00Z')).length,0);
+ assert.ok(gameReminders(data,'plano',new Date('2026-10-28T14:00:00Z')).every(r=>r.title.startsWith('Follow up')));
+ assert.equal(gameReminders(data,'plano',new Date('2026-10-28T21:59:00Z')).some(r=>r.title.startsWith('Before')),false);
+ assert.equal(gameReminders(data,'plano',new Date('2026-10-28T22:00:00Z')).some(r=>r.title.startsWith('Before')),true);
+ assert.equal(gameReminders(data,'missing',new Date('2026-10-28T22:00:00Z')).length,0);
 });
