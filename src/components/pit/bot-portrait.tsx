@@ -174,7 +174,8 @@ export function BotPortrait({
         if (!hot && heat < 0.002) heat = 0;
         const w = canvas.width;
         const h = canvas.height;
-        const u = Math.min(w * 0.62, h * 1.25) * zoom;
+        // Reserve headroom for tall shells, antennas, and heart flags in every portrait.
+        const u = Math.min(Math.min(w * 0.62, h * 1.25) * zoom, h * 0.6);
         const turntable = Boolean(spinYaw && spinPlaying);
         if (turntable && spinPlaying?.current && spinYaw) {
           spinYaw.current = (spinYaw.current + garageYawStep(dt)) % (Math.PI * 2);
