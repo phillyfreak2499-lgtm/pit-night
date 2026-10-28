@@ -1438,7 +1438,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         const current = styleOf(bot, bot.classId);
         const next = styleOf({ classId: bot.classId, style: { ...current, ...nextPatch, stickers: nextPatch.stickers ?? (nextPatch.decal !== undefined ? { ...current.stickers!, hood: nextPatch.decal } : current.stickers) } });
         const store = data.stores.find(s => s.id === storeId);
-        if (!store || !checkedCosmeticLoadout(data, storeId, { paint: store.paint, look: bot.look, number: bot.number, style: next })) {
+        if (!store || !checkedCosmeticLoadout(data, storeId, { paint: store.paint, look: bot.look, number: bot.number, style: next }, true)) {
           set({ flash: "Earn or purchase that cosmetic before equipping it." }); return;
         }
         if (nextPatch.body) {

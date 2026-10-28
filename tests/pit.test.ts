@@ -1465,3 +1465,25 @@ test("the pit banner stays locked until a win and rejects profanity and trademar
   assert.equal(checkedCosmeticLoadout(store.getState(), "plano", look)?.style.banner, "");
   assert.equal(commandArgs.proposeCosmetic.safeParse(["plano", { ...look, style: { ...look.style, banner: "x".repeat(13) } }]).success, false);
   assert.equal(planoCoins(store), before);});
+
+test("free heart topper can be equipped with a previously equipped locked cosmetic", () => {
+ const league=state();
+ league.setState({ bots: league.getState().bots.map(b=>b.storeId==='plano'?{...b,style:{...styleOf(b),eye:'blue'}}:b) });
+ league.getState().setStyle('plano',{topper:'janelle-purple'});
+ assert.equal(league.getState().bots.find(b=>b.storeId==='plano')!.style?.topper,'janelle-purple');
+ league.getState().setStyle('plano',{topper:'crown'});
+ assert.equal(league.getState().bots.find(b=>b.storeId==='plano')!.style?.topper,'janelle-purple');
+});
+
+test("every store can equip every free Team Janelle color", () => {
+ const league=state('commissioner');
+ league.setState({bots:league.getState().bots.map(b=>({...b,style:styleOf(b)}))});
+ for(const row of league.getState().stores) {
+  for(const color of ['pink','red','purple','blue','teal','gold'] as const) {
+   const topper=`janelle-${color}` as const;
+   assert.equal(commandArgs.setStyle.safeParse([row.id,{topper}]).success,true);
+   league.getState().setStyle(row.id,{topper});
+   assert.equal(league.getState().bots.find(b=>b.storeId===row.id)!.style?.topper,topper,row.id);
+  }
+ }
+});
