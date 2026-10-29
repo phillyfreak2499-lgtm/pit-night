@@ -1,0 +1,60 @@
+.halloween-arcade {
+  background-image: radial-gradient(ellipse at 50% 0%, #51295a66, transparent 62%);
+  isolation: isolate;
+}
+
+.arcade-invite-art {
+  background: radial-gradient(ellipse at 50% 90%, #754a9259, #20182c00 72%);
+  border-bottom: 1px solid #ad79dc55;
+}
+
+.arcade-hat-table {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 36px, #0d07184d 37px 39px),
+    radial-gradient(ellipse at 50% 100%, #68384d, #2c1737 75%);
+  box-shadow:
+    inset 0 -12px 0 #120c1b,
+    inset 0 2px 14px #b57c4422;
+}
+
+.arcade-moving-hat {
+  transition-property: left, transform;
+  transition-timing-function: ease-in-out;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.arcade-pumpkin-patch,
+.arcade-potion-shelf {
+  background: radial-gradient(ellipse at 50% 100%, #3c2844, #120e1b 85%);
+}
+
+.arcade-pumpkin-glow {
+  filter: drop-shadow(0 0 5px #fff374);
+}
+
+.arcade-prize {
+  background: radial-gradient(circle at 35% 30%, #a5742d, #31200e);
+  box-shadow: 0 0 45px #f4bd3433;
+}
+
+.arcade-reduced-guide {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arcade-moving-hat {
+    transition-duration: 0ms !important;
+  }
+
+  .arcade-reduced-guide {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+  }
+}

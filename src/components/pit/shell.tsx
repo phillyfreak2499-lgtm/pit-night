@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
 const StarterBodyPicker = lazy(() => import("./starter-body-picker"));
+const HalloweenArcade = lazy(() => import("./halloween-arcade"));
 import { TUTORIAL_REV, applyHulen, usePit } from "@/lib/pit/store";
 import { startSync, useSyncStatus } from "@/lib/pit/sync";
 import { setSoundMuted, soundMuted, subscribeSound } from "@/lib/pit/sound";
@@ -99,6 +100,7 @@ export function PitShell({ children }: { children: React.ReactNode }) {
   const veterans = Boolean(now && veteransVisuals(now));
   const recycles = Boolean(now && recyclesVisuals(now));
   const myStore = usePit((s) => (s.session.role === "captain" || s.session.role === "crew" ? s.session.storeId : null));
+  const needsStarterBody = usePit((s) => s.week === 1 && Boolean(s.session.storeId) && ["crew", "captain"].includes(s.session.role) && !s.bots.find((bot) => bot.storeId === s.session.storeId)?.style?.body);
   return (
     <div className={`min-h-screen text-fg ${halloween ? "halloween-site" : ""} ${thanksgiving ? "thanksgiving-site" : ""} ${election ? "election-site" : ""} ${veterans ? "veterans-site" : ""} ${recycles ? "recycles-site" : ""}`}>
       <div className="shell-grid md:grid md:grid-cols-[13.5rem_1fr]">
@@ -192,6 +194,7 @@ export function PitShell({ children }: { children: React.ReactNode }) {
           </header>
           <Flash />
           <Celebrate />
+          {ready && session.role === "captain" ? <Suspense fallback={null}><HalloweenArcade blocked={passOpen || more || guide || tutorialSeen !== TUTORIAL_REV || needsStarterBody} /></Suspense> : null}
           {ready ? (
             <main key={pathname} className="page-in px-4 pt-5 pb-28 md:px-6 md:pb-10">
               <GameReminders />
@@ -286,6 +289,7 @@ function HalloweenBanner() {
       <p className="mt-1 text-sm leading-snug">
         Tuesday October 27 through Saturday October 31. Approve Pit Week 1 jobs to earn a pumpkin sticker, a lantern mask, a hockey mask, and the Hockey Mask Machete. The looks stay after the week and never change the fight.
       </p>
+      <p className="mt-1 text-sm leading-snug">Thursday through Saturday: captains, gather your team for a different daily Halloween game. Win 2–4 upgrade coins in a random category. Your first attempt is free; retries after a loss cost 10 Bolts.</p>
     </div>
   );
 }

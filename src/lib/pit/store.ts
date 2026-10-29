@@ -397,7 +397,7 @@ export const TUTORIAL_REV = 3;
 export const SHARED_KEYS = [
   "version", "seasonName", "tagline", "week", "phase", "stores", "crew", "bots", "weeks", "storeCards", "bouts",
   "gazette", "quotes", "proposals", "mvps", "honors", "craft", "log", "intel", "jobLog", "rallies", "sparkLog", "shouts", "picks",
-  "trainingOpenAll", "kickoff", "cosmeticProposals",
+  "trainingOpenAll", "kickoff", "cosmeticProposals", "halloweenArcade",
 ] as const satisfies readonly (keyof PitData)[];
 
 export type SharedDoc = Pick<PitData, (typeof SHARED_KEYS)[number]>;
@@ -421,6 +421,9 @@ export function sharedDoc(state: PitData): SharedDoc {
 /** Private drafts and scouting notes are projected for the verified viewer only. */
 export function clientDoc(state: PitData, session: Session): SharedDoc {
   const out = sharedDoc(state);
+  // Game solutions and attempt ledgers never travel in the shared client snapshot,
+  // including Desk and post-fight projections. The game API returns a safe view.
+  out.halloweenArcade = [];
   const desk = session.role === "commissioner";
   out.intel = desk ? out.intel : out.intel.filter(i => i.from === session.storeId);
   out.proposals = desk ? out.proposals : out.proposals.filter(p => p.storeId === session.storeId);
@@ -2136,6 +2139,7 @@ export function applyLeague14<T extends Partial<PitData>>(data: T): T {
     weeks,
     rallies: data.rallies ?? [],
     cosmeticProposals: data.cosmeticProposals ?? [],
+    halloweenArcade: data.halloweenArcade ?? [],
   } as T;
 }
 
