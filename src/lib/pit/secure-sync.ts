@@ -11,6 +11,7 @@ import {
   type SyncMode,
 } from "./sync-server";
 import type { Session } from "./types";
+import type { HalloweenArcadeInput, HalloweenArcadeResult } from "./halloween-arcade";
 export type SyncStatus = {
   mode: SyncMode | "starting";
   state: "idle" | "saving" | "error" | "mismatch";
@@ -63,6 +64,31 @@ function command(name: Command, args: unknown[]) {
 }
 export function submitDailySpark(week: number, day: string, answers: number[]) {
   return command("submitSpark", [week, day, answers]);
+}
+/** Shares the normal command queue, but returns the game result and failures to its UI. */
+export async function playHalloweenArcade(input: HalloweenArcadeInput): Promise<HalloweenArcadeResult> {
+  const expectedSession = usePit.getState().session;
+  let result: HalloweenArcadeResult | undefined;
+  let failure: unknown;
+  await enqueue(async () => {
+    try {
+      if (expectedSession.role !== "captain" || !sameSession(expectedSession, usePit.getState().session))
+        throw new Error("Sign in as your store's captain to play.");
+      const { halloweenArcade } = await import("./halloween-arcade-api");
+      const response = await halloweenArcade({ data: input });
+      if (!sameSession(expectedSession, usePit.getState().session) || !sameSession(expectedSession, response.session))
+        throw new Error("Your sign-in changed. Open the game again.");
+      apply(response.doc, response.rev, response.session);
+      setStatus({ mode: response.mode });
+      result = response;
+    } catch (err) {
+      failure = err;
+      throw err;
+    }
+  });
+  if (failure) throw failure;
+  if (!result) throw new Error("The game could not be reached. Please try again.");
+  return result;
 }
 async function login(
   role: "crew" | "captain" | "commissioner",

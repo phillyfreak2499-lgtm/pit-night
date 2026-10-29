@@ -397,6 +397,8 @@ export type Session = {
 };
 
 export type PitData = {
+  /** Server-only daily games and reward ledger; excluded from client snapshots. */
+  halloweenArcade?: import("./halloween-arcade").HalloweenArcadeRecord[];
   version: number;
   seasonName: string;
   tagline: string;

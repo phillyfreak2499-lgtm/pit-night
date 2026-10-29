@@ -444,6 +444,7 @@ export function makeData(): PitData {
     quotes: {},
     proposals: [],
     cosmeticProposals: [],
+    halloweenArcade: [],
     mvps: [],
     honors: { pitBelt: null, plate: null, bestBuild: null, bestBuildWhy: "", titleDrop: null },
     craft: [],
