@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { LEDS, PAINT, SMOKE, TRIM, styleOf } from "@/lib/pit/catalog";
 import type { BotLookProps } from "../bot-portrait";
 import { stickerBadge } from "../cage-draw";
+import { botFrameOf } from "../bot-frame";
+import { measureTeamFlag, paintTeamFlagName } from "../team-flag";
 
 type Dimensions = {
   roofY: number;
@@ -173,35 +175,12 @@ export function createGarageCosmetics(
     );
   };
 
-  // Pattern and stickers remain distinct, independently saved layers.
-  if (look.look !== "plain") {
+  // Match the broadcast's white racing stripe, dark side chevrons and extra
+  // rivets. These are hull markings, independent of the four sticker slots.
+  if (look.look === "stripe") {
     const pattern = canvasMap((ctx, w, h) => {
-      ctx.fillStyle = style.trim === "white" ? "#f3efe6" : "#17191d";
-      if (look.look === "stripe") {
-        ctx.fillRect(w * 0.35, 0, w * 0.12, h);
-        ctx.fillRect(w * 0.55, 0, w * 0.055, h);
-      } else if (look.look === "chevron") {
-        ctx.strokeStyle = ctx.fillStyle;
-        ctx.lineWidth = w * 0.075;
-        for (let y = -h; y < h * 1.6; y += h * 0.35) {
-          ctx.beginPath();
-          ctx.moveTo(w * 0.2, y);
-          ctx.lineTo(w * 0.5, y + h * 0.22);
-          ctx.lineTo(w * 0.8, y);
-          ctx.stroke();
-        }
-      } else {
-        ctx.fillStyle = "#b6bcc2";
-        ctx.strokeStyle = "#22252b";
-        ctx.lineWidth = 3;
-        for (const x of [0.18, 0.82])
-          for (const y of [0.14, 0.38, 0.62, 0.86]) {
-            ctx.beginPath();
-            ctx.arc(w * x, h * y, 9, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
-          }
-      }
+      ctx.fillStyle = "#f3efe6";
+      ctx.fillRect(w * 0.42, 0, w * 0.16, h);
     });
     surface(
       `${look.look} roof pattern`,
@@ -210,6 +189,52 @@ export function createGarageCosmetics(
       [0, roofY + 0.008, 0.04],
       [-Math.PI / 2, 0, 0],
     );
+  }
+  if (look.look === "stripe" || look.look === "chevron") {
+    const sideHeight = Math.max(0.24, roofY - 0.36);
+    for (const side of [-1, 1]) {
+      const pattern = canvasMap((ctx, w, h) => {
+        if (look.look === "stripe") {
+          ctx.fillStyle = "#f3efe6";
+          ctx.fillRect(0, h * 0.22, w, h * 0.12);
+          ctx.fillStyle = "#0e0d0b";
+          ctx.fillRect(0, h * 0.34, w, h * 0.04);
+        } else {
+          ctx.strokeStyle = "#0e0d0b";
+          ctx.lineWidth = w * 0.045;
+          // Each plane faces outward, so reverse the pattern on the opposite
+          // flank to keep its points aimed toward the actual front (+Z).
+          const X = (x: number) => (side < 0 ? x : 1 - x) * w;
+          for (const offset of [0, 0.09]) {
+            ctx.beginPath();
+            ctx.moveTo(X(0.16 + offset), h * 0.1);
+            ctx.lineTo(X(0.3 + offset), h * 0.45);
+            ctx.lineTo(X(0.16 + offset), h * 0.8);
+            ctx.stroke();
+          }
+        }
+      });
+      surface(
+        `${look.look} ${side < 0 ? "left" : "right"} pattern`,
+        pattern,
+        [depth * 0.86, sideHeight],
+        [side * (sidePanelX - 0.002), 0.36 + sideHeight / 2, -depth * 0.03],
+        [0, (side * Math.PI) / 2, 0],
+      );
+    }
+  }
+  if (look.look === "rivets") {
+    for (const side of [-1, 1])
+      for (let i = 0; i < 7; i++) {
+        const rivet = cylinder(
+          "Saved extra hull rivet",
+          0.024,
+          0.012,
+          [side * sidePanelX, roofY - 0.1, depth * (-0.4 + i * 0.1)],
+          steel,
+        );
+        rivet.rotation.z = Math.PI / 2;
+      }
   }
 
   for (const [slot, decal] of Object.entries(style.stickers ?? {})) {
@@ -253,7 +278,7 @@ export function createGarageCosmetics(
       surface(
         `${slot} sticker ${decal}`,
         map,
-        [depth * 0.42, 0.18],
+        [depth * 0.42, depth * 0.16],
         [(slot === "left" ? -1 : 1) * sidePanelX, sideLabelY, -0.06],
         [0, ((slot === "left" ? -1 : 1) * Math.PI) / 2, 0],
         group,
@@ -299,14 +324,22 @@ export function createGarageCosmetics(
       gold: "#fbbf24",
     };
     const color = colors[topper.slice(8)] ?? colors.pink;
-    cylinder("Heart flag pole", 0.014, 0.93, [0, 0.465, 0], steel, mount);
-    cylinder("Heart flag roof socket", 0.05, 0.035, [0, 0.018, 0], black, mount);
+    // drawJanelleFlag uses a .42-unit heart at +.15 forward and .34 above
+    // the roof. Match its exact outline at the shared body's 2-world-unit scale.
+    // Face both flanks, so a side view shows the same heart rather than its edge.
+    mount.position.set(-width * 0.17, roofY - 0.045, 0);
+    mount.rotation.y = -Math.PI / 2;
+    cylinder("Heart flag pole", 0.014, 1.092, [-0.036, 0.47, 0], steel, mount);
+    cylinder("Heart flag roof socket", 0.05, 0.035, [-0.036, 0.018, 0], black, mount);
+    const size = 0.84;
+    const X = (value: number) => value * size;
+    const Y = (value: number) => -value * size;
     const shape = new THREE.Shape();
-    shape.moveTo(0, -0.28);
-    shape.bezierCurveTo(-0.08, -0.2, -0.36, 0.02, -0.29, 0.18);
-    shape.bezierCurveTo(-0.23, 0.32, -0.06, 0.3, 0, 0.17);
-    shape.bezierCurveTo(0.06, 0.3, 0.23, 0.32, 0.29, 0.18);
-    shape.bezierCurveTo(0.36, 0.02, 0.08, -0.2, 0, -0.28);
+    shape.moveTo(0, Y(0.52));
+    shape.bezierCurveTo(X(-0.18), Y(0.35), X(-0.65), Y(0.04), X(-0.48), Y(-0.25));
+    shape.bezierCurveTo(X(-0.35), Y(-0.48), X(-0.1), Y(-0.38), 0, Y(-0.22));
+    shape.bezierCurveTo(X(0.1), Y(-0.38), X(0.35), Y(-0.48), X(0.48), Y(-0.25));
+    shape.bezierCurveTo(X(0.65), Y(0.04), X(0.18), Y(0.35), 0, Y(0.52));
     add(
       new THREE.Mesh(
         new THREE.ExtrudeGeometry(shape, {
@@ -320,7 +353,7 @@ export function createGarageCosmetics(
         new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.12 }),
       ),
       "Team Janelle heart",
-      [0.235, 0.79, -0.009],
+      [0.3, 0.68, -0.009],
       mount,
     );
     const lettering = canvasMap((ctx, w, h) => {
@@ -331,7 +364,7 @@ export function createGarageCosmetics(
       ctx.fillText("TEAM", w / 2, h * 0.3);
       ctx.fillText("JANELLE", w / 2, h * 0.7, w * 0.96);
     });
-    doubleLabel("Team Janelle lettering", lettering, [0.45, 0.22], [0.235, 0.825, 0], mount);
+    doubleLabel("Team Janelle lettering", lettering, [0.72, 0.378], [0.3, 0.6716, 0], mount);
   } else if (topper === "antenna") {
     cylinder("Whip antenna base", 0.06, 0.07, [0, 0.035, 0], black, mount);
     cylinder("Whip antenna", 0.008, 0.67, [0, 0.37, 0], steel, mount);
@@ -400,17 +433,28 @@ export function createGarageCosmetics(
     aerial.rotation.x = Math.PI / 2;
   } else if (topper === "flagpole") {
     cylinder("Tall flag pole", 0.014, 0.85, [0, 0.425, 0], steel, mount);
-    doubleLabel(
+    const pennant = new THREE.Shape();
+    pennant.moveTo(0, 0.85);
+    pennant.lineTo(0.4, 0.7);
+    pennant.lineTo(0, 0.55);
+    pennant.closePath();
+    add(
+      new THREE.Mesh(
+        new THREE.ShapeGeometry(pennant),
+        new THREE.MeshStandardMaterial({
+          color: "#e0402e",
+          roughness: 0.86,
+          side: THREE.DoubleSide,
+        }),
+      ),
       "Pit flag",
-      labelMap(style.banner || "THE PIT", TRIM[style.trim] ?? "#d6ae57", "#ffffff"),
-      [0.47, 0.26],
-      [0.225, 0.7, 0],
+      [0, 0, 0],
       mount,
     );
   } else if (topper === "tophat" || topper === "pilgrimhat") {
     cylinder("Hat brim", 0.31, 0.035, [0, 0.025, 0], black, mount);
     cylinder("Hat crown", 0.2, 0.34, [0, 0.21, 0], black, mount, topper === "tophat" ? 0.21 : 0.16);
-    cylinder("Hat band", 0.206, 0.055, [0, 0.095, 0], topper === "tophat" ? red : wood, mount);
+    cylinder("Hat band", 0.206, 0.055, [0, 0.095, 0], topper === "tophat" ? gold : wood, mount);
     if (topper === "pilgrimhat") {
       box("Hat gold buckle", [0.09, 0.08, 0.02], [0, 0.1, 0.209], gold, mount);
       box("Hat buckle inset", [0.052, 0.043, 0.022], [0, 0.1, 0.22], black, mount);
@@ -478,17 +522,60 @@ export function createGarageCosmetics(
     const flag = new THREE.Group();
     flag.name = "Saved team flag";
     group.add(flag);
-    flag.position.set(width * 0.3, roofY - 0.043, -depth * 0.34);
-    cylinder("Team flag mast", 0.012, 0.71, [0, 0.355, 0], steel, flag);
-    doubleLabel(
-      "Team flag cloth",
-      labelMap(
-        style.banner || look.number || "PIT",
-        TRIM[style.trim] ?? "#d4b45d",
-        style.trim === "white" ? "#17191d" : "#ffffff",
+    const frame = botFrameOf(look.classId, style.body);
+    const treads = look.driveFamily ? look.driveFamily === "treads" : frame.treads;
+    flag.position.set(width * 0.3, roofY - 0.045, treads ? -0.72 : -0.76);
+    // The broadcast pennant trails toward the rear and carries the store name.
+    // A custom pit banner is a separate saved rear-panel decoration.
+    flag.rotation.y = Math.PI / 2;
+    const measuringContext =
+      typeof document === "undefined" ? null : document.createElement("canvas").getContext("2d");
+    const layout = measureTeamFlag(measuringContext, look.storeName);
+    const height = 1,
+      length = layout.length * 2,
+      drop = layout.drop * 2,
+      lean = 0.1;
+    const mast = cylinder(
+      "Team flag mast",
+      0.012,
+      Math.hypot(height, lean),
+      [lean / 2, height / 2, 0],
+      steel,
+      flag,
+    );
+    mast.rotation.z = -Math.atan2(lean, height);
+    cylinder("Team flag socket", 0.035, 0.035, [0, 0.0175, 0], black, flag);
+    const pennant = new THREE.Shape();
+    pennant.moveTo(lean, height);
+    pennant.lineTo(lean + length, height - drop / 2);
+    pennant.lineTo(lean, height - drop);
+    pennant.closePath();
+    add(
+      new THREE.Mesh(
+        new THREE.ShapeGeometry(pennant),
+        new THREE.MeshStandardMaterial({
+          color: style.trim === "steel" ? (PAINT[look.paint] ?? PAINT.amber) : TRIM[style.trim],
+          roughness: 0.88,
+          metalness: 0,
+          side: THREE.DoubleSide,
+        }),
       ),
-      [0.4, 0.25],
-      [0.19, 0.56, 0],
+      "Team flag cloth",
+      [0, 0, 0],
+      flag,
+    );
+    doubleLabel(
+      "Team flag lettering",
+      canvasMap(
+        (ctx, w, h) => {
+          ctx.translate(w / 2, h / 2);
+          paintTeamFlagName(ctx, layout, w / layout.labelWidth);
+        },
+        512,
+        Math.ceil((512 * layout.labelHeight) / layout.labelWidth),
+      ),
+      [layout.labelWidth * 2, layout.labelHeight * 2],
+      [lean + layout.labelCenter * 2, height - drop / 2, 0],
       flag,
     );
   }

@@ -5,6 +5,7 @@ import type { BotLookProps } from "../bot-portrait";
 import type { GarageLook } from "@/lib/pit/types";
 import { createGarageBot } from "./bot-model";
 import { garageCameraDistance } from "./framing";
+import { createGarageArena, garageFloorTexture } from "./arena-corner";
 
 export type GarageScene = {
   update: (look: BotLookProps, floor: GarageLook) => void;
@@ -20,6 +21,7 @@ function disposeObject(root: THREE.Object3D) {
   const materials = new Set<THREE.Material>();
   const textures = new Set<THREE.Texture>();
   root.traverse((object) => {
+    if (object instanceof THREE.InstancedMesh) object.dispose();
     const mesh = object as THREE.Mesh;
     if (mesh.geometry) geometries.add(mesh.geometry);
     if (mesh.material)
@@ -34,49 +36,6 @@ function disposeObject(root: THREE.Object3D) {
   geometries.forEach((geometry) => geometry.dispose());
 }
 
-function floorTexture(look: GarageLook) {
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = 256;
-  const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = {
-    hazard: "#383c42",
-    concrete: "#686968",
-    night: "#202936",
-    bone: "#99968b",
-    checker: "#373c43",
-  }[look];
-  ctx.fillRect(0, 0, 256, 256);
-  let seed = 42;
-  const random = () => {
-    seed = (1664525 * seed + 1013904223) >>> 0;
-    return seed / 4294967296;
-  };
-  for (let i = 0; i < 1600; i++) {
-    ctx.fillStyle = random() > 0.5 ? "rgba(220,226,230,.08)" : "rgba(0,0,0,.1)";
-    ctx.fillRect(random() * 256, random() * 256, random() * 22 + 1, 1);
-  }
-  if (look === "checker") {
-    ctx.fillStyle = "rgba(210,209,198,.35)";
-    for (let x = 0; x < 4; x++)
-      for (let y = 0; y < 4; y++) if ((x + y) % 2) ctx.fillRect(x * 64, y * 64, 64, 64);
-  }
-  ctx.strokeStyle = "#161b20";
-  ctx.lineWidth = 3;
-  ctx.strokeRect(1, 1, 254, 254);
-  for (const x of [13, 243])
-    for (const y of [13, 243]) {
-      ctx.fillStyle = "#9a9e9f";
-      ctx.beginPath();
-      ctx.arc(x, y, 2.5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(5, 5);
-  return texture;
-}
-
 /** Browser-only scene. It reads appearance; no game or persistence commands belong here. */
 export function createGarageScene(
   canvas: HTMLCanvasElement,
@@ -89,7 +48,7 @@ export function createGarageScene(
     alpha: false,
     powerPreference: "low-power",
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, window.innerWidth < 640 ? 1.5 : 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -120,7 +79,10 @@ export function createGarageScene(
     const key = new THREE.DirectionalLight("#ffe1b1", 4.2);
     key.position.set(3, 7, 4);
     key.castShadow = true;
-    key.shadow.mapSize.set(1024, 1024);
+    key.shadow.mapSize.set(
+      window.innerWidth < 640 ? 1024 : 2048,
+      window.innerWidth < 640 ? 1024 : 2048,
+    );
     Object.assign(key.shadow.camera, {
       left: -4,
       right: 4,
@@ -138,77 +100,13 @@ export function createGarageScene(
     const fill = new THREE.DirectionalLight("#dce4ec", 1.2);
     fill.position.set(4, 2, -1);
     scene.add(fill);
-    const metal = new THREE.MeshStandardMaterial({
-      color: "#444d59",
-      metalness: 0.75,
-      roughness: 0.4,
-    });
-    const dark = new THREE.MeshStandardMaterial({
-      color: "#20252b",
-      metalness: 0.5,
-      roughness: 0.65,
-    });
-    const floorMaterial = new THREE.MeshStandardMaterial({ metalness: 0.55, roughness: 0.65 });
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(6, 0.1, 6), floorMaterial);
-    floor.position.y = -0.065;
-    floor.receiveShadow = true;
-    scene.add(floor);
-    const box = (
-      size: [number, number, number],
-      pos: [number, number, number],
-      material: THREE.Material,
-    ) => {
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
-      mesh.position.set(...pos);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      scene.add(mesh);
-      return mesh;
-    };
-    const glass = new THREE.MeshPhysicalMaterial({
-      color: "#b3cddd",
-      roughness: 0.2,
-      transparent: true,
-      opacity: 0.1,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    });
-    for (const axis of ["x", "z"] as const) {
-      box(
-        axis === "x" ? [0.12, 0.42, 6] : [6, 0.42, 0.12],
-        axis === "x" ? [-3, 0.2, 0] : [0, 0.2, -3],
-        dark,
-      );
-      box(
-        axis === "x" ? [0.1, 0.08, 6] : [6, 0.08, 0.1],
-        axis === "x" ? [-3, 1.8, 0] : [0, 1.8, -3],
-        metal,
-      );
-      for (const offset of [-3, -1, 1, 3])
-        box([0.09, 1.85, 0.09], axis === "x" ? [-3, 0.9, offset] : [offset, 0.9, -3], metal);
-      const pane = box(
-        axis === "x" ? [0.02, 1.3, 5.9] : [5.9, 1.3, 0.02],
-        axis === "x" ? [-3, 1.1, 0] : [0, 1.1, -3],
-        glass,
-      );
-      pane.castShadow = false;
-    }
-    const amber = new THREE.MeshStandardMaterial({
-      color: "#edaa22",
-      metalness: 0.3,
-      roughness: 0.6,
-    });
-    for (let i = 0; i < 22; i++) {
-      const stripe = box([0.13, 0.09, 0.025], [-2.85 + i * 0.27, 0.42, -2.92], amber);
-      stripe.rotation.z = -0.5;
-    }
-    const lamp = new THREE.MeshStandardMaterial({
-      color: "#ffd292",
-      emissive: "#ffac42",
-      emissiveIntensity: 2,
-    });
-    for (const z of [-2.2, -0.2, 1.8]) box([0.04, 0.04, 0.45], [-2.9, 0.5, z], lamp);
-
+    const { group: arena, floorMaterial } = createGarageArena(
+      Math.min(8, renderer.capabilities.getMaxAnisotropy()),
+    );
+    scene.add(arena);
+    const warm = new THREE.PointLight("#ffba52", 14, 8, 2);
+    warm.position.set(-2.6, 2.1, -2);
+    scene.add(warm);
     let bot: THREE.Group | undefined;
     let currentFloor: GarageLook | undefined;
     let visible = true,
@@ -218,7 +116,7 @@ export function createGarageScene(
       previous = 0;
     let radius = 1.5;
     const center = new THREE.Vector3(0, 0.8, 0);
-    const home = new THREE.Vector3(1, 0.62, 1.25).normalize();
+    const home = new THREE.Vector3(1, 0.8, 1.12).normalize();
     const render = () => {
       if (disposed || !visible || document.hidden || !canvas.clientWidth || !canvas.clientHeight)
         return;
@@ -302,7 +200,8 @@ export function createGarageScene(
         radius = Math.sqrt(extentX ** 2 + extentZ ** 2 + ((bounds.max.y - bounds.min.y) / 2) ** 2);
         if (currentFloor !== floorLook) {
           floorMaterial.map?.dispose();
-          floorMaterial.map = floorTexture(floorLook);
+          floorMaterial.map = garageFloorTexture(floorLook);
+          floorMaterial.map.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
           floorMaterial.needsUpdate = true;
           currentFloor = floorLook;
         }

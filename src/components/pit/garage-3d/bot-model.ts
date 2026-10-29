@@ -2,35 +2,33 @@ import * as THREE from "three";
 import { EYES, PAINT, TRIM, styleOf } from "@/lib/pit/catalog";
 import type { BotBody } from "@/lib/pit/types";
 import type { BotLookProps } from "../bot-portrait";
+import { botFrameOf } from "../bot-frame";
+import { sawPoseOf } from "../bot-weapons";
 import { createGarageCosmetics } from "./cosmetics";
 
 type Vec = [number, number, number];
 type Profile = {
   width: number;
-  depth: number;
-  roof: number;
-  nose: number;
-  shoulder: number;
   detail: "low" | "long" | "split" | "block" | "tiered";
 };
 
-/** Body shells are cosmetic. These dimensions never enter the combat model. */
+/** Width/detail complete the shared side profile; these never enter the combat model. */
 export const GARAGE_BODY_PROFILES: Record<BotBody, Profile> = {
-  shrike: { width: 1.34, depth: 2.02, roof: 0.72, nose: 0.47, shoulder: 0.58, detail: "low" },
-  raptor: { width: 1.42, depth: 2.24, roof: 0.76, nose: 0.48, shoulder: 0.45, detail: "long" },
-  stinger: { width: 1.16, depth: 2.16, roof: 0.78, nose: 0.45, shoulder: 0.38, detail: "split" },
-  viper: { width: 1.27, depth: 2.27, roof: 0.69, nose: 0.43, shoulder: 0.4, detail: "low" },
-  warhawk: { width: 1.5, depth: 2.16, roof: 0.82, nose: 0.5, shoulder: 0.6, detail: "split" },
-  keystone: { width: 1.48, depth: 1.96, roof: 0.89, nose: 0.7, shoulder: 0.66, detail: "block" },
-  juggernaut: { width: 1.55, depth: 2.1, roof: 0.94, nose: 0.71, shoulder: 0.62, detail: "block" },
-  bunker: { width: 1.65, depth: 1.98, roof: 0.73, nose: 0.57, shoulder: 0.7, detail: "low" },
-  fortress: { width: 1.66, depth: 2.08, roof: 0.96, nose: 0.73, shoulder: 0.74, detail: "tiered" },
-  colossus: { width: 1.74, depth: 2.2, roof: 1.06, nose: 0.81, shoulder: 0.7, detail: "tiered" },
-  windlass: { width: 1.39, depth: 1.96, roof: 0.86, nose: 0.61, shoulder: 0.6, detail: "block" },
-  scorpion: { width: 1.31, depth: 2.17, roof: 0.94, nose: 0.57, shoulder: 0.45, detail: "long" },
-  mantis: { width: 1.21, depth: 1.9, roof: 1.0, nose: 0.7, shoulder: 0.38, detail: "split" },
-  phantom: { width: 1.37, depth: 2.12, roof: 0.81, nose: 0.52, shoulder: 0.48, detail: "low" },
-  reaper: { width: 1.46, depth: 2.16, roof: 0.98, nose: 0.59, shoulder: 0.5, detail: "split" },
+  shrike: { width: 1.34, detail: "low" },
+  raptor: { width: 1.42, detail: "long" },
+  stinger: { width: 1.16, detail: "split" },
+  viper: { width: 1.27, detail: "low" },
+  warhawk: { width: 1.5, detail: "split" },
+  keystone: { width: 1.48, detail: "block" },
+  juggernaut: { width: 1.55, detail: "block" },
+  bunker: { width: 1.65, detail: "low" },
+  fortress: { width: 1.66, detail: "tiered" },
+  colossus: { width: 1.74, detail: "tiered" },
+  windlass: { width: 1.39, detail: "block" },
+  scorpion: { width: 1.31, detail: "long" },
+  mantis: { width: 1.21, detail: "split" },
+  phantom: { width: 1.37, detail: "low" },
+  reaper: { width: 1.46, detail: "split" },
 };
 
 /** Complete family lists make unsupported new catalog entries detectable in tests. */
@@ -130,7 +128,15 @@ export const GARAGE_MODEL_FAMILIES = {
 export function createGarageBot(look: BotLookProps): THREE.Group {
   const style = styleOf(look, look.classId);
   const profile = GARAGE_BODY_PROFILES[style.body ?? "shrike"] ?? GARAGE_BODY_PROFILES.shrike;
-  const { width: w, depth: d, roof: h } = profile;
+  const frame = botFrameOf(look.classId, style.body);
+  const unit = 2;
+  const w = profile.width;
+  const rear = Math.min(...frame.hull.map(([x]) => x)) * unit;
+  const front = frame.front * unit;
+  const d = front - rear;
+  const h = -frame.deck * unit;
+  const hullBottom = -Math.max(...frame.hull.map(([, y]) => y)) * unit;
+  const nose = -Math.min(...frame.hull.filter(([x]) => x === frame.front).map(([, y]) => y)) * unit;
   const bot = new THREE.Group();
   bot.name = `${look.storeName} · ${style.body} garage bot`;
   bot.userData = {
@@ -177,6 +183,12 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
   const steel = metal("#abb4b9", 0.32, 0.92),
     dark = metal("#20252b", 0.55, 0.5);
   const trim = metal(TRIM[style.trim] ?? TRIM.steel, 0.4, 0.8);
+  // Classic stock hubs tint the base paint, even when a finish changes the shell.
+  const hubColor =
+    style.trim === "steel"
+      ? `rgb(${[1, 3, 5].map((offset) => Math.max(0, parseInt(color.slice(offset, offset + 2), 16) - 40)).join(",")})`
+      : (TRIM[style.trim] ?? TRIM.steel);
+  const wheelHub = metal(hubColor, 0.48, 0.65);
   const rubber = metal("#171b1e", 0.91, 0.03),
     brass = metal("#ae8750", 0.42, 0.72);
   const white = metal("#e4e1cd", 0.64, 0.12),
@@ -330,27 +342,31 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
     return result;
   };
 
-  bevelBox("Lower chassis", [w * 0.94, 0.21, d * 0.95], [0, 0.32, 0], dark);
+  bevelBox(
+    "Lower chassis",
+    [w * 0.94, 0.16, d * 0.91],
+    [0, Math.max(0.15, hullBottom - 0.06), 0],
+    dark,
+  );
   profileSolid(
     `Body shell · ${style.body}`,
-    [
-      [-d / 2, 0.4],
-      [-d / 2, h * 0.73],
-      [-d * 0.35, h],
-      [(d * profile.shoulder) / 2, h],
-      [d / 2, profile.nose],
-      [d / 2, 0.4],
-    ],
+    frame.hull.map(([x, y]) => [x * unit, -y * unit]),
     w,
     paint,
   );
   for (const side of [-1, 1]) {
-    bevelBox(
+    // Follow the bevelled hull instead of putting a rectangular plate through a sloping nose.
+    const panelCenterY = (h + hullBottom) / 2;
+    const sidePanel = profileSolid(
       "Bolted side panel",
-      [0.045, Math.max(0.18, h - 0.48), d * 0.72],
-      [side * (w / 2 + 0.017), 0.44 + (h - 0.48) / 2, -0.05],
+      frame.hull.map(([x, y]) => [
+        x * unit * 0.87,
+        panelCenterY + (-y * unit - panelCenterY) * 0.8,
+      ]),
+      0.035,
       panel,
     );
+    sidePanel.position.x = side * (w / 2 + 0.018);
     box("Lower armor seam", [0.024, 0.025, d * 0.8], [side * (w / 2 + 0.041), 0.4, 0], trim);
     for (const z of [-d * 0.31, 0, d * 0.31])
       for (const y of [0.45, h * 0.78])
@@ -360,8 +376,15 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
   bevelBox("Service hatch", [w * 0.64, 0.045, d * 0.32], [0, h + 0.023, 0.04], panel);
   for (const x of [-w * 0.27, w * 0.27])
     for (const z of [-d * 0.11, d * 0.16]) bolts.push({ pos: [x, roofY + 0.008, z], axis: "y" });
-  for (let i = 0; i < 6; i++)
+  for (let i = 0; i < 6; i++) {
     box("Cooling vent", [w * 0.37, 0.014, 0.027], [0, h + 0.014, -d * 0.23 - i * 0.042], dark);
+    box(
+      "Cooling vent metal lip",
+      [w * 0.37, 0.006, 0.007],
+      [0, h + 0.024, -d * 0.23 - i * 0.042],
+      steel,
+    );
+  }
   if (profile.detail === "split")
     for (const side of [-1, 1])
       bevelBox(
@@ -387,17 +410,28 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
         [side * w * 0.33, h + 0.025, -0.05],
         trim,
       );
-  bevelBox("Visor surround", [w * 0.31, 0.1, 0.06], [0, profile.nose - 0.07, d / 2 + 0.014], dark);
-  bevelBox("Visor lens", [w * 0.24, 0.043, 0.018], [0, profile.nose - 0.065, d / 2 + 0.052], lens);
+  bevelBox(
+    "Visor surround",
+    [w * 0.31, 0.1, 0.06],
+    [0, Math.max(nose - 0.07, 0.29), front + 0.014],
+    dark,
+  );
+  bevelBox(
+    "Visor lens",
+    [w * 0.24, 0.043, 0.018],
+    [0, Math.max(nose - 0.065, 0.295), front + 0.052],
+    lens,
+  );
 
   // Drives: track shoes are a single instanced draw call instead of hundreds of separate objects.
   const drive = group(`Drive · ${look.driveFamily ?? "concealed"}`);
   const driveFamily = look.driveFamily;
+  const treads = driveFamily ? driveFamily === "treads" : frame.treads;
   const wheelX = w / 2 + 0.13,
     wheelZ = d * 0.34;
-  if (driveFamily === "treads") {
+  if (treads) {
     const r = 0.235,
-      end = d * 0.35,
+      end = 0.765,
       trackShape = new THREE.Shape();
     trackShape.moveTo(-end, 0.025);
     trackShape.lineTo(end, 0.025);
@@ -425,6 +459,10 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
     shoes.name = "Instanced track shoes";
     shoes.castShadow = true;
     drive.add(shoes);
+    const grips = new THREE.InstancedMesh(unitBox, rubber, 88);
+    grips.name = "Raised track traction grips";
+    grips.castShadow = true;
+    drive.add(grips);
     let index = 0;
     for (const side of [-1, 1]) {
       add("Continuous rubber belt", trackGeometry, rubber, [side * wheelX, 0, 0], [1, 1, 1], drive);
@@ -435,24 +473,60 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
         matrix.rotation.set(-Math.atan2(q.y - p.y, -q.x + p.x), 0, 0);
         matrix.scale.set(0.26, 0.026, 0.068);
         matrix.updateMatrix();
-        shoes.setMatrixAt(index++, matrix.matrix);
+        shoes.setMatrixAt(index, matrix.matrix);
+        matrix.position.y += Math.cos(matrix.rotation.x) * 0.02;
+        matrix.position.z += Math.sin(matrix.rotation.x) * 0.02;
+        matrix.scale.set(0.278, 0.013, 0.025);
+        matrix.updateMatrix();
+        grips.setMatrixAt(index++, matrix.matrix);
       }
-      for (const z of [-end, -end / 2, 0, end / 2, end]) {
-        cylinder("Road wheel", 0.18, 0.19, [side * wheelX, 0.26, z], rubber, "x", drive);
+      for (const wh of frame.wheels) {
+        const z = wh.x * unit;
+        const r = wh.r * unit;
+        cylinder("Road wheel", r, 0.19, [side * wheelX, 0.25, z], rubber, "x", drive);
         cylinder(
           "Road wheel rim",
-          0.132,
+          r * 0.77,
           0.027,
-          [side * (wheelX + 0.112), 0.26, z],
+          [side * (wheelX + 0.112), 0.25, z],
           steel,
           "x",
           drive,
         );
-        cylinder("Wheel axle", 0.047, 0.038, [side * (wheelX + 0.133), 0.26, z], dark, "x", drive);
+        cylinder(
+          "Road wheel dark inset",
+          r * 0.56,
+          0.03,
+          [side * (wheelX + 0.13), 0.25, z],
+          dark,
+          "x",
+          drive,
+        );
+        cylinder(
+          "Wheel axle",
+          r * 0.25,
+          0.038,
+          [side * (wheelX + 0.15), 0.25, z],
+          wheelHub,
+          "x",
+          drive,
+        );
+        for (let i = 0; i < 6; i++) {
+          const a = (i * Math.PI) / 3;
+          bolts.push({
+            pos: [
+              side * (wheelX + 0.155),
+              0.25 + Math.cos(a) * r * 0.45,
+              z + Math.sin(a) * r * 0.45,
+            ],
+            axis: "x",
+          });
+        }
       }
       box("Track guard", [0.28, 0.035, d * 0.76], [side * wheelX, 0.53, 0], dark, drive);
     }
     shoes.computeBoundingSphere();
+    grips.computeBoundingSphere();
   } else if (driveFamily === "air") {
     bevelBox("Air cushion rubber skirt", [w + 0.36, 0.32, d + 0.25], [0, 0.2, 0], rubber, drive);
     for (const x of [-w * 0.32, w * 0.32]) {
@@ -469,8 +543,9 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
       }
   } else {
     for (const side of [-1, 1])
-      for (const z of [-wheelZ, wheelZ]) {
-        const radius = driveFamily === "haywagon" ? 0.31 : 0.255;
+      for (const wh of frame.wheels) {
+        const z = wh.x * unit;
+        const radius = wh.r * unit;
         const wheel = group("Wheel assembly");
         drive.add(wheel);
         cylinder(
@@ -496,10 +571,30 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
           0.06,
           0.05,
           [side * (wheelX + 0.145), radius + 0.025, z],
-          steel,
+          wheelHub,
           "x",
           wheel,
         );
+        cylinder(
+          "Wheel inset",
+          radius * 0.48,
+          0.035,
+          [side * (wheelX + 0.13), radius + 0.025, z],
+          dark,
+          "x",
+          wheel,
+        );
+        for (let i = 0; i < 6; i++) {
+          const a = (i * Math.PI) / 3;
+          bolts.push({
+            pos: [
+              side * (wheelX + 0.153),
+              radius + 0.025 + Math.cos(a) * radius * 0.42,
+              z + Math.sin(a) * radius * 0.42,
+            ],
+            axis: "x",
+          });
+        }
         if (driveFamily === "omni" || driveFamily === "swerve")
           for (let i = 0; i < 8; i++) {
             const angle = (i * Math.PI) / 4;
@@ -854,8 +949,7 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
     );
   }
 
-  const weapon = group(`Weapon · ${look.weapon}`),
-    front = d / 2;
+  const weapon = group(`Weapon · ${look.weapon}`);
   const barrel = (
     name: string,
     x: number,
@@ -949,12 +1043,31 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
     case "saw":
     case "disc": {
       const horizontal = look.weapon === "disc";
-      cylinder("Spinner mount", 0.11, 0.31, [0, 0.42, front + 0.15], dark, "y", weapon);
+      const pose = sawPoseOf(frame);
+      const bladeY = horizontal ? 0.39 : -pose.bladeY * unit;
+      const bladeZ = horizontal ? front + 0.32 : pose.bladeX * unit;
+      const bladeRadius = horizontal ? 0.4 : pose.bladeRadius * unit;
+      if (horizontal)
+        cylinder("Spinner mount", 0.11, 0.31, [0, 0.42, front + 0.15], dark, "y", weapon);
+      else {
+        const pivot: Vec = [0, -pose.pivotY * unit, pose.pivotX * unit];
+        beam(
+          "Saw mount pedestal",
+          [0, -(pose.mountY + 0.02) * unit, pose.pivotX * unit],
+          pivot,
+          0.075,
+          dark,
+          weapon,
+        );
+        cylinder("Overhead saw pivot", 0.1, 0.32, pivot, dark, "x", weapon);
+        beam("Overhead saw arm", pivot, [0, bladeY, bladeZ], 0.055, steel, weapon);
+        cylinder("Saw axle", 0.085, 0.19, [0, bladeY, bladeZ], dark, "x", weapon);
+      }
       const saw = cylinder(
         "Steel spinning blade",
-        0.4,
+        bladeRadius,
         0.045,
-        [0, 0.39, front + 0.32],
+        [0, bladeY, bladeZ],
         steel,
         horizontal ? "y" : "x",
         weapon,
@@ -965,8 +1078,8 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
           "Saw tooth",
           horizontal ? [0.11, 0.065, 0.085] : [0.07, 0.09, 0.11],
           horizontal
-            ? [Math.cos(a) * 0.4, 0.39, front + 0.32 + Math.sin(a) * 0.4]
-            : [0, 0.39 + Math.cos(a) * 0.4, front + 0.32 + Math.sin(a) * 0.4],
+            ? [Math.cos(a) * bladeRadius, bladeY, bladeZ + Math.sin(a) * bladeRadius]
+            : [0, bladeY + Math.cos(a) * bladeRadius, bladeZ + Math.sin(a) * bladeRadius],
           trim,
           weapon,
         );
@@ -977,33 +1090,85 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
       break;
     }
     case "hammer":
-    case "axe":
-      cylinder("Overhead arm pivot", 0.12, 0.48, [0, 0.62, front - 0.2], dark, "x", weapon);
+    case "axe": {
+      const hammer = look.weapon === "hammer";
+      const angle = hammer ? 2.3 : 0.5;
+      const length = (hammer ? 0.62 : 0.46) * unit;
+      const pivotZ = (hammer ? -0.05 : -0.12) * unit;
+      const pivotY = h + 0.02 * unit;
+      const headZ = pivotZ + Math.cos(angle) * length;
+      const headY = pivotY + Math.sin(angle) * length;
+      cylinder("Overhead arm pivot", 0.1, 0.48, [0, pivotY, pivotZ], dark, "x", weapon);
       beam(
         "Overhead weapon arm",
-        [0, 0.62, front - 0.2],
-        [0, 1.23, front + 0.6],
+        [0, pivotY, pivotZ],
+        [0, headY, headZ],
         0.07,
         look.weapon === "axe" ? brass : trim,
         weapon,
       );
-      if (look.weapon === "hammer")
-        bevelBox("Hammer head", [0.63, 0.29, 0.3], [0, 1.23, front + 0.6], steel, weapon);
+      if (hammer) bevelBox("Hammer head", [0.63, 0.29, 0.3], [0, headY, headZ], steel, weapon);
       else
         profileSolid(
           "Axe blade",
           [
-            [front + 0.37, 1.4],
-            [front + 0.85, 1.36],
-            [front + 0.88, 1.01],
-            [front + 0.56, 1.13],
+            [headZ - 0.12, headY + 0.1],
+            [headZ + 0.08, headY + 0.3],
+            [headZ + 0.24, headY - 0.04],
+            [headZ + 0.08, headY - 0.12],
+            [headZ - 0.12, headY - 0.06],
           ],
           0.075,
           steel,
           weapon,
         );
       break;
-    case "claw":
+    }
+    case "claw": {
+      profileSolid(
+        "Claw lower jaw",
+        [
+          [front - 0.08, 0.2],
+          [front + 0.64, 0.04],
+          [front + 0.64, 0.01],
+          [front - 0.08, 0.04],
+        ],
+        w * 0.54,
+        steel,
+        weapon,
+      );
+      const pivotZ = front - 0.06 * unit;
+      const pivotY = h * 0.85;
+      const a = 0.55;
+      const profile: [number, number][] = [
+        [0, 0.03],
+        [0.36, 0.02],
+        [0.42, -0.1],
+        [0.36, -0.04],
+        [0, -0.035],
+      ];
+      profileSolid(
+        "Claw raised biting jaw",
+        profile.map(([z, y]) => [
+          pivotZ + (z * Math.cos(a) - y * Math.sin(a)) * unit,
+          pivotY + (z * Math.sin(a) + y * Math.cos(a)) * unit,
+        ]),
+        w * 0.38,
+        steel,
+        weapon,
+      );
+      cylinder("Claw pivot", 0.09, w * 0.6, [0, pivotY, pivotZ], dark, "x", weapon);
+      for (const x of [-w * 0.23, w * 0.23])
+        beam(
+          "Claw support bracket",
+          [x, 0.2, front - 0.1],
+          [x, pivotY, pivotZ],
+          0.045,
+          trim,
+          weapon,
+        );
+      break;
+    }
     case "bones":
       for (const side of [-1, 1]) {
         const mat = look.weapon === "bones" ? white : steel;
@@ -1364,7 +1529,7 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
   bot.add(boltMesh);
   // Flat badges sit on the fitted armor rather than disappearing behind it.
   // Rails, spikes and magnetic pucks remain separate objects in front of the badge.
-  const frontLabelY = Math.min(0.59, profile.nose - 0.1);
+  const frontLabelY = Math.max(0.2, Math.min(0.59, nose - 0.1));
   if (look.number) {
     box(
       "Front number backing plate",

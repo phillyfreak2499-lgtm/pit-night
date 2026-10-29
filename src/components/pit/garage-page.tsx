@@ -677,7 +677,7 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
         </div>
       ) : null}
 
-      <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(18rem,0.85fr)]">
         <div className="lg:sticky lg:top-24 lg:self-start">
           <GarageViewer look={look} floor={store.garage} fallback={<GarageTurntable
             look={look}

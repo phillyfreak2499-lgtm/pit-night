@@ -8,6 +8,7 @@ import type { Spot } from "./cage-motion";
 import { chasingArrows, flatFlag, star } from "./fall-art";
 import { RECYCLES_COLORS } from "@/lib/pit/recycles";
 import { VETERANS_COLORS } from "@/lib/pit/veterans";
+import { paintTeamJanelleBanner } from "./team-janelle-banner";
 
 export type ArenaId = "pit" | "ring" | "warehouse" | "junkyard" | "grand";
 
@@ -20,6 +21,21 @@ export const ARENAS: Record<ArenaId, { name: string; blurb: string }> = {
 };
 
 export const ARENA_IDS = Object.keys(ARENAS) as ArenaId[];
+
+/** Mounted on the scenery behind the floor, never over a hazard or the fighting area. */
+export function paintArenaJanelleBanner(c: CanvasRenderingContext2D, w: number, h: number, arena: ArenaId) {
+  const positions: Record<ArenaId, [number, number, number, number]> = {
+    pit: [0.35, 0.33, 0.3, 0.065],
+    ring: [0.35, 0.32, 0.3, 0.065],
+    warehouse: [0.35, 0.308, 0.3, 0.05],
+    junkyard: [0.26, 0.33, 0.225, 0.065],
+    grand: [0.35, 0.32, 0.3, 0.065],
+  };
+  const [x, y, width, height] = positions[arena];
+  paintTeamJanelleBanner(c, w * x, h * y, w * width, h * height);
+  // The crusher ram runs down the center: paired signs keep the lettering clear on either side.
+  if (arena === "junkyard") paintTeamJanelleBanner(c, w * 0.515, h * y, w * width, h * height);
+}
 
 /** The holiday dressing that belongs to each arena's week, so a replay keeps its own week's theme. */
 export type ArenaTheme = "halloween" | "election" | "veterans" | "recycles" | "thanksgiving";
@@ -333,7 +349,8 @@ function paintWarehouse(c: CanvasRenderingContext2D, w: number, h: number, P: Pr
 /** Where the flag hangs on the Warehouse wall, shared by the static scene and the live ripple. */
 function warehouseFlag(w: number, h: number, q: ReturnType<typeof floorQuad>) {
   const y = h * 0.17;
-  const fh = Math.max(h * 0.05, Math.min((w * 0.3) / 1.9, (warehouseBanner(w, h, q).y - y) * 0.9));
+  // Leave a separate strip below the flag for both wall banners, even under camera zoom.
+  const fh = Math.max(h * 0.05, Math.min((w * 0.3) / 1.9, h * 0.13, (warehouseBanner(w, h, q).y - y) * 0.9));
   const fw = fh * 1.9;
   return { x: w / 2 - fw / 2, y, w: fw, h: fh };
 }
