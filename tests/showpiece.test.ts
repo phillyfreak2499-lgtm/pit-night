@@ -76,7 +76,7 @@ test("reduced motion starts the garage spin paused", () => {
   assert.equal(garageSpinStartsPlaying(false), true);
 });
 
-test("garage preview exposes pause and resume and no drag or keyboard rotation", () => {
+test("classic garage portrait retains its pause and resume controls", () => {
   const garage = readFileSync(new URL("../src/components/pit/garage-page.tsx", import.meta.url), "utf8");
   const portrait = readFileSync(new URL("../src/components/pit/bot-portrait.tsx", import.meta.url), "utf8");
   assert.match(garage, /Pause rotation/);

@@ -126,9 +126,7 @@ export function BotPortrait({
   spinPlaying?: RefObject<boolean>;
 }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
-  const key = look
-    ? `${look.id}|${look.paint}|${look.classId}|${look.weapon}|${look.look}|${look.number}|${look.hp}|${look.scars ?? 0}|${JSON.stringify(look.style ?? {})}|${look.brainTier ?? ""}`
-    : "";
+  const key = JSON.stringify(look);
 
   useEffect(() => {
     const canvas = ref.current;

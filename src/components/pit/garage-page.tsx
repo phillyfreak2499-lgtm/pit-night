@@ -23,6 +23,7 @@ import { cosmeticProgress, cosmeticUnlocked, rewardFor, type CosmeticKind } from
 import type { BotLook, GarageLook, Slot } from "@/lib/pit/types";
 import { garageSpinStartsPlaying } from "@/lib/pit/turntable";
 import { BotPortrait, useBotLook, type BotLookProps } from "./bot-portrait";
+import { GarageViewer } from "./garage-3d/garage-viewer";
 import { KeyLadder } from "./key-ladder";
 import { canEnterBay, LockedBay } from "./bay-lock";
 import { Btn, Field, SectionLabel, StatStrip, TextInput } from "./bits";
@@ -677,15 +678,15 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
       ) : null}
 
       <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <div className="lg:sticky lg:top-4 lg:self-start">
-          <GarageTurntable
-            look={look ? { ...look, weapon: look.weapon === "hidden" ? "none" : look.weapon } : null}
+        <div className="lg:sticky lg:top-24 lg:self-start">
+          <GarageViewer look={look} floor={store.garage} fallback={<GarageTurntable
+            look={look}
             frameClass={`relative h-64 overflow-hidden border border-line md:h-72 ${garageClass(store.garage)}`}
             veil
             zoom={0.74}
             testId="garage-turntable"
-          />
-          <p className="mt-2 text-xs text-muted">It turns through a full circle. Pause it to hold a side. Hover or focus the preview to rev it. Open a category and tap a locked item to see its requirement.</p>
+          />} />
+          <p className="mt-2 text-xs text-muted">Choose a category to update the preview. Tap a locked item to see its requirement.</p>
         </div>
 
         <div className="flex flex-col gap-3">

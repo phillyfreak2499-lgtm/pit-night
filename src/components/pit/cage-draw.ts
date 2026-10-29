@@ -2144,7 +2144,7 @@ function drawWear(ctx: CanvasRenderingContext2D, f: Frame, u: number, top: numbe
 }
 
 /** Draws the actual decal art inside a bounded physical sticker region. */
-function stickerBadge(
+export function stickerBadge(
   ctx: CanvasRenderingContext2D,
   decal: string,
   x: number,
