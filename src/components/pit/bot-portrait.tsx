@@ -7,6 +7,8 @@ import { garagePlateMix, garagePose, garageYawStep } from "@/lib/pit/turntable";
 import type { BotLook, BotStyle, ClassId, FighterSnap, Tier } from "@/lib/pit/types";
 import { drawSideBot, drawTopBot, drawCosmeticEffect, Fx, paintOf, shade } from "./cage-draw";
 import type { BotState } from "./cage-motion";
+import { fitSidePortrait } from "./portrait-framing";
+import { measureTeamFlag } from "./team-flag";
 
 export type BotLookProps = {
   id: string;
@@ -135,6 +137,7 @@ export function BotPortrait({
     if (!ctx) return;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const state = stateFor(look);
+    const flagLength = look.style?.flag ? measureTeamFlag(ctx, look.storeName).length : 0;
     const fx = new Fx();
     const host = (canvas.closest("[data-bot-hover]") as HTMLElement | null) ?? canvas;
     let hot = false;
@@ -172,9 +175,8 @@ export function BotPortrait({
         if (!hot && heat < 0.002) heat = 0;
         const w = canvas.width;
         const h = canvas.height;
-        // Reserve headroom for tall shells, antennas, and heart flags in every portrait.
-        const u = Math.min(Math.min(w * 0.62, h * 1.25) * zoom, h * 0.6);
         const turntable = Boolean(spinYaw && spinPlaying);
+        const { u, gx, gy } = fitSidePortrait(w, h, look, zoom, turntable, facing, flagLength);
         if (turntable && spinPlaying?.current && spinYaw) {
           spinYaw.current = (spinYaw.current + garageYawStep(dt)) % (Math.PI * 2);
         }
@@ -182,8 +184,6 @@ export function BotPortrait({
         const pose = turntable ? garagePose(yaw) : null;
         const plate = pose ? garagePlateMix(pose.end) : 0;
         const facingNow = pose ? pose.facing : facing;
-        const gx = pose ? w / 2 : w / 2 - facing * u * 0.08;
-        const gy = h * 0.82;
         ctx.clearRect(0, 0, w, h);
         if (floor) {
           const spread = pose ? 0.55 + 0.45 * pose.side : 1;

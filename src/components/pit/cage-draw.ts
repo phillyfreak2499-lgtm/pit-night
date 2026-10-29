@@ -1,7 +1,11 @@
+import { botFrameOf as frameOf, type BotFrame as Frame } from "./bot-frame";
+import { sawPoseOf } from "./bot-weapons";
 import { bannerVerdict } from "../../../scripts/copy-guard.mjs";
 import { EYES, LEDS, PAINT, SMOKE, TRIM, decalArt, styleOf } from "@/lib/pit/catalog";
 import { ELECTION_COLORS } from "@/lib/pit/election";
-import { arenaTheme, drawArenaHazards, drawArenaTopScene, paintArenaScene, type ArenaId, type ArenaTheme } from "./arena-scenes";
+import { arenaTheme, drawArenaHazards, drawArenaTopScene, paintArenaScene, paintArenaJanelleBanner, type ArenaId, type ArenaTheme } from "./arena-scenes";
+import { paintTeamJanelleBanner } from "./team-janelle-banner";
+import { measureTeamFlag, paintTeamFlagName } from "./team-flag";
 import { drawFallSticker, drawFallTopper, drawFallWeapon, drawFallWeaponTop } from "./fall-art";
 import { armorEdges, deckHardware } from "./material-detail";
 import type { BotBody, ClassId } from "@/lib/pit/types";
@@ -11,7 +15,7 @@ import { PIT, clamp, ease, hash, lerp, type BotState, type Drive, type Spot } fr
 /* Colour helpers                                                      */
 /* ------------------------------------------------------------------ */
 
-function drawJanelleFlag(ctx: CanvasRenderingContext2D, topper: string, x: number, y: number, size: number) {
+function drawJanelleFlag(ctx: CanvasRenderingContext2D, topper: string, x: number, y: number, size: number, facing = 1) {
   const colors: Record<string, string> = { pink: "#ec4899", red: "#dc2626", purple: "#9333ea", blue: "#2563eb", teal: "#0f766e", gold: "#fbbf24" };
   ctx.save(); ctx.translate(x, y); ctx.scale(size, size);
   ctx.strokeStyle = "#f3efe6"; ctx.lineWidth = 0.025;
@@ -26,6 +30,8 @@ function drawJanelleFlag(ctx: CanvasRenderingContext2D, topper: string, x: numbe
   ctx.fillStyle = topper === "janelle-gold" ? "#241b12" : "#ffffff";
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.font = "bold 0.15px sans-serif";
+  // The hull mirrors when it faces left; lettering is printed on both flag faces.
+  ctx.scale(Math.sign(facing) || 1, 1);
   ctx.fillText("TEAM", 0, -0.08); ctx.fillText("JANELLE", 0, 0.1);
   ctx.restore();
 }
@@ -778,6 +784,7 @@ function backdrop(ctx: CanvasRenderingContext2D, w: number, h: number, arena: Ar
       paintArenaScene(c, w, h, arena, project);
       paintTheme(c, w, h, theme);
     }
+    paintArenaJanelleBanner(c, w, h, arena);
   }
   backdropCache.set(ctx, { w, h, v: logoVersion, decor, arena, canvas });
   return canvas;
@@ -1373,99 +1380,6 @@ function crowdFlashes(
 /* ------------------------------------------------------------------ */
 /* Side camera: a bot                                                  */
 /* ------------------------------------------------------------------ */
-
-type Frame = {
-  /** Hull outline, bot lengths, +x forward, -y up, origin on the floor. */
-  hull: [number, number][];
-  deck: number;
-  front: number;
-  height: number;
-  wheels: { x: number; r: number }[];
-  treads: boolean;
-};
-
-function frameOf(classId: ClassId, body?: BotBody): Frame {
-  const id = body ?? (classId === "tank" ? "keystone" : classId === "specialist" ? "windlass" : "shrike");
-  if (classId === "tank") {
-    if (id === "juggernaut") return {
-      hull:[[-0.52,-0.18],[-0.52,-0.43],[-0.36,-0.56],[0.23,-0.56],[0.5,-0.42],[0.5,-0.18]],
-      deck:-0.56, front:0.5, height:0.56,
-      wheels:[-0.4,-0.2,0,0.2,0.4].map(x=>({x,r:0.075})), treads:true,
-    };
-    if (id === "bunker") return {
-      hull:[[-0.48,-0.18],[-0.48,-0.38],[-0.34,-0.46],[0.32,-0.46],[0.48,-0.32],[0.48,-0.18]],
-      deck:-0.46, front:0.48, height:0.46,
-      wheels:[-0.36,-0.18,0,0.18,0.36].map(x=>({x,r:0.072})), treads:true,
-    };
-    if (id === "fortress") return {
-      hull:[[-0.5,-0.18],[-0.5,-0.46],[-0.38,-0.58],[-0.08,-0.62],[0.28,-0.57],[0.5,-0.4],[0.5,-0.18]],
-      deck:-0.62, front:0.5, height:0.62,
-      wheels:[-0.38,-0.19,0,0.19,0.38].map(x=>({x,r:0.078})), treads:true,
-    };
-    if (id === "colossus") return {
-      hull:[[-0.54,-0.2],[-0.54,-0.48],[-0.42,-0.63],[0.12,-0.65],[0.38,-0.57],[0.54,-0.38],[0.54,-0.2]],
-      deck:-0.65, front:0.54, height:0.65,
-      wheels:[-0.42,-0.21,0,0.21,0.42].map(x=>({x,r:0.08})), treads:true,
-    };
-    return {
-      hull:[[-0.46,-0.2],[-0.46,-0.46],[-0.3,-0.52],[0.3,-0.52],[0.46,-0.4],[0.46,-0.2]],
-      deck:-0.52, front:0.46, height:0.52,
-      wheels:[-0.36,-0.18,0,0.18,0.36].map(x=>({x,r:0.075})), treads:true,
-    };
-  }
-  if (classId === "specialist") {
-    if (id === "scorpion") return {
-      hull:[[-0.44,-0.1],[-0.44,-0.38],[-0.3,-0.48],[0.08,-0.48],[0.28,-0.39],[0.46,-0.18],[0.46,-0.1]],
-      deck:-0.48, front:0.46, height:0.48,
-      wheels:[{x:-0.27,r:0.115},{x:0.22,r:0.115}], treads:false,
-    };
-    if (id === "mantis") return {
-      hull:[[-0.4,-0.1],[-0.4,-0.35],[-0.22,-0.43],[0.06,-0.43],[0.2,-0.55],[0.36,-0.48],[0.42,-0.14],[0.42,-0.1]],
-      deck:-0.55, front:0.42, height:0.55,
-      wheels:[{x:-0.24,r:0.11},{x:0.21,r:0.11}], treads:false,
-    };
-    if (id === "phantom") return {
-      hull:[[-0.45,-0.09],[-0.45,-0.31],[-0.28,-0.38],[0.16,-0.38],[0.46,-0.16],[0.46,-0.09]],
-      deck:-0.38, front:0.46, height:0.38,
-      wheels:[{x:-0.28,r:0.105},{x:0.22,r:0.105}], treads:false,
-    };
-    if (id === "reaper") return {
-      hull:[[-0.46,-0.1],[-0.46,-0.4],[-0.3,-0.51],[0.02,-0.51],[0.22,-0.58],[0.47,-0.2],[0.47,-0.1]],
-      deck:-0.58, front:0.47, height:0.58,
-      wheels:[{x:-0.27,r:0.118},{x:0.22,r:0.118}], treads:false,
-    };
-    return {
-      hull:[[-0.4,-0.11],[-0.4,-0.38],[-0.28,-0.44],[0.1,-0.44],[0.32,-0.34],[0.4,-0.16],[0.4,-0.11]],
-      deck:-0.44, front:0.4, height:0.44,
-      wheels:[{x:-0.25,r:0.12},{x:0.2,r:0.12}], treads:false,
-    };
-  }
-  if (id === "raptor") return {
-    hull:[[-0.48,-0.09],[-0.48,-0.32],[-0.34,-0.39],[0.08,-0.39],[0.52,-0.1]],
-    deck:-0.39, front:0.52, height:0.39,
-    wheels:[{x:-0.28,r:0.125},{x:0.18,r:0.125}], treads:false,
-  };
-  if (id === "stinger") return {
-    hull:[[-0.43,-0.08],[-0.43,-0.27],[-0.28,-0.31],[0.1,-0.31],[0.49,-0.08]],
-    deck:-0.31, front:0.49, height:0.31,
-    wheels:[{x:-0.25,r:0.115},{x:0.17,r:0.115}], treads:false,
-  };
-  if (id === "viper") return {
-    hull:[[-0.49,-0.08],[-0.49,-0.3],[-0.32,-0.36],[0.14,-0.36],[0.54,-0.09]],
-    deck:-0.36, front:0.54, height:0.36,
-    wheels:[{x:-0.28,r:0.12},{x:0.19,r:0.12}], treads:false,
-  };
-  if (id === "warhawk") return {
-    hull:[[-0.5,-0.09],[-0.5,-0.36],[-0.34,-0.43],[-0.04,-0.46],[0.16,-0.39],[0.55,-0.1]],
-    deck:-0.46, front:0.55, height:0.46,
-    wheels:[{x:-0.29,r:0.125},{x:0.2,r:0.125}], treads:false,
-  };
-  return {
-    hull:[[-0.46,-0.1],[-0.46,-0.3],[-0.36,-0.34],[0.08,-0.34],[0.44,-0.13],[0.44,-0.1]],
-    deck:-0.34, front:0.44, height:0.34,
-    wheels:[{x:-0.27,r:0.13},{x:0.17,r:0.13}], treads:false,
-  };
-}
 
 function poly(ctx: CanvasRenderingContext2D, pts: [number, number][], u: number) {
   ctx.beginPath();
@@ -2076,7 +1990,7 @@ export function drawSideBot(
 
   if (style.flag && !s.flipped)
     drawFlag(ctx, f, u2, top, trim, paint, s.bot.storeName ?? "", time, s.charging, facing);
-  if (!s.flipped) drawTopper(ctx, style.topper, top, u2, trim, eye, time);
+  if (!s.flipped) drawTopper(ctx, style.topper, top, u2, trim, eye, time, facing);
   if (style.banner) drawBannerPlate(ctx, style.banner, -0.22 * u2, top + f.height * u2 * 0.18, u2, true);
   if (style.smoke && SMOKE[style.smoke])
     drawSmokePuffs(ctx, -0.34 * u2, top + u2 * 0.02, u2, SMOKE[style.smoke].rgb, time);
@@ -2820,6 +2734,7 @@ function drawTopper(
   trim: string,
   eye: string,
   time = 0,
+  facing = 1,
 ) {
   if (!topper || topper === "none") return;
   ctx.save();
@@ -2914,7 +2829,7 @@ function drawTopper(
     ctx.arc(u * 0.05, top - u * 0.3, u * 0.014, 0, Math.PI * 2);
     ctx.fill();
   } else if (topper?.startsWith("janelle-")) {
-    drawJanelleFlag(ctx, topper, u * 0.15, top - u * 0.34, u * 0.42);
+    drawJanelleFlag(ctx, topper, u * 0.15, top - u * 0.34, u * 0.42, facing);
   } else if (topper === "flagpole") {
     ctx.strokeStyle = "#f3efe6";
     ctx.lineWidth = Math.max(1.2, u * 0.01);
@@ -2963,7 +2878,7 @@ function drawTopper(
   ctx.restore();
 }
 
-function drawFlag(
+export function drawFlag(
   ctx: CanvasRenderingContext2D,
   f: Frame,
   u: number,
@@ -2992,8 +2907,9 @@ function drawFlag(
   ctx.fillRect(bx - u * 0.02, by - u * 0.03, u * 0.04, u * 0.03);
   // Pennant trails backward from the tip.
   const flutter = Math.sin(time * 7) * u * 0.015;
-  const len = u * 0.3;
-  const drop = u * 0.12;
+  const layout = measureTeamFlag(ctx, name);
+  const len = u * layout.length;
+  const drop = u * layout.drop;
   ctx.fillStyle = trim === "#b8b2a6" ? paint : trim;
   ctx.beginPath();
   ctx.moveTo(tipX, tipY);
@@ -3011,17 +2927,9 @@ function drawFlag(
   ctx.stroke();
   if (name) {
     ctx.save();
-    ctx.translate(tipX - len * 0.42, tipY + drop * 0.52 + flutter);
+    ctx.translate(tipX - u * layout.labelCenter, tipY + drop * 0.5 + flutter);
     ctx.scale(Math.sign(facing) || 1, 1);
-    ctx.fillStyle = "#0e0d0b";
-    ctx.font = `700 ${Math.max(7, u * 0.05)}px Oswald, sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    const label = name
-      .split(/[\s—-]+/)[0]!
-      .toUpperCase()
-      .slice(0, 9);
-    ctx.fillText(label, 0, 0);
+    paintTeamFlagName(ctx, layout, u);
     ctx.restore();
   }
   ctx.restore();
@@ -3357,18 +3265,20 @@ function weaponBack(ctx: CanvasRenderingContext2D, s: BotState, f: Frame, u: num
     ctx.arc(px, py, 0.05 * u, 0, Math.PI * 2);
     ctx.fill();
   } else if (fam === "saw") {
-    const a = lerp(-0.55, 0.28, s.stroke);
-    const px = -0.12 * u;
-    const py = f.deck * u - 0.02 * u;
-    const len = 0.58 * u;
+    const saw = sawPoseOf(f, s.stroke);
+    const px = saw.pivotX * u;
+    const py = saw.pivotY * u;
+    const len = saw.armLength * u;
+    ctx.fillStyle = steel(ctx, px - 0.045 * u, py, px + 0.045 * u, py);
+    ctx.fillRect(px - 0.045 * u, py, 0.09 * u, (saw.mountY + 0.02 - saw.pivotY) * u);
     ctx.save();
     ctx.translate(px, py);
-    ctx.rotate(a);
+    ctx.rotate(saw.angle);
     ctx.fillStyle = steel(ctx, 0, -0.03 * u, 0, 0.03 * u);
     ctx.beginPath();
     ctx.roundRect(0, -0.035 * u, len, 0.07 * u, 0.02 * u);
     ctx.fill();
-    spinnerDisc(ctx, len, 0, 0.16 * u, spin, s.rev, 14, s.stroke > 0.7);
+    spinnerDisc(ctx, len, 0, saw.bladeRadius * u, spin, s.rev, 14, s.stroke > 0.7);
     ctx.restore();
     ctx.fillStyle = "#26241f";
     ctx.beginPath();
@@ -4682,6 +4592,8 @@ export function drawTop(
   ctx.save();
   ctx.clearRect(0, 0, w, h);
   ctx.drawImage(topBackdrop(ctx, w, h), 0, 0);
+  // A hanging rail sign above the overhead floor, shared by all five arenas.
+  paintTeamJanelleBanner(ctx, g.x0 + g.s * 0.24, g.y0 - g.s * 0.071, g.s * 0.52, g.s * 0.055);
   ctx.beginPath();
   ctx.rect(g.x0, g.y0, g.s, g.s);
   ctx.clip();
@@ -5053,11 +4965,24 @@ function topWeapon(
   }
   if (fam === "disc" || fam === "saw") {
     // Vertical blade seen edge-on, with a blur box.
-    const x = len * (fam === "saw" ? 0.25 + s.stroke * 0.15 : 0.55);
-    const r = len * (fam === "saw" ? 0.3 : 0.36);
+    let x = len * 0.55;
+    let r = len * 0.36;
     if (fam === "saw") {
+      const body = styleOf(s.bot, s.bot.classId).body;
+      const frame = frameOf(s.bot.classId, body);
+      const pose = sawPoseOf(frame, s.stroke);
+      // Match traceTopHull's stylized nose while preserving the shared arm's reach.
+      const topFront = s.bot.classId === "striker"
+        ? body === "stinger" ? 0.56 : body === "raptor" || body === "warhawk" ? 0.58 : 0.5
+        : s.bot.classId === "tank"
+          ? body === "bunker" ? 0.52 : body === "juggernaut" || body === "colossus" ? 0.55 : 0.5
+          : body === "scorpion" ? 0.52 : 0.5;
+      const offset = topFront - frame.front;
+      const pivot = (pose.pivotX + offset) * len;
+      x = (pose.bladeX + offset) * len;
+      r = pose.tipRadius * len;
       ctx.fillStyle = "#8e8a82";
-      ctx.fillRect(-len * 0.1, -wid * 0.05, x + len * 0.1, wid * 0.1);
+      ctx.fillRect(pivot, -wid * 0.05, x - pivot, wid * 0.1);
     }
     ctx.fillStyle = `rgba(230,225,215,${0.2 + s.rev * 0.25})`;
     ctx.fillRect(x - r, -wid * 0.09, r * 2, wid * 0.18);
