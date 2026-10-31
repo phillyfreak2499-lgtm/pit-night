@@ -8,7 +8,7 @@ export type PullResult = {
   doc: string | null;
   session: import("./types").Session;
 };
-const SCHEMA_TAG = "14-store-abilene-proposals-remove-cleanup-v1";
+const SCHEMA_TAG = "14-store-abilene-proposals-remove-removed-cleanup-v2";
 async function services() {
   const [db, store, auth, vanilla] = await Promise.all([
     import("@/lib/db"),
@@ -43,9 +43,17 @@ async function load(options?: { deadlines?: boolean }) {
     const parsed = JSON.parse(row.doc) as import("./types").PitData;
     const normalized = s.store.applyLeague14(s.store.applyMondays(s.store.applyHulen(parsed)));
     const merged = { ...seed, ...s.store.sharedDoc(normalized) };
-    // Only the first read after this release performs the owner-requested cleanup.
-    const cleaned =
-      row.schema_tag !== SCHEMA_TAG ? s.store.pruneRemovePlaceholders(merged) : merged;
+    // Run the owner-authorized roster cleanup once against the authoritative
+    // season row; not against cached browser roster snapshots.
+    const isNewCleanup = row.schema_tag !== SCHEMA_TAG;
+    const matches = isNewCleanup
+      ? merged.crew.filter((member) =>
+          member.role === "specialist" &&
+          ["remove", "removed"].includes(member.name.trim().toLowerCase()),
+        )
+      : [];
+    const matchedStores = [...new Set(matches.map((member) => member.storeId))].sort();
+    const cleaned = isNewCleanup ? s.store.pruneRemovePlaceholders(merged) : merged;
     const removedCount = merged.crew.length - cleaned.crew.length;
     const due = deadlines ? s.store.applyDueLock(cleaned, new Date()) : null;
     const effective = due ?? cleaned;
@@ -53,9 +61,15 @@ async function load(options?: { deadlines?: boolean }) {
     let rev = Number(row.rev);
     let doc = row.doc;
     if (normalizedDoc !== row.doc || row.schema_tag !== SCHEMA_TAG) {
+      let backupId: string | null = null;
       if (removedCount > 0) {
-        // Snapshot the original live season before removing roster identities.
-        await s.sql`insert into pit_season (id, rev, doc) values ('backup-remove-roster-2026-10-31', ${row.rev}, ${row.doc}) on conflict (id) do nothing`;
+        // Keep a separate, immutable copy of exactly the source revision.
+        // Never change the season if the backup cannot be read back byte-for-byte.
+        backupId = `backup-remove-roster-2026-10-31-v2-rev-${row.rev}`;
+        await s.sql`insert into pit_season (id, rev, doc) values (${backupId}, ${row.rev}, ${row.doc}) on conflict (id) do nothing`;
+        const backup = (await s.sql<{ doc: string }>`select doc from pit_season where id = ${backupId}`)[0];
+        if (!backup || backup.doc !== row.doc)
+          throw new Error("Roster cleanup halted: pre-change backup verification failed.");
       }
       const changed = await s.sql<{ rev: number }>`
         update pit_season
@@ -66,8 +80,20 @@ async function load(options?: { deadlines?: boolean }) {
       if (!changed[0]) continue; // A concurrent command won. Read again, up to 8 tries.
       rev = Number(changed[0].rev);
       doc = normalizedDoc;
-      if (removedCount > 0) {
-        console.info(`[pit] cleaned ${removedCount} roster placeholder(s) named remove; prior season snapshot saved`);
+      if (isNewCleanup) {
+        // Verify the actual production database after committing the changed revision.
+        const saved = (await s.sql<{ doc: string }>`select doc from pit_season where id = 'main'`)[0];
+        if (!saved) throw new Error("Roster cleanup verification failed: season row missing.");
+        const verified = JSON.parse(saved.doc) as import("./types").PitData;
+        const remaining = verified.crew.filter((member) =>
+          member.role === "specialist" &&
+          ["remove", "removed"].includes(member.name.trim().toLowerCase()),
+        ).length;
+        console.info(
+          `[pit] roster cleanup v2: matched=${matches.length}; removed=${removedCount}; stores=${matchedStores.join(",") || "none"}; remaining=${remaining}; backup=${backupId ?? "not-needed"}; totalStores=${verified.stores.length}`,
+        );
+        if (remaining > 0)
+          throw new Error("Roster cleanup verification detected remaining placeholder names.");
       }
     }
     const data = { ...s.store.sharedDoc(effective), tutorialSeen: false, session: s.auth.publicSession };

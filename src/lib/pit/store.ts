@@ -2090,12 +2090,12 @@ export function applyHulen<T extends Partial<PitData>>(data: T): T {
   };
 }
 
-/** Owner-directed, one-time roster cleanup. Only active specialist identities are removed.
+/** Owner-directed roster cleanup for exact placeholder names "remove" and "removed".
  * Historic training, results, MVP awards, and other activity remain intact. */
 export function pruneRemovePlaceholders<T extends Partial<PitData>>(data: T): T {
   const retired = new Set(
     (data.crew ?? [])
-      .filter((member) => member.role === "specialist" && member.name.trim().toLowerCase() === "remove")
+      .filter((member) => member.role === "specialist" && ["remove", "removed"].includes(member.name.trim().toLowerCase()))
       .map((member) => member.id),
   );
   if (!retired.size) return data;

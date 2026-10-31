@@ -26,10 +26,11 @@ test("one-time placeholder cleanup removes only exact specialist names and prese
   const specialist = seed.crew.find((member) => member.role === "specialist")!;
   const captain = seed.crew.find((member) => member.role === "captain")!;
   const target = { ...specialist, id: "temporary-remove", name: "  ReMoVe  " };
+  const second = { ...specialist, id: "temporary-removed", storeId: "allen", name: " Removed " };
   const other = { ...specialist, id: "not-a-placeholder", name: "Remove Thompson" };
   const data = {
     ...seed,
-    crew: [...seed.crew, target, other, { ...captain, id: "captain-not-deleted", name: "remove" }],
+    crew: [...seed.crew, target, second, other, { ...captain, id: "captain-not-deleted", name: "remove" }],
     proposals: [
       ...seed.proposals,
       { id: "placeholder-proposal", storeId: target.storeId, crewId: target.id, crewName: target.name, partId: "stock", note: "test" },
@@ -38,6 +39,8 @@ test("one-time placeholder cleanup removes only exact specialist names and prese
   };
   const cleaned = pruneRemovePlaceholders(data);
   assert.ok(!cleaned.crew.some((member) => member.id === target.id));
+  assert.ok(!cleaned.crew.some((member) => member.id === second.id));
+  assert.equal(data.crew.length - cleaned.crew.length, 2);
   assert.ok(cleaned.crew.some((member) => member.id === other.id));
   assert.ok(cleaned.crew.some((member) => member.id === "captain-not-deleted"));
   assert.ok(!cleaned.proposals.some((proposal) => proposal.crewId === target.id));
