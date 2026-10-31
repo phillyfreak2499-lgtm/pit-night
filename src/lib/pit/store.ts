@@ -2090,6 +2090,25 @@ export function applyHulen<T extends Partial<PitData>>(data: T): T {
   };
 }
 
+/** Owner-directed, one-time roster cleanup. Only active specialist identities are removed.
+ * Historic training, results, MVP awards, and other activity remain intact. */
+export function pruneRemovePlaceholders<T extends Partial<PitData>>(data: T): T {
+  const retired = new Set(
+    (data.crew ?? [])
+      .filter((member) => member.role === "specialist" && member.name.trim().toLowerCase() === "remove")
+      .map((member) => member.id),
+  );
+  if (!retired.size) return data;
+  return {
+    ...data,
+    crew: data.crew!.filter((member) => !retired.has(member.id)),
+    proposals: data.proposals?.filter((proposal) => !retired.has(proposal.crewId)),
+    cosmeticProposals: data.cosmeticProposals
+      ?.filter((proposal) => !retired.has(proposal.crewId))
+      .map((proposal) => ({ ...proposal, voters: proposal.voters.filter((id) => !retired.has(id)) })),
+  } as T;
+}
+
 /** Adds the 14-store conference format to an existing live Period 12 row without wiping work already entered. */
 export function applyLeague14<T extends Partial<PitData>>(data: T): T {
   const fresh = makeData();
