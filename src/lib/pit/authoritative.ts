@@ -8,7 +8,7 @@ export type PullResult = {
   doc: string | null;
   session: import("./types").Session;
 };
-const SCHEMA_TAG = "14-store-abilene-proposals-v1";
+const SCHEMA_TAG = "14-store-abilene-proposals-remove-cleanup-v1";
 async function services() {
   const [db, store, auth, vanilla] = await Promise.all([
     import("@/lib/db"),
@@ -43,12 +43,20 @@ async function load(options?: { deadlines?: boolean }) {
     const parsed = JSON.parse(row.doc) as import("./types").PitData;
     const normalized = s.store.applyLeague14(s.store.applyMondays(s.store.applyHulen(parsed)));
     const merged = { ...seed, ...s.store.sharedDoc(normalized) };
-    const due = deadlines ? s.store.applyDueLock(merged, new Date()) : null;
-    const effective = due ?? merged;
+    // Only the first read after this release performs the owner-requested cleanup.
+    const cleaned =
+      row.schema_tag !== SCHEMA_TAG ? s.store.pruneRemovePlaceholders(merged) : merged;
+    const removedCount = merged.crew.length - cleaned.crew.length;
+    const due = deadlines ? s.store.applyDueLock(cleaned, new Date()) : null;
+    const effective = due ?? cleaned;
     const normalizedDoc = JSON.stringify(s.store.sharedDoc(effective));
     let rev = Number(row.rev);
     let doc = row.doc;
     if (normalizedDoc !== row.doc || row.schema_tag !== SCHEMA_TAG) {
+      if (removedCount > 0) {
+        // Snapshot the original live season before removing roster identities.
+        await s.sql`insert into pit_season (id, rev, doc) values ('backup-remove-roster-2026-10-31', ${row.rev}, ${row.doc}) on conflict (id) do nothing`;
+      }
       const changed = await s.sql<{ rev: number }>`
         update pit_season
         set rev = rev + 1, doc = ${normalizedDoc}, schema_tag = ${SCHEMA_TAG}, updated_at = now()
@@ -58,6 +66,9 @@ async function load(options?: { deadlines?: boolean }) {
       if (!changed[0]) continue; // A concurrent command won. Read again, up to 8 tries.
       rev = Number(changed[0].rev);
       doc = normalizedDoc;
+      if (removedCount > 0) {
+        console.info(`[pit] cleaned ${removedCount} roster placeholder(s) named remove; prior season snapshot saved`);
+      }
     }
     const data = { ...s.store.sharedDoc(effective), tutorialSeen: false, session: s.auth.publicSession };
     return { ...s, row: { rev, doc, schema_tag: SCHEMA_TAG }, data };
