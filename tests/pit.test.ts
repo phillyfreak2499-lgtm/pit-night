@@ -2,7 +2,7 @@ import test, { beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createStore } from "zustand/vanilla";
-import { pitCreator, sharedDoc, clientDoc, applyLeague14, applyDueLock } from "../src/lib/pit/store.ts";
+import { pitCreator, sharedDoc, clientDoc, applyLeague14, applyDueLock, pruneRemovePlaceholders } from "../src/lib/pit/store.ts";
 import { makeData } from "../src/lib/pit/seed.ts";
 import { nsnuOf, rankedStores, simulateDuel, simulateChampionshipDuel, buildCard, conferenceStandings, championshipFinalists, coinMath, coinsByJar, type GradeSet } from "../src/lib/pit/engine.ts";
 import { weekProgress, boltsOf, lockerItem } from "../src/lib/pit/week.ts";
@@ -21,6 +21,32 @@ import { DECALS, styleOf, GRADE_COINS, METRICS } from "../src/lib/pit/catalog.ts
 import { createFrameLoop } from "../src/lib/pit/frame-loop.ts";
 import { leagueArgs, sameSession, singleFlight } from "../src/lib/pit/sync-policy.ts";
 import { memoSnapshot, snapshotStorage } from "../src/lib/pit/snapshot-storage.ts";
+test("one-time placeholder cleanup removes only exact specialist names and preserves history", () => {
+  const seed = makeData();
+  const specialist = seed.crew.find((member) => member.role === "specialist")!;
+  const captain = seed.crew.find((member) => member.role === "captain")!;
+  const target = { ...specialist, id: "temporary-remove", name: "  ReMoVe  " };
+  const other = { ...specialist, id: "not-a-placeholder", name: "Remove Thompson" };
+  const data = {
+    ...seed,
+    crew: [...seed.crew, target, other, { ...captain, id: "captain-not-deleted", name: "remove" }],
+    proposals: [
+      ...seed.proposals,
+      { id: "placeholder-proposal", storeId: target.storeId, crewId: target.id, crewName: target.name, partId: "stock", note: "test" },
+    ],
+    mvps: [...seed.mvps, { week: 1, storeId: target.storeId, crewId: target.id, name: target.name }],
+  };
+  const cleaned = pruneRemovePlaceholders(data);
+  assert.ok(!cleaned.crew.some((member) => member.id === target.id));
+  assert.ok(cleaned.crew.some((member) => member.id === other.id));
+  assert.ok(cleaned.crew.some((member) => member.id === "captain-not-deleted"));
+  assert.ok(!cleaned.proposals.some((proposal) => proposal.crewId === target.id));
+  assert.equal(cleaned.mvps.length, data.mvps.length);
+  assert.strictEqual(cleaned.jobLog, data.jobLog);
+  assert.strictEqual(cleaned.sparkLog, data.sparkLog);
+  assert.strictEqual(pruneRemovePlaceholders(cleaned), cleaned);
+});
+
 test("transient state updates neither project nor serialize unchanged persisted data", () => {
   let projections=0,writes=0,serializations=0;
   const project=memoSnapshot((state: {doc: object; flash: string}) => { projections++;return {doc:state.doc}; },['doc']);
