@@ -7,6 +7,7 @@ import type { Bout, Exchange, FightResult } from "@/lib/pit/types";
 import { Fx, drawSide, drawTop, impactPoints, project, stepBots } from "./cage-draw";
 import { arenaForWeek, arenaTheme, hazardCallout, type ArenaId } from "./arena-scenes";
 import { beatAt, buildBeats, fightDrive, lerp, type Beat, type Spot } from "./cage-motion";
+import { readMeters, type MeterPhase, type MeterRead } from "@/lib/pit/vitals";
 
 const ROUND_SHOW = 0.22;
 
@@ -21,6 +22,8 @@ export function Broadcast({
   kicker,
   noDamage = false,
   arena: arenaProp,
+  /** Watch party: the cage fills the viewport and the overhead cam is a corner inset. */
+  stage = false,
 }: {
   bout: Bout;
   playing?: boolean;
@@ -35,6 +38,7 @@ export function Broadcast({
   noDamage?: boolean;
   /** Override the week's arena (the Playground picks its own). */
   arena?: ArenaId;
+  stage?: boolean;
 }) {
   // Sync hands us fresh copies of the same bout; keep one object per tape so playback never restarts.
   const tapeKey = `${boutProp.id}|${boutProp.result?.seed ?? ""}|${boutProp.result ? "r" : ""}`;
@@ -58,6 +62,7 @@ export function Broadcast({
   };
   const [caption, setCaption] = useState("Lights down.");
   const [hp, setHp] = useState<Record<string, number>>({});
+  const [meters, setMeters] = useState<Record<string, MeterRead | null>>({});
   const [clock, setClock] = useState("0:00");
   const [round, setRound] = useState<string>("");
   const timeRef = useRef(0);
@@ -179,10 +184,10 @@ export function Broadcast({
           const paint = PAINT[victim?.bot.paint ?? ""] ?? "#e2a21a";
           fx.burst(at.side.x, at.side.y, at.side.ground, at.side.scale, blocked ? 0.25 : drive.power, paint, drive.weapon, reduced);
           fx.topBurst(at.top.x, at.top.y, at.top.scale, drive.power, reduced);
-          shook = reduced ? 0 : (blocked ? 3 : 6 + drive.power * 14 + (crit ? 10 : 0)) * (canvas.width / 1200);
-          freeze = reduced ? 0 : blocked ? 0.04 : crit ? 0.28 : 0.06 + drive.power * 0.08;
-          fx.punch = reduced ? 0 : blocked ? 0.15 : crit ? 1 : 0.45;
-          if (beat.kind === "finisher" && !blocked && !reduced) hold = 1.1;
+          shook = reduced ? 0 : (blocked ? 2 : 4 + drive.power * 8 + (crit ? 6 : 0)) * (canvas.width / 1200);
+          freeze = reduced ? 0 : blocked ? 0.03 : crit ? 0.22 : 0.05 + drive.power * 0.06;
+          fx.punch = reduced ? 0 : blocked ? 0.1 : crit ? 0.85 : 0.35;
+          if (beat.kind === "finisher" && !blocked && !reduced) hold = 1.25;
           const s = at.side.scale;
           if (!drive.replay) {
             if (blocked) fx.popText(at.side.x, at.side.y - s * 0.35, "BLOCKED", "#8eafc9", s * 0.2, 1.1);
@@ -234,6 +239,35 @@ export function Broadcast({
       if (beat.kind === "replay") for (const f of result.fighters) bars[f.id] = result.hp[f.id] ?? bars[f.id] ?? 100;
       else for (const b of drive.bots) bars[b.bot.id] = Math.round(b.hp);
       setHp(previous => Object.keys(bars).length === Object.keys(previous).length && Object.entries(bars).every(([id, value]) => previous[id] === value) ? previous : bars);
+      const phase = meterPhase(beat, local);
+      const nextMeters: Record<string, MeterRead | null> = {};
+      for (const fighter of result.fighters) {
+        const read = readMeters(result, fighter.id, phase);
+        nextMeters[fighter.id] = read
+          ? {
+              battery: Math.round(read.battery),
+              batteryMax: read.batteryMax,
+              stamina: Math.round(read.stamina),
+              staminaMax: read.staminaMax,
+              power: Math.round(read.power),
+              powerMax: read.powerMax,
+            }
+          : null;
+      }
+      setMeters((previous) => {
+        const ids = Object.keys(nextMeters);
+        if (ids.length !== Object.keys(previous).length) return nextMeters;
+        for (const id of ids) {
+          const a = previous[id];
+          const b = nextMeters[id];
+          if (!a || !b) {
+            if (a !== b) return nextMeters;
+            continue;
+          }
+          if (a.battery !== b.battery || a.stamina !== b.stamina || a.power !== b.power) return nextMeters;
+        }
+        return previous;
+      });
       setRound(drive.round ? `Round ${drive.round}` : beat.kind === "countdown" ? "Get ready" : beat.kind === "replay" ? "Replay" : "");
       const secs = Math.floor(time);
       setClock(`${Math.floor(secs / 60)}:${(secs % 60).toString().padStart(2, "0")}`);
@@ -265,43 +299,67 @@ export function Broadcast({
   const beats = buildBeats(result);
   const total = beats.reduce((m, b) => Math.max(m, b.t + b.dur), 0);
 
+  const meterFor = (id: string | undefined) => {
+    if (!id) return null;
+    if (Object.prototype.hasOwnProperty.call(meters, id)) return meters[id] ?? null;
+    return readMeters(result, id, { kind: "bell" });
+  };
+  const healthFor = (fighter: (typeof result.fighters)[number], align: "left" | "right") => (
+    <Health
+      name={fighter.botName}
+      store={fighter.teamName ? `${fighter.storeName} · ${fighter.teamName}` : fighter.storeName}
+      hp={hp[fighter.id] ?? 100}
+      paint={fighter.paint}
+      align={align}
+      tuned={fighter.tuned}
+      meter={meterFor(fighter.id)}
+    />
+  );
+
   return (
-    <div className="overflow-hidden border border-line bg-deep" data-testid="broadcast">
+    <div className={stage ? "relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-deep" : "overflow-hidden border border-line bg-deep"} data-testid="broadcast">
+      {stage ? null : (
       <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
         <p className="font-display text-sm tracking-[0.18em] text-amber uppercase">{kicker ?? "Live cage"}</p>
         <p className="font-display text-sm text-muted">{clock} / {Math.round(total)}s</p>
       </div>
-      {group ? (
+      )}
+      {group && !stage ? (
         <div className="grid grid-cols-2 gap-3 border-b border-line p-3" aria-label="All fighters' health">
           {result.fighters.map((fighter) => (
             <div key={fighter.id} data-testid={`group-health-${fighter.id}`}>
-              <Health
-                name={fighter.botName}
-                store={fighter.teamName ? `${fighter.storeName} · ${fighter.teamName}` : fighter.storeName}
-                hp={hp[fighter.id] ?? 100}
-                paint={fighter.paint}
-                align="left"
-                tuned={fighter.tuned}
-              />
+              {healthFor(fighter, "left")}
             </div>
           ))}
         </div>
       ) : null}
-      <div className="grid gap-px bg-line lg:grid-cols-[minmax(0,1.55fr)_minmax(190px,0.72fr)]">
-        <div className="relative min-w-0 bg-deep">
-          <canvas ref={canvasRef} aria-label="Battle arena animation" className="aspect-[4/3] w-full bg-deep sm:aspect-video" />
-          <div className="pointer-events-none absolute inset-x-0 top-0 grid grid-cols-[1fr_auto_1fr] items-start gap-2 p-2 pb-6 md:gap-3 md:p-3 md:pb-8" style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.78), rgba(0,0,0,0))" }}>
-            {left ? <Health name={left.botName} store={left.teamName ? `${left.storeName} · ${left.teamName}` : left.storeName} hp={hp[left.id] ?? 100} paint={left.paint} align="left" tuned={left.tuned} /> : <span />}
-            <div className="flex min-w-[3.5rem] flex-col items-center pt-0.5 md:min-w-[5rem]">
-              <span className="font-display text-base leading-none text-amber tabular-nums md:text-2xl">{clock}</span>
-              {round ? <span className="mt-0.5 text-[9px] tracking-[0.2em] text-fg uppercase md:text-[11px]">{round}</span> : null}
-            </div>
-            {right ? <Health name={right.botName} store={right.teamName ? `${right.storeName} · ${right.teamName}` : right.storeName} hp={hp[right.id] ?? 100} paint={right.paint} align="right" tuned={right.tuned} /> : <span />}
+      <div className={stage ? "relative min-h-0 flex-1" : "grid gap-px bg-line lg:grid-cols-[minmax(0,1.55fr)_minmax(190px,0.72fr)]"}>
+        <div className={stage ? "absolute inset-0 bg-deep" : "relative min-w-0 bg-deep"}>
+          <canvas ref={canvasRef} aria-label="Battle arena animation" className={stage ? "h-full w-full bg-deep" : "aspect-[4/3] w-full bg-deep sm:aspect-video"} />
+          <div className={`pointer-events-none absolute inset-x-0 top-0 grid items-start gap-2 p-2 pb-6 md:gap-3 md:p-3 md:pb-8 ${group && stage ? "grid-cols-1" : "grid-cols-[1fr_auto_1fr]"}`} style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.82), rgba(0,0,0,0))" }}>
+            {group && stage ? (
+              <div className="grid max-h-[42vh] grid-cols-2 gap-2 overflow-y-auto" aria-label="All fighters' health">
+                {result.fighters.map((fighter) => (
+                  <div key={fighter.id} data-testid={`group-health-${fighter.id}`}>
+                    {healthFor(fighter, "left")}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <>
+                {left ? healthFor(left, "left") : <span />}
+                <div className="flex min-w-[3.5rem] flex-col items-center pt-0.5 md:min-w-[5rem]">
+                  <span className="font-display text-base leading-none text-amber tabular-nums md:text-2xl">{clock}</span>
+                  {round ? <span className="mt-0.5 text-[9px] tracking-[0.2em] text-fg uppercase md:text-[11px]">{round}</span> : null}
+                </div>
+                {right ? healthFor(right, "right") : <span />}
+              </>
+            )}
           </div>
-          <p className="absolute inset-x-0 bottom-0 bg-deep/95 px-3 py-1.5 text-xs leading-relaxed md:py-3 md:text-base">{caption}</p>
+          <p className={`absolute inset-x-0 bottom-0 bg-deep/95 px-3 py-1.5 text-xs leading-relaxed md:py-3 md:text-base ${stage ? "pr-28 sm:pr-40" : ""}`}>{caption}</p>
         </div>
-        <div className="relative min-w-0 bg-deep lg:min-h-full">
-          <canvas ref={topRef} aria-label="Overhead arena camera" className="aspect-square w-full bg-deep lg:absolute lg:inset-0 lg:h-full lg:w-full" />
+        <div className={stage ? "pointer-events-none absolute right-2 bottom-14 z-20 w-24 sm:w-36 md:bottom-16 md:w-44" : "relative min-w-0 bg-deep lg:min-h-full"}>
+          <canvas ref={topRef} aria-label="Overhead arena camera" className={stage ? "aspect-square w-full border border-white/25 bg-deep shadow-lg" : "aspect-square w-full bg-deep lg:absolute lg:inset-0 lg:h-full lg:w-full"} />
         </div>
       </div>
       {chromeless ? null : (
@@ -355,6 +413,7 @@ function Health({
   paint,
   align,
   tuned,
+  meter,
 }: {
   name: string;
   store: string;
@@ -362,6 +421,7 @@ function Health({
   paint: string;
   align: "left" | "right";
   tuned?: boolean;
+  meter: MeterRead | null;
 }) {
   const color = PAINT[paint] ?? "#f0a202";
   const low = hp > 0 && hp < 25;
@@ -390,8 +450,47 @@ function Health({
         />
       </div>
       <p className={`mt-0.5 font-display text-[10px] leading-none tabular-nums md:text-sm ${low ? "text-bad" : "text-muted"}`}>{Math.round(hp)}</p>
+      <Meters meter={meter} align={align} />
     </div>
   );
+}
+
+function Meters({ meter, align }: { meter: MeterRead | null; align: "left" | "right" }) {
+  const right = align === "right";
+  const rows = [
+    { label: "BAT", value: meter?.battery ?? null, max: meter?.batteryMax ?? 1, tone: "#7ecbff" },
+    { label: "PWR", value: meter?.power ?? null, max: meter?.powerMax ?? 1, tone: "#f0a202" },
+    { label: "STA", value: meter?.stamina ?? null, max: meter?.staminaMax ?? 1, tone: "#9fe0b0" },
+  ];
+  return (
+    <div className={`mt-1 flex w-full max-w-sm flex-col gap-0.5 ${right ? "ml-auto" : ""}`} data-testid="bot-meters">
+      {rows.map((row) => {
+        const pct = row.value == null ? 0 : Math.max(0, Math.min(100, (row.value / Math.max(1, row.max)) * 100));
+        const tired = row.value != null && pct < 28;
+        return (
+          <div key={row.label} className={`flex items-center gap-1 ${right ? "flex-row-reverse" : ""}`}>
+            <span className="w-7 shrink-0 font-display text-[9px] tracking-wider text-muted md:text-[10px]">{row.label}</span>
+            <span className="relative h-1.5 min-w-0 flex-1 bg-black/70 md:h-2">
+              <span
+                className={`absolute inset-y-0 ${right ? "right-0" : "left-0"}`}
+                style={{ width: `${pct}%`, background: tired ? "#e0402a" : row.tone }}
+              />
+            </span>
+            <span className={`w-8 shrink-0 font-display text-[9px] tabular-nums md:text-[10px] ${right ? "text-left" : "text-right"} ${tired ? "text-bad" : "text-muted"}`}>
+              {row.value == null ? "N/A" : row.value}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function meterPhase(beat: Beat, local: number): MeterPhase {
+  if (beat.kind === "exchange") return { kind: "exchange", index: beat.index, local };
+  if (beat.kind === "clash") return { kind: "enter", index: beat.index };
+  if (beat.kind === "finisher" || beat.kind === "replay" || beat.kind === "decision") return { kind: "final" };
+  return { kind: "bell" };
 }
 
 function captionFor(result: FightResult, bout: Bout, beat: Beat, noDamage: boolean) {
