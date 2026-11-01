@@ -110,9 +110,9 @@ export function reactivePrompt(moment: ReactiveMoment) {
 
 /** Hard length cap: a long model reply cannot turn into a monologue. */
 export function shortReactiveLine(raw: string): string {
-  const first = raw.replace(/[\\r\\n]+/g, " ").replace(/[\\*#]/g, "")
+  const first = raw.replace(/[\r\n]+/g, " ").replace(/[*#]/g, "")
     .trim().replace(/^[\"'“”]+|[\"'“”]+$/g, "")
-    .split(/(?<=[.!?])\\s+/)[0] ?? "";
-  const words = first.trim().split(/\\s+/).filter(Boolean).slice(0, 14);
+    .split(/(?<=[.!?])\s+/)[0] ?? "";
+  const words = first.trim().split(/\s+/).filter(Boolean).slice(0, 14);
   return words.length >= 2 ? words.join(" ") : "";
 }
