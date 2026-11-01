@@ -57,6 +57,15 @@ export function Commercial({ ad, paused, onEnded }: { ad: Commercial; paused: bo
     return () => window.clearTimeout(id);
   }, [mode, ad.slug]);
 
+  // Stall watchdog: a video that reached canPlay can still freeze mid-stream
+  // (store Wi-Fi). The spot is AD_MS long, so if it has not ended well past
+  // that, end the break instead of holding the room on a frozen frame.
+  useEffect(() => {
+    if (mode !== "video" || paused) return;
+    const id = window.setTimeout(finish, AD_MS + 8_000);
+    return () => window.clearTimeout(id);
+  }, [mode, paused, finish]);
+
   useEffect(() => {
     const el = videoRef.current;
     if (!el || mode !== "video") return;
