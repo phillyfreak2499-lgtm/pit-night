@@ -163,7 +163,7 @@ export const GROUPS: Group[] = [
       ),
       faq(
         "Where can we watch?",
-        "Fight Day plays the whole card. For a huddle, tap Watch party and put it on the big screen: every fight plays back to back with a live standings table.",
+        "Fight Day plays the whole card. For a huddle, tap Watch party and put it on the big screen: every fight plays back to back, a house commercial runs after every other fight, and the standings table stays live.",
       ),
       faq(
         "What happens to damage?",

@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Flame, HelpCircle, Maximize, Minimize, Package, Pause, Play, SkipForward, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { commercialAfter } from "@/lib/pit/commercials";
 import { PROGRAM_HOLD_MS, programRecords, storeNameMap } from "@/lib/pit/fight-card";
 import { recordOf } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
@@ -11,10 +12,11 @@ import type { Bout, PitData } from "@/lib/pit/types";
 import { streakHolders, tunedUp } from "@/lib/pit/week";
 import { ResultLine } from "./bits";
 import { armBroadcastAudio, Broadcast } from "./broadcast";
+import { Commercial } from "./commercial";
 import { FightProgram } from "./fight-program";
 import { buildTape, matchup, methodWord } from "./show-page";
 
-type Stage = "lobby" | "intro" | "fight" | "result" | "final";
+type Stage = "lobby" | "intro" | "fight" | "result" | "ad" | "final";
 
 const RESULT_MS = 6500;
 const BYE_MS = 6000;
@@ -39,15 +41,22 @@ export function WatchPage() {
     else if (stage === "fight") setStage("result");
     else if (stage === "result") {
       if (index + 1 >= bouts.length) setStage("final");
+      else if (commercialAfter(week, index + 1, bouts.length)) setStage("ad");
+      else {
+        setIndex(index + 1);
+        setStage("intro");
+      }
+    } else if (stage === "ad") {
+      if (index + 1 >= bouts.length) setStage("final");
       else {
         setIndex(index + 1);
         setStage("intro");
       }
     }
-  }, [stage, bout, index, bouts.length]);
+  }, [stage, bout, index, bouts.length, week]);
 
   useEffect(() => {
-    if (paused || stage === "lobby" || stage === "final" || stage === "fight") return;
+    if (paused || stage === "lobby" || stage === "final" || stage === "fight" || stage === "ad") return;
     const ms = stage === "intro" ? (bout?.kind === "bye" ? BYE_MS : PROGRAM_HOLD_MS) : RESULT_MS;
     const id = window.setTimeout(next, ms);
     return () => window.clearTimeout(id);
@@ -85,10 +94,12 @@ export function WatchPage() {
   };
 
   // Records as the room has seen them: earlier weeks, plus this card up to the fight on screen.
-  const shown = new Set(bouts.slice(0, stage === "result" || stage === "final" ? index + 1 : index).map((b) => b.id));
+  const revealed = stage === "result" || stage === "ad" || stage === "final" ? index + 1 : index;
+  const shown = new Set(bouts.slice(0, revealed).map((b) => b.id));
   if (stage === "final") for (const b of bouts) shown.add(b.id);
   const seen: PitData = { ...data, bouts: [...data.bouts.filter((b) => b.week !== week), ...bouts.filter((b) => shown.has(b.id))] };
   const weekName = data.weeks.find((w) => w.number === week)?.name ?? `Week ${week}`;
+  const spot = stage === "ad" ? commercialAfter(week, index + 1, bouts.length) : null;
 
   const [host, setHost] = useState<HTMLElement | null>(null);
   useEffect(() => setHost(document.body), []);
@@ -100,10 +111,16 @@ export function WatchPage() {
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-2 md:px-6">
         <div className="min-w-0">
           <p className="truncate font-display text-xs tracking-[0.3em] text-amber uppercase">Waterman Battle Bot League · Watch party</p>
-          <p className="truncate font-display text-2xl leading-none md:text-3xl">
-            Week {week} · {weekName}
-            {stage !== "lobby" && stage !== "final" && bouts.length ? (
-              <span className="ml-3 text-base text-muted">
+          <p className="font-display text-2xl leading-none md:text-3xl">
+            <span className="block truncate md:inline">
+              Week {week} · {weekName}
+            </span>
+            {stage === "ad" ? (
+              <span className="mt-1 block text-sm tracking-[0.18em] text-muted uppercase md:mt-0 md:ml-3 md:inline md:text-base md:tracking-normal md:normal-case">
+                Commercial
+              </span>
+            ) : stage !== "lobby" && stage !== "final" && bouts.length ? (
+              <span className="mt-1 block text-sm text-muted md:mt-0 md:ml-3 md:inline md:text-base">
                 Fight {index + 1} of {bouts.length}
               </span>
             ) : null}
@@ -132,7 +149,12 @@ export function WatchPage() {
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] xl:grid-cols-[1fr_22rem]">
+      <div className="relative grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] xl:grid-cols-[1fr_22rem]">
+        {spot ? (
+          <div className="absolute inset-0 z-10">
+            <Commercial key={`${spot.slug}-${index}`} ad={spot} paused={paused} onEnded={next} />
+          </div>
+        ) : null}
         <main className="relative flex min-h-0 flex-col overflow-y-auto p-3 md:p-5">
           {stage === "lobby" ? (
             <Lobby data={data} week={week} weeks={postedWeeks} setWeek={setWeek} tape={liveTape} onStart={start} />
@@ -143,14 +165,16 @@ export function WatchPage() {
               <Broadcast key={bout.id} bout={bout} playing={!paused} speed={1.5} chromeless kicker={(tape ?? liveTape).live ? "Live card" : "House tape"} onComplete={next} />
             </div>
           ) : null}
-          {stage === "result" && bout ? <Result key={bout.id} data={data} bout={bout} seen={seen} next={bouts[index + 1] ?? null} /> : null}
+          {stage === "result" && bout ? (
+            <Result key={bout.id} data={data} bout={bout} seen={seen} next={bouts[index + 1] ?? null} commercialNext={Boolean(commercialAfter(week, index + 1, bouts.length))} />
+          ) : null}
           {stage === "final" ? <Final data={data} seen={seen} bouts={bouts} onAgain={() => setStage("lobby")} /> : null}
-          {paused && stage !== "lobby" && stage !== "final" ? (
+          {paused && stage !== "lobby" && stage !== "final" && stage !== "ad" ? (
             <p className="pointer-events-none absolute inset-x-0 top-4 text-center font-display text-sm tracking-[0.3em] text-amber uppercase">Paused · space to resume</p>
           ) : null}
         </main>
         <aside className="hidden min-h-0 overflow-y-auto border-l border-line bg-surface xl:block">
-          <Scoreboard data={seen} highlight={stage !== "lobby" && stage !== "final" && bout ? bout.storeIds : []} />
+          <Scoreboard data={seen} highlight={stage !== "lobby" && stage !== "final" && stage !== "ad" && bout ? bout.storeIds : []} />
         </aside>
       </div>
 
@@ -196,7 +220,7 @@ function Lobby({
         <p className="mt-4 max-w-2xl text-lg text-muted">
           {week === 5
             ? "One title fight. No judges and no decision: it keeps going until one bot is knocked out. Rally support makes the room louder, never the bot stronger."
-            : "Put this on the big screen. Every fight plays back to back with a walk-out, the tape, and the call. The live table updates after every fight."}
+            : "Put this on the big screen. Every fight plays back to back with a walk-out, the tape, and the call. A house commercial runs after every other fight. The live table updates after every fight."}
         </p>
       </div>
       {choices.length > 1 ? (
@@ -273,7 +297,7 @@ function Intro({ data, bout, seen, order, total }: { data: PitData; bout: Bout; 
   );
 }
 
-function Result({ data, bout, seen, next }: { data: PitData; bout: Bout; seen: PitData; next: Bout | null }) {
+function Result({ data, bout, seen, next, commercialNext }: { data: PitData; bout: Bout; seen: PitData; next: Bout | null; commercialNext: boolean }) {
   const winner = bout.result?.winnerIds[0];
   const store = data.stores.find((s) => s.id === winner);
   const bot = winner ? data.bots.find((b) => b.storeId === winner) : undefined;
@@ -294,7 +318,9 @@ function Result({ data, bout, seen, next }: { data: PitData; bout: Bout; seen: P
         <ResultLine bout={bout} />
       </p>
       <TaleOfTape bout={bout} compact />
-      <p className="mt-4 text-sm tracking-widest text-muted uppercase">{next ? `Up next · ${matchup(data, next)}` : "That was the last fight"}</p>
+      <p className="mt-4 text-sm tracking-widest text-muted uppercase">
+        {next ? `${commercialNext ? "Commercial break · then " : "Up next · "}${matchup(data, next)}` : "That was the last fight"}
+      </p>
     </div>
   );
 }
