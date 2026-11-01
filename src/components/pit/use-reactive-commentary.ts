@@ -33,6 +33,9 @@ export function useReactiveCommentary(bout: Bout | null, active: boolean) {
     if (active) return;
     generation.current++;
     busy.current = false;
+    // A new playback may reuse the same published bout and its cached lines.
+    seen.current.clear();
+    setLastLine(null);
     if (typeof window !== "undefined") window.speechSynthesis?.cancel();
   }, [active]);
 
