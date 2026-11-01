@@ -111,6 +111,45 @@ export const PIT = { x: 0.5, y: 0.1, w: 0.2, h: 0.09 };
 const REACH = 0.2;
 const HIT_AT = 0.42;
 
+/**
+ * One-on-one round at 1× is 45s: 20s of clash, then a 25s exchange.
+ * The scoring strike still runs for the old 13s. The extra time is footwork.
+ * Multi-bot exchanges stay 12s and do not get a clash.
+ */
+export const DUEL_CLASH_SEC = 20;
+export const DUEL_EXCHANGE_SEC = 25;
+export const GROUP_EXCHANGE_SEC = 12;
+/** Round splash. Divided by the clash beat so it stays this many seconds at 1×. */
+export const ROUND_CARD_SEC = 2.4;
+
+// 8s approach / circle / feints, 4s counter, 2s reset, 4s chip, 2s square-up.
+const CLASH_OPEN_SEC = 8;
+const CLASH_COUNTER_SEC = 4;
+const CLASH_RESET_SEC = 2;
+const CLASH_CHIP_SEC = 4;
+const CLASH_SETTLE_SEC = 2;
+const CLASH_COUNTER_AT = CLASH_OPEN_SEC / DUEL_CLASH_SEC;
+const CLASH_COUNTER_END = (CLASH_OPEN_SEC + CLASH_COUNTER_SEC) / DUEL_CLASH_SEC;
+const CLASH_CHIP_AT = (CLASH_OPEN_SEC + CLASH_COUNTER_SEC + CLASH_RESET_SEC) / DUEL_CLASH_SEC;
+const CLASH_CHIP_END =
+  (CLASH_OPEN_SEC + CLASH_COUNTER_SEC + CLASH_RESET_SEC + CLASH_CHIP_SEC) / DUEL_CLASH_SEC;
+
+// 7s stalk, then the original 13s strike, then 5s to clear the lane.
+const EX_STALK_SEC = 7;
+const EX_STRIKE_SEC = 13;
+const EX_STALK_END = EX_STALK_SEC / DUEL_EXCHANGE_SEC;
+const EX_STRIKE_SPAN = EX_STRIKE_SEC / DUEL_EXCHANGE_SEC;
+const EX_STRIKE_END = (EX_STALK_SEC + EX_STRIKE_SEC) / DUEL_EXCHANGE_SEC;
+
+/** Beat fraction where a duel exchange's scoring blow connects. */
+export function duelExchangeHitAt() {
+  return EX_STALK_END + HIT_AT * EX_STRIKE_SPAN;
+}
+
+function clashWindowHit(start: number, end: number) {
+  return start + (end - start) * HIT_AT;
+}
+
 export function buildBeats(result: FightResult): Beat[] {
   const beats: Beat[] = [];
   let t = 0;
@@ -125,8 +164,8 @@ export function buildBeats(result: FightResult): Beat[] {
   push(5.5, { kind: "stats" });
   if (result.exchanges.length) push(4, { kind: "countdown" });
   result.exchanges.forEach((_, index) => {
-    if (duel) push(11, { kind: "clash", index });
-    push(duel ? 13 : 12, { kind: "exchange", index });
+    if (duel) push(DUEL_CLASH_SEC, { kind: "clash", index });
+    push(duel ? DUEL_EXCHANGE_SEC : GROUP_EXCHANGE_SEC, { kind: "exchange", index });
   });
   if (result.finisher) push(8, { kind: "finisher" });
   if (duel && finalBlow(result) !== null) push(7.5, { kind: "replay" });
@@ -443,7 +482,158 @@ function duelEnd(result: FightResult, time: number): { a: BotState; b: BotState 
   return { a: A, b: B };
 }
 
-function exchangeState(result: FightResult, index: number, local: number, time: number) {
+type Footwork = {
+  pa: Spot;
+  pb: Spot;
+  atkStroke: number;
+  defStroke: number;
+  atkCharge: boolean;
+  defCharge: boolean;
+  /** Strafe heading. Zero at both ends so the next strike starts square. */
+  lead: number;
+  /** 0..1 how committed the bots look. Zero at both ends. */
+  heat: number;
+  /** Idle wobble. Zero at both ends so marks meet the strike exactly. */
+  wobble: number;
+};
+
+function smoothRange(t: number, a: number, b: number) {
+  return ease((t - a) / (b - a || 1));
+}
+
+function pulse(t: number, a: number, b: number) {
+  const u = clamp((t - a) / (b - a || 1), 0, 1);
+  return Math.sin(u * Math.PI);
+}
+
+function orbit(mid: Spot, home: Spot, turn: number, radiusScale: number): Spot {
+  const reach = dist(mid, home) || 0.001;
+  const a0 = angle(mid, home);
+  const r = reach * radiusScale;
+  return { x: mid.x + Math.cos(a0 + turn) * r, y: mid.y + Math.sin(a0 + turn) * r };
+}
+
+/** Approach, switch direction, jab, and two feints. Starts and ends on the homes. */
+function longFootwork(atkHome: Spot, defHome: Spot, t: number, seed: string, sweep: number): Footwork {
+  const u = clamp(t, 0, 1);
+  const dir = rand(`${seed}|way`) > 0.5 ? 1 : -1;
+  const mid = mix(atkHome, defHome, 0.5);
+  const open = smoothRange(u, 0.05, 0.22);
+  const outSwing = smoothRange(u, 0.18, 0.48);
+  const backSwing = smoothRange(u, 0.5, 0.78);
+  const settle = smoothRange(u, 0.82, 1);
+  const alive = 1 - settle;
+  const turn = dir * sweep * (outSwing * 0.85 - backSwing * 0.55) * alive;
+  const close = open * alive * 0.3;
+  let pa = orbit(mid, atkHome, turn, 1 - close);
+  let pb = orbit(mid, defHome, turn, 1 - close * 0.9);
+  const perp = (spot: Spot) => {
+    const n = unit(mid, spot);
+    return { x: -n.y, y: n.x };
+  };
+  const weave = Math.sin(u * Math.PI * 2) * alive * open * 0.02;
+  const spa = perp(pa);
+  const spb = perp(pb);
+  pa = { x: pa.x + spa.x * dir * weave, y: pa.y + spa.y * dir * weave };
+  pb = { x: pb.x - spb.x * dir * weave, y: pb.y - spb.y * dir * weave };
+  const jab = pulse(u, 0.12, 0.28) * alive;
+  const feintA = pulse(u, 0.36, 0.54) * alive;
+  const feintB = pulse(u, 0.58, 0.76) * alive;
+  const towardA = unit(pa, pb);
+  const towardB = unit(pb, pa);
+  pa = keepIn({
+    x: pa.x + towardA.x * (jab * 0.035 + feintA * 0.055),
+    y: pa.y + towardA.y * (jab * 0.035 + feintA * 0.055),
+  });
+  pb = keepIn({ x: pb.x + towardB.x * feintB * 0.05, y: pb.y + towardB.y * feintB * 0.05 });
+  const pin = Math.max(settle, 1 - smoothRange(u, 0, 0.06));
+  pa = mix(pa, atkHome, pin);
+  pb = mix(pb, defHome, pin);
+  const moving = alive * (1 - pin);
+  return {
+    pa,
+    pb,
+    atkStroke: Math.max(jab, feintA) * moving,
+    defStroke: feintB * moving,
+    atkCharge: feintA > 0.55 && moving > 0.4,
+    defCharge: feintB > 0.55 && moving > 0.4,
+    lead: dir * (outSwing - backSwing) * moving,
+    heat: alive * smoothRange(u, 0.08, 0.3) * (1 - pin),
+    wobble: 0.007 * moving * open,
+  };
+}
+
+/** A short step off, one feint, and a square-up. Starts and ends on the homes. */
+function shortFootwork(atkHome: Spot, defHome: Spot, t: number, seed: string): Footwork {
+  const u = clamp(t, 0, 1);
+  const dir = rand(`${seed}|way`) > 0.5 ? 1 : -1;
+  const mid = mix(atkHome, defHome, 0.5);
+  const away = unit(mid, atkHome);
+  const side = { x: -away.y, y: away.x };
+  const out = Math.sin(u * Math.PI);
+  const feint = pulse(u, 0.34, 0.7);
+  let pa = {
+    x: atkHome.x + away.x * out * 0.055 + side.x * dir * out * 0.04,
+    y: atkHome.y + away.y * out * 0.055 + side.y * dir * out * 0.04,
+  };
+  let pb = {
+    x: defHome.x - away.x * out * 0.05 - side.x * dir * out * 0.032,
+    y: defHome.y - away.y * out * 0.05 - side.y * dir * out * 0.032,
+  };
+  const toward = unit(pa, pb);
+  pa = keepIn({ x: pa.x + toward.x * feint * 0.045, y: pa.y + toward.y * feint * 0.045 });
+  pb = keepIn(pb);
+  const pin = Math.max(smoothRange(u, 0.82, 1), 1 - smoothRange(u, 0, 0.1));
+  pa = mix(pa, atkHome, pin);
+  pb = mix(pb, defHome, pin);
+  const moving = 1 - pin;
+  return {
+    pa,
+    pb,
+    atkStroke: feint * moving,
+    defStroke: 0,
+    atkCharge: feint > 0.6 && moving > 0.45,
+    defCharge: false,
+    lead: dir * out * moving * 0.8,
+    heat: out * moving,
+    wobble: 0.005 * out * moving,
+  };
+}
+
+function botsFromFoot(
+  atkBot: FighterSnap,
+  defBot: FighterSnap,
+  fw: Footwork,
+  hpAtk: number,
+  hpDef: number,
+  time: number,
+  seed: string,
+) {
+  const atk = blank(atkBot, fw.pa, 0, hpAtk);
+  const def = blank(defBot, fw.pb, 0, hpDef);
+  if (fw.wobble > 0) {
+    const ja = juke(`${seed}|atk`, time, fw.wobble);
+    const jb = juke(`${seed}|def`, time + 0.6, fw.wobble);
+    atk.spot = { x: atk.spot.x + ja.x, y: atk.spot.y + ja.y };
+    def.spot = { x: def.spot.x + jb.x, y: def.spot.y + jb.y };
+  }
+  atk.stroke = fw.atkStroke;
+  def.stroke = fw.defStroke;
+  atk.charging = fw.atkCharge;
+  def.charging = fw.defCharge;
+  atk.rev = lerp(0.6, 1, fw.heat);
+  def.rev = lerp(0.45, 0.85, fw.heat * 0.8);
+  face(atk, def);
+  face(def, atk);
+  atk.heading += fw.lead * 0.45;
+  def.heading -= fw.lead * 0.35;
+  atk.roll = atk.spot.x * 34 + atk.spot.y * 21;
+  def.roll = def.spot.x * 34 + def.spot.y * 21;
+  return { atk, def, focus: mix(atk.spot, def.spot, 0.5) };
+}
+
+/** The scoring strike alone. Replay samples this, not the footwork around it. */
+function exchangeStrike(result: FightResult, index: number, local: number, time: number) {
   const a = result.fighters[0]!;
   const b = result.fighters[1]!;
   const ex = result.exchanges[index]!;
@@ -463,21 +653,137 @@ function exchangeState(result: FightResult, index: number, local: number, time: 
     Q1,
     local,
     time,
-    ex.damage - (isDuel(result) ? chipOf(ex) : 0),
+    ex.damage - chipOf(ex),
     ex.attackerHp,
-    beforeHp(result, ex) - (isDuel(result) ? chipOf(ex) : 0),
+    beforeHp(result, ex) - chipOf(ex),
     ex.defenderHp,
     false,
   );
   return aAttacks ? { a: out.atk, b: out.def, out } : { a: out.def, b: out.atk, out };
 }
 
-const COUNTER_AT = 0.28;
-const CHIP_AT = 0.62;
+function exchangeCast(result: FightResult, index: number) {
+  const a = result.fighters[0]!;
+  const b = result.fighters[1]!;
+  const ex = result.exchanges[index]!;
+  const aAttacks = ex.attackerId === a.id;
+  return {
+    a,
+    b,
+    ex,
+    aAttacks,
+    atkBot: aAttacks ? a : b,
+    defBot: aAttacks ? b : a,
+    P0: mark(result, aAttacks ? 0 : 1, index),
+    Q0: mark(result, aAttacks ? 1 : 0, index),
+    hpAtk: ex.attackerHp,
+    hpDef: beforeHp(result, ex) - chipOf(ex),
+  };
+}
+
+function exchangeStalk(result: FightResult, index: number, local: number, time: number) {
+  const cast = exchangeCast(result, index);
+  const t = clamp(local / EX_STALK_END, 0, 1);
+  const fw = longFootwork(cast.P0, cast.Q0, t, `${result.seed}|stalk|${index}`, 2.6);
+  const posed = botsFromFoot(cast.atkBot, cast.defBot, fw, cast.hpAtk, cast.hpDef, time, `${result.seed}|stalk|${index}`);
+  const a = cast.aAttacks ? posed.atk : posed.def;
+  const b = cast.aAttacks ? posed.def : posed.atk;
+  return {
+    a,
+    b,
+    out: {
+      atk: posed.atk,
+      def: posed.def,
+      impact: null,
+      power: 0,
+      focus: posed.focus,
+      tight: lerp(0.32, 0.35, t),
+    },
+  };
+}
+
+function exchangeDisengage(result: FightResult, index: number, local: number, time: number) {
+  const end = exchangeStrike(result, index, 1, time);
+  const t = clamp((local - EX_STRIKE_END) / (1 - EX_STRIKE_END), 0, 1);
+  if (end.a.dead || end.b.dead) {
+    const wiggle = Math.sin(t * Math.PI);
+    const a = { ...end.a, spot: { ...end.a.spot } };
+    const b = { ...end.b, spot: { ...end.b.spot } };
+    const live = a.dead ? b : a;
+    const dead = a.dead ? a : b;
+    const home = { ...live.spot };
+    const dir = rand(`${result.seed}|ko-lap|${index}`) > 0.5 ? 1 : -1;
+    const away = unit(dead.spot, home);
+    const perp = { x: -away.y, y: away.x };
+    const j = juke(`${result.seed}|ko|${index}`, time, 0.004 * wiggle);
+    live.spot = keepIn({
+      x: home.x + perp.x * dir * wiggle * 0.05 + away.x * wiggle * 0.02 + j.x,
+      y: home.y + perp.y * dir * wiggle * 0.05 + away.y * wiggle * 0.02 + j.y,
+    });
+    face(live, dead);
+    live.heading += dir * wiggle * 1.1;
+    live.rev = 1;
+    live.stroke = wiggle > 0.75 ? 1 : 0;
+    live.roll = live.spot.x * 34 + live.spot.y * 21;
+    return {
+      a,
+      b,
+      out: { atk: a, def: b, impact: null, power: 0, focus: mix(a.spot, b.spot, 0.45), tight: lerp(0.3, 0.36, t) },
+    };
+  }
+  const cast = exchangeCast(result, index);
+  const atkHome = cast.aAttacks ? end.a.spot : end.b.spot;
+  const defHome = cast.aAttacks ? end.b.spot : end.a.spot;
+  const fw = longFootwork(atkHome, defHome, t, `${result.seed}|clear|${index}`, 1.5);
+  const posed = botsFromFoot(
+    cast.atkBot,
+    cast.defBot,
+    fw,
+    cast.aAttacks ? end.a.hp : end.b.hp,
+    cast.aAttacks ? end.b.hp : end.a.hp,
+    time,
+    `${result.seed}|clear|${index}`,
+  );
+  const a = cast.aAttacks ? posed.atk : posed.def;
+  const b = cast.aAttacks ? posed.def : posed.atk;
+  a.flipped = end.a.flipped;
+  b.flipped = end.b.flipped;
+  a.dead = end.a.dead;
+  b.dead = end.b.dead;
+  a.hp = end.a.hp;
+  b.hp = end.b.hp;
+  return {
+    a,
+    b,
+    out: {
+      atk: posed.atk,
+      def: posed.def,
+      impact: null,
+      power: 0,
+      focus: posed.focus,
+      tight: lerp(0.3, 0.28, t),
+    },
+  };
+}
 
 /**
- * The trade before the big hit: square up and circle, the defender swings and
- * bounces off, then the attacker lands a chip. Starts and ends on the exchange marks.
+ * Duel exchange. Footwork, then the strike at its old speed so the hit still
+ * falls on `duelExchangeHitAt`, then a clear. Ends where the next beat starts.
+ */
+function exchangeState(result: FightResult, index: number, local: number, time: number) {
+  if (local >= EX_STRIKE_END) return exchangeDisengage(result, index, local, time);
+  if (local > EX_STALK_END) {
+    const strikeLocal = clamp((local - EX_STALK_END) / EX_STRIKE_SPAN, 0, 1);
+    return exchangeStrike(result, index, strikeLocal, time);
+  }
+  return exchangeStalk(result, index, local, time);
+}
+
+type ClashPhase = "approach" | "counter" | "reset" | "chip" | "settle";
+
+/**
+ * The trade before the big hit: close, circle, feint, the defender bounces off,
+ * then the attacker lands a chip. Strikes keep a ~4s wall clock. Ends on the marks.
  */
 function clashState(result: FightResult, index: number, local: number, time: number) {
   const a = result.fighters[0]!;
@@ -490,63 +796,70 @@ function clashState(result: FightResult, index: number, local: number, time: num
   const defBot = aAttacks ? b : a;
   const hpDef0 = beforeHp(result, ex);
   const chip = chipOf(ex);
-  let atk: BotState;
-  let def: BotState;
-  let impact: Spot | null = null;
-  let power = 0;
-  let focus: Spot;
-  let tight = 0.3;
-  let phase: "circle" | "counter" | "chip" = "circle";
+  const seed = `${result.seed}|clash|${index}`;
+  const finish = (
+    atk: BotState,
+    def: BotState,
+    phase: ClashPhase,
+    impact: Spot | null,
+    power: number,
+    focus: Spot,
+    tight: number,
+  ) => {
+    const A = aAttacks ? atk : def;
+    const B = aAttacks ? def : atk;
+    return { a: A, b: B, impact, power, focus, tight, phase, chip, atkBot, defBot };
+  };
 
-  if (local < COUNTER_AT) {
-    // Circle: orbit the middle, feint once, settle back on the marks.
-    const t = local / COUNTER_AT;
-    const mid = mix(P0, Q0, 0.5);
-    const r = dist(P0, Q0) / 2;
-    const a0 = angle(mid, P0);
-    const swing = Math.sin(t * Math.PI) * 0.85 * (rand(`${result.seed}|orbit|${index}`) > 0.5 ? 1 : -1);
-    const feint = t > 0.5 && t < 0.72 ? Math.sin(((t - 0.5) / 0.22) * Math.PI) * 0.035 : 0;
-    const pa = keepIn({ x: mid.x + Math.cos(a0 + swing) * (r - feint), y: mid.y + Math.sin(a0 + swing) * (r - feint) * 0.8 });
-    const pb = keepIn({ x: mid.x - Math.cos(a0 + swing) * r, y: mid.y - Math.sin(a0 + swing) * r * 0.8 });
-    atk = blank(atkBot, pa, 0, ex.attackerHp);
-    def = blank(defBot, pb, 0, hpDef0);
-    const ja = juke(`${atkBot.id}circle${index}`, time, 0.008);
-    const jb = juke(`${defBot.id}circle${index}`, time + 0.7, 0.008);
-    atk.spot = { x: atk.spot.x + ja.x, y: atk.spot.y + ja.y };
-    def.spot = { x: def.spot.x + jb.x, y: def.spot.y + jb.y };
-    atk.charging = feint > 0.01;
-    atk.rev = 0.75;
-    def.rev = 0.65;
+  if (local < CLASH_COUNTER_AT) {
+    const fw = longFootwork(P0, Q0, local / CLASH_COUNTER_AT, `${seed}|open`, 2.5);
+    const posed = botsFromFoot(atkBot, defBot, fw, ex.attackerHp, hpDef0, time, `${seed}|open`);
+    return finish(posed.atk, posed.def, "approach", null, 0, posed.focus, 0.26 + fw.heat * 0.12);
+  }
+
+  if (local < CLASH_COUNTER_END) {
+    const u = (local - CLASH_COUNTER_AT) / (CLASH_COUNTER_END - CLASH_COUNTER_AT);
+    const out = strike(defBot, atkBot, Q0, P0, Q0, P0, u, time, 0, hpDef0, ex.attackerHp, ex.attackerHp, false);
+    return finish(out.def, out.atk, "counter", out.impact, out.impact ? 0.3 : 0, out.focus, out.tight * 0.85);
+  }
+
+  if (local < CLASH_CHIP_AT) {
+    const fw = shortFootwork(P0, Q0, (local - CLASH_COUNTER_END) / (CLASH_CHIP_AT - CLASH_COUNTER_END), `${seed}|reset`);
+    const posed = botsFromFoot(atkBot, defBot, fw, ex.attackerHp, hpDef0, time, `${seed}|reset`);
+    return finish(posed.atk, posed.def, "reset", null, 0, posed.focus, 0.3);
+  }
+
+  if (local < CLASH_CHIP_END) {
+    const u = (local - CLASH_CHIP_AT) / (CLASH_CHIP_END - CLASH_CHIP_AT);
+    const out = strike(atkBot, defBot, P0, Q0, P0, Q0, u, time, chip, ex.attackerHp, hpDef0, hpDef0 - chip, false);
+    return finish(
+      out.atk,
+      out.def,
+      "chip",
+      out.impact,
+      out.impact ? Math.max(0.3, out.power * 0.7) : 0,
+      out.focus,
+      out.tight * 0.9,
+    );
+  }
+
+  const held = strike(atkBot, defBot, P0, Q0, P0, Q0, 1, time, chip, ex.attackerHp, hpDef0, hpDef0 - chip, false);
+  const t = clamp((local - CLASH_CHIP_END) / (CLASH_SETTLE_SEC / DUEL_CLASH_SEC), 0, 1);
+  if (held.def.dead) {
+    const wiggle = Math.sin(t * Math.PI);
+    const atk = { ...held.atk, spot: mix(held.atk.spot, P0, ease(t)) };
+    const def = { ...held.def, spot: mix(held.def.spot, Q0, ease(t)) };
     face(atk, def);
     face(def, atk);
+    atk.heading += wiggle * 0.45;
+    atk.rev = 1;
     atk.roll = atk.spot.x * 34 + atk.spot.y * 21;
     def.roll = def.spot.x * 34 + def.spot.y * 21;
-    focus = mix(atk.spot, def.spot, 0.5);
-  } else if (local < CHIP_AT) {
-    // The defender tries first. Armor holds.
-    phase = "counter";
-    const u = (local - COUNTER_AT) / (CHIP_AT - COUNTER_AT);
-    const out = strike(defBot, atkBot, Q0, P0, Q0, P0, u, time, 0, hpDef0, ex.attackerHp, ex.attackerHp, false);
-    def = out.atk;
-    atk = out.def;
-    impact = out.impact;
-    power = out.impact ? 0.3 : 0;
-    focus = out.focus;
-    tight = out.tight * 0.85;
-  } else {
-    phase = "chip";
-    const u = (local - CHIP_AT) / (1 - CHIP_AT);
-    const out = strike(atkBot, defBot, P0, Q0, P0, Q0, u, time, chip, ex.attackerHp, hpDef0, hpDef0 - chip, false);
-    atk = out.atk;
-    def = out.def;
-    impact = out.impact;
-    power = out.impact ? Math.max(0.3, out.power * 0.7) : 0;
-    focus = out.focus;
-    tight = out.tight * 0.9;
+    return finish(atk, def, "settle", null, 0, mix(atk.spot, def.spot, 0.5), lerp(0.5, 0.3, t));
   }
-  const A = aAttacks ? atk : def;
-  const B = aAttacks ? def : atk;
-  return { a: A, b: B, impact, power, focus, tight, phase, chip, atkBot, defBot };
+  const fw = shortFootwork(P0, Q0, t, `${seed}|settle`);
+  const posed = botsFromFoot(atkBot, defBot, fw, held.atk.hp, held.def.hp, time, `${seed}|settle`);
+  return finish(posed.atk, posed.def, "settle", null, 0, posed.focus, lerp(0.34, 0.3, t));
 }
 
 function finisherState(result: FightResult, local: number, time: number) {
@@ -694,8 +1007,8 @@ export function fightDrive(result: FightResult, beat: Beat, local: number, time:
       bots: [s.a, s.b],
       impact: s.impact,
       power: s.power,
-      hitKey: s.phase === "circle" ? null : `cl-${beat.index}-${s.phase}`,
-      hitAt: counter ? COUNTER_AT + (CHIP_AT - COUNTER_AT) * HIT_AT : CHIP_AT + (1 - CHIP_AT) * HIT_AT,
+      hitKey: s.phase === "counter" ? `cl-${beat.index}-counter` : s.phase === "chip" ? `cl-${beat.index}-chip` : null,
+      hitAt: counter ? clashWindowHit(CLASH_COUNTER_AT, CLASH_COUNTER_END) : clashWindowHit(CLASH_CHIP_AT, CLASH_CHIP_END),
       weapon: (counter ? s.defBot : s.atkBot).weaponFamily,
       victim: counter ? ex.attackerId : ex.defenderId,
       focus: s.focus,
@@ -716,7 +1029,7 @@ export function fightDrive(result: FightResult, beat: Beat, local: number, time:
       impact: s.out.impact,
       power: s.out.power,
       hitKey: `ex-${beat.index}`,
-      hitAt: HIT_AT,
+      hitAt: duelExchangeHitAt(),
       weapon: (ex.attackerId === a.id ? a : b).weaponFamily,
       victim: ex.defenderId,
       focus: s.out.focus,
@@ -751,7 +1064,7 @@ export function fightDrive(result: FightResult, beat: Beat, local: number, time:
     // The blow again at a crawl: from the charge to the throw.
     const blow = finalBlow(result);
     const u = HIT_AT - 0.08 + clamp(local / 0.85, 0, 1) * 0.28;
-    const s = blow === "finisher" ? finisherState(result, u, time) : exchangeState(result, blow ?? 0, u, time);
+    const s = blow === "finisher" ? finisherState(result, u, time) : exchangeStrike(result, blow ?? 0, u, time);
     const ex = typeof blow === "number" ? result.exchanges[blow] : undefined;
     return {
       bots: [s.a, s.b],
