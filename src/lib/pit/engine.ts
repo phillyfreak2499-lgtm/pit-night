@@ -1085,6 +1085,7 @@ export function simulateDuel(data: PitData, idA: string, idB: string, seed: stri
     fighters: [a, b],
     wear,
     seed,
+    bell: fought.bell,
   };
 }
 
@@ -1120,6 +1121,7 @@ export function simulateChampionshipDuel(
     fighters: [a, b],
     wear: duelWear(winner.id, loser.id, "ko", exchanges.length <= 3),
     seed,
+    bell: fought.bell,
   };
 }
 
@@ -1231,6 +1233,7 @@ export function simulateTag(
     fighters: snaps,
     wear,
     seed,
+    bell: fought.bell,
   };
 }
 
@@ -1263,6 +1266,7 @@ export function simulateMelee(data: PitData, ids: string[], seed: string): Fight
     wear,
     seed,
     meleeOrder: order,
+    bell: fought.bell,
   };
 }
 

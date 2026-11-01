@@ -166,6 +166,26 @@ export function ease(t: number) {
   return x * x * (3 - 2 * x);
 }
 
+/** Smootherstep. Same endpoints as ease, softer acceleration. */
+function smoother(t: number) {
+  const x = clamp(t, 0, 1);
+  return x * x * x * (x * (x * 6 - 15) + 10);
+}
+
+/**
+ * Visual pace when the recorded cell is low late in a fight.
+ * 1 when the tape has no vitals, so old replays move exactly as before.
+ */
+function drivePace(result: FightResult, id: string, index: number): number {
+  const bell = result.bell?.[id];
+  if (!bell || bell.batteryMax <= 0) return 1;
+  const entering = index > 0 ? (result.exchanges[index - 1]?.vitals?.[id]?.battery ?? bell.battery) : bell.battery;
+  const ending = result.exchanges[index]?.vitals?.[id]?.battery ?? entering;
+  const ratio = Math.min(entering, ending) / bell.batteryMax;
+  if (index < 3 || ratio >= 0.45) return 1;
+  return 0.78 + 0.22 * (ratio / 0.45);
+}
+
 function easeOut(t: number) {
   const x = clamp(t, 0, 1);
   return 1 - (1 - x) * (1 - x) * (1 - x);
@@ -280,6 +300,7 @@ function strike(
   hpDefBefore: number,
   hpDefAfter: number,
   flameHit: boolean,
+  pace = 1,
 ): StrikeOut {
   const family = atkBot.weaponFamily;
   const dir = unit(P0, Q0);
@@ -302,7 +323,7 @@ function strike(
   let tight = 0.35;
 
   if (local < 0.1) {
-    const t = ease(local / 0.1);
+    const t = smoother(local / 0.1);
     atk.spot = mix(P0, back, t);
     def.spot = mix(Q0, qBrace, t * 0.5);
     atk.rev = lerp(0.6, 1, t);
@@ -357,7 +378,7 @@ function strike(
     def.hp = lerp(hpDefBefore, hpDefAfter, clamp(k * 3, 0, 1));
     tight = lerp(0.9, 0.5, k);
   } else {
-    const t = ease((local - 0.72) / 0.28);
+    const t = smoother((local - 0.72) / 0.28);
     atk.spot = mix(pEnd, P1, t);
     def.spot = ko ? qEnd : mix(qEnd, Q1, t);
     def.hp = hpDefAfter;
@@ -397,6 +418,10 @@ function strike(
   }
   face(atk, def);
   face(def, atk, spinDef);
+  if (pace < 1) {
+    atk.rev *= pace;
+    def.rev *= Math.max(pace, 0.85);
+  }
   atk.roll = atk.spot.x * 34 + atk.spot.y * 21;
   def.roll = def.spot.x * 34 + def.spot.y * 21;
   return { atk, def, impact, power, focus: mix(atk.spot, def.spot, 0.5), tight };
@@ -468,6 +493,7 @@ function exchangeState(result: FightResult, index: number, local: number, time: 
     beforeHp(result, ex) - (isDuel(result) ? chipOf(ex) : 0),
     ex.defenderHp,
     false,
+    drivePace(result, atkBot.id, index),
   );
   return aAttacks ? { a: out.atk, b: out.def, out } : { a: out.def, b: out.atk, out };
 }
@@ -526,7 +552,7 @@ function clashState(result: FightResult, index: number, local: number, time: num
     // The defender tries first. Armor holds.
     phase = "counter";
     const u = (local - COUNTER_AT) / (CHIP_AT - COUNTER_AT);
-    const out = strike(defBot, atkBot, Q0, P0, Q0, P0, u, time, 0, hpDef0, ex.attackerHp, ex.attackerHp, false);
+    const out = strike(defBot, atkBot, Q0, P0, Q0, P0, u, time, 0, hpDef0, ex.attackerHp, ex.attackerHp, false, drivePace(result, defBot.id, index));
     def = out.atk;
     atk = out.def;
     impact = out.impact;
@@ -536,7 +562,7 @@ function clashState(result: FightResult, index: number, local: number, time: num
   } else {
     phase = "chip";
     const u = (local - CHIP_AT) / (1 - CHIP_AT);
-    const out = strike(atkBot, defBot, P0, Q0, P0, Q0, u, time, chip, ex.attackerHp, hpDef0, hpDef0 - chip, false);
+    const out = strike(atkBot, defBot, P0, Q0, P0, Q0, u, time, chip, ex.attackerHp, hpDef0, hpDef0 - chip, false, drivePace(result, atkBot.id, index));
     atk = out.atk;
     def = out.def;
     impact = out.impact;
@@ -576,6 +602,7 @@ function finisherState(result: FightResult, local: number, time: number) {
     hpDef,
     hpAfter,
     true,
+    drivePace(result, atkBot.id, n),
   );
   if (local > HIT_AT) {
     out.def.hp = lerp(hpDef, hpAfter, clamp((local - HIT_AT) / 0.3, 0, 1));
@@ -622,7 +649,7 @@ export function fightDrive(result: FightResult, beat: Beat, local: number, time:
   }
 
   if (beat.kind === "bumper") {
-    const t = ease(clamp((local - 0.15) / 0.75, 0, 1));
+    const t = smoother(clamp((local - 0.15) / 0.75, 0, 1));
     const A = blank(a, mix({ x: -0.15, y: 0.62 }, startA, t), 0, 100);
     const B = blank(b, mix({ x: 1.15, y: 0.62 }, startB, t), Math.PI, 100);
     A.charging = t > 0 && t < 0.9;
@@ -750,7 +777,10 @@ export function fightDrive(result: FightResult, beat: Beat, local: number, time:
   if (beat.kind === "replay") {
     // The blow again at a crawl: from the charge to the throw.
     const blow = finalBlow(result);
-    const u = HIT_AT - 0.08 + clamp(local / 0.85, 0, 1) * 0.28;
+    const replayLead = 0.12;
+    const replaySpan = 0.34;
+    const replayHold = 0.92;
+    const u = HIT_AT - replayLead + clamp(local / replayHold, 0, 1) * replaySpan;
     const s = blow === "finisher" ? finisherState(result, u, time) : exchangeState(result, blow ?? 0, u, time);
     const ex = typeof blow === "number" ? result.exchanges[blow] : undefined;
     return {
@@ -758,11 +788,11 @@ export function fightDrive(result: FightResult, beat: Beat, local: number, time:
       impact: s.out.impact,
       power: s.out.power,
       hitKey: "replay",
-      hitAt: (0.08 / 0.28) * 0.85,
+      hitAt: (replayLead / replaySpan) * replayHold,
       weapon: blow === "finisher" ? "burn" : (ex?.attackerId === a.id ? a : b).weaponFamily,
       victim: blow === "finisher" ? (result.finisher?.against ?? null) : (ex?.defenderId ?? null),
       focus: s.out.focus,
-      tight: Math.max(0.85, s.out.tight),
+      tight: Math.max(0.95, s.out.tight),
       crit: true,
       replay: true,
     };

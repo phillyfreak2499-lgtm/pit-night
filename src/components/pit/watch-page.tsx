@@ -138,11 +138,6 @@ export function WatchPage() {
             <Lobby data={data} week={week} weeks={postedWeeks} setWeek={setWeek} tape={liveTape} onStart={start} />
           ) : null}
           {stage === "intro" && bout ? <Intro key={bout.id} data={data} bout={bout} seen={seen} order={index + 1} total={bouts.length} /> : null}
-          {stage === "fight" && bout ? (
-            <div className="mx-auto w-full max-w-6xl">
-              <Broadcast key={bout.id} bout={bout} playing={!paused} speed={1.5} chromeless kicker={(tape ?? liveTape).live ? "Live card" : "House tape"} onComplete={next} />
-            </div>
-          ) : null}
           {stage === "result" && bout ? <Result key={bout.id} data={data} bout={bout} seen={seen} next={bouts[index + 1] ?? null} /> : null}
           {stage === "final" ? <Final data={data} seen={seen} bouts={bouts} onAgain={() => setStage("lobby")} /> : null}
           {paused && stage !== "lobby" && stage !== "final" ? (
@@ -155,6 +150,37 @@ export function WatchPage() {
       </div>
 
       <Ticker data={data} week={week} />
+      {stage === "fight" && bout ? (
+        <div className="absolute inset-0 z-30 flex flex-col bg-deep" data-testid="watch-fight">
+          <Broadcast
+            key={bout.id}
+            bout={bout}
+            playing={!paused}
+            speed={1.5}
+            chromeless
+            stage
+            kicker={(tape ?? liveTape).live ? "Live card" : "House tape"}
+            onComplete={next}
+          />
+          <div className="absolute bottom-[4.75rem] left-2 z-40 flex gap-1 sm:bottom-20">
+            <IconBtn label={paused ? "Play" : "Pause"} onClick={() => setPaused((p) => !p)}>
+              {paused ? <Play size={18} /> : <Pause size={18} />}
+            </IconBtn>
+            <IconBtn label="Skip ahead" onClick={next}>
+              <SkipForward size={18} />
+            </IconBtn>
+            <IconBtn label={full ? "Leave full screen" : "Full screen"} onClick={toggleFull}>
+              {full ? <Minimize size={18} /> : <Maximize size={18} />}
+            </IconBtn>
+            <Link to="/broadcast" aria-label="Leave the watch party" className="inline-flex min-h-11 min-w-11 items-center justify-center border border-line bg-deep/80">
+              <X size={18} />
+            </Link>
+          </div>
+          {paused ? (
+            <p className="pointer-events-none absolute inset-x-0 top-3 z-40 text-center font-display text-sm tracking-[0.3em] text-amber uppercase">Paused · space to resume</p>
+          ) : null}
+        </div>
+      ) : null}
     </div>,
     host,
   );

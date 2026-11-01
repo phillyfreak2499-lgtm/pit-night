@@ -14,6 +14,7 @@ import {
 } from "../src/lib/pit/engine.ts";
 import { PARTS } from "../src/lib/pit/catalog.ts";
 import { fightDuel } from "../src/lib/pit/combat.ts";
+import { readMeters } from "../src/lib/pit/vitals.ts";
 import type { Loadout, PitData } from "../src/lib/pit/types.ts";
 
 const IDS = ["waco", "arlington", "plano", "allen"];
@@ -274,4 +275,60 @@ test("scouting accepts every weapon family in the current catalog", () => {
     store.getState().pullSpy(IDS[0]!, targetId);
     assert.ok(store.getState().intel[0]!.lines.some((line) => line.includes(weapon.name)), weapon.name);
   }
+});
+
+test("battery and stamina are recorded, recover between exchanges, and tire glass cannons first", () => {
+  const [baseA, baseB] = simulateDuel(world(), IDS[0]!, IDS[1]!, "vitals").fighters;
+  const glass = {
+    ...baseA!,
+    stats: { power: 42, speed: 22, armor: 8, heat: 10 },
+    chassisFamily: "shrike",
+    weaponFamily: "disc",
+    driveFamily: "rocket",
+    batteryMax: 58,
+  };
+  const brick = {
+    ...baseB!,
+    stats: { power: 18, speed: 10, armor: 44, heat: 10 },
+    chassisFamily: "keystone",
+    weaponFamily: "hammer",
+    driveFamily: "anchor",
+    batteryMax: 110,
+  };
+  const fought = fightDuel(glass, brick, { overtime: true, pace: 0.4, rounds: 6 });
+  assert.equal(fought.bell[glass.id]!.battery, 58);
+  assert.equal(fought.bell[glass.id]!.stamina, 100);
+  assert.equal(fought.bell[glass.id]!.power, 42);
+  assert.equal(fought.bell[brick.id]!.batteryMax, 110);
+  const first = fought.exchanges[0]!;
+  assert.ok(first.vitals);
+  assert.ok(first.vitals![glass.id]!.staminaLow <= first.vitals![glass.id]!.stamina);
+  assert.ok(first.vitals![glass.id]!.stamina < first.vitals![brick.id]!.stamina);
+  assert.ok(first.vitals![glass.id]!.battery < fought.bell[glass.id]!.battery);
+  for (let i = 1; i < fought.exchanges.length; i++) {
+    const exchange = fought.exchanges[i]!;
+    if (exchange.tags.includes("sudden-death") || exchange.tags.includes("burn")) continue;
+    assert.equal(exchange.combat![glass.id]!.before.stamina, fought.exchanges[i - 1]!.combat![glass.id]!.after.stamina);
+    assert.equal(exchange.combat![brick.id]!.before.battery, fought.exchanges[i - 1]!.combat![brick.id]!.after.battery);
+  }
+  const again = fightDuel(glass, brick, { overtime: true, pace: 0.4, rounds: 6 });
+  assert.deepEqual(again.exchanges, fought.exchanges);
+  assert.deepEqual(again.bell, fought.bell);
+});
+
+test("watch meters read recorded vitals and stay blank when a tape predates them", () => {
+  const result = simulateDuel(world(), IDS[0]!, IDS[1]!, "meters");
+  const id = result.fighters[0]!.id;
+  const bell = readMeters(result, id, { kind: "bell" });
+  assert.ok(bell);
+  assert.equal(bell!.battery, result.bell![id]!.battery);
+  assert.equal(bell!.stamina, 100);
+  assert.equal(bell!.power, result.fighters[0]!.stats.power);
+  const mid = readMeters(result, id, { kind: "exchange", index: 0, local: 0.8 });
+  assert.ok(mid);
+  assert.ok(mid!.battery <= bell!.battery);
+  const legacy = { ...result, bell: undefined, exchanges: result.exchanges.map((exchange) => ({ ...exchange, vitals: undefined })) };
+  assert.equal(readMeters(legacy, id, { kind: "bell" }), null);
+  assert.equal(readMeters(legacy, id, { kind: "exchange", index: 0, local: 0.5 }), null);
+  assert.equal(readMeters(legacy, id, { kind: "final" }), null);
 });

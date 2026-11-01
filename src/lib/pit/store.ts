@@ -1952,6 +1952,7 @@ function mapFight(result: FightResult): FightResult {
     loserIds: result.loserIds.map(mapStoreId),
     hp: renameRecordKey(result.hp),
     wear: renameRecordKey(result.wear),
+    bell: result.bell ? renameRecordKey(result.bell) : result.bell,
     meleeOrder: result.meleeOrder?.map(mapStoreId),
     fighters: result.fighters.map((fighter) =>
       fighter.id === "bryant"
@@ -1969,6 +1970,7 @@ function mapFight(result: FightResult): FightResult {
       attackerId: mapStoreId(exchange.attackerId),
       defenderId: mapStoreId(exchange.defenderId),
       call: exchange.call.replaceAll("Bryant Irvin", "Hulen").replaceAll("IRVIN", "HULEN"),
+      vitals: exchange.vitals ? renameRecordKey(exchange.vitals) : exchange.vitals,
     })),
     finisher: result.finisher
       ? {

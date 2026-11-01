@@ -213,6 +213,11 @@ export type CombatState = {
   /** Movement multiplier from the current terrain; 1 means unaffected. */
   slow: number;
   phoenixUsed: boolean;
+  /**
+   * Endurance, 0–100. Separate from the chassis battery.
+   * Absent on tapes recorded before stamina was tracked.
+   */
+  stamina?: number;
 };
 
 export type CombatTrace = {
@@ -241,6 +246,34 @@ export type Exchange = {
   tags: string[];
   /** Keyed by fighter ID. Optional so historical replays remain readable. */
   combat?: Record<string, CombatTrace>;
+  /**
+   * Battery and stamina after this exchange, keyed by fighter id.
+   * Absent on tapes fought before those pools were tracked. Replays must
+   * read this instead of simulating the bout again.
+   */
+  vitals?: Record<string, ExchangeVitals>;
+};
+
+/** Chassis cell and endurance at the bell, before any exchange. */
+export type BellVitals = {
+  battery: number;
+  batteryMax: number;
+  stamina: number;
+  staminaMax: number;
+  /** Printed power. Battery and stamina factors are still 1. */
+  power: number;
+};
+
+/** Tracked pools for one fighter after an exchange. */
+export type ExchangeVitals = {
+  /** Cell left after this exchange's movement and weapon drain. */
+  battery: number;
+  /** Stamina left after the spend and the partial recovery. */
+  stamina: number;
+  /** Stamina at the bottom of the exchange, before recovery. */
+  staminaLow: number;
+  /** Printed power times the battery, pace, and stamina factors for this swing. */
+  power: number;
 };
 
 export type FighterSnap = {
@@ -304,6 +337,11 @@ export type FightResult = {
   wear: Record<string, Record<Slot, Condition>>;
   seed: string;
   meleeOrder?: string[];
+  /**
+   * Battery and stamina at the bell, keyed by fighter id.
+   * Absent on tapes fought before those pools were tracked.
+   */
+  bell?: Record<string, BellVitals>;
 };
 
 export type Bout = {
