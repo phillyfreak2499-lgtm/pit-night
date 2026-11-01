@@ -2,6 +2,7 @@ import { createFrameLoop } from "@/lib/pit/frame-loop";
 import { useEffect, useRef, useState } from "react";
 import { PAINT } from "@/lib/pit/catalog";
 import { methodLabel } from "@/lib/pit/engine";
+import { reactiveMoment, type ReactiveCue } from "@/lib/pit/reactive-commentary";
 import { armSound, playBell, playClank, playCount, playDecision, playFinisher, playWeaponHit } from "@/lib/pit/sound";
 import type { Bout, Exchange, FightResult } from "@/lib/pit/types";
 import { Fx, drawSide, drawTop, impactPoints, project, stepBots } from "./cage-draw";
@@ -16,6 +17,7 @@ export function Broadcast({
   speed: speedProp,
   onPlayingChange,
   onComplete,
+  onNotableBeat,
   seek = 0,
   chromeless = false,
   kicker,
@@ -27,6 +29,7 @@ export function Broadcast({
   speed?: number;
   onPlayingChange?: (playing: boolean) => void;
   onComplete?: () => void;
+  onNotableBeat?: (cue: ReactiveCue) => void;
   /** Changes after mount jump the tape to the decision. */
   seek?: number;
   chromeless?: boolean;
@@ -66,10 +69,12 @@ export function Broadcast({
   const fxRef = useRef(new Fx());
   const trailsRef = useRef(new Map<string, Spot[]>());
   const onCompleteRef = useRef(onComplete);
+  const onNotableBeatRef = useRef(onNotableBeat);
   const doneRef = useRef(false);
   // Only a change in `seek` after mount jumps the tape (not a remount in dev).
   const lastSeek = useRef(seek);
   onCompleteRef.current = onComplete;
+  onNotableBeatRef.current = onNotableBeat;
 
   useEffect(() => {
     if (!result) return;
@@ -170,6 +175,11 @@ export function Broadcast({
       }
       if (playing && drive.hitKey && local >= drive.hitAt && local < drive.hitAt + 0.2 && hitRef.current !== drive.hitKey) {
         hitRef.current = drive.hitKey;
+        // Dispatch at the actual strike, not at the end of the round or tape.
+        if (beat.kind === "exchange" || beat.kind === "finisher") {
+          const cue: ReactiveCue = { phase: beat.kind, index: beat.kind === "exchange" ? beat.index : result.exchanges.length };
+          if (reactiveMoment(result, cue)) onNotableBeatRef.current?.(cue);
+        }
         const at = impactPoints(drive, canvas.width, canvas.height, top.width, top.height);
         const blocked = Boolean(drive.blocked);
         const crit = Boolean(drive.crit) && !blocked;
