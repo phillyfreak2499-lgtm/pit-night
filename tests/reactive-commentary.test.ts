@@ -77,7 +77,7 @@ test("finisher replay does not create a second commentary call", () => {
 });
 
 test("model output is one sentence and at most fourteen spoken words", () => {
-  assert.equal(shortReactiveLine("WOW! This second sentence should never be spoken."), "WOW!");
+  assert.equal(shortReactiveLine("What a hit! This second sentence should never be spoken."), "What a hit!");
   assert.equal(shortReactiveLine("A"), "");
   assert.equal(shortReactiveLine("One two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen").split(" ").length, 14);
 });
