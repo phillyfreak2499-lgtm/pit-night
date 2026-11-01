@@ -1,6 +1,6 @@
 import { TaleOfTape } from "./tale-of-tape";
 import { Link } from "@tanstack/react-router";
-import { Flame, HelpCircle, Maximize, Minimize, Package, Pause, Play, SkipForward, X } from "lucide-react";
+import { Flame, HelpCircle, Maximize, Mic, MicOff, Minimize, Package, Pause, Play, SkipForward, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { PROGRAM_HOLD_MS, programRecords, storeNameMap } from "@/lib/pit/fight-card";
@@ -12,6 +12,7 @@ import { streakHolders, tunedUp } from "@/lib/pit/week";
 import { ResultLine } from "./bits";
 import { armBroadcastAudio, Broadcast } from "./broadcast";
 import { FightProgram } from "./fight-program";
+import { useReactiveCommentary } from "./use-reactive-commentary";
 import { buildTape, matchup, methodWord } from "./show-page";
 
 type Stage = "lobby" | "intro" | "fight" | "result" | "final";
@@ -33,6 +34,10 @@ export function WatchPage() {
   const [paused, setPaused] = useState(false);
   const [full, setFull] = useState(false);
   const bout = bouts[index] ?? null;
+  const [commentaryEnabled, setCommentaryEnabled] = useState(true);
+  const { line: commentaryLine, onBeat: onNotableBeat } = useReactiveCommentary(
+    bout, commentaryEnabled && stage === "fight" && !paused,
+  );
 
   const next = useCallback(() => {
     if (stage === "intro") setStage(bout?.kind === "bye" ? "result" : "fight");
@@ -110,6 +115,12 @@ export function WatchPage() {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
+          <button type="button" aria-pressed={commentaryEnabled} aria-label={commentaryEnabled ? "Turn AI commentary off" : "Turn AI commentary on"}
+            title="Reactive AI color commentary" onClick={() => setCommentaryEnabled((on) => !on)}
+            className={`inline-flex min-h-11 items-center gap-1.5 border px-2 font-display text-xs uppercase ${commentaryEnabled ? "border-amber text-amber" : "border-line text-muted"}`}>
+            {commentaryEnabled ? <Mic size={17} /> : <MicOff size={17} />}
+            <span className="hidden sm:inline">AI color {commentaryEnabled ? "on" : "off"}</span>
+          </button>
           <IconBtn label="How to play" onClick={() => { setPaused(true); data.showTutorial(); }}>
             <HelpCircle size={18} />
           </IconBtn>
@@ -140,7 +151,8 @@ export function WatchPage() {
           {stage === "intro" && bout ? <Intro key={bout.id} data={data} bout={bout} seen={seen} order={index + 1} total={bouts.length} /> : null}
           {stage === "fight" && bout ? (
             <div className="mx-auto w-full max-w-6xl">
-              <Broadcast key={bout.id} bout={bout} playing={!paused} speed={1.5} chromeless kicker={(tape ?? liveTape).live ? "Live card" : "House tape"} onComplete={next} />
+              <Broadcast key={bout.id} bout={bout} playing={!paused} speed={1.5} chromeless kicker={(tape ?? liveTape).live ? "Live card" : "House tape"} onComplete={next} onNotableBeat={onNotableBeat} />
+              {commentaryEnabled && commentaryLine ? <p className="mt-2 border-l-2 border-amber bg-surface px-3 py-2 text-base" aria-live="polite" data-testid="reactive-commentary"><span className="mr-2 font-display text-xs tracking-widest text-amber uppercase">AI color</span>{commentaryLine}</p> : null}
             </div>
           ) : null}
           {stage === "result" && bout ? <Result key={bout.id} data={data} bout={bout} seen={seen} next={bouts[index + 1] ?? null} /> : null}
@@ -255,7 +267,7 @@ function Lobby({
           Start in this window
         </button>
       </div>
-      <p className="text-sm text-muted">Space pauses. The right arrow skips ahead. Turn the sound up.</p>
+      <p className="text-sm text-muted">Space pauses. The right arrow skips ahead. AI color reacts to big hits with spoken lines when enabled; turn the sound up.</p>
     </div>
   );
 }
