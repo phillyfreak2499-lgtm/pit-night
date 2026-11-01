@@ -6,9 +6,9 @@ import { armSound, playBell, playClank, playCount, playDecision, playFinisher, p
 import type { Bout, Exchange, FightResult } from "@/lib/pit/types";
 import { Fx, drawSide, drawTop, impactPoints, project, stepBots } from "./cage-draw";
 import { arenaForWeek, arenaTheme, hazardCallout, type ArenaId } from "./arena-scenes";
-import { beatAt, buildBeats, fightDrive, lerp, type Beat, type Spot } from "./cage-motion";
+import { beatAt, buildBeats, DUEL_CLASH_SEC, fightDrive, lerp, ROUND_CARD_SEC, type Beat, type Spot } from "./cage-motion";
 
-const ROUND_SHOW = 0.22;
+const ROUND_SHOW = ROUND_CARD_SEC / DUEL_CLASH_SEC;
 
 export function Broadcast({
   bout: boutProp,
@@ -408,7 +408,7 @@ function captionFor(result: FightResult, bout: Bout, beat: Beat, noDamage: boole
     const ex = result.exchanges[beat.index];
     const atk = result.fighters.find((f) => f.id === ex?.attackerId);
     const def = result.fighters.find((f) => f.id === ex?.defenderId);
-    return `Round ${beat.index + 1}. They circle. ${def?.botName ?? "The defender"} swings first and bounces off. ${atk?.botName ?? "The attacker"} answers.`;
+    return `Round ${beat.index + 1}. They close, circle, and feint. ${def?.botName ?? "The defender"} swings first and bounces off. ${atk?.botName ?? "The attacker"} answers.`;
   }
   if (beat.kind === "replay") return "One more time, slower. That is the blow that ended it.";
   if (beat.kind === "exchange") return result.exchanges[beat.index]?.call ?? "";

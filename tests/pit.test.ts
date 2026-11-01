@@ -13,7 +13,7 @@ import { checkedCosmeticLoadout } from "../src/lib/pit/cosmetic-loadout.ts";
 import { PRODUCT_QUIZ, productQuestion } from "../src/lib/pit/product-quiz.ts";
 import { authorize, commandArgs, CAPTAIN_BUILD_COMMANDS, captainBuildRejection, type Command } from "../src/lib/pit/commands.ts";
 import { central, nextLockAt, weekDeadline, deadlineDue } from "../src/lib/pit/time.ts";
-import { buildBeats, fightDrive } from "../src/components/pit/cage-motion.ts";
+import { buildBeats, fightDrive, type Beat } from "../src/components/pit/cage-motion.ts";
 import { Fx } from "../src/components/pit/cage-draw.ts";
 import type { Bout, FightResult, Grade, KeyName, Session, StatKey, StoreCard } from "../src/lib/pit/types.ts";
 import { STICKER_ART } from "../src/lib/pit/types.ts";
@@ -626,6 +626,119 @@ test("two full fight timelines are finite, preserve results and include KO repla
     assert.equal(JSON.stringify(result), before);
     if (result.method === "ko") assert.ok(beats.some((b) => b.kind === "replay"));
   }
+});
+
+test("one-on-one rounds last 45 seconds and the hits still meet the clock", () => {
+  const result = simulateDuel(makeData(), "plano", "allen", "round-length");
+  const before = JSON.stringify(result);
+  const beats = buildBeats(result);
+  const clashes = beats.filter((beat) => beat.kind === "clash");
+  const exchanges = beats.filter((beat) => beat.kind === "exchange");
+  assert.equal(clashes.length, exchanges.length);
+  assert.ok(exchanges.length >= 1 && exchanges.length <= 12);
+  for (let i = 0; i < exchanges.length; i++) {
+    const clash = clashes[i]!;
+    const exchange = exchanges[i]!;
+    assert.equal(clash.dur, 20);
+    assert.equal(exchange.dur, 25);
+    assert.equal(clash.dur + exchange.dur, 45);
+    assert.equal(exchange.t, clash.t + clash.dur);
+    if (clash.kind === "clash" && exchange.kind === "exchange") assert.equal(clash.index, exchange.index);
+  }
+  assert.equal(beats.find((beat) => beat.kind === "bumper")!.dur, 5);
+  assert.equal(beats.filter((beat) => beat.kind === "intro").every((beat) => beat.dur === 6.5), true);
+  assert.equal(beats.find((beat) => beat.kind === "stats")!.dur, 5.5);
+  assert.equal(beats.find((beat) => beat.kind === "countdown")!.dur, 4);
+  assert.equal(beats.find((beat) => beat.kind === "decision")!.dur, 8);
+  const finisher = beats.find((beat) => beat.kind === "finisher");
+  const replay = beats.find((beat) => beat.kind === "replay");
+  if (finisher) assert.equal(finisher.dur, 8);
+  if (replay) assert.equal(replay.dur, 7.5);
+  const total = beats.reduce((max, beat) => Math.max(max, beat.t + beat.dur), 0);
+  // Entrances 27.5s + 45s per round + decision 8s. Finisher and replay stay put.
+  const expected = 27.5 + exchanges.length * 45 + (finisher ? 8 : 0) + (replay ? 7.5 : 0) + 8;
+  assert.equal(total, expected);
+  if (exchanges.length === 3 && !finisher && !replay) assert.equal(total, 170.5);
+
+  const jump = (beat: Beat, label: string) => {
+    let prev: { x: number; y: number }[] | null = null;
+    for (let t = 0; t <= 1.0001; t += 0.01) {
+      const local = Math.min(1, t);
+      const drive = fightDrive(result, beat, local, beat.t + local * beat.dur);
+      if (prev) {
+        drive.bots.forEach((bot, i) => {
+          const moved = Math.hypot(bot.spot.x - prev![i]!.x, bot.spot.y - prev![i]!.y);
+          assert.ok(moved < 0.22, `${label} jumped ${moved.toFixed(3)} at ${local.toFixed(2)}`);
+        });
+      }
+      prev = drive.bots.map((bot) => ({ ...bot.spot }));
+      for (const bot of drive.bots) assert.ok(Number.isFinite(bot.hp) && Number.isFinite(bot.spot.x));
+    }
+  };
+  clashes.forEach((beat, index) => jump(beat, `clash ${index}`));
+  exchanges.forEach((beat, index) => jump(beat, `exchange ${index}`));
+
+  for (let i = 0; i < exchanges.length; i++) {
+    const clash = clashes[i]!;
+    const exchange = exchanges[i]!;
+    const left = fightDrive(result, clash, 1, clash.t + clash.dur);
+    const right = fightDrive(result, exchange, 0, exchange.t);
+    left.bots.forEach((bot, n) => {
+      const other = right.bots[n]!;
+      assert.ok(Math.hypot(bot.spot.x - other.spot.x, bot.spot.y - other.spot.y) < 0.02);
+      assert.equal(Math.round(bot.hp), Math.round(other.hp));
+    });
+    if (i + 1 < clashes.length) {
+      const next = clashes[i + 1]!;
+      const end = fightDrive(result, exchange, 1, exchange.t + exchange.dur);
+      const start = fightDrive(result, next, 0, next.t);
+      end.bots.forEach((bot, n) => {
+        const other = start.bots[n]!;
+        assert.ok(Math.hypot(bot.spot.x - other.spot.x, bot.spot.y - other.spot.y) < 0.02);
+      });
+    }
+  }
+
+  for (const beat of exchanges) {
+    if (beat.kind !== "exchange") continue;
+    const ex = result.exchanges[beat.index]!;
+    const hitAt = fightDrive(result, beat, 0.2, beat.t).hitAt;
+    const beforeHit = fightDrive(result, beat, hitAt - 0.01, beat.t);
+    const onHit = fightDrive(result, beat, hitAt + 0.008, beat.t);
+    assert.equal(beforeHit.impact, null);
+    assert.ok(onHit.impact);
+    assert.ok(Math.abs(hitAt * beat.dur - (7 + 0.42 * 13)) < 0.05);
+    const early = beforeHit.bots.find((bot) => bot.bot.id === ex.defenderId)!.hp;
+    const late = fightDrive(result, beat, Math.min(0.78, hitAt + 0.16), beat.t).bots.find((bot) => bot.bot.id === ex.defenderId)!.hp;
+    if (ex.defenderHp < early - 0.5) assert.ok(late < early - 0.5);
+  }
+
+  for (const beat of clashes) {
+    if (beat.kind !== "clash") continue;
+    for (const sample of [0.5, 0.8]) {
+      const there = fightDrive(result, beat, sample, beat.t);
+      const beforeHit = fightDrive(result, beat, there.hitAt - 0.004, beat.t);
+      const onHit = fightDrive(result, beat, there.hitAt + 0.003, beat.t);
+      assert.equal(beforeHit.impact, null);
+      assert.ok(onHit.impact);
+      assert.equal(beforeHit.hitKey, onHit.hitKey);
+      assert.ok(onHit.hitKey);
+    }
+  }
+
+  if (replay) {
+    const hitAt = fightDrive(result, replay, 0, replay.t).hitAt;
+    assert.equal(fightDrive(result, replay, Math.max(0, hitAt - 0.02), replay.t).impact, null);
+    const onHit = fightDrive(result, replay, hitAt + 0.02, replay.t);
+    assert.ok(onHit.impact);
+    assert.equal(onHit.replay, true);
+  }
+  if (finisher) {
+    const onHit = fightDrive(result, finisher, 0.43, finisher.t);
+    assert.equal(onHit.hitAt, 0.42);
+    assert.ok(onHit.impact);
+  }
+  assert.equal(JSON.stringify(result), before);
 });
 
 test("authoritative hydration keeps actions bound to the receiving store", () => {
