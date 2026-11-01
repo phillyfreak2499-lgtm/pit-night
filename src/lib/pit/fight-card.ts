@@ -3,7 +3,7 @@ import { recordOf } from "./engine";
 import type { Bout, FighterSnap, PitData, Slot } from "./types";
 
 /** How long the program stays up before the tape, when the broadcast is rolling. */
-export const PROGRAM_HOLD_MS = 11000;
+export const PROGRAM_HOLD_MS = 5000;
 
 /** Chassis, armor, drive, weapon, utility, brain. Every slot, in program order. */
 export const PROGRAM_SLOTS = ["chassis", "armor", "drive", "weapon", "utility", "brain"] as const satisfies readonly Slot[];
