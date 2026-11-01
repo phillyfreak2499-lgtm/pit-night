@@ -57,6 +57,20 @@ export function Commercial({ ad, paused, onEnded }: { ad: Commercial; paused: bo
     return () => window.clearTimeout(id);
   }, [mode, ad.slug]);
 
+  // Video time budget counts only unpaused viewing time. A stalled stream cannot
+  // leave the room waiting forever, and repeated Pause/Resume cannot reset the cap.
+  const videoWatchLeft = useRef(AD_MS + 8_000);
+  const videoWatchStart = useRef(0);
+  useEffect(() => {
+    if (mode !== "video" || paused) return;
+    videoWatchStart.current = performance.now();
+    const id = window.setTimeout(finish, Math.max(0, videoWatchLeft.current));
+    return () => {
+      videoWatchLeft.current = Math.max(0, videoWatchLeft.current - (performance.now() - videoWatchStart.current));
+      window.clearTimeout(id);
+    };
+  }, [mode, paused, finish]);
+
   useEffect(() => {
     const el = videoRef.current;
     if (!el || mode !== "video") return;
