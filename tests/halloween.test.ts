@@ -86,7 +86,9 @@ test("Halloween dates follow Pit Week 1 and Championship Saturday", () => {
   assert.equal(premiumHalloweenOpen(central(2026, 12, 5, 12)), true);
 });
 
-test("Pit Week 1 jobs earn Halloween looks without touching coins or the fight", () => {
+test("Pit Week 1 jobs earn Halloween looks without touching coins or the fight", (t) => {
+  // The jobs are earned during Pit Week 1, not on the wall-clock date CI runs.
+  t.mock.timers.enable({ apis: ["Date"], now: HALLOWEEN_PIT_START.getTime() });
   const league = state();
   const coins = JSON.stringify(league.getState().bots.map((b) => b.coins));
   const before = simulateDuel(league.getState(), "plano", "allen", "halloween-looks");
