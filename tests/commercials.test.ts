@@ -33,64 +33,73 @@ function breaks(fightCount: number): number[] {
   return Array.from({ length: fightCount }, (_, i) => i + 1).filter((fight) => commercialAfterFight(fight, fightCount));
 }
 
-test("a house spot runs after every second fight except the last", () => {
-  assert.equal(COMMERCIAL_ROTATION_BLOCK, 3);
+const QUEUE = ["pit-mutual", "voltage", "scrapyard-sals", "brain-be-gone", "repair-hotline", "nap-pod-3000"];
+
+test("a house spot runs between every bout except after the main event", () => {
+  assert.equal(COMMERCIAL_ROTATION_BLOCK, 6);
+  assert.equal(COMMERCIAL_ROTATION_BLOCK, COMMERCIALS.length);
   assert.equal(AD_MS, 15_000);
-  assert.deepEqual(breaks(7), [2, 4, 6]);
-  assert.deepEqual(breaks(8), [2, 4, 6]);
-  assert.deepEqual(breaks(9), [2, 4, 6, 8]);
-  assert.deepEqual(breaks(6), [2, 4]);
-  assert.deepEqual(breaks(4), [2]);
-  assert.deepEqual(breaks(3), [2]);
-  assert.deepEqual(breaks(2), []);
+  assert.deepEqual(breaks(7), [1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(breaks(8), [1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(breaks(9), [1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(breaks(6), [1, 2, 3, 4, 5]);
+  assert.deepEqual(breaks(4), [1, 2, 3]);
+  assert.deepEqual(breaks(3), [1, 2]);
+  assert.deepEqual(breaks(2), [1]);
   assert.deepEqual(breaks(1), []);
+  assert.equal(commercialAfterFight(1, 7), true);
   assert.equal(commercialAfterFight(2, 7), true);
+  assert.equal(commercialAfterFight(5, 7), true);
+  assert.equal(commercialAfterFight(6, 7), true);
   assert.equal(commercialAfterFight(7, 7), false);
   assert.equal(commercialAfterFight(6, 6), false);
   assert.equal(commercialAfterFight(8, 8), false);
-  assert.equal(commercialAfterFight(1, 7), false);
-  assert.equal(commercialAfterFight(5, 7), false);
+  assert.equal(commercialAfterFight(7, 8), false);
   assert.equal(commercialAfterFight(0, 7), false);
   assert.equal(commercialAfterFight(8, 7), false);
   assert.equal(commercialAfterFight(2.5, 7), false);
   assert.equal(commercialAfterFight(2, 7.5), false);
 });
 
-test("week 1 plays spots 1-3 and week 2 plays spots 4-6, then the reel repeats", () => {
+test("a seven-bout card plays each house spot once, in a fixed catalog order", () => {
   const slugs = (week: number, fights = 7) => commercialsForCard(week, fights).map((ad) => ad.slug);
   assert.deepEqual(
     COMMERCIALS.map((ad) => ad.slug),
-    ["pit-mutual", "voltage", "scrapyard-sals", "brain-be-gone", "repair-hotline", "nap-pod-3000"],
+    QUEUE,
   );
-  assert.deepEqual(slugs(1), ["pit-mutual", "voltage", "scrapyard-sals"]);
-  assert.deepEqual(slugs(2), ["brain-be-gone", "repair-hotline", "nap-pod-3000"]);
-  assert.deepEqual(slugs(3), slugs(1));
-  assert.deepEqual(slugs(4), slugs(2));
+  for (const week of [1, 2, 3, 4, 5]) {
+    const queued = slugs(week);
+    assert.deepEqual(queued, QUEUE);
+    assert.equal(new Set(queued).size, QUEUE.length);
+    for (let fight = 1; fight <= 6; fight++) {
+      const spot = commercialAfter(week, fight, 7);
+      assert.equal(spot?.slug, QUEUE[fight - 1]);
+      assert.equal(spot?.number, fight);
+    }
+    assert.equal(commercialAfter(week, 7, 7), null);
+  }
+  assert.deepEqual(slugs(2), slugs(1));
+  assert.deepEqual(slugs(99), slugs(1));
   assert.deepEqual(slugs(5, 1), []);
   assert.equal(commercialAfter(5, 1, 1), null);
-  assert.deepEqual(slugs(2, 5), ["brain-be-gone", "repair-hotline"]);
-  assert.deepEqual(slugs(2, 4), ["brain-be-gone"]);
-  assert.deepEqual(slugs(1, 9), ["pit-mutual", "voltage", "scrapyard-sals", "brain-be-gone"]);
-  assert.equal(commercialAfter(1, 2, 7)?.number, 1);
-  assert.equal(commercialAfter(1, 4, 7)?.number, 2);
-  assert.equal(commercialAfter(1, 6, 7)?.number, 3);
-  assert.equal(commercialAfter(1, 7, 7), null);
-  assert.equal(commercialAfter(2, 2, 7)?.slug, "brain-be-gone");
-  assert.equal(commercialAt(1, 0), commercialAt(1, 0));
+  assert.deepEqual(slugs(2, 5), QUEUE.slice(0, 4));
+  assert.deepEqual(slugs(2, 4), QUEUE.slice(0, 3));
+  assert.deepEqual(slugs(1, 9), QUEUE);
+  assert.equal(commercialAfter(1, 1, 7)?.slug, "pit-mutual");
+  assert.equal(commercialAfter(1, 2, 7)?.slug, "voltage");
+  assert.equal(commercialAfter(1, 6, 7)?.slug, "nap-pod-3000");
+  assert.equal(commercialAfter(2, 2, 7)?.slug, "voltage");
+  assert.equal(commercialAt(1, 0).slug, commercialAt(2, 0).slug);
+  assert.equal(commercialAt(1, 0).slug, "pit-mutual");
   assert.deepEqual(slugs(2), slugs(2));
   assert.deepEqual(
     COMMERCIALS.map((ad) => commercialVideoSrc(ad)),
-    [
-      "/ads/pit-mutual.mp4",
-      "/ads/voltage.mp4",
-      "/ads/scrapyard-sals.mp4",
-      "/ads/brain-be-gone.mp4",
-      "/ads/repair-hotline.mp4",
-      "/ads/nap-pod-3000.mp4",
-    ],
+    QUEUE.map((slug) => `/ads/${slug}.mp4`),
   );
   for (const week of [0, -4, 1, 2, 99]) {
-    for (const ad of commercialsForCard(week, 7)) assert.ok(COMMERCIALS.includes(ad));
+    const card = commercialsForCard(week, 7);
+    assert.deepEqual(card.map((ad) => ad.slug), QUEUE);
+    assert.equal(new Set(card).size, COMMERCIALS.length);
   }
 });
 
@@ -108,6 +117,11 @@ test("the watch party cuts to an ad stage and can fall back when the file is mis
   const styles = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
   assert.match(watch, /"lobby" \| "intro" \| "fight" \| "result" \| "ad" \| "final"/);
   assert.match(watch, /commercialAfter\(week, index \+ 1, bouts\.length\)/);
+  assert.match(watch, /A house commercial runs between every fight/);
+  assert.doesNotMatch(watch, /every other fight/);
+  const faq = readFileSync(new URL("../src/components/pit/faq-page.tsx", import.meta.url), "utf8");
+  assert.match(faq, /a house commercial runs between every fight/);
+  assert.doesNotMatch(faq, /every other fight/);
   assert.match(watch, /setStage\("ad"\)/);
   assert.match(watch, /stage === "ad"/);
   assert.match(watch, /<Commercial/);
