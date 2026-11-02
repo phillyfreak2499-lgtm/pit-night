@@ -40,6 +40,7 @@ import {
   wonThisWeek,
   writeGazette,
 } from "./engine";
+import { backfillReplays, sealReplay } from "./replay";
 import { makeData } from "./seed";
 import { BOLTS, STREAK_BADGE, allJobs, crateFor, dayOpen, programWeek, type DayKey } from "./training";
 import { eligibilityClosed } from "./eligibility";
@@ -52,7 +53,7 @@ import { showEffect } from "./halloween";
 import { thanksgivingShowEffect } from "./thanksgiving";
 import { buildLockMessage, deadlineDue, weekDeadline } from "./time";
 import type { BotDecal, CosmeticLoadout, StickerSlot } from "./types";
-import type { Bot, BotLook, BotStyle, Condition, FightResult, GarageLook, GazetteEntry, Grade, Kickoff, Loadout, PitData, Session, ShowEffectId, Slot, StatKey, StoreCard } from "./types";
+import type { Bot, BotLook, BotStyle, Bout, Condition, FightResult, GarageLook, GazetteEntry, Grade, Kickoff, Loadout, PitData, Session, ShowEffectId, Slot, StatKey, StoreCard } from "./types";
 import { dailyGazetteId, type GazetteDraft } from "./gazette-ai";
 
 const FIELD_OF: Record<StatKey, keyof StoreCard> = { nsnu: "nsnu", conv: "conv", demoRate: "demoRate", demoClose: "demoClose", arch: "arch", ticket: "demoTicket" };
@@ -395,7 +396,7 @@ export const TUTORIAL_REV = 3;
 
 /** Everything the league shares. Session and tutorial stay on the device. */
 export const SHARED_KEYS = [
-  "version", "seasonName", "tagline", "week", "phase", "stores", "crew", "bots", "weeks", "storeCards", "bouts",
+  "version", "seasonName", "tagline", "week", "phase", "stores", "crew", "bots", "weeks", "storeCards", "bouts", "replays",
   "gazette", "quotes", "proposals", "mvps", "honors", "craft", "log", "intel", "jobLog", "rallies", "sparkLog", "shouts", "picks",
   "trainingOpenAll", "kickoff", "cosmeticProposals", "halloweenArcade",
 ] as const satisfies readonly (keyof PitData)[];
@@ -1761,10 +1762,12 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           if (data.week !== 5 || honors.pitBelt !== bot.storeId || !honors.titleDrop) return bot;
           return bot.owned.includes(honors.titleDrop) ? bot : { ...bot, owned: [...bot.owned, honors.titleDrop] };
         });
+        const postedBouts = [...data.bouts.filter((b) => b.week !== data.week), ...bouts];
         set({
           phase: "fought",
           bots,
-          bouts: [...data.bouts.filter((b) => b.week !== data.week), ...bouts],
+          bouts: postedBouts,
+          replays: sealReplay({ replays: data.replays, bouts: postedBouts, week: data.week }),
           gazette,
           craft,
           honors,
@@ -1826,7 +1829,9 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         if (data.week === 5) {
           set({
             phase: "complete",
-            flash: "Season closed. The Waterman Champion is on the wall.",
+            bouts: data.bouts,
+            replays: sealReplay(data),
+            flash: "Season closed. The Waterman Champion is on the wall. Every card stays on Fight Day as a replay.",
             log: ["Championship Saturday complete.", ...data.log].slice(0, 24),
           });
           return;
@@ -1878,7 +1883,11 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           phase: "open",
           bots,
           storeCards,
-          flash: next === 5 ? "Championship Week is open. Only the two conference champions can work on their bots; everyone else can Rally." : `Week ${next} is open. ${data.week === 1 ? "Coins are in the jars and the shop is open." : "Cards are house projections until the desk clicks in Sunday's colors."}`,
+          // The posted card stays on `bouts` (records) and in `replays` (the tape).
+          // Advance pays coins and moves the week. It does not drop the fight.
+          bouts: data.bouts,
+          replays: sealReplay(data),
+          flash: next === 5 ? "Championship Week is open. Only the two conference champions can work on their bots; everyone else can Rally. The regular season stays on Fight Day as a replay." : `Week ${next} is open. ${data.week === 1 ? "Coins are in the jars and the shop is open." : "Cards are house projections until the desk clicks in Sunday's colors."} Week ${data.week} stays on Fight Day as a replay.`,
           log: [...lines, ...data.log].slice(0, 24),
         });
       },
@@ -1943,6 +1952,17 @@ function renameRecordKey<T>(record: Record<string, T>): Record<string, T> {
   const next: Record<string, T> = {};
   for (const key of Object.keys(record)) next[key === "bryant" ? "hulen" : key] = record[key]!;
   return next;
+}
+
+function mapBout(bout: Bout): Bout {
+  return {
+    ...bout,
+    id: bout.id.replaceAll("bryant", "hulen"),
+    storeIds: bout.storeIds.map(mapStoreId),
+    teamA: bout.teamA.map(mapStoreId),
+    teamB: bout.teamB.map(mapStoreId),
+    result: bout.result ? mapFight(bout.result) : bout.result,
+  };
 }
 
 function mapFight(result: FightResult): FightResult {
@@ -2050,14 +2070,8 @@ export function applyHulen<T extends Partial<PitData>>(data: T): T {
     storeCards: data.storeCards?.map((card) =>
       card.storeId === "bryant" ? { ...card, id: card.id.replace(/^bryant-/, "hulen-"), storeId: "hulen" } : card,
     ),
-    bouts: data.bouts?.map((bout) => ({
-      ...bout,
-      id: bout.id.replaceAll("bryant", "hulen"),
-      storeIds: bout.storeIds.map(mapStoreId),
-      teamA: bout.teamA.map(mapStoreId),
-      teamB: bout.teamB.map(mapStoreId),
-      result: bout.result ? mapFight(bout.result) : bout.result,
-    })),
+    bouts: data.bouts?.map((bout) => mapBout(bout)),
+    replays: data.replays?.map((card) => ({ ...card, bouts: card.bouts.map((bout) => mapBout(bout)) })),
     quotes: data.quotes ? renameRecordKey(data.quotes) : data.quotes,
     proposals: data.proposals?.map((proposal) =>
       proposal.storeId === "bryant" ? { ...proposal, storeId: "hulen", crewId: mapCrewId(proposal.crewId) } : proposal,
@@ -2159,6 +2173,7 @@ export function applyLeague14<T extends Partial<PitData>>(data: T): T {
     rallies: data.rallies ?? [],
     cosmeticProposals: data.cosmeticProposals ?? [],
     halloweenArcade: data.halloweenArcade ?? [],
+    replays: backfillReplays(data.replays, data.bouts ?? []),
   } as T;
 }
 

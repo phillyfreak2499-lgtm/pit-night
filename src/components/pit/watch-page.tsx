@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { commercialAfter } from "@/lib/pit/commercials";
 import { PROGRAM_HOLD_MS, programRecords, storeNameMap } from "@/lib/pit/fight-card";
 import { recordOf } from "@/lib/pit/engine";
+import { isLiveCard, replayWeeks } from "@/lib/pit/replay";
 import { paintHex, usePit } from "@/lib/pit/store";
 import { TUNE_UP_BONUS, crateFor } from "@/lib/pit/training";
 import type { Bout, PitData } from "@/lib/pit/types";
@@ -24,11 +25,11 @@ const BYE_MS = 6000;
 /** Watch party: Monday regular-season cards plus Championship Saturday. */
 export function WatchPage() {
   const data = usePit();
-  const postedWeeks = useMemo(() => [...new Set(data.bouts.filter((b) => b.result).map((b) => b.week))].sort((a, b) => a - b), [data.bouts]);
+  const postedWeeks = useMemo(() => replayWeeks(data), [data.bouts, data.replays]);
   const [week, setWeek] = useState(() => (postedWeeks.includes(data.week) || !postedWeeks.length ? data.week : postedWeeks.at(-1)!));
   // Freeze the tape when the party starts so a sync mid-show never reshuffles it.
   const liveTape = useMemo(() => buildTape(data, week), [data, week]);
-  const [tape, setTape] = useState<{ live: boolean; bouts: Bout[] } | null>(null);
+  const [tape, setTape] = useState<{ live: boolean; replay: boolean; bouts: Bout[] } | null>(null);
   const bouts = (tape ?? liveTape).bouts;
   const [stage, setStage] = useState<Stage>("lobby");
   const [index, setIndex] = useState(0);
@@ -97,7 +98,8 @@ export function WatchPage() {
   const revealed = stage === "result" || stage === "ad" || stage === "final" ? index + 1 : index;
   const shown = new Set(bouts.slice(0, revealed).map((b) => b.id));
   if (stage === "final") for (const b of bouts) shown.add(b.id);
-  const seen: PitData = { ...data, bouts: [...data.bouts.filter((b) => b.week !== week), ...bouts.filter((b) => shown.has(b.id))] };
+  const seen: PitData = { ...data, bouts: [...data.bouts.filter((b) => b.week < week && b.result), ...bouts.filter((b) => shown.has(b.id))] };
+  const replaying = (tape ?? liveTape).replay;
   const weekName = data.weeks.find((w) => w.number === week)?.name ?? `Week ${week}`;
   const spot = stage === "ad" ? commercialAfter(week, index + 1, bouts.length) : null;
 
@@ -114,6 +116,7 @@ export function WatchPage() {
           <p className="font-display text-2xl leading-none md:text-3xl">
             <span className="block truncate md:inline">
               Week {week} · {weekName}
+              {replaying ? <span className="ml-2 text-base tracking-[0.18em] text-amber uppercase">Replay</span> : null}
             </span>
             {stage === "ad" ? (
               <span className="mt-1 block text-sm tracking-[0.18em] text-muted uppercase md:mt-0 md:ml-3 md:inline md:text-base md:tracking-normal md:normal-case">
@@ -162,13 +165,13 @@ export function WatchPage() {
           {stage === "intro" && bout ? <Intro key={bout.id} data={data} bout={bout} seen={seen} order={index + 1} total={bouts.length} /> : null}
           {stage === "fight" && bout ? (
             <div className="mx-auto w-full max-w-6xl">
-              <Broadcast key={bout.id} bout={bout} playing={!paused} speed={1.5} chromeless kicker={(tape ?? liveTape).live ? "Live card" : "House tape"} onComplete={next} />
+              <Broadcast key={bout.id} bout={bout} playing={!paused} speed={1.5} chromeless kicker={replaying ? "Replay" : (tape ?? liveTape).live ? "Live card" : "House tape"} onComplete={next} />
             </div>
           ) : null}
           {stage === "result" && bout ? (
             <Result key={bout.id} data={data} bout={bout} seen={seen} next={bouts[index + 1] ?? null} commercialNext={Boolean(commercialAfter(week, index + 1, bouts.length))} />
           ) : null}
-          {stage === "final" ? <Final data={data} seen={seen} bouts={bouts} onAgain={() => setStage("lobby")} /> : null}
+          {stage === "final" ? <Final data={data} seen={seen} bouts={bouts} replay={replaying} onAgain={() => setStage("lobby")} /> : null}
           {paused && stage !== "lobby" && stage !== "final" && stage !== "ad" ? (
             <p className="pointer-events-none absolute inset-x-0 top-4 text-center font-display text-sm tracking-[0.3em] text-amber uppercase">Paused · space to resume</p>
           ) : null}
@@ -204,7 +207,7 @@ function Lobby({
   week: number;
   weeks: number[];
   setWeek: (w: number) => void;
-  tape: { live: boolean; bouts: Bout[] };
+  tape: { live: boolean; replay: boolean; bouts: Bout[] };
   onStart: (full: boolean) => void;
 }) {
   const choices = [...new Set([...weeks, data.week])].sort((a, b) => a - b);
@@ -212,27 +215,33 @@ function Lobby({
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col justify-center gap-6 py-6">
       <div>
-        <p className="font-display text-sm tracking-[0.3em] text-amber uppercase">{tape.live ? "The card is posted" : "House tape · card not posted yet"}</p>
+        <p className="font-display text-sm tracking-[0.3em] text-amber uppercase">{tape.replay ? "Replay · read only" : tape.live ? "The card is posted" : "House tape · card not posted yet"}</p>
         <h1 className="mt-2 font-display text-6xl leading-[0.85] md:text-8xl">
           {week === 5 ? "Championship" : "Monday"}
           <span className="block text-amber">{week === 5 ? "Saturday" : "watch party"}</span>
         </h1>
         <p className="mt-4 max-w-2xl text-lg text-muted">
-          {week === 5
-            ? "One title fight. No judges and no decision: it keeps going until one bot is knocked out. Rally support makes the room louder, never the bot stronger."
-            : "Put this on the big screen. Every fight plays back to back with a walk-out, the tape, and the call. A house commercial runs between every fight. The live table updates after every fight."}
+          {tape.replay
+            ? week === 5
+              ? "Replay of Championship Saturday. Same tape as the night it posted. Watching it does not change coins, damage, records, or the week."
+              : "Replay of that Monday's card. Same walk-out, tape, and call. A house commercial runs between every fight. Watching it does not change coins, damage, records, or the week."
+            : week === 5
+              ? "One title fight. No judges and no decision: it keeps going until one bot is knocked out. Rally support makes the room louder, never the bot stronger."
+              : "Put this on the big screen. Every fight plays back to back with a walk-out, the tape, and the call. A house commercial runs between every fight. The live table updates after every fight."}
         </p>
       </div>
-      {choices.length > 1 ? (
-        <div className="flex flex-wrap gap-2">
+      {weeks.length > 0 ? (
+        <div className="flex flex-wrap gap-2" data-testid="replay-archive" role="group" aria-label="Replay archive">
           {choices.map((w) => (
             <button
               key={w}
               type="button"
+              data-testid={`replay-week-${w}`}
+              aria-pressed={w === week}
               onClick={() => setWeek(w)}
               className={`min-h-11 border px-4 font-display uppercase ${w === week ? "border-amber text-amber" : "border-line text-muted"}`}
             >
-              Week {w}
+              {weeks.includes(w) && !isLiveCard(data, w) ? `Week ${w} replay` : `Week ${w}`}
             </button>
           ))}
         </div>
@@ -325,7 +334,7 @@ function Result({ data, bout, seen, next, commercialNext }: { data: PitData; bou
   );
 }
 
-function Final({ data, seen, bouts, onAgain }: { data: PitData; seen: PitData; bouts: Bout[]; onAgain: () => void }) {
+function Final({ data, seen, bouts, replay, onAgain }: { data: PitData; seen: PitData; bouts: Bout[]; replay: boolean; onAgain: () => void }) {
   const flames = streakHolders(data).slice(0, 6);
   return (
     <div className="watch-in mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center gap-5 py-6">
@@ -353,8 +362,8 @@ function Final({ data, seen, bouts, onAgain }: { data: PitData; seen: PitData; b
         <button type="button" onClick={onAgain} className="min-h-11 border border-line px-4 font-display uppercase">
           Back to the lobby
         </button>
-        <Link to={data.week === 5 ? "/honors" : "/week"} className="inline-flex min-h-11 items-center bg-amber px-4 font-display text-deep uppercase">
-          {data.week === 5 ? "Season honors →" : "Pit Week starts tomorrow →"}
+        <Link to={replay ? "/broadcast" : data.week === 5 ? "/honors" : "/week"} className="inline-flex min-h-11 items-center bg-amber px-4 font-display text-deep uppercase">
+          {replay ? "Fight Day →" : data.week === 5 ? "Season honors →" : "Pit Week starts tomorrow →"}
         </Link>
       </div>
     </div>
