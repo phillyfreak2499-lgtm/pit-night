@@ -367,7 +367,7 @@ test("opponent drafts and scouting notes remain private until the fight posts", 
     "weapon-disc-super",
   );
 });
-test("availability freezes at Tuesday midnight Central and on first practice submission", () => {
+test("availability freezes at Tuesday midnight while roster edits stay open", () => {
   const data = makeData();
   assert.equal(eligibilityClosed(data, 1, new Date("2026-10-27T04:59:59Z")), null);
   assert.ok(eligibilityClosed(data, 1, new Date("2026-10-27T05:00:00Z")));
@@ -390,8 +390,8 @@ test("availability freezes at Tuesday midnight Central and on first practice sub
       .crew.find((c) => c.id === member.id)
       ?.offWeeks?.includes(1),
   );
-  store.getState().removeCrew("plano", member.id);
-  assert.ok(store.getState().crew.some((c) => c.id === member.id));
+  store.getState().addCrew("plano", "New Specialist");
+  assert.ok(store.getState().crew.some((c) => c.storeId === "plano" && c.name === "New Specialist"));
   store.setState({ session: { role: "commissioner", storeId: null, crewId: null } });
   store.getState().setCrewOff(member.id, 1, true);
   assert.ok(
@@ -401,6 +401,9 @@ test("availability freezes at Tuesday midnight Central and on first practice sub
       ?.offWeeks?.includes(1),
   );
   assert.match(store.getState().log.at(-1)!, /commissioner.*Off week 1/);
+  store.setState({ session: { role: "captain", storeId: "plano", crewId: cap.id } });
+  store.getState().removeCrew("plano", member.id);
+  assert.ok(!store.getState().crew.some((c) => c.id === member.id));
 });
 test("legitimate planned vacation before Pit Week is allowed", () => {
   const store = state();
