@@ -1505,7 +1505,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         const clean = name.trim().slice(0, 40);
         if (!clean) return;
         const specialists = data.crew.filter((c) => c.storeId === storeId && c.role === "specialist");
-        if (eligibilityClosed(data, data.week)) { set({ flash: "Add staff before Tuesday Pit Week begins." }); return; }
+
         if (specialists.length >= 8) {
           set({ flash: "Eight specialists is the bay cap." });
           return;
@@ -1520,7 +1520,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         if (!isCaptainOf(data, storeId)) return;
         const member = data.crew.find((c) => c.id === crewId && c.storeId === storeId && c.role === "specialist");
         if (!member) return;
-        if (eligibilityClosed(data, data.week)) { set({ flash: "Weekly roster is frozen. The Desk can mark a legitimate absence Off." }); return; }
+
         const specialists = data.crew.filter((c) => c.storeId === storeId && c.role === "specialist");
         if (specialists.length <= 1) {
           set({ flash: "A bay keeps at least one specialist." });
