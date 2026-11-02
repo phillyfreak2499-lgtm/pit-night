@@ -220,7 +220,7 @@ function Lobby({
         <p className="mt-4 max-w-2xl text-lg text-muted">
           {week === 5
             ? "One title fight. No judges and no decision: it keeps going until one bot is knocked out. Rally support makes the room louder, never the bot stronger."
-            : "Put this on the big screen. Every fight plays back to back with a walk-out, the tape, and the call. A house commercial runs after every other fight. The live table updates after every fight."}
+            : "Put this on the big screen. Every fight plays back to back with a walk-out, the tape, and the call. A house commercial runs between every fight. The live table updates after every fight."}
         </p>
       </div>
       {choices.length > 1 ? (

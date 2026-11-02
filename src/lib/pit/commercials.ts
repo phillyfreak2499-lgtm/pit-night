@@ -1,9 +1,10 @@
 /**
  * House commercials for the watch party.
  *
- * A card breaks after every 2nd fight except the last one, before the next
- * program card. The reel is fixed by week: week 1 plays spots 1–3, week 2
- * plays 4–6, then it repeats, so a replay of the same week is the same reel.
+ * A card breaks between every pair of bouts, and not after the last one.
+ * On a seven-bout card that is six breaks: one after each of bouts 1–6,
+ * none after the main event. The reel is the catalog in order, every week,
+ * and each spot is used once. A longer card does not repeat the reel.
  *
  * Drop a finished spot at `public/ads/<slug>.mp4`. The player uses that file
  * (H.264 video, AAC audio, about 15 seconds). If the file is missing or fails
@@ -12,8 +13,11 @@
 
 export const AD_MS = 15_000;
 
-/** Spots scheduled on a normal seven-fight card, and the week-to-week step. */
-export const COMMERCIAL_ROTATION_BLOCK = 3;
+/**
+ * Breaks on a seven-bout card, and the length of one fixed pass.
+ * The reel does not rotate by week.
+ */
+export const COMMERCIAL_ROTATION_BLOCK = 6;
 
 export type CommercialTone = "lead" | "vo" | "end" | "flash" | "aside";
 
@@ -118,22 +122,25 @@ function mod(n: number, m: number): number {
 /** True when this 1-based fight should cut to a house spot before the next program. */
 export function commercialAfterFight(fightNumber: number, fightCount: number): boolean {
   if (!Number.isInteger(fightNumber) || !Number.isInteger(fightCount)) return false;
-  if (fightCount < 2 || fightNumber < 1 || fightNumber > fightCount) return false;
-  return fightNumber % 2 === 0 && fightNumber < fightCount;
+  if (fightCount < 2 || fightNumber < 1 || fightNumber >= fightCount) return false;
+  // One pass of the catalog. Bout 1 takes spot 1; the main event takes none.
+  return fightNumber <= COMMERCIAL_ROTATION_BLOCK && fightNumber <= COMMERCIALS.length;
 }
 
-/** Catalog spot for the slotIndex-th break on this week's card (0-based). */
-export function commercialAt(week: number, slotIndex: number): Commercial {
-  const safeWeek = Number.isFinite(week) ? Math.trunc(week) : 1;
+/**
+ * Catalog spot for the slotIndex-th break (0-based).
+ * Week is accepted so the watch party can keep passing the card week.
+ * It does not change the order.
+ */
+export function commercialAt(_week: number, slotIndex: number): Commercial {
   const safeSlot = Number.isFinite(slotIndex) ? Math.trunc(slotIndex) : 0;
-  const start = mod((safeWeek - 1) * COMMERCIAL_ROTATION_BLOCK, COMMERCIALS.length);
-  return COMMERCIALS[mod(start + safeSlot, COMMERCIALS.length)]!;
+  return COMMERCIALS[mod(safeSlot, COMMERCIALS.length)]!;
 }
 
 /** The spot that plays after this fight, or null when the card rolls on. */
 export function commercialAfter(week: number, fightNumber: number, fightCount: number): Commercial | null {
   if (!commercialAfterFight(fightNumber, fightCount)) return null;
-  return commercialAt(week, fightNumber / 2 - 1);
+  return commercialAt(week, fightNumber - 1);
 }
 
 /** Every spot on a card, in the order the room will see them. */
