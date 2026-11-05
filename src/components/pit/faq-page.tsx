@@ -126,7 +126,7 @@ export const GROUPS: Group[] = [
       ),
       faq(
         "Can we change our bot's class?",
-        "Not in Week 1. After the first fight a class change costs 3 chassis coins.",
+        "Not in Week 1. After the first fight the captain can switch between Striker, Tank and Specialist in the Garage for 60 Bolts earned from Pit Week jobs and Daily Sparks. Owned parts stay in the locker; incompatible equipped parts return to stock.",
       ),
     ],
   },
