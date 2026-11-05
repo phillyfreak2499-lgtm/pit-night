@@ -27,7 +27,7 @@ const STEPS = [
   {
     kicker: "The numbers",
     title: "Six numbers. Six parts. Colors pay coins.",
-    body: "NSNU builds the chassis, Conv % the armor, Demo Rate the drive, Demo Close % the weapon, Arch Supports the utility, and Demo Ticket Avg the brain. Each week green pays 3 coins into that part's jar, blue 2, orange 1, red 0. Week 1 coins come from your Period 11 colors. The brain does not change the four printed numbers. It changes how the bot fights. Battery is the chassis stamina and drains as the fight goes on.",
+    body: "NSNU builds the chassis, Conv % the armor, Demo Rate the drive, Demo Close % the weapon, Arch Supports the utility, and Demo Ticket Avg the brain. Each week green pays 3 coins into that part's jar, blue 2, orange 1, red 0. Week 1 coins come from your Period 11 colors. The brain does not change the four printed numbers. It changes how the bot fights. Battery is the chassis cell: it drains when the bot moves and fires. Stamina is separate. It drops on a hard swing and comes back a little between exchanges. A glass cannon feels that in a long fight.",
   },
   {
     kicker: "The garage",
