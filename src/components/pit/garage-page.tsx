@@ -440,7 +440,7 @@ const LOOKS: { id: BotLook; label: string }[] = [
   { id: "rivets", label: "Rivets" },
   { id: "two-tone", label: "Two-tone" },
   { id: "camouflage", label: "Camouflage" },
-  { id: "tie-dye", label: "Tie-dye" },
+  { id: "tie-dye", label: "Lulu" },
   { id: "texas", label: "Texas Lone Star" },
 ];
 
@@ -801,7 +801,7 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
           ))}
 
           <Group label="Stripes, patterns & skins">
-            <p className="mb-2 text-xs text-muted">Two-tone uses your selected base paint and trim color. Camouflage and tie-dye add all-over patterns; Texas uses the Lone Star flag.</p>
+            <p className="mb-2 text-xs text-muted">Two-tone uses your selected base paint and trim color. Camouflage and Lulu add all-over patterns; Texas uses the Lone Star flag.</p>
             {LOOKS.map((row) => (
               <Chip key={row.id} active={bot.look === row.id} onClick={() => setLook(storeId, row.id)}>
                 {row.label}

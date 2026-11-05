@@ -43,7 +43,7 @@ export const RULES: { title: string; text: string }[] = [
   },
   {
     title: "The bay",
-    text: "Paint, two-tone, camouflage, tie-dye, Texas Lone Star skin, finish, decals, trim, eye color, the flag, garage floor, stripes, and the bay number are decoration. They do not change Power, Speed, Armor, or Heat. A Scry on the utility slot is the spy, and it stays shut until the bay calls the weapon family out loud. Then it says whether that call was right, and whether the weapon belongs on their class. It does not name the part. One call per fight. They can still change the draft until Saturday close. Captains can test the build against three house drills. That tape does not post damage, scrap, or a record. Captains rename the crew, add up to eight specialists, and keep at least one. Staff edits are not the lock.",
+    text: "Paint, two-tone, camouflage, Lulu tie-dye, Texas Lone Star skin, finish, decals, trim, eye color, the flag, garage floor, stripes, and the bay number are decoration. They do not change Power, Speed, Armor, or Heat. A Scry on the utility slot is the spy, and it stays shut until the bay calls the weapon family out loud. Then it says whether that call was right, and whether the weapon belongs on their class. It does not name the part. One call per fight. They can still change the draft until Saturday close. Captains can test the build against three house drills. That tape does not post damage, scrap, or a record. Captains rename the crew, add up to eight specialists, and keep at least one. Staff edits are not the lock.",
   },
   {
     title: "Damage",
