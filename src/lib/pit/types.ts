@@ -12,7 +12,7 @@ export type KeyName = Slot;
 export type BoutKind = "bout" | "bye" | "tag" | "semi" | "final" | "melee";
 export type Method = "ko" | "dump" | "decision" | "melee" | "scrimmage" | "bye";
 export type GarageLook = "hazard" | "concrete" | "night" | "bone" | "checker";
-export type BotLook = "plain" | "stripe" | "chevron" | "rivets";
+export type BotLook = "plain" | "stripe" | "chevron" | "rivets" | "two-tone" | "camouflage" | "tie-dye" | "texas";
 export const FINISH_IDS = ["factory", "chrome", "matte", "worn", "satin", "carbon", "iridescent", "gold", "holographic"] as const;
 export type BotFinish = (typeof FINISH_IDS)[number];
 /** Base sticker art. Foil versions are the same id plus "-foil" and share the four slots. */
