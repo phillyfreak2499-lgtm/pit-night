@@ -123,6 +123,8 @@ export type Store = {
   /** Bolt Locker items this bay owns. */
   unlocks?: string[];
   boltsSpent?: number;
+  /** Coins bought with Bolts, by Pit Week number. Old saves omit it. */
+  boltCoins?: Record<string, number>;
 };
 
 export type Crew = {
