@@ -3875,6 +3875,29 @@ function drawArenaTop(
   }
 }
 
+/** World-space box around every bot that is actually in the cage, including weapon reach. */
+function framedBots(drive: Drive, w: number, h: number) {
+  let top = Infinity;
+  let bottom = -Infinity;
+  let left = Infinity;
+  let right = -Infinity;
+  let any = false;
+  for (const bot of drive.bots) {
+    if (bot.gone >= 1) continue;
+    if (bot.spot.x < 0.02 || bot.spot.x > 0.98 || bot.spot.y < 0.05 || bot.spot.y > 0.98) continue;
+    const p = project(bot.spot, w, h);
+    const up = p.size * (1.5 + Math.max(0, bot.lift));
+    const down = p.size * 0.3;
+    const side = p.size * 1.2;
+    top = Math.min(top, p.y - up);
+    bottom = Math.max(bottom, p.y + down);
+    left = Math.min(left, p.x - side);
+    right = Math.max(right, p.x + side);
+    any = true;
+  }
+  return any ? { top, bottom, left, right } : null;
+}
+
 export function drawSide(
   ctx: CanvasRenderingContext2D,
   w: number,
@@ -3890,14 +3913,36 @@ export function drawSide(
   const focus = project(drive.focus, w, h);
   const spread =
     pts.length > 1 ? Math.max(...pts.map((p) => p.x)) - Math.min(...pts.map((p) => p.x)) : w * 0.3;
-  const wantZ = opts.reduced
+  let wantZ = opts.reduced
     ? 1
-    : clamp(1 + drive.tight * 0.32 - clamp(spread / w - 0.3, 0, 0.5) * 0.4 + clamp(0.24 - spread / w, 0, 0.24) * 0.6, 1, 1.42) +
-      fx.punch * 0.28 +
-      (opts.replay ? 0.18 : 0) +
-      (opts.finish ?? 0) * 0.32;
-  const wantX = lerp(w / 2, focus.x, 0.55);
-  const wantY = lerp(h * 0.55, focus.y - focus.size * 0.3, 0.45);
+    : clamp(1 + drive.tight * 0.38 - clamp(spread / w - 0.3, 0, 0.5) * 0.35 + clamp(0.24 - spread / w, 0, 0.24) * 0.55, 1, 1.55) +
+      (opts.reduced ? 0 : fx.punch * 0.22) +
+      (opts.replay ? 0.24 : 0) +
+      (opts.finish ?? 0) * 0.28;
+  const span = framedBots(drive, w, h);
+  const topInset = h * 0.2;
+  const botInset = h * 0.14;
+  const sideInset = w * 0.05;
+  if (span) {
+    const availH = Math.max(32, h - topInset - botInset);
+    const availW = Math.max(32, w - sideInset * 2);
+    const fitZ = Math.min(
+      availH / Math.max(1, span.bottom - span.top),
+      availW / Math.max(1, span.right - span.left),
+    );
+    wantZ = opts.reduced ? Math.min(wantZ, fitZ) : Math.min(wantZ, fitZ);
+  }
+  let wantX = lerp(w / 2, focus.x, 0.55);
+  let wantY = lerp(h * 0.55, focus.y - focus.size * 0.3, 0.45);
+  if (span && wantZ > 0) {
+    const safeCenterY = topInset + (h - topInset - botInset) / 2;
+    const midY = (span.top + span.bottom) / 2;
+    const framedY = midY - (safeCenterY - h / 2) / wantZ;
+    const midX = (span.left + span.right) / 2;
+    const framedX = midX;
+    wantY = opts.reduced ? framedY : lerp(wantY, framedY, 0.72);
+    wantX = opts.reduced ? framedX : lerp(wantX, framedX, 0.4);
+  }
   const cam = fx.cam;
   if (!cam.ready) {
     cam.x = wantX;
@@ -3905,7 +3950,7 @@ export function drawSide(
     cam.z = wantZ;
     cam.ready = true;
   }
-  const k = 1 - Math.exp(-dt * 2.2);
+  const k = 1 - Math.exp(-dt * (opts.reduced ? 14 : 2.8));
   cam.x = lerp(cam.x, wantX, k);
   cam.y = lerp(cam.y, wantY, k);
   cam.z = lerp(cam.z, wantZ, 1 - Math.exp(-dt * (wantZ > cam.z ? (fx.punch > 0.2 || (opts.finish ?? 0) > 0 ? 14 : 4) : 1.5)));
@@ -3916,10 +3961,10 @@ export function drawSide(
 
   ctx.save();
   ctx.clearRect(0, 0, w, h);
-  ctx.translate(
-    w / 2 + (Math.random() - 0.5) * opts.shake,
-    h / 2 + (Math.random() - 0.5) * opts.shake,
-  );
+  const mag = opts.reduced ? 0 : opts.shake;
+  const jx = mag ? Math.sin(time * 61.3) * mag * 0.42 : 0;
+  const jy = mag ? Math.sin(time * 47.1 + 1.7) * mag * 0.32 : 0;
+  ctx.translate(w / 2 + jx, h / 2 + jy);
   ctx.scale(cam.z, cam.z);
   ctx.translate(-cx, -cy);
   ctx.drawImage(backdrop(ctx, w, h, opts.arena ?? "pit"), 0, 0);

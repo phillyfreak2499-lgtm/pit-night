@@ -398,7 +398,7 @@ export type Part = {
   straight?: boolean;
   /** Shop window. Absent means the peg is up all season. */
   window?: PartWindow;
-  /** Chassis stamina. Omitted chassis use the stock battery. */
+  /** Chassis cell size. Omitted chassis use STOCK_BATTERY. */
   battery?: number;
   /** Build-fit override for a price that is off the 3/5/8 ladder. */
   fit?: number;
@@ -572,6 +572,8 @@ const FAMILIES: Family[] = [
     classLock: "striker",
     tags: ["speed"],
     nudge: nudge(1, 4, -1, 0),
+    // Light striker cell. A long fight empties it before a tank's does.
+    batteries: { stock: 64, sport: 66, pro: 72, super: 80, championship: 88 },
     names: {
       stock: "Shrike",
       sport: "Shrike Sport",
@@ -595,6 +597,8 @@ const FAMILIES: Family[] = [
     classLock: "tank",
     tags: ["armor"],
     nudge: nudge(1, -2, 5, 0),
+    // Deep tank cell. The third exchange is still on the original charge.
+    batteries: { stock: 64, sport: 76, pro: 88, super: 102, championship: 116 },
     names: {
       stock: "Keystone",
       sport: "Keystone Sport",
@@ -618,6 +622,8 @@ const FAMILIES: Family[] = [
     classLock: "specialist",
     tags: ["heat"],
     nudge: nudge(0, 0, 0, 5),
+    // Middle cell. Heat builds, the battery does not fall off a cliff.
+    batteries: { stock: 64, sport: 72, pro: 82, super: 92, championship: 102 },
     names: {
       stock: "Windlass",
       sport: "Windlass Sport",
@@ -1174,6 +1180,7 @@ const FAMILIES: Family[] = [
     key: "chassis",
     tags: ["armor", "halloween"],
     nudge: nudge(2, -1, 4, -2),
+    batteries: { super: 84 },
     names: { super: "Pumpkin Chassis" },
     jobs: {
       super: "A round festive shell for any class. It shrugs the first bite and swings a little softer all night. It does not change your class. Eight chassis coins.",
@@ -1307,7 +1314,7 @@ function buildParts(): Part[] {
 
 export const PARTS: Part[] = [...buildParts(), ...ROSTER_PARTS];
 
-/** Stamina on a chassis that does not name its own battery. */
+/** Cell size when a chassis does not name its own battery. */
 export const STOCK_BATTERY = 64;
 
 export function batteryOf(part: Part | null | undefined): number {

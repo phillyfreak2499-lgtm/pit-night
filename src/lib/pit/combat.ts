@@ -1,7 +1,9 @@
 import type {
+  BellVitals,
   CombatState,
   CombatTrace,
   Exchange,
+  ExchangeVitals,
   FighterSnap,
   FightResult,
   Method,
@@ -44,6 +46,8 @@ type Mem = {
   grapple: Record<string, boolean>;
   heat: Record<string, number>;
   battery: Record<string, number>;
+  /** Endurance left, 0–STAMINA_MAX. Separate from the chassis cell. */
+  stamina: Record<string, number>;
   slow: Record<string, number>;
 };
 
@@ -56,6 +60,7 @@ export type DuelCore = {
   finisher: FightResult["finisher"];
   method: Method;
   koAt: number;
+  bell: Record<string, BellVitals>;
 };
 
 const TIER_Q: Record<Tier, number> = { stock: 0, sport: 1, pro: 2, super: 3, championship: 4 };
@@ -97,9 +102,115 @@ function utilityStrength(kit: Kit) {
   return (tiered ? (q(kit.utilityTier) + 1) / 4 : 1) * (kit.wear.utility ?? 1);
 }
 
-function stamina(max: number, left: number) {
+/**
+ * Battery and stamina.
+ *
+ * Battery is the chassis cell (`battery` on the part, otherwise STOCK_BATTERY).
+ * It drains once per exchange by weapon draw plus drive draw. Tesla also pulls
+ * charge out of the bot that got hit. The old curve still scales weapon output:
+ * full cell is 1, empty cell is 0.55. From the third swing on, a cell under 40%
+ * also loses pace (slower effective hit, down to 0.88 at empty). Pace waits
+ * until the fourth exchange, so a regulation three-round card barely feels it.
+ *
+ * Stamina is a separate 0–100 pool. It starts full, spends on the swing, then
+ * recovers partway before the next exchange. Glass cannons (high power, low
+ * armor) spend more and recover less. In a regulation card the floor is 1, so
+ * the bar moves on screen and the Monday result stays put. From exchange 4 on
+ * (overtime and anything that runs long) the floor drops, and it drops further
+ * for glass.
+ *
+ * Both are pure functions of the kits and the pools. No random draw, and the
+ * bout seed is not an input, so the same two builds always fight the same way.
+ */
+export const STAMINA_MAX = 100;
+
+/** 0 for a tanky build, 1 for a high-power low-armor glass cannon. */
+export function glassOf(stats: { power: number; armor: number }): number {
+  return clamp((stats.power - stats.armor) / 36, 0, 1);
+}
+
+/** Weapon output from the cell alone. Full is 1, empty is 0.55. */
+export function batteryCurve(max: number, left: number): number {
   const ratio = max <= 0 ? 0 : clamp(left, 0, max) / max;
   return 0.55 + 0.45 * ratio;
+}
+
+/**
+ * Extra pace loss when the cell is under 40% from the fourth swing on.
+ * 1 through a regulation card. Empty on a long fight is 0.88.
+ */
+export function batteryPace(max: number, left: number, exchangeIndex: number): number {
+  const ratio = max <= 0 ? 0 : clamp(left, 0, max) / max;
+  if (exchangeIndex < 3 || ratio >= 0.4) return 1;
+  return 0.88 + 0.12 * (ratio / 0.4);
+}
+
+/**
+ * Weapon output from stamina. Regulation floor is 0.97.
+ * Overtime floor is 0.76 for glass and 0.88 for a tank.
+ */
+export function staminaCurve(max: number, left: number, exchangeIndex: number, glass: number): number {
+  const ratio = max <= 0 ? 0 : clamp(left, 0, max) / max;
+  const floor = exchangeIndex >= 3 ? 0.76 + 0.12 * (1 - clamp(glass, 0, 1)) : 1;
+  return floor + (1 - floor) * ratio;
+}
+
+const WEAPON_DRAW: Record<string, number> = {
+  flame: 4,
+  tesla: 4,
+  chainsaw: 4,
+  disc: 1,
+  drum: 1,
+  flail: 1,
+  slasher: 1,
+  hammer: 1,
+  axe: 1,
+  crusher: 1,
+  launcher: 1,
+  yamcannon: 1,
+};
+
+const DRIVE_DRAW: Record<string, number> = {
+  rocket: 4,
+  ghostchaser: 2,
+  chaser: 2,
+  flip: 1,
+  swerve: 1,
+  anchor: -5,
+};
+
+/** Battery points spent moving and firing for one exchange. */
+export function batterySpend(kit: Kit): number {
+  let d = 20 + (WEAPON_DRAW[kit.weapon] ?? 0) + (DRIVE_DRAW[kit.drive] ?? 0);
+  if (kit.chassis === "sprinter" || kit.chassis === "hornet") d += 4;
+  if (kit.chassis === "reactor" || kit.chassis === "capacitor") d -= 4;
+  return Math.max(8, d);
+}
+
+/** Stamina points a swing costs. Glass and hungry weapons pay more. */
+export function staminaSpend(stats: { power: number; armor: number }, weapon: string, drive: string): number {
+  const glass = glassOf(stats);
+  const driveExert = Math.max(0, DRIVE_DRAW[drive] ?? 0);
+  return Math.round(14 + glass * 12 + (WEAPON_DRAW[weapon] ?? 0) * 1.25 + driveExert * 0.75);
+}
+
+/** Stamina points restored between exchanges. Armor and a low glass rating get more back. */
+export function staminaRecover(stats: { power: number; armor: number }): number {
+  const glass = glassOf(stats);
+  return Math.round(8 + stats.armor * 0.1 + (1 - glass) * 3);
+}
+
+function swingPower(bot: FighterSnap, mem: Mem, exchangeIndex: number): number {
+  const kit = kitOf(bot);
+  const left = mem.battery[bot.id] ?? kit.batteryMax;
+  const stamLeft = mem.stamina[bot.id] ?? STAMINA_MAX;
+  const glass = glassOf(bot.stats);
+  return (
+    bot.stats.power *
+    batteryCurve(kit.batteryMax, left) *
+    batteryPace(kit.batteryMax, left, exchangeIndex) *
+    staminaCurve(STAMINA_MAX, stamLeft, exchangeIndex, glass)
+  );
 }
 
 function lit(kit: Kit) {
@@ -464,8 +575,14 @@ function oneWay(
   ak.affinityHit = affinityOn(atk, ak);
   const tags: string[] = [];
   const left = mem.battery[atk.id] ?? ak.batteryMax;
-  const stam = stamina(ak.batteryMax, left) * (mem.slow[atk.id] ?? 1);
-  if (stam < 0.82) tags.push("battery");
+  const stamLeft = mem.stamina[atk.id] ?? STAMINA_MAX;
+  const glass = glassOf(atk.stats);
+  const cell = batteryCurve(ak.batteryMax, left);
+  const pace = batteryPace(ak.batteryMax, left, index);
+  const endurance = staminaCurve(STAMINA_MAX, stamLeft, index, glass);
+  const stam = cell * pace * endurance * (mem.slow[atk.id] ?? 1);
+  if (cell < 0.82) tags.push("battery");
+  if (stamLeft < STAMINA_MAX * 0.55 && index >= 2) tags.push("stamina");
   const thin = dk.chassis === "skeleton" ? 0.5 : 1;
   let dmg =
     (atk.stats.power * 1.22 + atk.stats.speed * 0.2) * stam * (mem.spike[atk.id] ?? 1) -
@@ -618,7 +735,7 @@ function oneWay(
     hits,
     reflect,
     tags,
-    call: callFor(atk, def, tags, index, stam),
+    call: callFor(atk, def, tags, index, cell),
     burn,
     stun,
     drain,
@@ -712,6 +829,8 @@ function callFor(atk: FighterSnap, def: FighterSnap, tags: string[], index: numb
   if (tags.includes("grapple"))
     return `${def.botName} clamps on. ${atk.botName} spends the exchange held.`;
   if (tags.includes("saw")) return `${atk.botName} takes the saw lane to reach ${def.botName}.`;
+  if (tags.includes("stamina"))
+    return `${atk.botName} is gassed. The swing gets there late.`;
   if (tags.includes("battery") && stam < 0.78)
     return `${atk.botName}'s battery is down. The weapon and the wheels both sag.`;
   if (tags.includes("first")) return `First steel belongs to ${atk.storeName}.`;
@@ -822,13 +941,7 @@ function revive(snap: FighterSnap, hp: number, mem: Mem) {
 }
 
 function drainAmt(kit: Kit) {
-  let d = 20;
-  if (kit.weapon === "flame" || kit.weapon === "tesla" || kit.weapon === "chainsaw") d += 4;
-  if (kit.drive === "rocket") d += 4;
-  if (kit.drive === "anchor") d -= 5;
-  if (kit.chassis === "sprinter" || kit.chassis === "hornet") d += 4;
-  if (kit.chassis === "reactor" || kit.chassis === "capacitor") d -= 4;
-  return d;
+  return batterySpend(kit);
 }
 
 function healAmt(kit: Kit, index = 0) {
@@ -860,6 +973,7 @@ function battleState(bots: FighterSnap[]): BattleState {
       heat: {},
       slow: {},
       battery: Object.fromEntries(bots.map((bot) => [bot.id, kitOf(bot).batteryMax])),
+      stamina: Object.fromEntries(bots.map((bot) => [bot.id, STAMINA_MAX])),
     },
     turns: {},
     exchanges: [],
@@ -875,6 +989,7 @@ function combatState(bot: FighterSnap, state: BattleState): CombatState {
     burn: state.mem.burn[bot.id] ?? 0,
     stun: state.mem.stun[bot.id] ?? 1,
     slow: state.mem.slow[bot.id] ?? 1,
+    stamina: state.mem.stamina[bot.id] ?? STAMINA_MAX,
     phoenixUsed: state.mem.phoenix[bot.id] ?? false,
   };
 }
@@ -910,6 +1025,53 @@ function endTrace(bots: FighterSnap[], state: BattleState, combat: Record<string
   return combat;
 }
 
+function bellFor(bots: FighterSnap[]): Record<string, BellVitals> {
+  return Object.fromEntries(
+    bots.map((bot) => {
+      const max = kitOf(bot).batteryMax;
+      return [
+        bot.id,
+        { battery: max, batteryMax: max, stamina: STAMINA_MAX, staminaMax: STAMINA_MAX, power: bot.stats.power },
+      ];
+    }),
+  );
+}
+
+/** Spend stamina, then give part of it back. Returns the bottom of the dip. */
+function applyStamina(bots: FighterSnap[], mem: Mem): Record<string, number> {
+  const low: Record<string, number> = {};
+  for (const bot of bots) {
+    const kit = kitOf(bot);
+    const spent = staminaSpend(bot.stats, kit.weapon, kit.drive);
+    const bottom = Math.max(0, (mem.stamina[bot.id] ?? STAMINA_MAX) - spent);
+    low[bot.id] = bottom;
+    mem.stamina[bot.id] = Math.min(STAMINA_MAX, bottom + staminaRecover(bot.stats));
+  }
+  return low;
+}
+
+function stampVitals(
+  bots: FighterSnap[],
+  state: BattleState,
+  powerAt: Record<string, number>,
+  low?: Record<string, number>,
+): Record<string, ExchangeVitals> {
+  return Object.fromEntries(
+    bots.map((bot) => {
+      const stamina = state.mem.stamina[bot.id] ?? STAMINA_MAX;
+      return [
+        bot.id,
+        {
+          battery: Math.max(0, state.mem.battery[bot.id] ?? 0),
+          stamina,
+          staminaLow: low?.[bot.id] ?? stamina,
+          power: powerAt[bot.id] ?? bot.stats.power,
+        },
+      ];
+    }),
+  );
+}
+
 /** One exchange, shared by duels, tag teams and conference melees. */
 function stepExchange(
   a: FighterSnap,
@@ -926,6 +1088,10 @@ function stepExchange(
   const bi = state.turns[b.id] ?? 0;
   state.turns[a.id] = ai + 1;
   state.turns[b.id] = bi + 1;
+  const powerAt: Record<string, number> = {
+    [a.id]: swingPower(a, mem, ai),
+    [b.id]: swingPower(b, mem, bi),
+  };
   const combat = startTrace(bots, state);
   const finishTrace = () => endTrace(bots, state, combat);
   const tryRevive = (bot: FighterSnap) => {
@@ -956,6 +1122,7 @@ function stepExchange(
       call: `${dead.botName} cannot survive the lingering burn.`,
       tags: ["burn"],
       combat: finishTrace(),
+      vitals: stampVitals(bots, state, powerAt),
     });
     return;
   }
@@ -993,6 +1160,7 @@ function stepExchange(
       call: `${dead.botName} takes the arena. ${hazA.tags.concat(hazB.tags).includes("saw") ? "The saw" : "The hazard"} ends the exchange.`,
       tags: ["hazard", ...hazA.tags, ...hazB.tags, `hazard:${a.id}`, `hazard:${b.id}`, ...hazardMarks(a.id, hazA), ...hazardMarks(b.id, hazB)],
       combat: finishTrace(),
+      vitals: stampVitals(bots, state, powerAt),
     });
     return;
   }
@@ -1038,6 +1206,7 @@ function stepExchange(
   ] as const) {
     mem.battery[bot.id] = Math.max(0, (mem.battery[bot.id] ?? 0) - drainAmt(kit));
   }
+  const staminaLow = applyStamina(bots, mem);
   if (blowA.tags.includes("grapple") || blowB.tags.includes("grapple")) {
     mem.grapple[a.id] = true;
     mem.grapple[b.id] = true;
@@ -1062,6 +1231,7 @@ function stepExchange(
     call: opts.overtime && i >= 3 ? `Overtime, round ${i + 1}. ${blow.call}` : blow.call,
     tags,
     combat: finishTrace(),
+    vitals: stampVitals(bots, state, powerAt, staminaLow),
   });
   if (hp[a.id] === 0 || hp[b.id] === 0) {
     state.koAt = i;
@@ -1071,6 +1241,7 @@ function stepExchange(
 
 export function fightDuel(a: FighterSnap, b: FighterSnap, opts: DuelOpts = {}): DuelCore {
   const state = battleState([a, b]);
+  const bell = bellFor([a, b]);
   const { hp, mem, exchanges } = state;
   const limit = Math.max(1, Math.min(12, opts.rounds ?? (opts.overtime ? 12 : 3)));
   for (let i = 0; i < limit && hp[a.id]! > 0 && hp[b.id]! > 0; i++)
@@ -1149,12 +1320,20 @@ export function fightDuel(a: FighterSnap, b: FighterSnap, opts: DuelOpts = {}): 
       call,
       tags: ["sudden-death"],
       combat: endTrace([a, b], state, combat),
+      vitals: stampVitals(
+        [a, b],
+        state,
+        {
+          [a.id]: swingPower(a, mem, state.turns[a.id] ?? 0),
+          [b.id]: swingPower(b, mem, state.turns[b.id] ?? 0),
+        },
+      ),
     });
     finisher = { by: attacker.id, against: defender.id, damage, call, combat };
     koAt = exchanges.length - 1;
   }
 
-  return { exchanges, hp, finisher, method, koAt };
+  return { exchanges, hp, finisher, method, koAt, bell };
 }
 
 /**
@@ -1165,8 +1344,9 @@ export function fightGroup(
   fighters: FighterSnap[],
   teams: string[][] | null,
   opts: DuelOpts = {},
-): Pick<DuelCore, "hp" | "exchanges"> & { order: string[] } {
+): Pick<DuelCore, "hp" | "exchanges" | "bell"> & { order: string[] } {
   const state = battleState(fighters);
+  const bell = bellFor(fighters);
   const ordered = [...fighters].sort((a, b) => a.id.localeCompare(b.id));
   const eliminatedAt: Record<string, number> = {};
   const sameTeam = (a: string, b: string) =>
@@ -1196,7 +1376,7 @@ export function fightGroup(
         a.id.localeCompare(b.id),
     )
     .map((bot) => bot.id);
-  return { hp: state.hp, exchanges: state.exchanges, order };
+  return { hp: state.hp, exchanges: state.exchanges, order, bell };
 }
 
 export function duelWear(winnerId: string, loserId: string, method: Method, blowout: boolean) {

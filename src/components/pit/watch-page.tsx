@@ -174,12 +174,6 @@ export function WatchPage() {
             <Lobby data={data} week={week} weeks={postedWeeks} setWeek={setWeek} tape={liveTape} onStart={start} />
           ) : null}
           {stage === "intro" && bout ? <Intro key={bout.id} data={data} bout={bout} seen={seen} order={index + 1} total={bouts.length} /> : null}
-          {stage === "fight" && bout ? (
-            <div className="mx-auto w-full max-w-6xl">
-              <Broadcast key={bout.id} bout={bout} playing={!paused} speed={1.5} chromeless kicker={replaying ? "Replay" : (tape ?? liveTape).live ? "Live card" : "House tape"} onComplete={next} onNotableBeat={onNotableBeat} />
-              {commentaryEnabled && commentaryLine ? <p className="mt-2 border-l-2 border-amber bg-surface px-3 py-2 text-base" aria-live="polite" data-testid="reactive-commentary"><span className="mr-2 font-display text-xs tracking-widest text-amber uppercase">AI color</span>{commentaryLine}</p> : null}
-            </div>
-          ) : null}
           {stage === "result" && bout ? (
             <Result key={bout.id} data={data} bout={bout} seen={seen} next={bouts[index + 1] ?? null} commercialNext={Boolean(commercialAfter(week, index + 1, bouts.length))} />
           ) : null}
@@ -194,6 +188,42 @@ export function WatchPage() {
       </div>
 
       <Ticker data={data} week={week} />
+      {stage === "fight" && bout ? (
+        <div className="absolute inset-0 z-30 flex flex-col bg-deep" data-testid="watch-fight">
+          <Broadcast
+            key={bout.id}
+            bout={bout}
+            playing={!paused}
+            speed={1.5}
+            chromeless
+            stage
+            kicker={replaying ? "Replay" : (tape ?? liveTape).live ? "Live card" : "House tape"}
+            onComplete={next}
+            onNotableBeat={onNotableBeat}
+          />
+          {commentaryEnabled && commentaryLine ? <p className="absolute bottom-32 left-2 z-40 max-w-lg border-l-2 border-amber bg-deep/90 px-3 py-2 text-base" aria-live="polite" data-testid="reactive-commentary"><span className="mr-2 font-display text-xs tracking-widest text-amber uppercase">AI color</span>{commentaryLine}</p> : null}
+          <div className="absolute bottom-[4.75rem] left-2 z-40 flex gap-1 sm:bottom-20">
+            <IconBtn label={commentaryEnabled ? "Turn AI commentary off" : "Turn AI commentary on"} onClick={() => setCommentaryEnabled((on) => !on)}>
+              {commentaryEnabled ? <Mic size={18} /> : <MicOff size={18} />}
+            </IconBtn>
+            <IconBtn label={paused ? "Play" : "Pause"} onClick={() => setPaused((p) => !p)}>
+              {paused ? <Play size={18} /> : <Pause size={18} />}
+            </IconBtn>
+            <IconBtn label="Skip ahead" onClick={next}>
+              <SkipForward size={18} />
+            </IconBtn>
+            <IconBtn label={full ? "Leave full screen" : "Full screen"} onClick={toggleFull}>
+              {full ? <Minimize size={18} /> : <Maximize size={18} />}
+            </IconBtn>
+            <Link to="/broadcast" aria-label="Leave the watch party" className="inline-flex min-h-11 min-w-11 items-center justify-center border border-line bg-deep/80">
+              <X size={18} />
+            </Link>
+          </div>
+          {paused ? (
+            <p className="pointer-events-none absolute inset-x-0 top-3 z-40 text-center font-display text-sm tracking-[0.3em] text-amber uppercase">Paused · space to resume</p>
+          ) : null}
+        </div>
+      ) : null}
     </div>,
     host,
   );
