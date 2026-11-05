@@ -94,7 +94,7 @@ test("catalog integrity: five Super parts, 8 coins, windowed, ungated, unlocked 
   assert.equal(leaves.name, "Falling Leaves");
   assert.equal(leaves.price, SHOW_PRICE);
   assert.equal(leaves.price, 100);
-  assert.equal(leaves.key, "utility");
+  assert.equal("key" in leaves, false, "show effects no longer spend utility coins");
 });
 
 test("no Thanksgiving nudge strictly dominates a same-slot super, and names stay clean", () => {
