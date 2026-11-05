@@ -468,26 +468,30 @@ function Health({
 function Meters({ meter, align }: { meter: MeterRead | null; align: "left" | "right" }) {
   const right = align === "right";
   const rows = [
-    { label: "BAT", value: meter?.battery ?? null, max: meter?.batteryMax ?? 1, tone: "#7ecbff" },
-    { label: "PWR", value: meter?.power ?? null, max: meter?.powerMax ?? 1, tone: "#f0a202" },
-    { label: "STA", value: meter?.stamina ?? null, max: meter?.staminaMax ?? 1, tone: "#9fe0b0" },
+    { label: "BAT", name: "Battery", value: meter?.battery ?? null, max: meter?.batteryMax ?? 1, tone: "#7ecbff" },
+    { label: "PWR", name: "Power", value: meter?.power ?? null, max: meter?.powerMax ?? 1, tone: "#f0a202" },
+    { label: "STA", name: "Stamina", value: meter?.stamina ?? null, max: meter?.staminaMax ?? 1, tone: "#9fe0b0" },
   ];
   return (
-    <div className={`mt-1 flex w-full max-w-sm flex-col gap-0.5 ${right ? "ml-auto" : ""}`} data-testid="bot-meters">
+    // One compact row instead of three stacked ones. Each thin bar is a fraction
+    // of its previous width, freeing cage space without shrinking the HP meter.
+    <div className={`mt-0.5 grid w-full max-w-[12rem] grid-cols-3 gap-1 ${right ? "ml-auto" : ""}`} data-testid="bot-meters">
       {rows.map((row) => {
         const pct = row.value == null ? 0 : Math.max(0, Math.min(100, (row.value / Math.max(1, row.max)) * 100));
         const tired = row.value != null && pct < 28;
         return (
-          <div key={row.label} className={`flex items-center gap-1 ${right ? "flex-row-reverse" : ""}`}>
-            <span className="w-7 shrink-0 font-display text-[9px] tracking-wider text-muted md:text-[10px]">{row.label}</span>
-            <span className="relative h-1.5 min-w-0 flex-1 bg-black/70 md:h-2">
+          <div key={row.label} className="min-w-0" role="meter" aria-label={row.name} aria-valuemin={0} aria-valuemax={row.max} aria-valuenow={row.value ?? undefined} aria-valuetext={row.value == null ? "Not available" : `${row.value} of ${row.max}`}>
+            <div className={`flex items-baseline justify-between gap-0.5 ${right ? "flex-row-reverse" : ""}`}>
+              <span className="font-display text-[8px] leading-none tracking-wide text-muted">{row.label}</span>
+              <span className={`font-display text-[8px] leading-none tabular-nums ${tired ? "text-bad" : "text-muted"}`}>
+                {row.value == null ? "N/A" : row.value}
+              </span>
+            </div>
+            <span className="relative mt-0.5 block h-[3px] w-full bg-black/70 md:h-1" aria-hidden="true">
               <span
                 className={`absolute inset-y-0 ${right ? "right-0" : "left-0"}`}
                 style={{ width: `${pct}%`, background: tired ? "#e0402a" : row.tone }}
               />
-            </span>
-            <span className={`w-8 shrink-0 font-display text-[9px] tabular-nums md:text-[10px] ${right ? "text-left" : "text-right"} ${tired ? "text-bad" : "text-muted"}`}>
-              {row.value == null ? "N/A" : row.value}
             </span>
           </div>
         );
