@@ -1,5 +1,6 @@
 import { central, centralDay } from "./time";
 import { dayDate, programWeek } from "./training";
+import { SHOW_PRICE } from "./halloween";
 import type { PartWindow } from "./catalog";
 
 /**
@@ -68,8 +69,7 @@ export const THANKSGIVING_SHOW_EFFECTS = [
   {
     id: "leaves" as const,
     name: "Falling Leaves",
-    price: 8,
-    key: "utility" as const,
+    price: SHOW_PRICE,
     blurb:
       "Amber and cranberry leaves drift across the ring during your bouts, and a win shakes the tree. Light and paper only. It does not change damage, coins, or the card.",
   },
