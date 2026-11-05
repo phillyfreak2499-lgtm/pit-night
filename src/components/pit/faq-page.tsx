@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ChevronDown, Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import { BOLTS, STREAK_BADGE, TUNE_UP_BONUS } from "@/lib/pit/training";
+import { BOLTS, BOLT_EXCHANGE, STREAK_BADGE, TUNE_UP_BONUS } from "@/lib/pit/training";
 import { usePit } from "@/lib/pit/store";
 import { SectionLabel } from "./bits";
 
@@ -57,7 +57,7 @@ export const GROUPS: Group[] = [
       ),
       faq(
         "What are Bolts?",
-        `Points for doing the work. An approved job is ${BOLTS.job} Bolts, each right Spark answer is ${BOLTS.sparkCorrect}, each right Monday pick is ${BOLTS.pickCorrect}, and the Wednesday Mystery Crate is ${BOLTS.crate}. The captain spends them in the Bolt Locker on looks: walk-out pyro, smoke, sparks, victory confetti, fireworks, and special paints. Bolts never buy wins.`,
+        `Points for doing the work. An approved job is ${BOLTS.job} Bolts, each right Spark answer is ${BOLTS.sparkCorrect}, each right Monday pick is ${BOLTS.pickCorrect}, and the Wednesday Mystery Crate is ${BOLTS.crate}. The captain spends them three ways. The Bolt Locker sells looks: walk-out pyro, smoke, sparks, victory confetti, fireworks, and special paints. In the Garage, any repair quote can be paid in Bolts at ${BOLT_EXCHANGE.repairBoltsPerCoin} Bolts per coin of the quote. And the Bolt exchange trades ${BOLT_EXCHANGE.boltsPerCoin} Bolts for 1 coin in any part's jar, up to ${BOLT_EXCHANGE.weeklyCoinCap} coins a Pit Week, so green grades stay the main way to upgrade.`,
       ),
       faq(
         "What is the Full Tune-Up?",
@@ -163,7 +163,7 @@ export const GROUPS: Group[] = [
       ),
       faq(
         "Where can we watch?",
-        "Fight Day plays the whole card. For a huddle, tap Watch party and put it on the big screen: every fight plays back to back with a live standings table.",
+        "Fight Day plays the whole card. For a huddle, tap Watch party and put it on the big screen: every fight plays back to back, a house commercial runs between every fight, and the standings table stays live.",
       ),
       faq(
         "What happens to damage?",

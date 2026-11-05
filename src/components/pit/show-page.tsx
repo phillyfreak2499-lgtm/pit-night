@@ -2,7 +2,8 @@ import { TaleOfTape } from "./tale-of-tape";
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PROGRAM_HOLD_MS, programRecords, programSegments, storeNameMap, type ProgramSegment } from "@/lib/pit/fight-card";
-import { previewSaturday, cardKey } from "@/lib/pit/engine";
+import { cardKey } from "@/lib/pit/engine";
+import { buildTape, isLiveCard, replayWeek, replayWeeks } from "@/lib/pit/replay";
 import { usePit } from "@/lib/pit/store";
 import type { Bout, PitData } from "@/lib/pit/types";
 import { ResultLine, SectionLabel } from "./bits";
@@ -13,9 +14,13 @@ type Segment = ProgramSegment<Bout>;
 
 export function ShowPage() {
   const data = usePit();
-  const [weekPick, setWeekPick] = useState(data.week);
+  const [weekPick, setWeekPick] = useState(() => openingWeek(data));
   const key = tapeSignature(data, weekPick);
   const tape = useMemo(() => buildTape(data, weekPick), [key]);
+  const throughWeek = useMemo(
+    () => ({ ...data, bouts: data.bouts.filter((bout) => bout.week <= weekPick) }),
+    [data, weekPick],
+  );
   const segments = useMemo(() => programSegments(tape.bouts), [tape]);
   const [index, setIndex] = useState(0);
   const [rolling, setRolling] = useState(false);
@@ -61,12 +66,8 @@ export function ShowPage() {
     });
   }, [segments]);
 
-  const postedWeeks = useMemo(() => {
-    const weeks = new Set<number>();
-    for (const bout of data.bouts) if (bout.result) weeks.add(bout.week);
-    return [...weeks].sort((a, b) => a - b);
-  }, [data.bouts]);
-  const showWeeks = postedWeeks.length > 1 || (postedWeeks.length > 0 && !postedWeeks.includes(data.week));
+  const savedWeeks = useMemo(() => replayWeeks(data), [data.bouts, data.replays]);
+  const weekChoices = useMemo(() => [...new Set([...savedWeeks, data.week])].sort((a, b) => a - b), [savedWeeks, data.week]);
 
   const start = () => {
     armBroadcastAudio();
@@ -88,11 +89,13 @@ export function ShowPage() {
           <SectionLabel>Monday broadcast</SectionLabel>
           <h1 className="font-display text-5xl leading-none">{weekName(data, weekPick)}</h1>
           <p className="mt-2 max-w-xl text-sm text-muted">
-            {tape.live
-              ? "Posted card. This is the tape the stores get."
-              : tape.bouts.length
-                ? "House tape. The gazette does not have this yet. A lock can still change it. The desk posts the card."
-                : "That fight day was never posted."}
+            {tape.replay
+              ? "Replay. This is the card that posted. Watching it does not change coins, damage, records, or the week."
+              : tape.live
+                ? "Posted card. This is the tape the stores get."
+                : tape.bouts.length
+                  ? "House tape. The gazette does not have this yet. A lock can still change it. The desk posts the card."
+                  : "That fight day was never posted."}
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -105,13 +108,16 @@ export function ShowPage() {
         </div>
       </div>
 
-      {showWeeks ? (
-        <div className="flex gap-2 overflow-x-auto">
-          {!postedWeeks.includes(data.week) ? (
-            <WeekChip active={weekPick === data.week} label="This week" onClick={() => setWeekPick(data.week)} />
-          ) : null}
-          {postedWeeks.map((week) => (
-            <WeekChip key={week} active={weekPick === week} label={`Week ${week}`} onClick={() => setWeekPick(week)} />
+      {savedWeeks.length > 0 ? (
+        <div className="flex gap-2 overflow-x-auto" data-testid="replay-archive" role="group" aria-label="Replay archive">
+          {weekChoices.map((week) => (
+            <WeekChip
+              key={week}
+              active={weekPick === week}
+              testId={`replay-week-${week}`}
+              label={weekLabel(data, week, savedWeeks)}
+              onClick={() => setWeekPick(week)}
+            />
           ))}
         </div>
       ) : null}
@@ -193,13 +199,13 @@ export function ShowPage() {
         )}
       </div>
 
-      {segment.kind === "open" ? <ColdOpen data={data} bouts={tape.bouts} live={tape.live} /> : null}
+      {segment.kind === "open" ? <ColdOpen data={data} bouts={tape.bouts} live={tape.live} replay={tape.replay} /> : null}
       {segment.kind === "card" ? (
         <FightProgram
           bout={segment.bout}
-          records={programRecords(data, segment.bout)}
+          records={programRecords(throughWeek, segment.bout)}
           storeNames={storeNameMap(data)}
-          kicker={tape.live ? "Posted card. Record going in." : "House tape. Record going in. Not posted yet."}
+          kicker={tape.replay ? "Replay. Record going in." : tape.live ? "Posted card. Record going in." : "House tape. Record going in. Not posted yet."}
         />
       ) : null}
       {segment.kind === "fight" ? (
@@ -210,20 +216,22 @@ export function ShowPage() {
           speed={speed}
           seek={seek}
           chromeless
-          kicker={tape.live ? "On air" : "House tape"}
+          kicker={tape.replay ? "Replay" : tape.live ? "On air" : "House tape"}
           onComplete={onFightDone}
         />
       ) : null}
       {segment.kind === "sting" ? <Sting bout={segment.bout} next={nextFight(segments, index)} data={data} /> : null}
-      {segment.kind === "close" ? <SignOff bouts={tape.bouts} live={tape.live} /> : null}
+      {segment.kind === "close" ? <SignOff bouts={tape.bouts} live={tape.live} replay={tape.replay} /> : null}
     </div>
   );
 }
 
-function WeekChip({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
+function WeekChip({ active, label, onClick, testId }: { active: boolean; label: string; onClick: () => void; testId?: string }) {
   return (
     <button
       type="button"
+      data-testid={testId}
+      aria-pressed={active}
       className={`min-h-11 shrink-0 border px-3 font-display text-sm uppercase ${active ? "border-amber text-amber" : "border-line text-muted"}`}
       onClick={onClick}
     >
@@ -232,12 +240,12 @@ function WeekChip({ active, label, onClick }: { active: boolean; label: string; 
   );
 }
 
-function ColdOpen({ data, bouts, live }: { data: PitData; bouts: Bout[]; live: boolean }) {
+function ColdOpen({ data, bouts, live, replay }: { data: PitData; bouts: Bout[]; live: boolean; replay: boolean }) {
   return (
     <section className="border border-line bg-deep">
       <div className="hazard h-2" />
       <div className="px-4 py-6 md:px-8 md:py-8">
-        <p className="font-display text-sm tracking-[0.28em] text-amber uppercase">{live ? "Posted" : "Not posted"}</p>
+        <p className="font-display text-sm tracking-[0.28em] text-amber uppercase">{replay ? "Replay" : live ? "Posted" : "Not posted"}</p>
         <h2 className="mt-2 font-display text-5xl leading-[0.85] md:text-6xl">
           THE WATERMAN
           <span className="block">BATTLE BOT</span>
@@ -280,7 +288,7 @@ function Sting({ bout, next, data }: { bout: Bout; next: Bout | null; data: PitD
   );
 }
 
-function SignOff({ bouts, live }: { bouts: Bout[]; live: boolean }) {
+function SignOff({ bouts, live, replay }: { bouts: Bout[]; live: boolean; replay: boolean }) {
   return (
     <section className="border border-line bg-deep">
       <div className="hazard h-2" />
@@ -288,7 +296,11 @@ function SignOff({ bouts, live }: { bouts: Bout[]; live: boolean }) {
         <p className="font-display text-sm tracking-[0.28em] text-amber uppercase">Sign-off</p>
         <h2 className="mt-2 font-display text-5xl leading-none">Lights up.</h2>
         <p className="mt-3 max-w-xl text-muted">
-          {live ? "The card is on the wall. Damage waits on the desk." : "Nothing on the wall moved. Post it from the desk if this is the card you want."}
+          {replay
+            ? "Replay. The card already posted. Nothing on the wall moves."
+            : live
+              ? "The card is on the wall. Damage waits on the desk."
+              : "Nothing on the wall moved. Post it from the desk if this is the card you want."}
         </p>
         <ul className="mt-6 flex flex-col gap-2">
           {bouts.map((bout) => (
@@ -316,15 +328,21 @@ function SignOff({ bouts, live }: { bouts: Bout[]; live: boolean }) {
   );
 }
 
-export function buildTape(data: PitData, week: number): { live: boolean; bouts: Bout[] } {
-  const posted = data.bouts.filter((b) => b.week === week && b.result).sort((a, b) => a.slot - b.slot);
-  if (posted.length) return { live: true, bouts: posted };
-  if (week !== data.week) return { live: false, bouts: [] };
-  return { live: false, bouts: previewSaturday(data) };
+export { buildTape };
+
+function openingWeek(data: PitData) {
+  const saved = replayWeeks(data);
+  if (saved.includes(data.week) || saved.length === 0) return data.week;
+  return saved.at(-1)!;
+}
+
+function weekLabel(data: PitData, week: number, saved: number[]) {
+  if (saved.includes(week) && !isLiveCard(data, week)) return `Week ${week} replay`;
+  return `Week ${week}`;
 }
 
 function tapeSignature(data: PitData, week: number) {
-  const posted = data.bouts.filter((b) => b.week === week && b.result);
+  const posted = replayWeek(data, week);
   if (posted.length) return `p:${week}:${posted.map((b) => b.result?.seed ?? b.id).join(",")}`;
   if (week !== data.week) return `empty:${week}`;
   const tags = data.weeks.find((w) => w.number === week)?.tagsEnabled ?? false;
@@ -363,11 +381,17 @@ export function storeBot(data: PitData, id: string) {
   return bot ? `${store.name} ${bot.name}` : store.name;
 }
 
+function cornerName(data: PitData, bout: Bout, id: string) {
+  const snap = bout.result?.fighters.find((fighter) => fighter.id === id);
+  if (snap) return `${snap.storeName} ${snap.botName}`;
+  return storeBot(data, id);
+}
+
 export function matchup(data: PitData, bout: Bout) {
-  if (bout.kind === "bye") return `${storeBot(data, bout.teamA[0] ?? "")} · bye, counts as a win`;
+  if (bout.kind === "bye") return `${cornerName(data, bout, bout.teamA[0] ?? "")} · bye, counts as a win`;
   if (bout.kind === "melee") return `${bout.teamA.length} stores battle the tie`;
-  const left = bout.teamA.map((id) => storeBot(data, id)).join(" + ");
-  const right = bout.teamB.map((id) => storeBot(data, id)).join(" + ");
+  const left = bout.teamA.map((id) => cornerName(data, bout, id)).join(" + ");
+  const right = bout.teamB.map((id) => cornerName(data, bout, id)).join(" + ");
   return right ? `${left} vs ${right}` : left;
 }
 

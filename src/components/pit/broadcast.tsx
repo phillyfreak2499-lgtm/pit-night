@@ -2,14 +2,15 @@ import { createFrameLoop } from "@/lib/pit/frame-loop";
 import { useEffect, useRef, useState } from "react";
 import { PAINT } from "@/lib/pit/catalog";
 import { methodLabel } from "@/lib/pit/engine";
+import { reactiveMoment, type ReactiveCue } from "@/lib/pit/reactive-commentary";
 import { armSound, playBell, playClank, playCount, playDecision, playFinisher, playWeaponHit } from "@/lib/pit/sound";
 import type { Bout, Exchange, FightResult } from "@/lib/pit/types";
 import { Fx, drawSide, drawTop, impactPoints, project, stepBots } from "./cage-draw";
 import { arenaForWeek, arenaTheme, hazardCallout, type ArenaId } from "./arena-scenes";
-import { beatAt, buildBeats, fightDrive, lerp, type Beat, type Spot } from "./cage-motion";
+import { beatAt, buildBeats, DUEL_CLASH_SEC, fightDrive, lerp, ROUND_CARD_SEC, type Beat, type Spot } from "./cage-motion";
 import { readMeters, type MeterPhase, type MeterRead } from "@/lib/pit/vitals";
 
-const ROUND_SHOW = 0.22;
+const ROUND_SHOW = ROUND_CARD_SEC / DUEL_CLASH_SEC;
 
 export function Broadcast({
   bout: boutProp,
@@ -17,6 +18,7 @@ export function Broadcast({
   speed: speedProp,
   onPlayingChange,
   onComplete,
+  onNotableBeat,
   seek = 0,
   chromeless = false,
   kicker,
@@ -30,6 +32,7 @@ export function Broadcast({
   speed?: number;
   onPlayingChange?: (playing: boolean) => void;
   onComplete?: () => void;
+  onNotableBeat?: (cue: ReactiveCue) => void;
   /** Changes after mount jump the tape to the decision. */
   seek?: number;
   chromeless?: boolean;
@@ -71,10 +74,12 @@ export function Broadcast({
   const fxRef = useRef(new Fx());
   const trailsRef = useRef(new Map<string, Spot[]>());
   const onCompleteRef = useRef(onComplete);
+  const onNotableBeatRef = useRef(onNotableBeat);
   const doneRef = useRef(false);
   // Only a change in `seek` after mount jumps the tape (not a remount in dev).
   const lastSeek = useRef(seek);
   onCompleteRef.current = onComplete;
+  onNotableBeatRef.current = onNotableBeat;
 
   useEffect(() => {
     if (!result) return;
@@ -175,6 +180,11 @@ export function Broadcast({
       }
       if (playing && drive.hitKey && local >= drive.hitAt && local < drive.hitAt + 0.2 && hitRef.current !== drive.hitKey) {
         hitRef.current = drive.hitKey;
+        // Dispatch at the actual strike, not at the end of the round or tape.
+        if (beat.kind === "exchange" || beat.kind === "finisher") {
+          const cue: ReactiveCue = { phase: beat.kind, index: beat.kind === "exchange" ? beat.index : result.exchanges.length };
+          if (reactiveMoment(result, cue)) onNotableBeatRef.current?.(cue);
+        }
         const at = impactPoints(drive, canvas.width, canvas.height, top.width, top.height);
         const blocked = Boolean(drive.blocked);
         const crit = Boolean(drive.crit) && !blocked;
@@ -507,7 +517,7 @@ function captionFor(result: FightResult, bout: Bout, beat: Beat, noDamage: boole
     const ex = result.exchanges[beat.index];
     const atk = result.fighters.find((f) => f.id === ex?.attackerId);
     const def = result.fighters.find((f) => f.id === ex?.defenderId);
-    return `Round ${beat.index + 1}. They circle. ${def?.botName ?? "The defender"} swings first and bounces off. ${atk?.botName ?? "The attacker"} answers.`;
+    return `Round ${beat.index + 1}. They close, circle, and feint. ${def?.botName ?? "The defender"} swings first and bounces off. ${atk?.botName ?? "The attacker"} answers.`;
   }
   if (beat.kind === "replay") return "One more time, slower. That is the blow that ended it.";
   if (beat.kind === "exchange") return result.exchanges[beat.index]?.call ?? "";

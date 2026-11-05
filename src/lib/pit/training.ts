@@ -53,6 +53,14 @@ export const DAY_ORDER: DayKey[] = ["tue", "wed", "thu", "fri", "sat"];
 /** Coins are performance. Bolts are effort. Bolts buy looks only. Completing the Full Tune-Up earns the separate +4 fight bonus. */
 export const BOLTS = { job: 2, sparkCorrect: 1, pickCorrect: 2, crate: 5 } as const;
 
+/**
+ * What Bolts can do beyond the Locker. Grades stay the main coin source:
+ * a green week pays 3 coins, and the Bolt exchange tops out at
+ * `weeklyCoinCap` coins a Pit Week. Repairs paid in Bolts are not capped,
+ * because a repair only puts a part back to clean.
+ */
+export const BOLT_EXCHANGE = { boltsPerCoin: 20, weeklyCoinCap: 2, repairBoltsPerCoin: 20 } as const;
+
 /** Perfect Sparks in a row for the streak badge. */
 export const STREAK_BADGE = 5;
 

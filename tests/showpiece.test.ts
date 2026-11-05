@@ -160,7 +160,7 @@ test("every match on a tape is preceded by its program card", () => {
     segments.map((row) => row.kind),
     ["open", "card", "fight", "sting", "card", "fight", "sting", "close"],
   );
-  assert.equal(PROGRAM_HOLD_MS, 11000);
+  assert.equal(PROGRAM_HOLD_MS, 5000);
   const card = segments.find((row) => row.kind === "card");
   const fight = segments.find((row) => row.kind === "fight");
   assert.equal(card && "bout" in card ? card.bout.id : "", "a");

@@ -8,7 +8,7 @@ export type PullResult = {
   doc: string | null;
   session: import("./types").Session;
 };
-const SCHEMA_TAG = "14-store-abilene-proposals-remove-removed-cleanup-v2";
+const SCHEMA_TAG = "14-store-abilene-proposals-remove-removed-cleanup-v3";
 async function services() {
   const [db, store, auth, vanilla] = await Promise.all([
     import("@/lib/db"),
@@ -65,7 +65,7 @@ async function load(options?: { deadlines?: boolean }) {
       if (removedCount > 0) {
         // Keep a separate, immutable copy of exactly the source revision.
         // Never change the season if the backup cannot be read back byte-for-byte.
-        backupId = `backup-remove-roster-2026-10-31-v2-rev-${row.rev}`;
+        backupId = `backup-remove-roster-2026-11-02-v3-rev-${row.rev}`;
         await s.sql`insert into pit_season (id, rev, doc) values (${backupId}, ${row.rev}, ${row.doc}) on conflict (id) do nothing`;
         const backup = (await s.sql<{ doc: string }>`select doc from pit_season where id = ${backupId}`)[0];
         if (!backup || backup.doc !== row.doc)
@@ -90,7 +90,7 @@ async function load(options?: { deadlines?: boolean }) {
           ["remove", "removed"].includes(member.name.trim().toLowerCase()),
         ).length;
         console.info(
-          `[pit] roster cleanup v2: matched=${matches.length}; removed=${removedCount}; stores=${matchedStores.join(",") || "none"}; remaining=${remaining}; backup=${backupId ?? "not-needed"}; totalStores=${verified.stores.length}`,
+          `[pit] roster cleanup v3: matched=${matches.length}; removed=${removedCount}; stores=${matchedStores.join(",") || "none"}; remaining=${remaining}; backup=${backupId ?? "not-needed"}; totalStores=${verified.stores.length}`,
         );
         if (remaining > 0)
           throw new Error("Roster cleanup verification detected remaining placeholder names.");

@@ -559,6 +559,55 @@
   }
 }
 
+/* Watch party commercials */
+.ad-line {
+  animation: ad-line-in 0.55s ease-out both;
+}
+@keyframes ad-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.ad-fine-track {
+  display: inline-block;
+  width: max-content;
+  animation: ad-fine 0.85s linear infinite;
+}
+@keyframes ad-fine {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.ad-flash {
+  animation: ad-flash 0.45s steps(2, end) infinite;
+}
+@keyframes ad-flash {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.15;
+  }
+}
+.ad-scan {
+  background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0, 0, 0, 0.16) 2px 3px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ad-line,
+  .ad-fine-track,
+  .ad-flash {
+    animation: none;
+  }
+}
+
 /* Fight HUD: a bar on its last legs blinks */
 .hp-low {
   animation: hp-low 0.45s steps(2, jump-none) infinite;

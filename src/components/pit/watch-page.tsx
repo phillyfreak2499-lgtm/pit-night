@@ -1,20 +1,24 @@
 import { TaleOfTape } from "./tale-of-tape";
 import { Link } from "@tanstack/react-router";
-import { Flame, HelpCircle, Maximize, Minimize, Package, Pause, Play, SkipForward, X } from "lucide-react";
+import { Flame, HelpCircle, Maximize, Mic, MicOff, Minimize, Package, Pause, Play, SkipForward, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { commercialAfter } from "@/lib/pit/commercials";
 import { PROGRAM_HOLD_MS, programRecords, storeNameMap } from "@/lib/pit/fight-card";
 import { recordOf } from "@/lib/pit/engine";
+import { isLiveCard, replayWeeks } from "@/lib/pit/replay";
 import { paintHex, usePit } from "@/lib/pit/store";
 import { TUNE_UP_BONUS, crateFor } from "@/lib/pit/training";
 import type { Bout, PitData } from "@/lib/pit/types";
 import { streakHolders, tunedUp } from "@/lib/pit/week";
 import { ResultLine } from "./bits";
 import { armBroadcastAudio, Broadcast } from "./broadcast";
+import { Commercial } from "./commercial";
 import { FightProgram } from "./fight-program";
+import { useReactiveCommentary } from "./use-reactive-commentary";
 import { buildTape, matchup, methodWord } from "./show-page";
 
-type Stage = "lobby" | "intro" | "fight" | "result" | "final";
+type Stage = "lobby" | "intro" | "fight" | "result" | "ad" | "final";
 
 const RESULT_MS = 6500;
 const BYE_MS = 6000;
@@ -22,32 +26,43 @@ const BYE_MS = 6000;
 /** Watch party: Monday regular-season cards plus Championship Saturday. */
 export function WatchPage() {
   const data = usePit();
-  const postedWeeks = useMemo(() => [...new Set(data.bouts.filter((b) => b.result).map((b) => b.week))].sort((a, b) => a - b), [data.bouts]);
+  const postedWeeks = useMemo(() => replayWeeks(data), [data.bouts, data.replays]);
   const [week, setWeek] = useState(() => (postedWeeks.includes(data.week) || !postedWeeks.length ? data.week : postedWeeks.at(-1)!));
   // Freeze the tape when the party starts so a sync mid-show never reshuffles it.
   const liveTape = useMemo(() => buildTape(data, week), [data, week]);
-  const [tape, setTape] = useState<{ live: boolean; bouts: Bout[] } | null>(null);
+  const [tape, setTape] = useState<{ live: boolean; replay: boolean; bouts: Bout[] } | null>(null);
   const bouts = (tape ?? liveTape).bouts;
   const [stage, setStage] = useState<Stage>("lobby");
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [full, setFull] = useState(false);
   const bout = bouts[index] ?? null;
+  const [commentaryEnabled, setCommentaryEnabled] = useState(true);
+  const { line: commentaryLine, onBeat: onNotableBeat } = useReactiveCommentary(
+    bout, commentaryEnabled && stage === "fight" && !paused,
+  );
 
   const next = useCallback(() => {
     if (stage === "intro") setStage(bout?.kind === "bye" ? "result" : "fight");
     else if (stage === "fight") setStage("result");
     else if (stage === "result") {
       if (index + 1 >= bouts.length) setStage("final");
+      else if (commercialAfter(week, index + 1, bouts.length)) setStage("ad");
+      else {
+        setIndex(index + 1);
+        setStage("intro");
+      }
+    } else if (stage === "ad") {
+      if (index + 1 >= bouts.length) setStage("final");
       else {
         setIndex(index + 1);
         setStage("intro");
       }
     }
-  }, [stage, bout, index, bouts.length]);
+  }, [stage, bout, index, bouts.length, week]);
 
   useEffect(() => {
-    if (paused || stage === "lobby" || stage === "final" || stage === "fight") return;
+    if (paused || stage === "lobby" || stage === "final" || stage === "fight" || stage === "ad") return;
     const ms = stage === "intro" ? (bout?.kind === "bye" ? BYE_MS : PROGRAM_HOLD_MS) : RESULT_MS;
     const id = window.setTimeout(next, ms);
     return () => window.clearTimeout(id);
@@ -85,10 +100,13 @@ export function WatchPage() {
   };
 
   // Records as the room has seen them: earlier weeks, plus this card up to the fight on screen.
-  const shown = new Set(bouts.slice(0, stage === "result" || stage === "final" ? index + 1 : index).map((b) => b.id));
+  const revealed = stage === "result" || stage === "ad" || stage === "final" ? index + 1 : index;
+  const shown = new Set(bouts.slice(0, revealed).map((b) => b.id));
   if (stage === "final") for (const b of bouts) shown.add(b.id);
-  const seen: PitData = { ...data, bouts: [...data.bouts.filter((b) => b.week !== week), ...bouts.filter((b) => shown.has(b.id))] };
+  const seen: PitData = { ...data, bouts: [...data.bouts.filter((b) => b.week < week && b.result), ...bouts.filter((b) => shown.has(b.id))] };
+  const replaying = (tape ?? liveTape).replay;
   const weekName = data.weeks.find((w) => w.number === week)?.name ?? `Week ${week}`;
+  const spot = stage === "ad" ? commercialAfter(week, index + 1, bouts.length) : null;
 
   const [host, setHost] = useState<HTMLElement | null>(null);
   useEffect(() => setHost(document.body), []);
@@ -100,16 +118,29 @@ export function WatchPage() {
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-2 md:px-6">
         <div className="min-w-0">
           <p className="truncate font-display text-xs tracking-[0.3em] text-amber uppercase">Waterman Battle Bot League · Watch party</p>
-          <p className="truncate font-display text-2xl leading-none md:text-3xl">
-            Week {week} · {weekName}
-            {stage !== "lobby" && stage !== "final" && bouts.length ? (
-              <span className="ml-3 text-base text-muted">
+          <p className="font-display text-2xl leading-none md:text-3xl">
+            <span className="block truncate md:inline">
+              Week {week} · {weekName}
+              {replaying ? <span className="ml-2 text-base tracking-[0.18em] text-amber uppercase">Replay</span> : null}
+            </span>
+            {stage === "ad" ? (
+              <span className="mt-1 block text-sm tracking-[0.18em] text-muted uppercase md:mt-0 md:ml-3 md:inline md:text-base md:tracking-normal md:normal-case">
+                Commercial
+              </span>
+            ) : stage !== "lobby" && stage !== "final" && bouts.length ? (
+              <span className="mt-1 block text-sm text-muted md:mt-0 md:ml-3 md:inline md:text-base">
                 Fight {index + 1} of {bouts.length}
               </span>
             ) : null}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
+          <button type="button" aria-pressed={commentaryEnabled} aria-label={commentaryEnabled ? "Turn AI commentary off" : "Turn AI commentary on"}
+            title="Reactive AI color commentary" onClick={() => setCommentaryEnabled((on) => !on)}
+            className={`inline-flex min-h-11 items-center gap-1.5 border px-2 font-display text-xs uppercase ${commentaryEnabled ? "border-amber text-amber" : "border-line text-muted"}`}>
+            {commentaryEnabled ? <Mic size={17} /> : <MicOff size={17} />}
+            <span className="hidden sm:inline">AI color {commentaryEnabled ? "on" : "off"}</span>
+          </button>
           <IconBtn label="How to play" onClick={() => { setPaused(true); data.showTutorial(); }}>
             <HelpCircle size={18} />
           </IconBtn>
@@ -132,20 +163,27 @@ export function WatchPage() {
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] xl:grid-cols-[1fr_22rem]">
+      <div className="relative grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] xl:grid-cols-[1fr_22rem]">
+        {spot ? (
+          <div className="absolute inset-0 z-10">
+            <Commercial key={`${spot.slug}-${index}`} ad={spot} paused={paused} onEnded={next} />
+          </div>
+        ) : null}
         <main className="relative flex min-h-0 flex-col overflow-y-auto p-3 md:p-5">
           {stage === "lobby" ? (
             <Lobby data={data} week={week} weeks={postedWeeks} setWeek={setWeek} tape={liveTape} onStart={start} />
           ) : null}
           {stage === "intro" && bout ? <Intro key={bout.id} data={data} bout={bout} seen={seen} order={index + 1} total={bouts.length} /> : null}
-          {stage === "result" && bout ? <Result key={bout.id} data={data} bout={bout} seen={seen} next={bouts[index + 1] ?? null} /> : null}
-          {stage === "final" ? <Final data={data} seen={seen} bouts={bouts} onAgain={() => setStage("lobby")} /> : null}
-          {paused && stage !== "lobby" && stage !== "final" ? (
+          {stage === "result" && bout ? (
+            <Result key={bout.id} data={data} bout={bout} seen={seen} next={bouts[index + 1] ?? null} commercialNext={Boolean(commercialAfter(week, index + 1, bouts.length))} />
+          ) : null}
+          {stage === "final" ? <Final data={data} seen={seen} bouts={bouts} replay={replaying} onAgain={() => setStage("lobby")} /> : null}
+          {paused && stage !== "lobby" && stage !== "final" && stage !== "ad" ? (
             <p className="pointer-events-none absolute inset-x-0 top-4 text-center font-display text-sm tracking-[0.3em] text-amber uppercase">Paused · space to resume</p>
           ) : null}
         </main>
         <aside className="hidden min-h-0 overflow-y-auto border-l border-line bg-surface xl:block">
-          <Scoreboard data={seen} highlight={stage !== "lobby" && stage !== "final" && bout ? bout.storeIds : []} />
+          <Scoreboard data={seen} highlight={stage !== "lobby" && stage !== "final" && stage !== "ad" && bout ? bout.storeIds : []} />
         </aside>
       </div>
 
@@ -159,10 +197,15 @@ export function WatchPage() {
             speed={1.5}
             chromeless
             stage
-            kicker={(tape ?? liveTape).live ? "Live card" : "House tape"}
+            kicker={replaying ? "Replay" : (tape ?? liveTape).live ? "Live card" : "House tape"}
             onComplete={next}
+            onNotableBeat={onNotableBeat}
           />
+          {commentaryEnabled && commentaryLine ? <p className="absolute bottom-32 left-2 z-40 max-w-lg border-l-2 border-amber bg-deep/90 px-3 py-2 text-base" aria-live="polite" data-testid="reactive-commentary"><span className="mr-2 font-display text-xs tracking-widest text-amber uppercase">AI color</span>{commentaryLine}</p> : null}
           <div className="absolute bottom-[4.75rem] left-2 z-40 flex gap-1 sm:bottom-20">
+            <IconBtn label={commentaryEnabled ? "Turn AI commentary off" : "Turn AI commentary on"} onClick={() => setCommentaryEnabled((on) => !on)}>
+              {commentaryEnabled ? <Mic size={18} /> : <MicOff size={18} />}
+            </IconBtn>
             <IconBtn label={paused ? "Play" : "Pause"} onClick={() => setPaused((p) => !p)}>
               {paused ? <Play size={18} /> : <Pause size={18} />}
             </IconBtn>
@@ -206,7 +249,7 @@ function Lobby({
   week: number;
   weeks: number[];
   setWeek: (w: number) => void;
-  tape: { live: boolean; bouts: Bout[] };
+  tape: { live: boolean; replay: boolean; bouts: Bout[] };
   onStart: (full: boolean) => void;
 }) {
   const choices = [...new Set([...weeks, data.week])].sort((a, b) => a - b);
@@ -214,27 +257,33 @@ function Lobby({
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col justify-center gap-6 py-6">
       <div>
-        <p className="font-display text-sm tracking-[0.3em] text-amber uppercase">{tape.live ? "The card is posted" : "House tape · card not posted yet"}</p>
+        <p className="font-display text-sm tracking-[0.3em] text-amber uppercase">{tape.replay ? "Replay · read only" : tape.live ? "The card is posted" : "House tape · card not posted yet"}</p>
         <h1 className="mt-2 font-display text-6xl leading-[0.85] md:text-8xl">
           {week === 5 ? "Championship" : "Monday"}
           <span className="block text-amber">{week === 5 ? "Saturday" : "watch party"}</span>
         </h1>
         <p className="mt-4 max-w-2xl text-lg text-muted">
-          {week === 5
-            ? "One title fight. No judges and no decision: it keeps going until one bot is knocked out. Rally support makes the room louder, never the bot stronger."
-            : "Put this on the big screen. Every fight plays back to back with a walk-out, the tape, and the call. The live table updates after every fight."}
+          {tape.replay
+            ? week === 5
+              ? "Replay of Championship Saturday. Same tape as the night it posted. Watching it does not change coins, damage, records, or the week."
+              : "Replay of that Monday's card. Same walk-out, tape, and call. A house commercial runs between every fight. Watching it does not change coins, damage, records, or the week."
+            : week === 5
+              ? "One title fight. No judges and no decision: it keeps going until one bot is knocked out. Rally support makes the room louder, never the bot stronger."
+              : "Put this on the big screen. Every fight plays back to back with a walk-out, the tape, and the call. A house commercial runs between every fight. The live table updates after every fight."}
         </p>
       </div>
-      {choices.length > 1 ? (
-        <div className="flex flex-wrap gap-2">
+      {weeks.length > 0 ? (
+        <div className="flex flex-wrap gap-2" data-testid="replay-archive" role="group" aria-label="Replay archive">
           {choices.map((w) => (
             <button
               key={w}
               type="button"
+              data-testid={`replay-week-${w}`}
+              aria-pressed={w === week}
               onClick={() => setWeek(w)}
               className={`min-h-11 border px-4 font-display uppercase ${w === week ? "border-amber text-amber" : "border-line text-muted"}`}
             >
-              Week {w}
+              {weeks.includes(w) && !isLiveCard(data, w) ? `Week ${w} replay` : `Week ${w}`}
             </button>
           ))}
         </div>
@@ -281,7 +330,7 @@ function Lobby({
           Start in this window
         </button>
       </div>
-      <p className="text-sm text-muted">Space pauses. The right arrow skips ahead. Turn the sound up.</p>
+      <p className="text-sm text-muted">Space pauses. The right arrow skips ahead. AI color reacts to big hits with spoken lines when enabled; turn the sound up.</p>
     </div>
   );
 }
@@ -299,7 +348,7 @@ function Intro({ data, bout, seen, order, total }: { data: PitData; bout: Bout; 
   );
 }
 
-function Result({ data, bout, seen, next }: { data: PitData; bout: Bout; seen: PitData; next: Bout | null }) {
+function Result({ data, bout, seen, next, commercialNext }: { data: PitData; bout: Bout; seen: PitData; next: Bout | null; commercialNext: boolean }) {
   const winner = bout.result?.winnerIds[0];
   const store = data.stores.find((s) => s.id === winner);
   const bot = winner ? data.bots.find((b) => b.storeId === winner) : undefined;
@@ -320,12 +369,14 @@ function Result({ data, bout, seen, next }: { data: PitData; bout: Bout; seen: P
         <ResultLine bout={bout} />
       </p>
       <TaleOfTape bout={bout} compact />
-      <p className="mt-4 text-sm tracking-widest text-muted uppercase">{next ? `Up next · ${matchup(data, next)}` : "That was the last fight"}</p>
+      <p className="mt-4 text-sm tracking-widest text-muted uppercase">
+        {next ? `${commercialNext ? "Commercial break · then " : "Up next · "}${matchup(data, next)}` : "That was the last fight"}
+      </p>
     </div>
   );
 }
 
-function Final({ data, seen, bouts, onAgain }: { data: PitData; seen: PitData; bouts: Bout[]; onAgain: () => void }) {
+function Final({ data, seen, bouts, replay, onAgain }: { data: PitData; seen: PitData; bouts: Bout[]; replay: boolean; onAgain: () => void }) {
   const flames = streakHolders(data).slice(0, 6);
   return (
     <div className="watch-in mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center gap-5 py-6">
@@ -353,8 +404,8 @@ function Final({ data, seen, bouts, onAgain }: { data: PitData; seen: PitData; b
         <button type="button" onClick={onAgain} className="min-h-11 border border-line px-4 font-display uppercase">
           Back to the lobby
         </button>
-        <Link to={data.week === 5 ? "/honors" : "/week"} className="inline-flex min-h-11 items-center bg-amber px-4 font-display text-deep uppercase">
-          {data.week === 5 ? "Season honors →" : "Pit Week starts tomorrow →"}
+        <Link to={replay ? "/broadcast" : data.week === 5 ? "/honors" : "/week"} className="inline-flex min-h-11 items-center bg-amber px-4 font-display text-deep uppercase">
+          {replay ? "Fight Day →" : data.week === 5 ? "Season honors →" : "Pit Week starts tomorrow →"}
         </Link>
       </div>
     </div>

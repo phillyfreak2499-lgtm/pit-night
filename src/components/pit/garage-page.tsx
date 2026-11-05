@@ -1,4 +1,6 @@
 import { Modal } from "./modal";
+import { boltsOf } from "@/lib/pit/week";
+import { BOLT_EXCHANGE } from "@/lib/pit/training";
 import { LockerIdentity } from "./locker-identity";
 import { CosmeticBoard, CosmeticTheme } from "./cosmetic-board";
 import { EffectLockerPreview } from "./effect-locker-preview";
@@ -46,6 +48,7 @@ export function GaragePage({ storeId }: { storeId: string }) {
   const acceptProposal = usePit((s) => s.acceptProposal);
   const dismissProposal = usePit((s) => s.dismissProposal);
   const repairSlot = usePit((s) => s.repairSlot);
+  const boltBalance = boltsOf(data, storeId).balance;
   const [code, setCode] = useState("");
   const [hire, setHire] = useState("");
   const [openSlot, setOpenSlot] = useState<Slot | null>(null);
@@ -235,6 +238,7 @@ export function GaragePage({ storeId }: { storeId: string }) {
       {quotes.length ? (
         <section className="border border-line p-4">
           <SectionLabel>Repair quotes</SectionLabel>
+          <p className="mt-1 text-sm text-muted">Pay with this part's coins or with Bolts. The bay has {boltBalance} Bolts.</p>
           <ul className="mt-3 flex flex-col gap-3">
             {quotes.map((quote) => (
               <li key={quote.slot} className="border border-line bg-deep p-3" data-testid={storeId === "allen" && quote.slot === "weapon" ? "allen-weapon-quote" : undefined}>
@@ -244,6 +248,13 @@ export function GaragePage({ storeId }: { storeId: string }) {
                   <div className="mt-2 flex flex-wrap gap-2">
                     <Btn tone="line" onClick={() => repairSlot(storeId, quote.slot, "full")}>
                       Repair {quote.repairCost}
+                    </Btn>
+                    <Btn
+                      tone="line"
+                      disabled={boltBalance < quote.repairCost * BOLT_EXCHANGE.repairBoltsPerCoin}
+                      onClick={() => repairSlot(storeId, quote.slot, "bolts")}
+                    >
+                      Fix with {quote.repairCost * BOLT_EXCHANGE.repairBoltsPerCoin} Bolts
                     </Btn>
                     {quote.weldCost ? (
                       <Btn tone="line" onClick={() => repairSlot(storeId, quote.slot, "weld")}>
