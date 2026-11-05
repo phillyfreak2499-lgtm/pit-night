@@ -6,6 +6,7 @@ import { pitCreator } from "../src/lib/pit/store.ts";
 import { makeData, WEEK_META } from "../src/lib/pit/seed.ts";
 import { PARTS, TIER_PRICE, partById, stockPart } from "../src/lib/pit/catalog.ts";
 import { programWeek } from "../src/lib/pit/training.ts";
+import { boltsOf } from "../src/lib/pit/week.ts";
 import { cosmeticUnlocked } from "../src/lib/pit/cosmetics.ts";
 import { authorize, commandArgs } from "../src/lib/pit/commands.ts";
 import {
@@ -149,10 +150,11 @@ test("Pit Week 1 jobs earn Halloween looks without touching coins or the fight",
   assert.equal(cosmeticUnlocked(otherWeek, "plano", "weaponSkin", "hockey-machete"), false);
 });
 
-test("premium iron and show effects cost 8 and are on the peg all season", (t) => {
+test("premium iron costs 8 coins while all-season show effects cost 100 Bolts", (t) => {
   t.mock.timers.enable({ apis: ["Date"], now: HALLOWEEN_PIT_START.getTime() });
   const league = state();
   fund(league);
+  creditShowBolts(league, "plano", 120);
   const saw = partById("weapon-saw-super")!;
   const chainsaw = partById("weapon-chainsaw-super")!;
   assert.equal(buyCheck(league.getState(), "plano", saw).ok, true);
@@ -169,15 +171,17 @@ test("premium iron and show effects cost 8 and are on the peg all season", (t) =
   }
   for (const effect of SHOW_EFFECTS) {
     assert.equal(effect.price, SHOW_PRICE);
-    assert.equal(effect.price, 8);
+    assert.equal(effect.price, 100);
     assert.equal(showCheck(league.getState(), "plano", effect.id).ok, true);
+    assert.equal(showCheck(league.getState(), "plano", effect.id).cost, 100);
   }
-  // Real purchases land before November: coins move, parts and shows are recorded.
+  // Real purchases land before November: only parts spend coins; shows spend Bolts.
   const coinsBefore = plano(league).coins.weapon;
   league.getState().buyPart("plano", chainsaw.id);
   league.getState().buyShow("plano", "fog");
   assert.equal(plano(league).coins.weapon, coinsBefore - 8);
-  assert.equal(plano(league).coins.utility, 32);
+  assert.equal(plano(league).coins.utility, 40);
+  assert.equal(boltsOf(league.getState(), "plano").balance, 140);
   assert.equal(plano(league).owned.includes(chainsaw.id), true);
   assert.deepEqual(plano(league).shows, ["fog"]);
 
@@ -187,6 +191,7 @@ test("premium iron and show effects cost 8 and are on the peg all season", (t) =
   assert.equal(buyCheck(league.getState(), "plano", saw).ok, true);
 
   const week1 = state();
+  creditShowBolts(week1, "plano", 60);
   week1.setState({
     kickoff: { ...week1.getState().kickoff, appliedAt: 1 },
     bots: week1.getState().bots.map((b) => (b.storeId === "plano" ? { ...b, coins: fullCoins(40), locked: null } : b)),
@@ -207,7 +212,9 @@ test("premium iron and show effects cost 8 and are on the peg all season", (t) =
   assert.equal(bot.coins.weapon, beforeWeapon);
   assert.equal(bot.coins.chassis, beforeChassis - 8);
   assert.equal(bot.coins.drive, beforeDrive - 8);
-  assert.equal(bot.coins.utility, beforeUtility - 8);
+  assert.equal(bot.coins.utility, beforeUtility);
+  assert.equal(boltsOf(league.getState(), "plano").balance, 40);
+  assert.equal(league.getState().stores.find((store) => store.id === "plano")?.boltsSpent, 200);
   assert.deepEqual(bot.shows, ["fog", "blacklight"]);
   assert.equal(bot.classId, "striker");
   assert.ok(bot.owned.includes("weapon-chainsaw-super"));
@@ -236,6 +243,45 @@ test("premium iron and show effects cost 8 and are on the peg all season", (t) =
   assert.equal(commandArgs.buyShow.safeParse(["plano", "gore"]).success, false);
 });
 
+
+test("new arena show effects spend exactly 100 Bolts, and never touch upgrade coins or fight stats", () => {
+  const league = state();
+  fund(league);
+  creditShowBolts(league, "plano", 300); // 600 Bolts, enough for all five all-season effects.
+  const coins = JSON.stringify(plano(league).coins);
+  const stats = JSON.stringify(plano(league).stats);
+  for (const effect of SHOW_EFFECTS) {
+    const before = boltsOf(league.getState(), "plano").balance;
+    assert.equal(showCheck(league.getState(), "plano", effect.id).ok, true);
+    league.getState().buyShow("plano", effect.id);
+    assert.equal(boltsOf(league.getState(), "plano").balance, before - 100, effect.id);
+    assert.ok(plano(league).shows?.includes(effect.id));
+    assert.equal(JSON.stringify(plano(league).coins), coins, "all coin jars are unchanged");
+    assert.equal(JSON.stringify(plano(league).stats), stats, "printed stats are unchanged");
+    league.getState().buyShow("plano", effect.id);
+    assert.equal(boltsOf(league.getState(), "plano").balance, before - 100, "repeat purchase cannot spend twice");
+  }
+  assert.equal(league.getState().stores.find((store) => store.id === "plano")?.boltsSpent, SHOW_EFFECTS.length * 100);
+
+  const short = state();
+  fund(short);
+  creditShowBolts(short, "plano", 49); // 98 Bolts.
+  const utility = plano(short).coins.utility;
+  assert.equal(showCheck(short.getState(), "plano", "laser").ok, false);
+  assert.match(showCheck(short.getState(), "plano", "laser").reason, /Needs 100 Bolts/);
+  short.getState().buyShow("plano", "laser");
+  assert.equal(plano(short).shows?.includes("laser") ?? false, false);
+  assert.equal(boltsOf(short.getState(), "plano").balance, 98);
+  assert.equal(plano(short).coins.utility, utility);
+  creditShowBolts(short, "plano", 1);
+  short.getState().buyShow("plano", "laser");
+  assert.equal(boltsOf(short.getState(), "plano").balance, 0);
+  assert.equal(plano(short).coins.utility, utility);
+  assert.equal(commandArgs.buyShow.safeParse(["plano", "laser"]).success, true);
+  assert.equal(commandArgs.buyShow.safeParse(["plano", "spotlights"]).success, true);
+  assert.equal(commandArgs.buyShow.safeParse(["plano", "embers"]).success, true);
+});
+
 test("Halloween parts trade off against each other and against other super parts", () => {
   const keys = ["power", "speed", "armor", "heat"] as const;
   const strict = (a: { power: number; speed: number; armor: number; heat: number }, b: typeof a) => {
@@ -259,7 +305,7 @@ test("Halloween parts trade off against each other and against other super parts
   }
   assert.equal(partById("weapon-slasher-super")!.name, "Slasher Blade");
   assert.equal(partById("drive-ghostchaser-super")!.name, "Ghost Chaser");
-  assert.equal(SHOW_EFFECTS.map((row) => row.name).join(","), "Fog Machine,Blacklight Mode");
+  assert.equal(SHOW_EFFECTS.map((row) => row.name).join(","), "Fog Machine,Blacklight Mode,Laser Grid,Spotlight Sweep,Golden Spark Rain");
 });
 
 test("Halloween strike trades are real and fog does not change the bout", () => {
@@ -370,7 +416,7 @@ test("Halloween strike trades are real and fog does not change the bout", () => 
 
   const plain = makeData();
   const dressed = structuredClone(plain) as PitData;
-  dressed.bots = dressed.bots.map((b) => (b.storeId === "plano" ? { ...b, shows: ["fog", "blacklight"] } : b));
+  dressed.bots = dressed.bots.map((b) => (b.storeId === "plano" ? { ...b, shows: ["fog", "blacklight", "laser", "spotlights", "embers"] } : b));
   const bot = plain.bots.find((b) => b.storeId === "plano")!;
   assert.deepEqual(printedStats(bot, bot.draft, 0.5), printedStats(dressed.bots.find((b) => b.storeId === "plano")!, bot.draft, 0.5));
   const fogFight = simulateDuel(dressed, "plano", "allen", "fog-check");
@@ -401,6 +447,28 @@ function state() {
   });
   store.getState().chooseStarterBody("plano", "striker", "shrike");
   return store;
+}
+
+/** Seed approved training activity to exercise the real spendable Bolt ledger. */
+function creditShowBolts(store: ReturnType<typeof state>, storeId: string, jobs: number) {
+  const captain = store.getState().crew.find((c) => c.storeId === storeId && c.role === "captain")!;
+  const before = store.getState().jobLog;
+  store.setState({
+    jobLog: [
+      ...before,
+      ...Array.from({ length: jobs }, (_, i) => ({
+        id: `test-show-${storeId}-${before.length}-${i}`,
+        week: 2,
+        jobId: `test-show-${i}`,
+        storeId,
+        crewId: captain.id,
+        crewName: captain.name,
+        note: "Approved fixture",
+        status: "approved" as const,
+        at: 1,
+      })),
+    ],
+  });
 }
 
 function fullCoins(n: number): Bot["coins"] {

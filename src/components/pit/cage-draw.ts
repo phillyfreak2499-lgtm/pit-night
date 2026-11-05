@@ -1329,6 +1329,75 @@ function drawRingFog(ctx: CanvasRenderingContext2D, w: number, h: number, time: 
   ctx.restore();
 }
 
+
+/** Purchased stage lighting: visual-only additions to the live broadcast. */
+function drawLaserGrid(ctx: CanvasRenderingContext2D, w: number, h: number, time: number, reduced: boolean) {
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (let i = 0; i < 6; i++) {
+    const sway = reduced ? 0 : Math.sin(time * 0.75 + i * 1.3) * w * 0.16;
+    const start = w * (0.12 + i * 0.15);
+    const end = w * (0.18 + i * 0.13) + sway;
+    const color = i % 2 ? "rgba(72,160,255,0.68)" : "rgba(255,62,92,0.68)";
+    ctx.strokeStyle = color;
+    ctx.shadowColor = i % 2 ? "#4d9fff" : "#ff4064";
+    ctx.shadowBlur = reduced ? 0 : w * 0.018;
+    ctx.lineWidth = Math.max(1, w * 0.0025);
+    ctx.beginPath();
+    ctx.moveTo(start, h * 0.065);
+    ctx.lineTo(end, h * 0.76);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawSpotlightSweep(ctx: CanvasRenderingContext2D, w: number, h: number, time: number, reduced: boolean) {
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (let i = 0; i < 3; i++) {
+    const x = w * (0.2 + i * 0.3);
+    const sweep = reduced ? 0 : Math.sin(time * 0.55 + i * 2.1) * w * 0.22;
+    const target = x + sweep;
+    const light = i % 2 ? "160,110,255" : "255,196,82";
+    const glow = ctx.createLinearGradient(x, h * 0.055, target, h * 0.78);
+    glow.addColorStop(0, `rgba(${light},0.23)`);
+    glow.addColorStop(1, `rgba(${light},0.01)`);
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.moveTo(x - w * 0.014, h * 0.055);
+    ctx.lineTo(x + w * 0.014, h * 0.055);
+    ctx.lineTo(target + w * 0.15, h * 0.78);
+    ctx.lineTo(target - w * 0.15, h * 0.78);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = `rgba(${light},0.11)`;
+    ctx.beginPath();
+    ctx.ellipse(target, h * 0.78, w * 0.14, h * 0.037, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawGoldenSparkRain(ctx: CanvasRenderingContext2D, w: number, h: number, time: number, reduced: boolean) {
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const count = reduced ? 12 : 38;
+  for (let i = 0; i < count; i++) {
+    const xSeed = (hash(`show-spark-x-${i}`) % 1000) / 1000;
+    const ySeed = (hash(`show-spark-y-${i}`) % 1000) / 1000;
+    const speed = 0.07 + (i % 6) * 0.015;
+    const x = w * xSeed + (reduced ? 0 : Math.sin(time * 0.6 + i) * w * 0.009);
+    const y = h * ((ySeed + (reduced ? 0 : time * speed)) % 0.82);
+    ctx.strokeStyle = i % 3 === 0 ? "rgba(255,245,188,0.85)" : "rgba(255,174,42,0.7)";
+    ctx.lineWidth = Math.max(1, w * 0.002);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - w * 0.003, y - h * 0.016);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function hazardBand(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
   c.save();
   c.beginPath();
@@ -3998,6 +4067,9 @@ export function drawSide(
   const festive = Boolean(opts.festive || theme === "halloween" || theme === "thanksgiving");
   if (drive.bots.some((bot) => bot.bot.shows?.includes("fog"))) drawRingFog(ctx, w, h, time, opts.reduced);
   if (drive.bots.some((bot) => bot.bot.shows?.includes("leaves"))) drawFallingLeaves(ctx, w, h, time, opts.reduced);
+  if (drive.bots.some((bot) => bot.bot.shows?.includes("laser"))) drawLaserGrid(ctx, w, h, time, opts.reduced);
+  if (drive.bots.some((bot) => bot.bot.shows?.includes("spotlights"))) drawSpotlightSweep(ctx, w, h, time, opts.reduced);
+  if (drive.bots.some((bot) => bot.bot.shows?.includes("embers"))) drawGoldenSparkRain(ctx, w, h, time, opts.reduced);
   // Contact light belongs on the steel and floor, with falloff at arena scale.
   if (drive.impact && fx.flash > 0 && !opts.reduced) {
     const hit = project(drive.impact, w, h);
@@ -4670,6 +4742,9 @@ export function drawTop(
   ctx.clip();
   if (arena === "pit") drawArenaTop(ctx, g, time);
   else drawArenaTopScene(ctx, g, time, arena);
+  if (drive.bots.some((bot) => bot.bot.shows?.includes("laser"))) drawLaserGrid(ctx, w, h, time, reduced);
+  if (drive.bots.some((bot) => bot.bot.shows?.includes("spotlights"))) drawSpotlightSweep(ctx, w, h, time, reduced);
+  if (drive.bots.some((bot) => bot.bot.shows?.includes("embers"))) drawGoldenSparkRain(ctx, w, h, time, reduced);
 
   // Skid marks.
   for (const s of drive.bots) {

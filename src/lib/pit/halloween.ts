@@ -9,7 +9,7 @@ import { dayDate, programWeek } from "./training";
  *
  * Purchase availability (owner directive 2026-10-25): Halloween stock —
  * the premium parts below, the Skeleton chassis, the Ghost Veil utility,
- * and the Fog Machine / Blacklight Mode show effects — is on the peg all
+ * and the all-season arena show effects — is on the peg all
  * season, in every week. There is no November-only sales window anymore,
  * so `premiumHalloweenOpen` returns true for every date. Decorations
  * timing (`halloweenVisuals`) is unchanged.
@@ -68,22 +68,38 @@ export function isPremiumHalloweenPart(id: string) {
   return (PREMIUM_PART_IDS as readonly string[]).includes(id);
 }
 
-export const SHOW_PRICE = 8;
+export const SHOW_PRICE = 100;
 
 export const SHOW_EFFECTS = [
   {
     id: "fog" as const,
     name: "Fog Machine",
     price: SHOW_PRICE,
-    key: "utility" as const,
     blurb: "Soft fog rolls across the ring during your bouts. Lights and atmosphere only. It does not change damage, coins, or the card.",
   },
   {
     id: "blacklight" as const,
     name: "Blacklight Mode",
     price: SHOW_PRICE,
-    key: "utility" as const,
     blurb: "Makes the green celebration ooze glow. Paint and light only. It does not change damage, coins, or the card.",
+  },
+  {
+    id: "laser" as const,
+    name: "Laser Grid",
+    price: SHOW_PRICE,
+    blurb: "Animated red and blue laser beams sweep the cage during your bouts. Lights only; no damage or aim changes.",
+  },
+  {
+    id: "spotlights" as const,
+    name: "Spotlight Sweep",
+    price: SHOW_PRICE,
+    blurb: "Moving gold and violet spotlights wash over the arena. Pure showmanship; fights are unchanged.",
+  },
+  {
+    id: "embers" as const,
+    name: "Golden Spark Rain",
+    price: SHOW_PRICE,
+    blurb: "Gold sparks fall from the lighting rig throughout the fight. Visual only; no heat or damage.",
   },
 ];
 

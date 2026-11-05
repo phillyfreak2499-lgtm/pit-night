@@ -979,12 +979,14 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         const effect = effectId;
         const effectName = showEffect(effectId)?.name ?? thanksgivingShowEffect(effectId)?.name ?? effectId;
         set({
+          stores: data.stores.map((s) =>
+            s.id === storeId ? { ...s, boltsSpent: (s.boltsSpent ?? 0) + check.cost } : s,
+          ),
           bots: patchBot(data.bots, storeId, (bot) => ({
             ...bot,
-            coins: { ...bot.coins, utility: (bot.coins.utility ?? 0) - check.cost },
             shows: [...(bot.shows ?? []), effect],
           })),
-          flash: `${effectName} is in the rafters. Light only. The fight does not change.`,
+          flash: `${effectName} is in the rafters for ${check.cost} Bolts. Light only. The fight does not change.`,
         });
       },
       repairSlot: (storeId, slot, mode) => {

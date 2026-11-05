@@ -62,7 +62,7 @@ export type BotTopper = (typeof TOPPER_IDS)[number];
 export type BotMask = "none" | "lantern" | "hockey";
 /** Cosmetic blade only. Premium Halloween weapons are real parts, not skins. */
 export type BotWeaponSkin = "none" | "hockey-machete" | "neon-fang" | "gold-fang" | "ice-fang";
-export type ShowEffectId = "fog" | "blacklight" | "leaves";
+export type ShowEffectId = "fog" | "blacklight" | "laser" | "spotlights" | "embers" | "leaves";
 export type BotLeds = "none" | StatKey;
 export const SMOKE_IDS = ["", "neon", "candy", "ice", "royal", "black"] as const;
 export type BotSmoke = (typeof SMOKE_IDS)[number];
@@ -312,7 +312,7 @@ export type FighterSnap = {
   armorFamily?: string;
   driveFamily?: string;
   chassisFamily?: string;
-  /** Fog Machine and Blacklight Mode. Drawing only. */
+  /** Purchased arena effects. Visual only; do not affect combat. */
   shows?: ShowEffectId[];
   /** Null when the utility slot is empty. */
   utilityFamily?: string | null;

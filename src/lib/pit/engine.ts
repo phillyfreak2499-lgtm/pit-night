@@ -32,7 +32,7 @@ import { buildScore, duelWear, fightDuel, fightGroup, preferFighter, type DuelOp
 import { centralDay } from "./time";
 export { halloweenStrikeAdjust } from "./combat";
 import { BOLTS, TUNE_UP_BONUS } from "./training";
-import { tunedUp } from "./week";
+import { boltsOf, tunedUp } from "./week";
 import type {
   Bot,
   BotStyle,
@@ -2224,9 +2224,9 @@ export function showCheck(data: PitData, storeId: string, effectId: string): { o
   // Falling Leaves keeps the Thanksgiving window; the Halloween effects stay on their own (all-season) terms.
   if (thanksgivingShowEffect(effectId) && !thanksgivingOpen()) return { ok: false, reason: THANKSGIVING_SHOW_CLOSED_REASON, cost: effect.price };
   if (bot.shows?.includes(effect.id)) return { ok: false, reason: "Already in the rafters.", cost: effect.price };
-  const have = bot.coins[effect.key] ?? 0;
+  const have = boltsOf(data, storeId).balance;
   if (have < effect.price) {
-    return { ok: false, reason: `Needs ${effect.price} utility coins. You have ${have}. Arch Supports pays them: green 3, blue 2, orange 1, red 0.`, cost: effect.price };
+    return { ok: false, reason: `Needs ${effect.price} Bolts. This bay has ${have}.`, cost: effect.price };
   }
   return { ok: true, reason: "On the peg.", cost: effect.price };
 }

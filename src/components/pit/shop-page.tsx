@@ -8,6 +8,7 @@ import { isVeteransPart } from "@/lib/pit/veterans";
 import { isRecyclesPart } from "@/lib/pit/recycles";
 import { SELL_BACK, buyCheck, canSeeLoadout, sellCheck, shopOpen, showCheck } from "@/lib/pit/engine";
 import { usePit } from "@/lib/pit/store";
+import { boltsOf } from "@/lib/pit/week";
 import type { Slot } from "@/lib/pit/types";
 import { Btn, SectionLabel } from "./bits";
 import { CoinStack, KeyLadder, UpgradeHowTo } from "./key-ladder";
@@ -44,6 +45,7 @@ export function ShopPage({ storeId }: { storeId: string }) {
   if (!store || !bot) return <p>No bay.</p>;
   if (!canEnterBay(data, storeId)) return <LockedBay storeId={storeId} />;
   const see = canSeeLoadout(data, storeId) || data.session.role === "commissioner";
+  const showBolts = boltsOf(data, storeId).balance;
   const open = shopOpen(data);
   const parts = PARTS.filter(
     (part) => part.slot === slot && part.tier !== "stock" && part.tier !== "championship" && (!part.classLock || part.slot === "chassis"),
@@ -177,18 +179,17 @@ export function ShopPage({ storeId }: { storeId: string }) {
           <section className="mt-6 border border-line bg-surface p-4" data-testid="halloween-show-shop">
             <SectionLabel>Show effects</SectionLabel>
             <p className="mt-2 text-sm text-muted">
-              Fog Machine and Blacklight Mode cost 8 utility coins, the same as a Super. They are light only. On the peg all season.
+              Every arena show effect costs 100 Bolts, not utility coins. They change the broadcast, never the fight. On the peg all season.
             </p>
             <ul className="mt-3 flex flex-col gap-3">
               {SHOW_EFFECTS.map((effect) => {
                 const check = showCheck(data, storeId, effect.id);
                 const owned = bot.shows?.includes(effect.id) ?? false;
-                const have = bot.coins.utility ?? 0;
                 return (
                   <li key={effect.id} className="border border-line bg-deep p-4">
                     <h2 className="font-display text-2xl leading-none">{effect.name}</h2>
                     <p className="mt-2 text-sm text-muted">{effect.blurb}</p>
-                    <p className="mt-2 text-sm">8 utility coins. Jar has {have}.</p>
+                    <p className="mt-2 text-sm">{effect.price} Bolts. Bay has {showBolts}.</p>
                     <p className={`mt-2 text-sm ${owned ? "text-ok" : check.ok ? "text-amber" : "text-muted"}`}>
                       {owned ? "Already in the rafters." : check.reason}
                     </p>
@@ -203,18 +204,17 @@ export function ShopPage({ storeId }: { storeId: string }) {
           <section className="mt-6 border border-line bg-surface p-4" data-testid="thanksgiving-show-shop">
             <SectionLabel>Championship Week show</SectionLabel>
             <p className="mt-2 text-sm text-muted">
-              Falling Leaves costs 8 utility coins, the same as a Super. It is light and paper only. On sale Championship Week, Tuesday November 24 through Saturday November 28. League-wide — finalist or not.
+              Falling Leaves costs 100 Bolts. It is light and paper only. On sale Championship Week, Tuesday November 24 through Saturday November 28. League-wide — finalist or not.
             </p>
             <ul className="mt-3 flex flex-col gap-3">
               {THANKSGIVING_SHOW_EFFECTS.map((effect) => {
                 const check = showCheck(data, storeId, effect.id);
                 const owned = bot.shows?.includes(effect.id) ?? false;
-                const have = bot.coins.utility ?? 0;
                 return (
                   <li key={effect.id} className="border border-line bg-deep p-4">
                     <h2 className="font-display text-2xl leading-none">{effect.name}</h2>
                     <p className="mt-2 text-sm text-muted">{effect.blurb}</p>
-                    <p className="mt-2 text-sm">8 utility coins. Jar has {have}.</p>
+                    <p className="mt-2 text-sm">{effect.price} Bolts. Bay has {showBolts}.</p>
                     <p className={`mt-2 text-sm ${owned ? "text-ok" : check.ok ? "text-amber" : "text-muted"}`}>
                       {owned ? "Already in the rafters." : check.reason}
                     </p>
