@@ -83,6 +83,24 @@ export const SHOW_EFFECTS = [
     price: SHOW_PRICE,
     blurb: "Makes the green celebration ooze glow. Paint and light only. It does not change damage, coins, or the card.",
   },
+  {
+    id: "laser" as const,
+    name: "Laser Grid",
+    price: SHOW_PRICE,
+    blurb: "Animated red and blue laser beams sweep the cage during your bouts. Lights only; no damage or aim changes.",
+  },
+  {
+    id: "spotlights" as const,
+    name: "Spotlight Sweep",
+    price: SHOW_PRICE,
+    blurb: "Moving gold and violet spotlights wash over the arena. Pure showmanship; fights are unchanged.",
+  },
+  {
+    id: "embers" as const,
+    name: "Golden Spark Rain",
+    price: SHOW_PRICE,
+    blurb: "Gold sparks fall from the lighting rig throughout the fight. Visual only; no heat or damage.",
+  },
 ];
 
 export type ShowEffectId = (typeof SHOW_EFFECTS)[number]["id"];
