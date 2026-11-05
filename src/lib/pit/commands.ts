@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { championshipFinalists } from "./engine";
 import { buildLockMessage, deadlineDue } from "./time";
+import { BOLT_EXCHANGE } from "./training";
 import type { PitData, Session } from "./types";
 import { FINISH_IDS, SMOKE_IDS, STICKER_ART, TOPPER_IDS, type BotDecal } from "./types";
 
@@ -79,7 +80,8 @@ export const commandArgs = {
   sellPart: z.tuple([id, id]),
   giftCoins: z.tuple([id, slot, z.number().int().min(1).max(20)]),
   buyShow: z.tuple([id, z.enum(["fog", "blacklight", "leaves"])]),
-  repairSlot: z.tuple([id, slot, z.enum(["full", "weld", "salvage", "crown"])]),
+  repairSlot: z.tuple([id, slot, z.enum(["full", "weld", "salvage", "crown", "bolts"])]),
+  convertBolts: z.tuple([id, slot, z.number().int().min(1).max(BOLT_EXCHANGE.weeklyCoinCap)]),
   nameMvp: z.tuple([id, id]),
   renameBot: z.tuple([id, text]),
   // eslint-disable-next-line no-control-regex -- names may not contain C0 controls or DEL

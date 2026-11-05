@@ -42,11 +42,11 @@ import {
 } from "./engine";
 import { backfillReplays, sealReplay } from "./replay";
 import { makeData } from "./seed";
-import { BOLTS, STREAK_BADGE, allJobs, crateFor, dayOpen, programWeek, type DayKey } from "./training";
+import { BOLTS, BOLT_EXCHANGE, STREAK_BADGE, allJobs, crateFor, dayOpen, programWeek, type DayKey } from "./training";
 import { eligibilityClosed } from "./eligibility";
 import { blockedName } from "../../../scripts/copy-guard.mjs";
 import { bannerVerdict, cosmeticUnlocked, earnedRewardIds, HALLOWEEN_REWARD_IDS, THANKSGIVING_REWARD_IDS, validBodyForClass } from "./cosmetics";
-import { boltsOf, lockerItem, sparkStreak } from "./week";
+import { boltCoinsLeft, boltsOf, lockerItem, sparkStreak } from "./week";
 import { checkedCosmeticLoadout } from "./cosmetic-loadout";
 import { authorize } from "./commands";
 import { showEffect } from "./halloween";
@@ -87,7 +87,8 @@ export type PitState = PitData & {
   buyPart: (storeId: string, partId: string) => void;
   sellPart: (storeId: string, partId: string) => void;
   buyShow: (storeId: string, effectId: ShowEffectId) => void;
-  repairSlot: (storeId: string, slot: Slot, mode: "full" | "weld" | "salvage" | "crown") => void;
+  repairSlot: (storeId: string, slot: Slot, mode: "full" | "weld" | "salvage" | "crown" | "bolts") => void;
+  convertBolts: (storeId: string, slot: Slot, coins: number) => void;
   nameMvp: (storeId: string, crewId: string) => void;
   renameBot: (storeId: string, name: string) => void;
   renameIdentity: (storeId: string, botName: string, teamName: string) => void;
@@ -349,6 +350,7 @@ function fresh(): PitState {
     sellPart: () => {},
     buyShow: () => {},
     repairSlot: () => {},
+    convertBolts: () => {},
     nameMvp: () => {},
     renameBot: () => {},
     renameIdentity: () => {},
@@ -415,7 +417,7 @@ function forgetSyncBase() {
 export function sharedDoc(state: PitData): SharedDoc {
   const out = {} as Record<string, unknown>;
   for (const k of SHARED_KEYS) out[k] = state[k];
-  out.stores = state.stores.map(s => ({ id: s.id, name: s.name, teamName: s.teamName, region: s.region, conference: s.conference, captain: s.captain, paint: s.paint, garage: s.garage, seed: s.seed, unlocks: s.unlocks, boltsSpent: s.boltsSpent }));
+  out.stores = state.stores.map(s => ({ id: s.id, name: s.name, teamName: s.teamName, region: s.region, conference: s.conference, captain: s.captain, paint: s.paint, garage: s.garage, seed: s.seed, unlocks: s.unlocks, boltsSpent: s.boltsSpent, boltCoins: s.boltCoins }));
   return out as SharedDoc;
 }
 
@@ -1097,6 +1099,22 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           });
           return;
         }
+        if (mode === "bolts") {
+          const bolts = REPAIR_PRICE[cond] * BOLT_EXCHANGE.repairBoltsPerCoin;
+          const balance = boltsOf(data, storeId).balance;
+          if (balance < bolts) {
+            set({ flash: `A Bolt repair is ${bolts} Bolts. The bay has ${balance}.` });
+            return;
+          }
+          set({
+            stores: data.stores.map((s) => (s.id === storeId ? { ...s, boltsSpent: (s.boltsSpent ?? 0) + bolts } : s)),
+            bots: patchBot(data.bots, storeId, () =>
+              setPartWear({ ...clearPartWeld(current, partId), services: (current.services ?? 0) + 1 }, partId, "clean"),
+            ),
+            flash: `${part.name} is clean. ${bolts} Bolts.`,
+          });
+          return;
+        }
         const cost = REPAIR_PRICE[cond];
         const paid = payRepair(current, slot, cost);
         if (!paid) {
@@ -1382,6 +1400,46 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
             s.id === storeId ? { ...s, unlocks: [...(s.unlocks ?? []), itemId], boltsSpent: (s.boltsSpent ?? 0) + item.price } : s,
           ),
           flash: `${item.name} unlocked.`,
+        });
+      },
+      convertBolts: (storeId, slot, coins) => {
+        const data = get();
+        if (!isCaptainOf(data, storeId)) {
+          set({ flash: "The captain spends the bolts." });
+          return;
+        }
+        const store = data.stores.find((s) => s.id === storeId);
+        if (!store || !data.bots.some((b) => b.storeId === storeId)) return;
+        const want = Math.floor(coins);
+        if (!(want >= 1)) return;
+        const left = boltCoinsLeft(data, storeId);
+        if (left <= 0) {
+          set({ flash: `The Bolt exchange is ${BOLT_EXCHANGE.weeklyCoinCap} coins a week. This week's are used.` });
+          return;
+        }
+        if (want > left) {
+          set({ flash: `Only ${left} more coin${left === 1 ? "" : "s"} from Bolts this week.` });
+          return;
+        }
+        const bolts = want * BOLT_EXCHANGE.boltsPerCoin;
+        const balance = boltsOf(data, storeId).balance;
+        if (balance < bolts) {
+          set({ flash: `${want} coin${want === 1 ? " is" : "s are"} ${bolts} Bolts. The bay has ${balance}.` });
+          return;
+        }
+        const week = String(data.week);
+        set({
+          stores: data.stores.map((s) =>
+            s.id === storeId
+              ? {
+                  ...s,
+                  boltsSpent: (s.boltsSpent ?? 0) + bolts,
+                  boltCoins: { ...s.boltCoins, [week]: (s.boltCoins?.[week] ?? 0) + want },
+                }
+              : s,
+          ),
+          bots: patchBot(data.bots, storeId, (bot) => ({ ...bot, coins: { ...bot.coins, [slot]: (bot.coins[slot] ?? 0) + want } })),
+          flash: `${bolts} Bolts in. ${want} ${slot} coin${want === 1 ? "" : "s"} out.`,
         });
       },
       makePick: (boutId, pick) => {
