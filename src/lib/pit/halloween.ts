@@ -68,21 +68,19 @@ export function isPremiumHalloweenPart(id: string) {
   return (PREMIUM_PART_IDS as readonly string[]).includes(id);
 }
 
-export const SHOW_PRICE = 8;
+export const SHOW_PRICE = 100;
 
 export const SHOW_EFFECTS = [
   {
     id: "fog" as const,
     name: "Fog Machine",
     price: SHOW_PRICE,
-    key: "utility" as const,
     blurb: "Soft fog rolls across the ring during your bouts. Lights and atmosphere only. It does not change damage, coins, or the card.",
   },
   {
     id: "blacklight" as const,
     name: "Blacklight Mode",
     price: SHOW_PRICE,
-    key: "utility" as const,
     blurb: "Makes the green celebration ooze glow. Paint and light only. It does not change damage, coins, or the card.",
   },
 ];
