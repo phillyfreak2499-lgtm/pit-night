@@ -111,7 +111,7 @@ export default function StarterBodyPicker({
           Lock {selected.label} for Week 1
         </button>
         <p className="mt-2 text-center text-xs text-muted">
-          After the first fight, class changes follow the normal chassis-coin rule.
+          After the first fight, captains can change class in the Garage for 60 Bolts earned through jobs and Daily Sparks.
         </p>
       </div>
     </div>

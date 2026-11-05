@@ -71,6 +71,10 @@ export const PAINT: Record<string, string> = {
   ultraviolet: "#aa56ff",
   midnight: "#223c86",
   bubblegum: "#ff83cb",
+  lagoon: "#09c2b1",
+  peach: "#ff9e83",
+  berry: "#bb48ea",
+  lemon: "#ffdf50",
 };
 
 /** Paints only the Bolt Locker sells. Key is the paint, value is the locker item. */

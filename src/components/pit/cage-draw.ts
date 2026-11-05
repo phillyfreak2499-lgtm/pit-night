@@ -1,5 +1,6 @@
 import { botFrameOf as frameOf, type BotFrame as Frame } from "./bot-frame";
 import { sawPoseOf } from "./bot-weapons";
+import { drawPaintSkin } from "./paint-skins";
 import { bannerVerdict } from "../../../scripts/copy-guard.mjs";
 import { EYES, LEDS, PAINT, SMOKE, TRIM, WHEEL_COLORS, decalArt, styleOf } from "@/lib/pit/catalog";
 import { ELECTION_COLORS } from "@/lib/pit/election";
@@ -1918,6 +1919,12 @@ export function drawSideBot(
       ctx.lineTo((-0.34 + off) * u2, top + f.height * u2 * 0.8);
       ctx.stroke();
     }
+    ctx.restore();
+  } else if (look === "two-tone" || look === "camouflage" || look === "tie-dye" || look === "texas") {
+    ctx.save();
+    poly(ctx, f.hull, u2);
+    ctx.clip();
+    drawPaintSkin(ctx, look, -0.6 * u2, top, u2 * 1.2, f.height * u2, paint, TRIM[style.trim] ?? "#f3efe6");
     ctx.restore();
   }
   {
@@ -4997,6 +5004,12 @@ export function drawTopBot(
   if (s.bot.look === "stripe") {
     ctx.fillStyle = "#f3efe6";
     ctx.fillRect(-len * 0.5, -wid * 0.05, len * 0.9, wid * 0.1);
+  } else if (s.bot.look === "two-tone" || s.bot.look === "camouflage" || s.bot.look === "tie-dye" || s.bot.look === "texas") {
+    ctx.save();
+    traceTopHull(ctx, s.bot.classId, style.body, len, wid);
+    ctx.clip();
+    drawPaintSkin(ctx, s.bot.look, -len * 0.55, -wid * 0.55, len * 1.1, wid * 1.1, paint, TRIM[style.trim] ?? "#f3efe6");
+    ctx.restore();
   }
   ctx.save();
   traceTopHull(ctx, s.bot.classId, style.body, len, wid);

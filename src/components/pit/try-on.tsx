@@ -68,7 +68,7 @@ export function PartDetails({ part }: { part: Part }) {
           {tierWord(part.tier)} tier
           {fit ? ` · Best on a ${fit}` : ""}
           {part.slot === "chassis" ? ` · Battery ${batteryOf(part)}` : ""}
-          {part.classLock ? ` · ${CLASS_META[part.classLock].label} chassis only (changing class costs 3 chassis coins after Week 1)` : ""}
+          {part.classLock ? ` · ${CLASS_META[part.classLock].label} chassis only (switch class in the Garage for 60 Bolts after Week 1 before buying this chassis)` : ""}
         </p>
       </div>
     </details>

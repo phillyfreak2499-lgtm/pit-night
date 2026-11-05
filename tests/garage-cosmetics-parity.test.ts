@@ -187,6 +187,27 @@ test("Stripe and chevron selections remain visible on both hull sides rather tha
     assert.ok(!plain.getObjectByName("stripe left pattern"));
   }));
 
+test("New two-tone, camouflage, tie-dye and Texas skins paint both 3D sides and the roof", () =>
+  withCanvas(() => {
+    for (const look of ["two-tone", "camouflage", "tie-dye", "texas"] as const) {
+      const model = createGarageCosmetics({ ...southlake, look, style: { ...southlake.style!, trim: "blue" } }, dimensions);
+      for (const face of ["left", "right"]) {
+        const skin = model.getObjectByName(look + " " + face + " skin");
+        assert.ok(skin, look + " should cover the " + face + " side");
+        assert.ok(textureDraws(skin!).some((draw) => draw.method === "fillRect"));
+        if (look === "texas")
+          assert.ok(textureDraws(skin!).some((draw) => draw.fill === "#002868" && draw.method === "fillRect"));
+        if (look === "two-tone")
+          assert.ok(textureDraws(skin!).some((draw) => draw.fill === "#3d8fe8" && draw.method === "fillRect"));
+      }
+      const roof = model.getObjectByName(look + " roof skin");
+      assert.ok(roof, look + " should also paint the roof");
+      assert.ok(textureDraws(roof!).some((draw) => draw.method === "fillRect"));
+    }
+    const plain = createGarageCosmetics(southlake, dimensions);
+    assert.ok(!plain.getObjectByName("texas left skin"));
+  }));
+
 test("A team pennant uses trim color only when explicitly selected and does not substitute the pit banner", () =>
   withCanvas(() => {
     const model = createGarageCosmetics(

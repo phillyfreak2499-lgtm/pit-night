@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { LEDS, PAINT, SMOKE, TRIM, styleOf } from "@/lib/pit/catalog";
 import type { BotLookProps } from "../bot-portrait";
 import { stickerBadge } from "../cage-draw";
+import { drawPaintSkin } from "../paint-skins";
 import { botFrameOf } from "../bot-frame";
 import { measureTeamFlag, paintTeamFlagName } from "../team-flag";
 
@@ -217,6 +218,29 @@ export function createGarageCosmetics(
       surface(
         `${look.look} ${side < 0 ? "left" : "right"} pattern`,
         pattern,
+        [depth * 0.86, sideHeight],
+        [side * (sidePanelX - 0.002), 0.36 + sideHeight / 2, -depth * 0.03],
+        [0, (side * Math.PI) / 2, 0],
+      );
+    }
+  }
+  if (look.look === "two-tone" || look.look === "camouflage" || look.look === "tie-dye" || look.look === "texas") {
+    const paint = PAINT[look.paint] ?? PAINT.amber;
+    const accent = TRIM[style.trim] ?? TRIM.white;
+    const roofMap = canvasMap((ctx, w, h) => drawPaintSkin(ctx, look.look, 0, 0, w, h, paint, accent));
+    surface(
+      look.look + " roof skin",
+      roofMap,
+      [width * 0.6, depth * 0.29],
+      [0, roofY + 0.009, 0.04],
+      [-Math.PI / 2, 0, 0],
+    );
+    const sideHeight = Math.max(0.24, roofY - 0.36);
+    for (const side of [-1, 1]) {
+      const sideMap = canvasMap((ctx, w, h) => drawPaintSkin(ctx, look.look, 0, 0, w, h, paint, accent));
+      surface(
+        look.look + (side < 0 ? " left skin" : " right skin"),
+        sideMap,
         [depth * 0.86, sideHeight],
         [side * (sidePanelX - 0.002), 0.36 + sideHeight / 2, -depth * 0.03],
         [0, (side * Math.PI) / 2, 0],

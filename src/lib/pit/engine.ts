@@ -31,7 +31,7 @@ import {
 import { buildScore, duelWear, fightDuel, fightGroup, preferFighter, type DuelOpts } from "./combat";
 import { centralDay } from "./time";
 export { halloweenStrikeAdjust } from "./combat";
-import { BOLTS, TUNE_UP_BONUS } from "./training";
+import { BOLTS, BOLT_EXCHANGE, TUNE_UP_BONUS } from "./training";
 import { boltsOf, tunedUp } from "./week";
 import type {
   Bot,
@@ -2090,7 +2090,37 @@ export function ownsPart(bot: Bot, part: Part): boolean {
   return bot.owned.includes(part.id);
 }
 
+/** The original three-coin reclass cost, paid from earned Bolts at the standard exchange. */
 export const RECLASS_FEE = 3;
+export const CLASS_SWITCH_BOLTS = RECLASS_FEE * BOLT_EXCHANGE.boltsPerCoin;
+
+/** The authoritative gate shared by the captain's Garage UI and the server action. */
+export function classSwitchCheck(
+  data: PitData,
+  storeId: string,
+  nextClass: ClassId,
+): { ok: boolean; reason: string; cost: number } {
+  const cost = CLASS_SWITCH_BOLTS;
+  const bot = data.bots.find((row) => row.storeId === storeId);
+  if (!bot || !data.stores.some((row) => row.id === storeId))
+    return { ok: false, reason: "That store does not have a bot.", cost };
+  if (!["striker", "tank", "specialist"].includes(nextClass))
+    return { ok: false, reason: "Unknown fighting class.", cost };
+  if (bot.classId === nextClass)
+    return { ok: false, reason: "Already this class.", cost: 0 };
+  if (data.week === 1)
+    return { ok: false, reason: "Week 1 class is frozen until after the first fight.", cost };
+  if (data.week === 5 && !championshipFinalists(data).includes(storeId))
+    return { ok: false, reason: "Championship Week builds belong to the conference champions.", cost };
+  if (!shopOpen(data))
+    return { ok: false, reason: "The shop must be open to change class.", cost };
+  if (bot.locked)
+    return { ok: false, reason: "Unlock this week's build before changing class.", cost };
+  const balance = boltsOf(data, storeId).balance;
+  if (balance < cost)
+    return { ok: false, reason: `Needs ${cost} Bolts from your Pit Week earnings and Daily Sparks. Bay has ${balance}.`, cost };
+  return { ok: true, reason: `Switch for ${cost} Bolts. Owned parts stay in inventory; incompatible equipped parts return to stock.`, cost };
+}
 
 /** Generic purchase-window check. Thanksgiving parts carry one; their dedicated gate in buyCheck speaks first. */
 export function partInWindow(part: Part, now = new Date()) {
@@ -2151,15 +2181,9 @@ export function buyCheck(
   if (part.classLock && part.slot !== "chassis")
     return { ok: false, reason: "Wrong class.", cost: 0 };
   if (ownsPart(bot, part)) return { ok: false, reason: "Already in the cage.", cost: part.price };
-  let cost = part.price;
-  if (
-    part.slot === "chassis" &&
-    part.classLock &&
-    part.classLock !== bot.classId &&
-    data.week > 1
-  ) {
-    cost += RECLASS_FEE;
-  }
+  const cost = part.price;
+  if (part.classLock && part.classLock !== bot.classId)
+    return { ok: false, reason: "Change class in the Garage using Bolts first.", cost };
   if (isThanksgivingPart(part.id)) {
     // Thanksgiving has its own gate and its own reasons. It never inherits
     // the Halloween all-season availability: window first, then finalists.

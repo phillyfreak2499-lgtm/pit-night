@@ -11,6 +11,7 @@ import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { BODY_STYLES, CLASS_META, DECALS, EYES, FINISHES, LEDS, MASKS, PAINT, SMOKE, TOPPERS, WEAPON_SKINS, WHEEL_COLORS, batteryOf, partById, partsFor, SLOT_LABEL, styleOf, TRIM } from "@/lib/pit/catalog";
 import {
   buyCheck,
+  classSwitchCheck,
   canSeeLoadout,
   cardFor,
   gradesOf,
@@ -22,7 +23,7 @@ import {
 } from "@/lib/pit/engine";
 import { paintHex, usePit, type PitState } from "@/lib/pit/store";
 import { cosmeticProgress, cosmeticUnlocked, rewardFor, type CosmeticKind } from "@/lib/pit/cosmetics";
-import type { BotLook, GarageLook, Slot } from "@/lib/pit/types";
+import type { BotLook, ClassId, GarageLook, Slot } from "@/lib/pit/types";
 import { garageSpinStartsPlaying } from "@/lib/pit/turntable";
 import { BotPortrait, useBotLook, type BotLookProps } from "./bot-portrait";
 import { GarageViewer } from "./garage-3d/garage-viewer";
@@ -41,6 +42,7 @@ export function GaragePage({ storeId }: { storeId: string }) {
   const signCaptain = usePit((s) => s.signCaptain);
   const lockStore = usePit((s) => s.lockStore);
   const setDraftPart = usePit((s) => s.setDraftPart);
+  const switchClass = usePit((s) => s.switchClass);
   const nameMvp = usePit((s) => s.nameMvp);
   const renameCrew = usePit((s) => s.renameCrew);
   const addCrew = usePit((s) => s.addCrew);
@@ -52,6 +54,7 @@ export function GaragePage({ storeId }: { storeId: string }) {
   const [code, setCode] = useState("");
   const [hire, setHire] = useState("");
   const [openSlot, setOpenSlot] = useState<Slot | null>(null);
+  const [confirmClass, setConfirmClass] = useState<ClassId | null>(null);
 
   if (!store) return <p>That bay does not exist.</p>;
   if (!canEnterBay(data, storeId)) return <LockedBay storeId={storeId} />;
@@ -107,6 +110,40 @@ export function GaragePage({ storeId }: { storeId: string }) {
             </p>
           </div>
           <GarageBot storeId={storeId} />
+        </div>
+      </section>
+
+      <section className="border border-line bg-surface p-4" data-testid="class-switch-panel">
+        <SectionLabel>Change fighting class</SectionLabel>
+        <p className="mt-2 text-sm text-muted">
+          Switch between Striker, Tank and Specialist for 60 Bolts, earned from jobs and Daily Sparks.
+          Your bay has {boltBalance} Bolts. Purchased parts stay owned; incompatible parts are replaced with stock gear.
+          The original Week 1 class lock and Saturday build lock still apply.
+        </p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          {(["striker", "tank", "specialist"] as const).map((next) => {
+            const check = classSwitchCheck(data, storeId, next);
+            const current = bot.classId === next;
+            const confirm = confirmClass === next;
+            return (
+              <div className="border border-line bg-deep p-3" key={next}>
+                <p className="font-display text-xl">{CLASS_META[next].label}</p>
+                <p className="mt-1 min-h-9 text-xs text-muted">{CLASS_META[next].threat}</p>
+                <Btn
+                  className="mt-2 w-full"
+                  tone={confirm ? "spark" : "line"}
+                  disabled={!captain || current || !check.ok}
+                  onClick={() => {
+                    if (confirm) { switchClass(storeId, next); setConfirmClass(null); }
+                    else setConfirmClass(next);
+                  }}
+                >
+                  {current ? "Current class" : confirm ? "Confirm 60 Bolts" : "Switch · 60 Bolts"}
+                </Btn>
+                {!current && !check.ok ? <p className="mt-2 text-xs text-muted">{check.reason}</p> : null}
+              </div>
+            );
+          })}
         </div>
       </section>
 
@@ -401,6 +438,10 @@ const LOOKS: { id: BotLook; label: string }[] = [
   { id: "stripe", label: "Stripe" },
   { id: "chevron", label: "Chevron" },
   { id: "rivets", label: "Rivets" },
+  { id: "two-tone", label: "Two-tone" },
+  { id: "camouflage", label: "Camouflage" },
+  { id: "tie-dye", label: "Tie-dye" },
+  { id: "texas", label: "Texas Lone Star" },
 ];
 
 function garageClass(look: GarageLook) {
@@ -759,7 +800,8 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
             </Group>
           ))}
 
-          <Group label="Stripes & panels">
+          <Group label="Stripes, patterns & skins">
+            <p className="mb-2 text-xs text-muted">Two-tone uses your selected base paint and trim color. Camouflage and tie-dye add all-over patterns; Texas uses the Lone Star flag.</p>
             {LOOKS.map((row) => (
               <Chip key={row.id} active={bot.look === row.id} onClick={() => setLook(storeId, row.id)}>
                 {row.label}

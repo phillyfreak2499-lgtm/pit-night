@@ -56,7 +56,7 @@ const style = z
   })
   .strict();
 export const cosmeticLoadoutSchema = z.object({
-  paint: id, look: z.enum(["plain", "stripe", "chevron", "rivets"]),
+  paint: id, look: z.enum(["plain", "stripe", "chevron", "rivets", "two-tone", "camouflage", "tie-dye", "texas"]),
   number: z.string().max(3), style: style.required({ finish: true, decal: true, trim: true, eye: true, flag: true }),
 }).strict();
 export const commandArgs = {
@@ -65,6 +65,7 @@ export const commandArgs = {
   voteCosmetic: z.tuple([id]),
   acceptCosmetic: z.tuple([id]),
   chooseStarterBody: z.tuple([id, z.enum(["striker","tank","specialist"]), body]),
+  switchClass: z.tuple([id, z.enum(["striker", "tank", "specialist"])]),
   setDraftPart: z.tuple([id, slot, id.nullable()]),
   setDraftLoadout: z.tuple([id, loadout]),
   lockStore: z.tuple([id]),
@@ -90,7 +91,7 @@ export const commandArgs = {
   renameCaptain: z.tuple([id, text]),
   setPaint: z.tuple([id, id]),
   setGarage: z.tuple([id, z.enum(["hazard", "concrete", "night", "bone", "checker"])]),
-  setLook: z.tuple([id, z.enum(["plain", "stripe", "chevron", "rivets"])]),
+  setLook: z.tuple([id, z.enum(["plain", "stripe", "chevron", "rivets", "two-tone", "camouflage", "tie-dye", "texas"])]),
   setStyle: z.tuple([id, style]),
   completeJob: z.tuple([week, id, text]),
   approveJob: z.tuple([id]),
@@ -130,6 +131,7 @@ export const CAPTAIN_BUILD_COMMANDS = new Set<Command>([
   "setDraftLoadout",
   "lockStore",
   "chooseStarterBody",
+  "switchClass",
   "buyPart",
   "sellPart",
   "buyShow",
