@@ -222,8 +222,7 @@ test("class switching refuses insufficient Bolts, crew members, Week 1, and lock
 
 test("new two-tone, camouflage, tie-dye and Texas skins can be applied without changing fights", () => {
   const store = setup(50);
-  const plain = structuredClone(store.getState());
-  const fight = simulateDuel(plain, "plano", "allen", "skin-only");
+  const fight = simulateDuel(store.getState(), "plano", "allen", "skin-only");
   const coins = JSON.stringify(bot(store).coins);
   const starts = balance(store);
   for (const skin of ["two-tone", "camouflage", "tie-dye", "texas"] as const) {
