@@ -15,7 +15,7 @@ import {
 } from "./catalog";
 import {
   SLOTS,
-  RECLASS_FEE,
+  classSwitchCheck,
   bestBuildId,
   buildCard,
   kickoffRank,
@@ -68,6 +68,7 @@ export type PitState = PitData & {
   acceptCosmetic: (id: string) => void;
   signPublic: () => void;
   chooseStarterBody: (storeId: string, classId: Bot["classId"], body: NonNullable<BotStyle["body"]>) => void;
+  switchClass: (storeId: string, classId: Bot["classId"]) => void;
   signCrew: (storeId: string, crewId: string, code?: string) => Promise<boolean>;
   signCaptain: (storeId: string, passcode: string) => Promise<boolean>;
   signCommissioner: (pin: string) => Promise<boolean>;
@@ -330,6 +331,7 @@ function fresh(): PitState {
     acceptCosmetic: () => {},
     signPublic: () => {},
     chooseStarterBody: () => {},
+    switchClass: () => {},
     signCrew: async () => false,
     signCaptain: async () => false,
     setPin: () => {},
@@ -537,6 +539,48 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           ],
         });
       },
+      switchClass: (storeId, classId) => {
+        const data = get();
+        const championshipBlock = championshipPrepGuard(data, storeId);
+        if (championshipBlock && !isBoss(data)) { set({ flash: championshipBlock }); return; }
+        const starterBlock = starterBodyGuard(data, storeId);
+        if (starterBlock && !isBoss(data)) { set({ flash: starterBlock }); return; }
+        if (!isCaptainOf(data, storeId)) {
+          set({ flash: "Only the captain can change the fighting class." });
+          return;
+        }
+        const buildBlock = captainBuildBlock(data);
+        if (buildBlock) { set({ flash: buildBlock }); return; }
+        const check = classSwitchCheck(data, storeId, classId);
+        if (!check.ok) { set({ flash: check.reason }); return; }
+        set({
+          stores: data.stores.map((row) =>
+            row.id === storeId ? { ...row, boltsSpent: (row.boltsSpent ?? 0) + check.cost } : row,
+          ),
+          bots: patchBot(data.bots, storeId, (current) => {
+            const bot = partWelds(current);
+            const next: Loadout = { ...bot.draft };
+            for (const slot of SLOTS) {
+              const id = bot.draft[slot];
+              const part = id ? partById(id) : null;
+              next[slot] = !id
+                ? null
+                : part && part.tier !== "stock" && (!part.classLock || part.classLock === classId)
+                  ? id
+                  : slot === "utility" ? null : stockPart(slot, classId).id;
+            }
+            return syncWear({
+              ...bot,
+              classId,
+              draft: next,
+              equipped: { ...next },
+              locked: null,
+              style: { ...styleOf(bot, classId), body: starterBodies(classId)[0]!.id },
+            });
+          }),
+          flash: "Now fighting as " + CLASS_META[classId].label + ". " + check.cost + " Bolts spent. Owned parts stay in inventory.",
+        });
+      },
       signCrew: async () => false,
       signCaptain: async () => false,
       signCommissioner: async () => false,
@@ -580,18 +624,11 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "That part is not in this cage." });
           return;
         }
-        if (part.classLock && part.classLock !== bot.classId && data.week === 1) {
-          set({ flash: "Week 1 class is locked. You can change class after the first fight (3 chassis coins)." });
+        if (part.classLock && part.classLock !== bot.classId) {
+          set({ flash: "Use Change Class in the Garage and pay Bolts first." });
           return;
         }
-        let next = partWelds(bot);
-        if (part.classLock && part.classLock !== bot.classId) {
-          if ((bot.coins.chassis ?? 0) < RECLASS_FEE) {
-            set({ flash: `Reclass costs ${RECLASS_FEE} chassis coins.` });
-            return;
-          }
-          next = { ...next, coins: { ...bot.coins, chassis: bot.coins.chassis - RECLASS_FEE }, classId: part.classLock, style: { ...styleOf(bot, part.classLock), body: starterBodies(part.classLock)[0]!.id } };
-        }
+        const next = partWelds(bot);
         const draft: Loadout = { ...next.draft, [slot]: part.id };
         set({
           bots: patchBot(data.bots, storeId, () =>
@@ -602,7 +639,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
               locked: next.locked && isBoss(data) ? { ...draft } : next.locked,
             }),
           ),
-          flash: part.classLock && part.classLock !== bot.classId ? `Reclassed to ${CLASS_META[part.classLock].label}. ${RECLASS_FEE} chassis coins.` : `${part.name} is on the ${slot}.`,
+          flash: part.name + " is on the " + slot + ".",
         });
       },
       setDraftLoadout: (storeId, loadout) => {
