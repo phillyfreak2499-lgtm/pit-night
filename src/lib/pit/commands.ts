@@ -80,7 +80,7 @@ export const commandArgs = {
   buyPart: z.tuple([id, id]),
   sellPart: z.tuple([id, id]),
   giftCoins: z.tuple([id, slot, z.number().int().min(1).max(20)]),
-  buyShow: z.tuple([id, z.enum(["fog", "blacklight", "leaves"])]),
+  buyShow: z.tuple([id, z.enum(["fog", "blacklight", "laser", "spotlights", "embers", "leaves"])]),
   repairSlot: z.tuple([id, slot, z.enum(["full", "weld", "salvage", "crown", "bolts"])]),
   convertBolts: z.tuple([id, slot, z.number().int().min(1).max(BOLT_EXCHANGE.weeklyCoinCap)]),
   nameMvp: z.tuple([id, id]),
