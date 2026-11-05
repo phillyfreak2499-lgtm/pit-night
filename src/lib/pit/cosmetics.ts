@@ -4,7 +4,7 @@ import { championshipFinalists, gradesOf, recordOf } from "./engine";
 import { sparkStreak, tunedUp } from "./week";
 import type { BotBody, PitData, StatKey } from "./types";
 
-export type CosmeticKind = "finish" | "decal" | "trim" | "eye" | "paint" | "topper" | "body" | "look" | "mask" | "weaponSkin" | "leds" | "smoke" | "banner";
+export type CosmeticKind = "finish" | "decal" | "trim" | "eye" | "paint" | "topper" | "body" | "look" | "mask" | "weaponSkin" | "wheelColor" | "leds" | "smoke" | "banner";
 export type CosmeticReward = {
   id: string;
   kind: CosmeticKind;
@@ -255,6 +255,7 @@ const FREE: Record<CosmeticKind, Set<string>> = {
   look:new Set(["plain","stripe","chevron","rivets"]),
   mask:new Set(["none"]),
   weaponSkin:new Set(["none"]),
+  wheelColor:new Set(["stock"]),
   leds:new Set(["none",""]),
   smoke:new Set(["","none"]),
   banner:new Set([""]),
@@ -304,6 +305,8 @@ export function cosmeticUnlocked(data:PitData,storeId:string,kind:CosmeticKind,v
   const reward=rewardFor(kind,value);
   if(reward && rewardHeld(data,storeId,reward.id,earned)) return true;
   if(kind==="paint" && lockerOwned(data,storeId,`paint-${value}`)) return true;
+  if(kind==="wheelColor" && lockerOwned(data,storeId,`wheel-${value}`)) return true;
+  if(kind==="weaponSkin" && lockerOwned(data,storeId,`weapon-${value}`)) return true;
   if(kind==="finish" && value==="holographic" && lockerOwned(data,storeId,"finish-holographic")) return true;
   if(kind==="smoke" && value && lockerOwned(data,storeId,`smoke-${value}`)) return true;
   return false;
