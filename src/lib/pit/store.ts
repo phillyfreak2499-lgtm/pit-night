@@ -563,11 +563,12 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
             for (const slot of SLOTS) {
               const id = bot.draft[slot];
               const part = id ? partById(id) : null;
-              next[slot] = !id
-                ? null
-                : part && part.tier !== "stock" && (!part.classLock || part.classLock === classId)
-                  ? id
-                  : slot === "utility" ? null : stockPart(slot, classId).id;
+              if (slot === "utility") {
+                next.utility = part && part.tier !== "stock" && (!part.classLock || part.classLock === classId) ? id : null;
+              } else {
+                next[slot] = part && part.tier !== "stock" && (!part.classLock || part.classLock === classId)
+                  ? id! : stockPart(slot, classId).id;
+              }
             }
             return syncWear({
               ...bot,
