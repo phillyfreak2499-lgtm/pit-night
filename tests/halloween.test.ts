@@ -87,7 +87,7 @@ test("Halloween dates follow Pit Week 1 and Championship Saturday", () => {
 });
 
 test("Pit Week 1 jobs earn Halloween looks without touching coins or the fight", (t) => {
-  // The jobs are earned during Pit Week 1, not on the wall-clock date CI runs.
+  // This test exercises the October Week 1 training window, not the CI wall clock.
   t.mock.timers.enable({ apis: ["Date"], now: HALLOWEEN_PIT_START.getTime() });
   const league = state();
   const coins = JSON.stringify(league.getState().bots.map((b) => b.coins));

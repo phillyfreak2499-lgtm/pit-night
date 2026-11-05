@@ -123,6 +123,8 @@ export type Store = {
   /** Bolt Locker items this bay owns. */
   unlocks?: string[];
   boltsSpent?: number;
+  /** Coins bought with Bolts, by Pit Week number. Old saves omit it. */
+  boltCoins?: Record<string, number>;
 };
 
 export type Crew = {
@@ -318,6 +320,12 @@ export type Bout = {
   result: FightResult | null;
 };
 
+/** A posted card, frozen when the desk runs it and kept after the week advances. */
+export type WeekReplay = {
+  week: number;
+  bouts: Bout[];
+};
+
 export type GazetteEntry = {
   id: string;
   week: number;
@@ -410,6 +418,11 @@ export type PitData = {
   weeks: WeekMeta[];
   storeCards: StoreCard[];
   bouts: Bout[];
+  /**
+   * Posted cards kept for replay. Written when a card runs and kept on advance.
+   * Absent on seasons saved before the archive; those cards still sit on `bouts`.
+   */
+  replays?: WeekReplay[];
   gazette: GazetteEntry[];
   quotes: Record<string, Quote[]>;
   proposals: Proposal[];

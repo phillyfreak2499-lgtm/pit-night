@@ -431,6 +431,7 @@ export function makeData(): PitData {
     weeks: WEEK_META,
     storeCards,
     bouts: [],
+    replays: [],
     gazette: [
       {
         id: "g-open",

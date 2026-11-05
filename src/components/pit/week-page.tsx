@@ -7,6 +7,7 @@ import { buildCard, championshipFinalists } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
 import {
   BOLTS,
+  BOLT_EXCHANGE,
   DAY_LABEL,
   PROGRAM,
   STREAK_BADGE,
@@ -21,7 +22,9 @@ import {
   type TrainingWeek,
 } from "@/lib/pit/training";
 import type { PitData } from "@/lib/pit/types";
-import { LOCKER, boltsOf, sparkStreak, weekProgress } from "@/lib/pit/week";
+import { LOCKER, boltCoinsLeft, boltsOf, sparkStreak, weekProgress } from "@/lib/pit/week";
+import { SLOT_LABEL } from "@/lib/pit/catalog";
+import type { Slot } from "@/lib/pit/types";
 import { Btn, SectionLabel, TextInput, useNow } from "./bits";
 import { BotPortrait, useBotLook } from "./bot-portrait";
 import { StreakBadge } from "./streak-badge";
@@ -681,6 +684,41 @@ function LeagueBoard({ data, week }: { data: PitData; week: number }) {
   );
 }
 
+const EXCHANGE_SLOTS: Slot[] = ["chassis", "drive", "weapon", "armor", "utility", "brain"];
+
+function BoltExchange({ data, storeId, canBuy, balance }: { data: PitData; storeId: string; canBuy: boolean; balance: number }) {
+  const convertBolts = usePit((s) => s.convertBolts);
+  const [slot, setSlot] = useState<Slot>("weapon");
+  const left = boltCoinsLeft(data, storeId);
+  const rate = BOLT_EXCHANGE.boltsPerCoin;
+  return (
+    <div className="flex flex-col gap-2 border-b border-line px-4 py-3" data-testid="bolt-exchange">
+      <p className="text-[10px] tracking-widest text-muted uppercase">Bolt exchange</p>
+      <p className="text-sm text-muted">
+        {rate} Bolts buy 1 coin for any part&apos;s jar, up to {BOLT_EXCHANGE.weeklyCoinCap} coins a week. Green grades still pay the most. {left} left this week.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          className="min-h-11 border border-line bg-deep px-3"
+          value={slot}
+          onChange={(e) => setSlot(e.target.value as Slot)}
+          aria-label="Coin jar"
+          disabled={!canBuy}
+        >
+          {EXCHANGE_SLOTS.map((s) => (
+            <option key={s} value={s}>
+              {SLOT_LABEL[s]}
+            </option>
+          ))}
+        </select>
+        <Btn disabled={!canBuy || left < 1 || balance < rate} onClick={() => convertBolts(storeId, slot, 1)}>
+          {rate} Bolts → 1 coin
+        </Btn>
+      </div>
+    </div>
+  );
+}
+
 function BoltLocker({ data, storeId, canBuy }: { data: PitData; storeId: string; canBuy: boolean }) {
   const buyLocker = usePit((s) => s.buyLocker);
   const setStyle = usePit((s) => s.setStyle);
@@ -694,13 +732,14 @@ function BoltLocker({ data, storeId, canBuy }: { data: PitData; storeId: string;
       <div className="flex flex-wrap items-end justify-between gap-2 border-b border-line px-4 py-3">
         <div>
           <SectionLabel>Bolt Locker</SectionLabel>
-          <p className="text-sm text-muted">Bolts buy looks, not wins. Jobs +{BOLTS.job}, Spark answers +{BOLTS.sparkCorrect}, right picks +{BOLTS.pickCorrect}.</p>
+          <p className="text-sm text-muted">Bolts buy looks, fix parts, and trade for a few coins. Jobs +{BOLTS.job}, Spark answers +{BOLTS.sparkCorrect}, right picks +{BOLTS.pickCorrect}.</p>
         </div>
         <p className="font-display text-xl">
           {bolts.balance} <span className="text-sm text-muted">bolts</span>
         </p>
       </div>
       <EffectLockerPreview storeId={storeId} canBuy={false} />
+      <BoltExchange data={data} storeId={storeId} canBuy={canBuy} balance={bolts.balance} />
       <ul className="grid gap-px bg-line sm:grid-cols-2 lg:grid-cols-3">
         {LOCKER.map((item) => {
           const have = owned.has(item.id);

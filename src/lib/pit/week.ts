@@ -1,4 +1,4 @@
-import { BOLTS, DAY_ORDER, STREAK_BADGE, allJobs, programWeek } from "./training";
+import { BOLTS, BOLT_EXCHANGE, DAY_ORDER, STREAK_BADGE, allJobs, programWeek } from "./training";
 import type { Crew, PitData } from "./types";
 import { championshipFinalists } from "./engine";
 
@@ -93,6 +93,12 @@ export function boltsOf(data: Pick<PitData, "jobLog" | "sparkLog" | "picks" | "b
     }).length * BOLTS.pickCorrect;
   const spent = data.stores.find((s) => s.id === storeId)?.boltsSpent ?? 0;
   return { earned: jobs + sparks + picks, spent, balance: jobs + sparks + picks - spent, jobs, sparks, picks, crates };
+}
+
+/** Coins this bay can still buy with Bolts in the current Pit Week. */
+export function boltCoinsLeft(data: Pick<PitData, "stores" | "week">, storeId: string) {
+  const used = data.stores.find((s) => s.id === storeId)?.boltCoins?.[String(data.week)] ?? 0;
+  return Math.max(0, BOLT_EXCHANGE.weeklyCoinCap - used);
 }
 
 /** Bolt Locker. Looks only. */

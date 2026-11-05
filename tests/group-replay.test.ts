@@ -71,6 +71,18 @@ test("tag replay uses every fighter's backend HP and celebrates the surviving te
   assert.ok(drive.bots.every((bot) => !bot.celebrate || (!bot.dead && bot.hp > 0)));
 });
 
+test("group exchanges stay 12 seconds with no duel clash", () => {
+  const result = tagResult();
+  const beats = buildBeats(result);
+  assert.equal(beats.some((beat) => beat.kind === "clash"), false);
+  const exchanges = beats.filter((beat) => beat.kind === "exchange");
+  assert.ok(exchanges.length > 0);
+  for (const beat of exchanges) {
+    assert.equal(beat.dur, 12);
+    assert.equal(fightDrive(result, beat, 0.5, beat.t).hitAt, 0.42);
+  }
+});
+
 test("group replay preserves both participants' HP after each exchange", () => {
   const result = tagResult();
   const expected = Object.fromEntries(result.fighters.map((fighter) => [fighter.id, 100]));

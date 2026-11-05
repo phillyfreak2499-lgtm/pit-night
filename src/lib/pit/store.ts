@@ -40,19 +40,20 @@ import {
   wonThisWeek,
   writeGazette,
 } from "./engine";
+import { backfillReplays, sealReplay } from "./replay";
 import { makeData } from "./seed";
-import { BOLTS, STREAK_BADGE, allJobs, crateFor, dayOpen, programWeek, type DayKey } from "./training";
+import { BOLTS, BOLT_EXCHANGE, STREAK_BADGE, allJobs, crateFor, dayOpen, programWeek, type DayKey } from "./training";
 import { eligibilityClosed } from "./eligibility";
 import { blockedName } from "../../../scripts/copy-guard.mjs";
 import { bannerVerdict, cosmeticUnlocked, earnedRewardIds, HALLOWEEN_REWARD_IDS, THANKSGIVING_REWARD_IDS, validBodyForClass } from "./cosmetics";
-import { boltsOf, lockerItem, sparkStreak } from "./week";
+import { boltCoinsLeft, boltsOf, lockerItem, sparkStreak } from "./week";
 import { checkedCosmeticLoadout } from "./cosmetic-loadout";
 import { authorize } from "./commands";
 import { showEffect } from "./halloween";
 import { thanksgivingShowEffect } from "./thanksgiving";
 import { buildLockMessage, deadlineDue, weekDeadline } from "./time";
 import type { BotDecal, CosmeticLoadout, StickerSlot } from "./types";
-import type { Bot, BotLook, BotStyle, Condition, FightResult, GarageLook, GazetteEntry, Grade, Kickoff, Loadout, PitData, Session, ShowEffectId, Slot, StatKey, StoreCard } from "./types";
+import type { Bot, BotLook, BotStyle, Bout, Condition, FightResult, GarageLook, GazetteEntry, Grade, Kickoff, Loadout, PitData, Session, ShowEffectId, Slot, StatKey, StoreCard } from "./types";
 import { dailyGazetteId, type GazetteDraft } from "./gazette-ai";
 
 const FIELD_OF: Record<StatKey, keyof StoreCard> = { nsnu: "nsnu", conv: "conv", demoRate: "demoRate", demoClose: "demoClose", arch: "arch", ticket: "demoTicket" };
@@ -86,7 +87,8 @@ export type PitState = PitData & {
   buyPart: (storeId: string, partId: string) => void;
   sellPart: (storeId: string, partId: string) => void;
   buyShow: (storeId: string, effectId: ShowEffectId) => void;
-  repairSlot: (storeId: string, slot: Slot, mode: "full" | "weld" | "salvage" | "crown") => void;
+  repairSlot: (storeId: string, slot: Slot, mode: "full" | "weld" | "salvage" | "crown" | "bolts") => void;
+  convertBolts: (storeId: string, slot: Slot, coins: number) => void;
   nameMvp: (storeId: string, crewId: string) => void;
   renameBot: (storeId: string, name: string) => void;
   renameIdentity: (storeId: string, botName: string, teamName: string) => void;
@@ -348,6 +350,7 @@ function fresh(): PitState {
     sellPart: () => {},
     buyShow: () => {},
     repairSlot: () => {},
+    convertBolts: () => {},
     nameMvp: () => {},
     renameBot: () => {},
     renameIdentity: () => {},
@@ -395,7 +398,7 @@ export const TUTORIAL_REV = 3;
 
 /** Everything the league shares. Session and tutorial stay on the device. */
 export const SHARED_KEYS = [
-  "version", "seasonName", "tagline", "week", "phase", "stores", "crew", "bots", "weeks", "storeCards", "bouts",
+  "version", "seasonName", "tagline", "week", "phase", "stores", "crew", "bots", "weeks", "storeCards", "bouts", "replays",
   "gazette", "quotes", "proposals", "mvps", "honors", "craft", "log", "intel", "jobLog", "rallies", "sparkLog", "shouts", "picks",
   "trainingOpenAll", "kickoff", "cosmeticProposals", "halloweenArcade",
 ] as const satisfies readonly (keyof PitData)[];
@@ -414,7 +417,7 @@ function forgetSyncBase() {
 export function sharedDoc(state: PitData): SharedDoc {
   const out = {} as Record<string, unknown>;
   for (const k of SHARED_KEYS) out[k] = state[k];
-  out.stores = state.stores.map(s => ({ id: s.id, name: s.name, teamName: s.teamName, region: s.region, conference: s.conference, captain: s.captain, paint: s.paint, garage: s.garage, seed: s.seed, unlocks: s.unlocks, boltsSpent: s.boltsSpent }));
+  out.stores = state.stores.map(s => ({ id: s.id, name: s.name, teamName: s.teamName, region: s.region, conference: s.conference, captain: s.captain, paint: s.paint, garage: s.garage, seed: s.seed, unlocks: s.unlocks, boltsSpent: s.boltsSpent, boltCoins: s.boltCoins }));
   return out as SharedDoc;
 }
 
@@ -1096,6 +1099,22 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           });
           return;
         }
+        if (mode === "bolts") {
+          const bolts = REPAIR_PRICE[cond] * BOLT_EXCHANGE.repairBoltsPerCoin;
+          const balance = boltsOf(data, storeId).balance;
+          if (balance < bolts) {
+            set({ flash: `A Bolt repair is ${bolts} Bolts. The bay has ${balance}.` });
+            return;
+          }
+          set({
+            stores: data.stores.map((s) => (s.id === storeId ? { ...s, boltsSpent: (s.boltsSpent ?? 0) + bolts } : s)),
+            bots: patchBot(data.bots, storeId, () =>
+              setPartWear({ ...clearPartWeld(current, partId), services: (current.services ?? 0) + 1 }, partId, "clean"),
+            ),
+            flash: `${part.name} is clean. ${bolts} Bolts.`,
+          });
+          return;
+        }
         const cost = REPAIR_PRICE[cond];
         const paid = payRepair(current, slot, cost);
         if (!paid) {
@@ -1383,6 +1402,46 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           flash: `${item.name} unlocked.`,
         });
       },
+      convertBolts: (storeId, slot, coins) => {
+        const data = get();
+        if (!isCaptainOf(data, storeId)) {
+          set({ flash: "The captain spends the bolts." });
+          return;
+        }
+        const store = data.stores.find((s) => s.id === storeId);
+        if (!store || !data.bots.some((b) => b.storeId === storeId)) return;
+        const want = Math.floor(coins);
+        if (!(want >= 1)) return;
+        const left = boltCoinsLeft(data, storeId);
+        if (left <= 0) {
+          set({ flash: `The Bolt exchange is ${BOLT_EXCHANGE.weeklyCoinCap} coins a week. This week's are used.` });
+          return;
+        }
+        if (want > left) {
+          set({ flash: `Only ${left} more coin${left === 1 ? "" : "s"} from Bolts this week.` });
+          return;
+        }
+        const bolts = want * BOLT_EXCHANGE.boltsPerCoin;
+        const balance = boltsOf(data, storeId).balance;
+        if (balance < bolts) {
+          set({ flash: `${want} coin${want === 1 ? " is" : "s are"} ${bolts} Bolts. The bay has ${balance}.` });
+          return;
+        }
+        const week = String(data.week);
+        set({
+          stores: data.stores.map((s) =>
+            s.id === storeId
+              ? {
+                  ...s,
+                  boltsSpent: (s.boltsSpent ?? 0) + bolts,
+                  boltCoins: { ...s.boltCoins, [week]: (s.boltCoins?.[week] ?? 0) + want },
+                }
+              : s,
+          ),
+          bots: patchBot(data.bots, storeId, (bot) => ({ ...bot, coins: { ...bot.coins, [slot]: (bot.coins[slot] ?? 0) + want } })),
+          flash: `${bolts} Bolts in. ${want} ${slot} coin${want === 1 ? "" : "s"} out.`,
+        });
+      },
       makePick: (boutId, pick) => {
         const data = get();
         const who = actor(data);
@@ -1504,7 +1563,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         const clean = name.trim().slice(0, 40);
         if (!clean) return;
         const specialists = data.crew.filter((c) => c.storeId === storeId && c.role === "specialist");
-        if (eligibilityClosed(data, data.week)) { set({ flash: "Add staff before Tuesday Pit Week begins." }); return; }
+
         if (specialists.length >= 8) {
           set({ flash: "Eight specialists is the bay cap." });
           return;
@@ -1519,7 +1578,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         if (!isCaptainOf(data, storeId)) return;
         const member = data.crew.find((c) => c.id === crewId && c.storeId === storeId && c.role === "specialist");
         if (!member) return;
-        if (eligibilityClosed(data, data.week)) { set({ flash: "Weekly roster is frozen. The Desk can mark a legitimate absence Off." }); return; }
+
         const specialists = data.crew.filter((c) => c.storeId === storeId && c.role === "specialist");
         if (specialists.length <= 1) {
           set({ flash: "A bay keeps at least one specialist." });
@@ -1761,10 +1820,12 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           if (data.week !== 5 || honors.pitBelt !== bot.storeId || !honors.titleDrop) return bot;
           return bot.owned.includes(honors.titleDrop) ? bot : { ...bot, owned: [...bot.owned, honors.titleDrop] };
         });
+        const postedBouts = [...data.bouts.filter((b) => b.week !== data.week), ...bouts];
         set({
           phase: "fought",
           bots,
-          bouts: [...data.bouts.filter((b) => b.week !== data.week), ...bouts],
+          bouts: postedBouts,
+          replays: sealReplay({ replays: data.replays, bouts: postedBouts, week: data.week }),
           gazette,
           craft,
           honors,
@@ -1826,7 +1887,9 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         if (data.week === 5) {
           set({
             phase: "complete",
-            flash: "Season closed. The Waterman Champion is on the wall.",
+            bouts: data.bouts,
+            replays: sealReplay(data),
+            flash: "Season closed. The Waterman Champion is on the wall. Every card stays on Fight Day as a replay.",
             log: ["Championship Saturday complete.", ...data.log].slice(0, 24),
           });
           return;
@@ -1878,7 +1941,11 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           phase: "open",
           bots,
           storeCards,
-          flash: next === 5 ? "Championship Week is open. Only the two conference champions can work on their bots; everyone else can Rally." : `Week ${next} is open. ${data.week === 1 ? "Coins are in the jars and the shop is open." : "Cards are house projections until the desk clicks in Sunday's colors."}`,
+          // The posted card stays on `bouts` (records) and in `replays` (the tape).
+          // Advance pays coins and moves the week. It does not drop the fight.
+          bouts: data.bouts,
+          replays: sealReplay(data),
+          flash: next === 5 ? "Championship Week is open. Only the two conference champions can work on their bots; everyone else can Rally. The regular season stays on Fight Day as a replay." : `Week ${next} is open. ${data.week === 1 ? "Coins are in the jars and the shop is open." : "Cards are house projections until the desk clicks in Sunday's colors."} Week ${data.week} stays on Fight Day as a replay.`,
           log: [...lines, ...data.log].slice(0, 24),
         });
       },
@@ -1943,6 +2010,17 @@ function renameRecordKey<T>(record: Record<string, T>): Record<string, T> {
   const next: Record<string, T> = {};
   for (const key of Object.keys(record)) next[key === "bryant" ? "hulen" : key] = record[key]!;
   return next;
+}
+
+function mapBout(bout: Bout): Bout {
+  return {
+    ...bout,
+    id: bout.id.replaceAll("bryant", "hulen"),
+    storeIds: bout.storeIds.map(mapStoreId),
+    teamA: bout.teamA.map(mapStoreId),
+    teamB: bout.teamB.map(mapStoreId),
+    result: bout.result ? mapFight(bout.result) : bout.result,
+  };
 }
 
 function mapFight(result: FightResult): FightResult {
@@ -2050,14 +2128,8 @@ export function applyHulen<T extends Partial<PitData>>(data: T): T {
     storeCards: data.storeCards?.map((card) =>
       card.storeId === "bryant" ? { ...card, id: card.id.replace(/^bryant-/, "hulen-"), storeId: "hulen" } : card,
     ),
-    bouts: data.bouts?.map((bout) => ({
-      ...bout,
-      id: bout.id.replaceAll("bryant", "hulen"),
-      storeIds: bout.storeIds.map(mapStoreId),
-      teamA: bout.teamA.map(mapStoreId),
-      teamB: bout.teamB.map(mapStoreId),
-      result: bout.result ? mapFight(bout.result) : bout.result,
-    })),
+    bouts: data.bouts?.map((bout) => mapBout(bout)),
+    replays: data.replays?.map((card) => ({ ...card, bouts: card.bouts.map((bout) => mapBout(bout)) })),
     quotes: data.quotes ? renameRecordKey(data.quotes) : data.quotes,
     proposals: data.proposals?.map((proposal) =>
       proposal.storeId === "bryant" ? { ...proposal, storeId: "hulen", crewId: mapCrewId(proposal.crewId) } : proposal,
@@ -2159,6 +2231,7 @@ export function applyLeague14<T extends Partial<PitData>>(data: T): T {
     rallies: data.rallies ?? [],
     cosmeticProposals: data.cosmeticProposals ?? [],
     halloweenArcade: data.halloweenArcade ?? [],
+    replays: backfillReplays(data.replays, data.bouts ?? []),
   } as T;
 }
 
