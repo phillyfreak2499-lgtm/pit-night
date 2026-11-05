@@ -6,6 +6,7 @@ import { pitCreator } from "../src/lib/pit/store.ts";
 import { makeData, WEEK_META } from "../src/lib/pit/seed.ts";
 import { PARTS, TIER_PRICE, partById, stockPart } from "../src/lib/pit/catalog.ts";
 import { programWeek } from "../src/lib/pit/training.ts";
+import { boltsOf } from "../src/lib/pit/week.ts";
 import { cosmeticUnlocked, earnedRewardIds, THANKSGIVING_REWARD_IDS } from "../src/lib/pit/cosmetics.ts";
 import { authorize, commandArgs } from "../src/lib/pit/commands.ts";
 import { buyCheck, championshipFinalists, showCheck, simulateDuel } from "../src/lib/pit/engine.ts";
@@ -92,7 +93,7 @@ test("catalog integrity: five Super parts, 8 coins, windowed, ungated, unlocked 
   const leaves = THANKSGIVING_SHOW_EFFECTS.find((effect) => effect.id === "leaves")!;
   assert.equal(leaves.name, "Falling Leaves");
   assert.equal(leaves.price, SHOW_PRICE);
-  assert.equal(leaves.price, 8);
+  assert.equal(leaves.price, 100);
   assert.equal(leaves.key, "utility");
 });
 
@@ -127,6 +128,7 @@ test("buy gate: closed before Nov 24, finalist-only in Week 5, owned parts stay 
   t.mock.timers.enable({ apis: ["Date"], now: central(2026, 11, 23, 12).getTime() });
   const league = state();
   fund(league);
+  creditShowBolts(league, "plano", 50);
 
   // Monday Nov 23: decorations are up, but no Thanksgiving part can be bought yet.
   assert.equal(thanksgivingVisuals(), true);
@@ -192,16 +194,20 @@ test("Falling Leaves sells league-wide in Week 5, finalist or not", (t) => {
   fund(league);
   const season = week5Season(league);
   const outsider = season.stores.find((s) => !championshipFinalists(season).includes(s.id))!.id;
+  creditShowBolts(league, outsider, 50);
+  creditShowBolts(league, championshipFinalists(season)[0]!, 50);
 
-  assert.equal(showCheck(season, outsider, "leaves").ok, true);
+  assert.equal(showCheck(league.getState(), outsider, "leaves").ok, true);
 
   // Store level: the Week 5 prep guard must not block a show purchase.
   const outsiderCaptain = season.crew.find((c) => c.storeId === outsider && c.role === "captain")!;
   league.setState({ session: { role: "captain", storeId: outsider, crewId: outsiderCaptain.id } satisfies Session });
   const utilityBefore = botOf(league, outsider).coins.utility;
+  const boltsBefore = boltsOf(league.getState(), outsider).balance;
   league.getState().buyShow(outsider, "leaves");
   assert.deepEqual(botOf(league, outsider).shows, ["leaves"]);
-  assert.equal(botOf(league, outsider).coins.utility, utilityBefore - 8);
+  assert.equal(botOf(league, outsider).coins.utility, utilityBefore);
+  assert.equal(boltsOf(league.getState(), outsider).balance, boltsBefore - 100);
   assert.match(league.getState().flash, /Falling Leaves is in the rafters/);
 
   const session = league.getState().session;
@@ -412,6 +418,27 @@ function state() {
   });
   store.getState().chooseStarterBody("plano", "striker", "shrike");
   return store;
+}
+
+function creditShowBolts(store: ReturnType<typeof state>, storeId: string, jobs: number) {
+  const captain = store.getState().crew.find((c) => c.storeId === storeId && c.role === "captain")!;
+  const before = store.getState().jobLog;
+  store.setState({
+    jobLog: [
+      ...before,
+      ...Array.from({ length: jobs }, (_, i) => ({
+        id: `test-show-${storeId}-${before.length}-${i}`,
+        week: 2,
+        jobId: `test-show-${i}`,
+        storeId,
+        crewId: captain.id,
+        crewName: captain.name,
+        note: "Approved fixture",
+        status: "approved" as const,
+        at: 1,
+      })),
+    ],
+  });
 }
 
 function fullCoins(n: number): Bot["coins"] {
