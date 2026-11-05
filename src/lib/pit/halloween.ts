@@ -9,7 +9,7 @@ import { dayDate, programWeek } from "./training";
  *
  * Purchase availability (owner directive 2026-10-25): Halloween stock —
  * the premium parts below, the Skeleton chassis, the Ghost Veil utility,
- * and the Fog Machine / Blacklight Mode show effects — is on the peg all
+ * and the all-season arena show effects — is on the peg all
  * season, in every week. There is no November-only sales window anymore,
  * so `premiumHalloweenOpen` returns true for every date. Decorations
  * timing (`halloweenVisuals`) is unchanged.
