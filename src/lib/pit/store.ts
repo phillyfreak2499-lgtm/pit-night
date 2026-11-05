@@ -1258,7 +1258,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         const data = get();
         if (!isCaptainOf(data, storeId)) return;
         if (!cosmeticUnlocked(data, storeId, "look", look)) {
-          set({ flash: "That stripe kit is still locked." });
+          set({ flash: "That paint pattern is still locked." });
           return;
         }
         set({ bots: patchBot(data.bots, storeId, (b) => ({ ...b, look })), flash: "Bot dressed. Still the same iron." });
