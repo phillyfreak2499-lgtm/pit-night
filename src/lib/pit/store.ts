@@ -1517,8 +1517,8 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           if (value === undefined || value === null || typeof value === "object") continue;
           if (["flag", "walkout", "victory", "body"].includes(kind)) continue;
           if (
-            ["finish", "decal", "trim", "eye", "topper", "mask", "weaponSkin", "leds", "smoke", "banner"].includes(kind) &&
-            !cosmeticUnlocked(data, storeId, kind as "finish" | "decal" | "trim" | "eye" | "topper" | "mask" | "weaponSkin" | "leds" | "smoke" | "banner", String(value))
+            ["finish", "decal", "trim", "eye", "topper", "mask", "weaponSkin", "wheelColor", "leds", "smoke", "banner"].includes(kind) &&
+            !cosmeticUnlocked(data, storeId, kind as "finish" | "decal" | "trim" | "eye" | "topper" | "mask" | "weaponSkin" | "wheelColor" | "leds" | "smoke" | "banner", String(value))
           ) {
             set({ flash: "Earn that cosmetic in Pit Week first." });
             return;

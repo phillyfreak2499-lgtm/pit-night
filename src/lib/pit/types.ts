@@ -61,7 +61,7 @@ export const TOPPER_IDS = ["none", "antenna", "horns", "mohawk", "crown", "beaco
 export type BotTopper = (typeof TOPPER_IDS)[number];
 export type BotMask = "none" | "lantern" | "hockey";
 /** Cosmetic blade only. Premium Halloween weapons are real parts, not skins. */
-export type BotWeaponSkin = "none" | "hockey-machete";
+export type BotWeaponSkin = "none" | "hockey-machete" | "neon-fang" | "gold-fang" | "ice-fang";
 export type ShowEffectId = "fog" | "blacklight" | "leaves";
 export type BotLeds = "none" | StatKey;
 export const SMOKE_IDS = ["", "neon", "candy", "ice", "royal", "black"] as const;
@@ -91,6 +91,8 @@ export type BotStyle = {
   mask?: BotMask;
   /** Drawn over the weapon. Does not change the equipped part or its stats. */
   weaponSkin?: BotWeaponSkin;
+  /** Painted wheel hubs and rim rings. Cosmetic only. */
+  wheelColor?: string;
   /** Glow along the trim. Absent on old saves; styleOf() defaults to none. */
   leds?: BotLeds;
   /** Colored smoke. Empty string means off. Old saves omit it. */

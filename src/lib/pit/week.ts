@@ -104,7 +104,7 @@ export function boltCoinsLeft(data: Pick<PitData, "stores" | "week">, storeId: s
 /** Bolt Locker. Looks only. */
 export type LockerItem = {
   id: string;
-  kind: "walkout" | "victory" | "paint" | "finish" | "smoke" | "foil";
+  kind: "walkout" | "victory" | "paint" | "finish" | "smoke" | "foil" | "wheelColor" | "weaponSkin";
   name: string;
   price: number;
   blurb: string;
@@ -122,6 +122,20 @@ export const LOCKER: LockerItem[] = [
   { id: "paint-candy", kind: "paint", name: "Candy Red", price: 6, blurb: "Deep candy-apple red.", hex: "#e3123f" },
   { id: "paint-ice", kind: "paint", name: "Glacier", price: 6, blurb: "Pale ice blue.", hex: "#bfe8ff" },
   { id: "paint-royal", kind: "paint", name: "Royal Purple", price: 6, blurb: "For bays that act like they own the place.", hex: "#6a2bd9" },
+  { id: "paint-coral", kind: "paint", name: "Coral", price: 6, blurb: "Warm orange-pink shell color.", hex: "#ff745f" },
+  { id: "paint-mint", kind: "paint", name: "Mint", price: 6, blurb: "Cool sea-glass green.", hex: "#59dfbf" },
+  { id: "paint-sunset", kind: "paint", name: "Sunset", price: 6, blurb: "Hot orange that reads across the cage.", hex: "#ff8e32" },
+  { id: "paint-ultraviolet", kind: "paint", name: "Ultraviolet", price: 6, blurb: "Violet under the arena lights.", hex: "#aa56ff" },
+  { id: "paint-midnight", kind: "paint", name: "Midnight Blue", price: 6, blurb: "Deep blue for a stealthy shell.", hex: "#223c86" },
+  { id: "paint-bubblegum", kind: "paint", name: "Bubblegum", price: 6, blurb: "Bright pink for a loud entrance.", hex: "#ff83cb" },
+  { id: "wheel-neon", kind: "wheelColor", name: "Neon wheels", price: 5, blurb: "Glowing green hubs and rim rings.", hex: "#39ff6a" },
+  { id: "wheel-candy", kind: "wheelColor", name: "Candy wheels", price: 5, blurb: "Red hubs and rim rings.", hex: "#e3123f" },
+  { id: "wheel-ice", kind: "wheelColor", name: "Glacier wheels", price: 5, blurb: "Icy blue hubs and rim rings.", hex: "#bfe8ff" },
+  { id: "wheel-gold", kind: "wheelColor", name: "Gold wheels", price: 5, blurb: "Golden hubs and rim rings.", hex: "#f4c44e" },
+  { id: "wheel-ultraviolet", kind: "wheelColor", name: "Ultraviolet wheels", price: 5, blurb: "Purple hubs and rim rings.", hex: "#aa56ff" },
+  { id: "weapon-neon-fang", kind: "weaponSkin", name: "Neon Fang", price: 8, blurb: "Green weapon edge and glowing fang guard. No combat effect.", hex: "#39ff6a" },
+  { id: "weapon-gold-fang", kind: "weaponSkin", name: "Gold Fang", price: 8, blurb: "Gold weapon edge and fang guard. No combat effect.", hex: "#f4c44e" },
+  { id: "weapon-ice-fang", kind: "weaponSkin", name: "Glacier Fang", price: 8, blurb: "Icy weapon edge and fang guard. No combat effect.", hex: "#bfe8ff" },
   { id: "sticker-foil", kind: "foil", name: "Holo foil stickers", price: 4, blurb: "Foil versions of stickers you already own. They still use the four fixed slots. A perfect week with 6 greens unlocks the same shine." },
   { id: "finish-holographic", kind: "finish", name: "Holographic finish", price: 14, blurb: "The shell shifts color under the lights. Full Tune-Ups in 3 weeks unlock it too." },
   { id: "smoke-neon", kind: "smoke", name: "Neon smoke", price: 10, blurb: "Locker neon, blown out as smoke. Looks only.", hex: "#39ff6a" },

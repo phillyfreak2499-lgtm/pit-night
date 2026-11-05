@@ -1,14 +1,14 @@
 import { botFrameOf as frameOf, type BotFrame as Frame } from "./bot-frame";
 import { sawPoseOf } from "./bot-weapons";
 import { bannerVerdict } from "../../../scripts/copy-guard.mjs";
-import { EYES, LEDS, PAINT, SMOKE, TRIM, decalArt, styleOf } from "@/lib/pit/catalog";
+import { EYES, LEDS, PAINT, SMOKE, TRIM, WHEEL_COLORS, decalArt, styleOf } from "@/lib/pit/catalog";
 import { ELECTION_COLORS } from "@/lib/pit/election";
 import { arenaTheme, drawArenaHazards, drawArenaTopScene, paintArenaScene, paintArenaJanelleBanner, type ArenaId, type ArenaTheme } from "./arena-scenes";
 import { paintTeamJanelleBanner } from "./team-janelle-banner";
 import { measureTeamFlag, paintTeamFlagName } from "./team-flag";
 import { drawFallSticker, drawFallTopper, drawFallWeapon, drawFallWeaponTop } from "./fall-art";
 import { armorEdges, deckHardware } from "./material-detail";
-import type { BotBody, ClassId } from "@/lib/pit/types";
+import type { BotBody, BotWeaponSkin, ClassId } from "@/lib/pit/types";
 import { PIT, clamp, ease, hash, lerp, type BotState, type Drive, type Spot } from "./cage-motion";
 
 /* ------------------------------------------------------------------ */
@@ -1423,6 +1423,11 @@ function drawWheel(
   ctx.beginPath();
   ctx.arc(x, y, r * 0.3, 0, Math.PI * 2);
   ctx.fill();
+  ctx.strokeStyle = paint;
+  ctx.lineWidth = Math.max(1.5, r * 0.095);
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.69, 0, Math.PI * 2);
+  ctx.stroke();
   ctx.fillStyle = "#1a1918";
   for (let i = 0; i < 5; i++) {
     const a = roll + (i / 5) * Math.PI * 2;
@@ -1536,7 +1541,7 @@ export function drawSideBot(
   const dark = shade(paint, -80);
   const trim = TRIM[style.trim] ?? TRIM.steel!;
   const eye = EYES[style.eye] ?? EYES.green!;
-  const hub = style.trim === "steel" ? shade(paint, -40) : trim;
+  const hub = style.wheelColor && style.wheelColor !== "stock" ? WHEEL_COLORS[style.wheelColor]?.hex ?? trim : style.trim === "steel" ? shade(paint, -40) : trim;
 
   // Weapon behind the hull (arms, hammer back swing).
   weaponBack(ctx, s, f, u2, spin);
@@ -2007,6 +2012,7 @@ export function drawSideBot(
   ctx.fill();
 
   weaponFront(ctx, s, f, u2, spin, dark);
+  drawFangSkin(ctx, style.weaponSkin, f.front * u2, (f.deck + 0.12) * u2, u2 * 0.24);
 
   if (s.flame > 0) drawFlame(ctx, f.front * u2, top + f.height * u2 * 0.3, u2, s.flame, time);
 
@@ -3285,6 +3291,26 @@ function weaponBack(ctx: CanvasRenderingContext2D, s: BotState, f: Frame, u: num
     ctx.arc(px, py, 0.05 * u, 0, Math.PI * 2);
     ctx.fill();
   }
+}
+
+function drawFangSkin(ctx: CanvasRenderingContext2D, skin: BotWeaponSkin | undefined, x: number, y: number, size: number) {
+  const color = skin === "neon-fang" ? "#39ff6a" : skin === "gold-fang" ? "#f4c44e" : skin === "ice-fang" ? "#bfe8ff" : null;
+  if (!color) return;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = Math.max(2, size * 0.11);
+  ctx.shadowColor = color;
+  ctx.shadowBlur = size * 0.45;
+  ctx.beginPath();
+  ctx.moveTo(x - size * 0.6, y - size * 0.45);
+  ctx.lineTo(x + size * 0.55, y - size * 0.12);
+  ctx.lineTo(x - size * 0.2, y + size * 0.42);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(x - size * 0.15, y, size * 0.14, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 function weaponFront(
@@ -4929,6 +4955,7 @@ export function drawTopBot(
     ctx.restore();
   }
   drawTopperPlan(ctx, style.topper, len, wid, time, EYES[style.eye] ?? "#50ff8c");
+  drawFangSkin(ctx, style.weaponSkin, len * 0.45, -wid * 0.3, wid * 0.45);
   if (style.banner) drawBannerPlate(ctx, style.banner, -len * 0.05, wid * 0.78, len * 1.4, false);
   if (style.smoke && SMOKE[style.smoke]) drawSmokePuffs(ctx, -len * 0.2, -wid * 0.1, len * 1.2, SMOKE[style.smoke].rgb, time);
   ctx.restore();

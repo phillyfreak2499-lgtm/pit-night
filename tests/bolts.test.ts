@@ -7,6 +7,7 @@ import { boltCoinsLeft, boltsOf } from "../src/lib/pit/week.ts";
 import { BOLT_EXCHANGE, BOLTS } from "../src/lib/pit/training.ts";
 import { REPAIR_PRICE } from "../src/lib/pit/catalog.ts";
 import { authorize, CAPTAIN_BUILD_COMMANDS, commandArgs } from "../src/lib/pit/commands.ts";
+import { cosmeticUnlocked } from "../src/lib/pit/cosmetics.ts";
 
 const STORE = "plano";
 const PART = "weapon-saw-pro";
@@ -134,4 +135,22 @@ test("command schemas accept the new Bolt moves and keep the exchange off the bu
   assert.ok(!commandArgs.convertBolts.safeParse([STORE, "weapon", 0]).success);
   assert.ok(CAPTAIN_BUILD_COMMANDS.has("repairSlot"));
   assert.ok(!CAPTAIN_BUILD_COMMANDS.has("convertBolts"));
+});
+
+test("Bolt-only looks require purchase and equip without changing the build", () => {
+  const store = setup();
+  const before = bot(store);
+  const build = JSON.stringify({ equipped: before.equipped, stats: before.stats });
+  assert.equal(cosmeticUnlocked(store.getState(), STORE, "wheelColor", "neon"), false);
+  assert.equal(cosmeticUnlocked(store.getState(), STORE, "weaponSkin", "neon-fang"), false);
+  store.getState().setStyle(STORE, { wheelColor: "neon", weaponSkin: "neon-fang" });
+  assert.notEqual(bot(store).style?.wheelColor, "neon");
+
+  for (const id of ["wheel-neon", "weapon-neon-fang", "paint-coral"]) store.getState().buyLocker(STORE, id);
+  store.getState().setStyle(STORE, { wheelColor: "neon", weaponSkin: "neon-fang" });
+  store.getState().setPaint(STORE, "coral");
+  assert.equal(bot(store).style?.wheelColor, "neon");
+  assert.equal(bot(store).style?.weaponSkin, "neon-fang");
+  assert.equal(store.getState().stores.find((s) => s.id === STORE)?.paint, "coral");
+  assert.equal(JSON.stringify({ equipped: bot(store).equipped, stats: bot(store).stats }), build);
 });

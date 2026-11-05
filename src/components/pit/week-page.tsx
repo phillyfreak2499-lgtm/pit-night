@@ -750,13 +750,17 @@ function BoltLocker({ data, storeId, canBuy }: { data: PitData; storeId: string;
                 ? bot?.style?.victory === item.id
                 : item.kind === "finish"
                   ? bot?.style?.finish === "holographic"
+                  : item.kind === "wheelColor"
+                    ? bot?.style?.wheelColor === item.id.replace("wheel-", "")
+                    : item.kind === "weaponSkin"
+                      ? bot?.style?.weaponSkin === item.id.replace("weapon-", "")
                   : item.kind === "smoke"
                     ? bot?.style?.smoke === item.id.replace("smoke-", "")
                     : item.kind === "foil"
                       ? false
                       : store.paint === item.id.replace("paint-", "");
           const kindLabel =
-            item.kind === "walkout" ? "Walk-out" : item.kind === "victory" ? "Victory" : item.kind === "finish" ? "Finish" : item.kind === "smoke" ? "Smoke" : item.kind === "foil" ? "Stickers" : "Paint";
+            item.kind === "walkout" ? "Walk-out" : item.kind === "victory" ? "Victory" : item.kind === "finish" ? "Finish" : item.kind === "smoke" ? "Smoke" : item.kind === "foil" ? "Stickers" : item.kind === "wheelColor" ? "Wheels" : item.kind === "weaponSkin" ? "Weapon" : "Paint";
           return (
             <li key={item.id} className="flex flex-col gap-2 bg-surface p-4">
               <div className="flex items-start justify-between gap-2">
@@ -775,6 +779,8 @@ function BoltLocker({ data, storeId, canBuy }: { data: PitData; storeId: string;
                     tone={equipped ? "line" : "amber"}
                     onClick={() => {
                       if (item.kind === "paint") setPaint(storeId, item.id.replace("paint-", ""));
+                      else if (item.kind === "wheelColor") setStyle(storeId, { wheelColor: item.id.replace("wheel-", "") });
+                      else if (item.kind === "weaponSkin") setStyle(storeId, { weaponSkin: item.id.replace("weapon-", "") as "neon-fang" | "gold-fang" | "ice-fang" });
                       else if (item.kind === "walkout") setStyle(storeId, { walkout: equipped ? "" : item.id });
                       else if (item.kind === "victory") setStyle(storeId, { victory: equipped ? "" : item.id });
                       else if (item.kind === "finish") setStyle(storeId, { finish: equipped ? "factory" : "holographic" });

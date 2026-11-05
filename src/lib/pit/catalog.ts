@@ -65,6 +65,12 @@ export const PAINT: Record<string, string> = {
   candy: "#e3123f",
   ice: "#bfe8ff",
   royal: "#6a2bd9",
+  coral: "#ff745f",
+  mint: "#59dfbf",
+  sunset: "#ff8e32",
+  ultraviolet: "#aa56ff",
+  midnight: "#223c86",
+  bubblegum: "#ff83cb",
 };
 
 /** Paints only the Bolt Locker sells. Key is the paint, value is the locker item. */
@@ -73,6 +79,21 @@ export const LOCKER_PAINTS: Record<string, string> = {
   candy: "paint-candy",
   ice: "paint-ice",
   royal: "paint-royal",
+  coral: "paint-coral",
+  mint: "paint-mint",
+  sunset: "paint-sunset",
+  ultraviolet: "paint-ultraviolet",
+  midnight: "paint-midnight",
+  bubblegum: "paint-bubblegum",
+};
+
+export const WHEEL_COLORS: Record<string, { label: string; hex: string }> = {
+  stock: { label: "Stock hubs", hex: "#7b8790" },
+  neon: { label: "Neon wheels", hex: "#39ff6a" },
+  candy: { label: "Candy wheels", hex: "#e3123f" },
+  ice: { label: "Glacier wheels", hex: "#bfe8ff" },
+  gold: { label: "Gold wheels", hex: "#f4c44e" },
+  ultraviolet: { label: "Ultraviolet wheels", hex: "#aa56ff" },
 };
 
 export const FINISHES: { id: BotFinish; label: string; note: string }[] = [
@@ -136,6 +157,9 @@ export const MASKS: { id: BotMask; label: string }[] = [
 export const WEAPON_SKINS: { id: BotWeaponSkin; label: string }[] = [
   { id: "none", label: "No weapon skin" },
   { id: "hockey-machete", label: "Hockey Mask Machete" },
+  { id: "neon-fang", label: "Neon Fang" },
+  { id: "gold-fang", label: "Gold Fang" },
+  { id: "ice-fang", label: "Glacier Fang" },
 ];
 
 export const DECALS: { id: BotDecal; label: string }[] = [
@@ -204,6 +228,7 @@ export const DEFAULT_STYLE: BotStyle = {
   banner: "",
   mask: "none",
   weaponSkin: "none",
+  wheelColor: "stock",
 };
 
 export function defaultBody(classId: ClassId): BotBody {

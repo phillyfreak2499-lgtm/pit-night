@@ -677,6 +677,15 @@ export function createGarageCosmetics(
       red,
     );
   }
+  const fangColor = style.weaponSkin === "neon-fang" ? "#39ff6a" : style.weaponSkin === "gold-fang" ? "#f4c44e" : style.weaponSkin === "ice-fang" ? "#bfe8ff" : null;
+  if (fangColor && look.weapon !== "hidden" && look.weapon !== "none") {
+    const fang = new THREE.MeshStandardMaterial({ color: fangColor, emissive: fangColor, emissiveIntensity: 0.35, metalness: 0.65, roughness: 0.25 });
+    for (const side of [-1, 1]) {
+      const edge = box("Fang weapon edge", [0.055, 0.045, 0.45], [side * width * 0.18, 0.51, depth / 2 + 0.19], fang);
+      edge.rotation.y = side * 0.16;
+      box("Fang weapon tip", [0.1, 0.025, 0.12], [side * width * 0.18, 0.53, depth / 2 + 0.46], fang);
+    }
+  }
   // Unused shared materials are not traversed by the scene's resource cleanup.
   const used = new Set<THREE.Material>();
   group.traverse((object) => {

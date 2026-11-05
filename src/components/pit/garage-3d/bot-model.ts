@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { EYES, PAINT, TRIM, styleOf } from "@/lib/pit/catalog";
+import { EYES, PAINT, TRIM, WHEEL_COLORS, styleOf } from "@/lib/pit/catalog";
 import type { BotBody } from "@/lib/pit/types";
 import type { BotLookProps } from "../bot-portrait";
 import { botFrameOf } from "../bot-frame";
@@ -184,7 +184,7 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
     dark = metal("#20252b", 0.55, 0.5);
   const trim = metal(TRIM[style.trim] ?? TRIM.steel, 0.4, 0.8);
   // Classic stock hubs tint the base paint, even when a finish changes the shell.
-  const hubColor =
+  const hubColor = style.wheelColor && style.wheelColor !== "stock" ? WHEEL_COLORS[style.wheelColor]?.hex ?? TRIM.steel :
     style.trim === "steel"
       ? `rgb(${[1, 3, 5].map((offset) => Math.max(0, parseInt(color.slice(offset, offset + 2), 16) - 40)).join(",")})`
       : (TRIM[style.trim] ?? TRIM.steel);

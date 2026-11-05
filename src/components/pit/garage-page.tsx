@@ -8,7 +8,7 @@ import type { CosmeticLoadout, StickerSlot } from "@/lib/pit/types";
 import { BuildLockBanner } from "./build-lock-banner";
 import { Link } from "@tanstack/react-router";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { BODY_STYLES, CLASS_META, DECALS, EYES, FINISHES, LEDS, MASKS, PAINT, SMOKE, TOPPERS, WEAPON_SKINS, batteryOf, partById, partsFor, SLOT_LABEL, styleOf, TRIM } from "@/lib/pit/catalog";
+import { BODY_STYLES, CLASS_META, DECALS, EYES, FINISHES, LEDS, MASKS, PAINT, SMOKE, TOPPERS, WEAPON_SKINS, WHEEL_COLORS, batteryOf, partById, partsFor, SLOT_LABEL, styleOf, TRIM } from "@/lib/pit/catalog";
 import {
   buyCheck,
   canSeeLoadout,
@@ -619,6 +619,8 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
     if (kind === "decal" && value.endsWith("-foil")) return "Foil stickers: 4 Bolts, or one perfect week with 6 greens";
     if (kind === "finish" && value === "holographic") return "Full Tune-Ups in 3 weeks, or 14 Bolts";
     if (kind === "smoke" && value && value !== "black") return "10 Bolts in the Bolt Locker";
+    if (kind === "wheelColor" && value !== "stock") return "5 Bolts in the Bolt Locker";
+    if (kind === "weaponSkin" && value.endsWith("-fang")) return "8 Bolts in the Bolt Locker";
     const reward = rewardFor(kind, value);
     if (!reward) return "Locked";
     const row = progress.find((item) => item.reward.id === reward.id);
@@ -802,6 +804,13 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
                   {row.label}{!open ? " 🔒" : ""}
                 </Chip>
               );
+            })}
+          </Group>
+
+          <Group label="Wheel colors">
+            {Object.entries(WHEEL_COLORS).map(([key, row]) => {
+              const open = unlocked("wheelColor", key);
+              return <Swatch key={key} color={row.hex} active={(style.wheelColor ?? "stock") === key} label={row.label} disabled={!open} title={open ? row.label : lockTitle("wheelColor", key)} onClick={() => setStyle(storeId, { wheelColor: key })} />;
             })}
           </Group>
 
