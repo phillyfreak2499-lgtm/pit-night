@@ -12,7 +12,7 @@ export type KeyName = Slot;
 export type BoutKind = "bout" | "bye" | "tag" | "semi" | "final" | "melee";
 export type Method = "ko" | "dump" | "decision" | "melee" | "scrimmage" | "bye";
 export type GarageLook = "hazard" | "concrete" | "night" | "bone" | "checker";
-export type BotLook = "plain" | "stripe" | "chevron" | "rivets" | "two-tone" | "camouflage" | "tie-dye" | "texas";
+export type BotLook = "plain" | "stripe" | "chevron" | "rivets" | "two-tone" | "camouflage" | "tie-dye" | "texas" | "louisiana" | "cowboys" | "seahawks" | "raiders" | "chiefs";
 export const FINISH_IDS = ["factory", "chrome", "matte", "worn", "satin", "carbon", "iridescent", "gold", "holographic"] as const;
 export type BotFinish = (typeof FINISH_IDS)[number];
 /** Base sticker art. Foil versions are the same id plus "-foil" and share the four slots. */
@@ -54,11 +54,16 @@ export const STICKER_ART = [
   "tonic",
   "archlabs",
   "turbo",
+  "airforce",
+  "longhorn",
 ] as const;
 export type StickerArt = (typeof STICKER_ART)[number];
 export type BotDecal = StickerArt | `${Exclude<StickerArt, "none">}-foil`;
 export const TOPPER_IDS = ["none", "antenna", "horns", "mohawk", "crown", "beacon", "dish", "flagpole", "janelle-pink", "janelle-red", "janelle-purple", "janelle-blue", "janelle-teal", "janelle-gold", "pilgrimhat", "wreath", "tophat", "bugle", "tincan", "tyler-roses"] as const;
 export type BotTopper = (typeof TOPPER_IDS)[number];
+/** Optional side-mounted B-1B-inspired swept wing kit. Visual only. */
+export const WING_IDS = ["none", "abilene"] as const;
+export type BotWings = (typeof WING_IDS)[number];
 export type BotMask = "none" | "lantern" | "hockey";
 /** Cosmetic blade only. Premium Halloween weapons are real parts, not skins. */
 export type BotWeaponSkin = "none" | "hockey-machete" | "neon-fang" | "gold-fang" | "ice-fang";
@@ -87,6 +92,7 @@ export type BotStyle = {
   eye: string;
   flag: boolean;
   topper?: BotTopper;
+  wings?: BotWings;
   /** Face plate. Visual only. */
   mask?: BotMask;
   /** Drawn over the weapon. Does not change the equipped part or its stats. */
