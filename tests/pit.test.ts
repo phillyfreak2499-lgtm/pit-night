@@ -17,7 +17,7 @@ import { buildBeats, fightDrive, type Beat } from "../src/components/pit/cage-mo
 import { Fx } from "../src/components/pit/cage-draw.ts";
 import type { Bout, FightResult, Grade, KeyName, Session, StatKey, StoreCard } from "../src/lib/pit/types.ts";
 import { STICKER_ART } from "../src/lib/pit/types.ts";
-import { DECALS, styleOf, GRADE_COINS, METRICS } from "../src/lib/pit/catalog.ts";
+import { DECALS, styleOf, partById, GRADE_COINS, METRICS } from "../src/lib/pit/catalog.ts";
 import { createFrameLoop } from "../src/lib/pit/frame-loop.ts";
 import { leagueArgs, sameSession, singleFlight } from "../src/lib/pit/sync-policy.ts";
 import { memoSnapshot, snapshotStorage } from "../src/lib/pit/snapshot-storage.ts";
@@ -98,6 +98,47 @@ test("free Tyler rose topper is available to all stores and never heals a future
   const gifted = grantOwnerGifts(after, due);
   assert.ok(gifted.ownerEvents?.includes(TYLER_ROSES_GIFT));
   assert.ok(!gifted.ownerEvents?.includes(WEEK2_REPAIR_GIFT));
+});
+
+
+test("every new state, football and Bumblebee skin and sticker is unlocked without stat effect", () => {
+  const data = makeData();
+  const looks = ["louisiana", "cowboys", "seahawks", "raiders", "chiefs", "bumblebee"] as const;
+  for (const store of data.stores) {
+    for (const look of looks) {
+      assert.equal(cosmeticUnlocked(data, store.id, "look", look), true, store.id + " " + look);
+      assert.equal(commandArgs.setLook.safeParse([store.id, look]).success, true);
+    }
+    for (const [kind, value] of [
+      ["decal", "airforce"], ["decal", "longhorn"],
+      ["topper", "shrek-ears"], ["topper", "wally-eyes"],
+      ["wings", "abilene"],
+    ] as const) assert.equal(cosmeticUnlocked(data, store.id, kind, value), true, store.id + " " + value);
+    const bot = data.bots.find((b) => b.storeId === store.id)!;
+    const before = { ...bot };
+    const proposed = checkedCosmeticLoadout(data, store.id, {
+      paint: store.paint,
+      look: "bumblebee",
+      number: bot.number,
+      style: { ...styleOf(bot), wings: "abilene", topper: "wally-eyes",
+        stickers: { left: "airforce", right: "longhorn", hood: "none", rear: "none" } },
+    }, true);
+    assert.ok(proposed, "New mixed cosmetic loadout rejected");
+    assert.equal(proposed.style.wings, "abilene");
+    assert.deepEqual(data.bots.find((b) => b.storeId === store.id), before, "Preview mutated a bot");
+  }
+});
+
+test("Longhorn Ram is a paid Sport Wedge equivalent, never a hidden combat upgrade", () => {
+  const ram = partById("weapon-longhorn-sport")!;
+  const wedge = partById("weapon-wedge-sport")!;
+  assert.equal(ram.name, "Longhorn Ram");
+  assert.equal(ram.slot, "weapon");
+  assert.equal(ram.family, wedge.family);
+  assert.equal(ram.tier, wedge.tier);
+  assert.equal(ram.price, wedge.price);
+  assert.deepEqual(ram.nudge, wedge.nudge);
+  assert.deepEqual(ram.tags, wedge.tags);
 });
 
 test("transient state updates neither project nor serialize unchanged persisted data", () => {

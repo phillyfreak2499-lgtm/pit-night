@@ -442,6 +442,13 @@ const LOOKS: { id: BotLook; label: string }[] = [
   { id: "camouflage", label: "Camouflage" },
   { id: "tie-dye", label: "Lulu" },
   { id: "texas", label: "Texas Lone Star" },
+  { id: "louisiana", label: "Louisiana Flag" },
+  { id: "cowboys", label: "Dallas Cowboys colors" },
+  { id: "seahawks", label: "Seattle Seahawks colors" },
+  { id: "raiders", label: "Oakland Raiders colors" },
+  { id: "chiefs", label: "Kansas City Chiefs colors" },
+  { id: "bumblebee", label: "Bumblebee" },
+  { id: "chase", label: "Chase · Spartan armor" },
 ];
 
 function garageClass(look: GarageLook) {
@@ -801,7 +808,7 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
           ))}
 
           <Group label="Stripes, patterns & skins">
-            <p className="mb-2 text-xs text-muted">Two-tone uses your selected base paint and trim color. Camouflage and Lulu add all-over patterns; Texas uses the Lone Star flag.</p>
+            <p className="mb-2 text-xs text-muted">Choose state flags or original, football-inspired team-color graphics. These fan-theme skins are not official NFL logos.</p>
             {LOOKS.map((row) => (
               <Chip key={row.id} active={bot.look === row.id} onClick={() => setLook(storeId, row.id)}>
                 {row.label}
@@ -885,6 +892,11 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
                 </Chip>
               );
             })}
+          </Group>
+
+          <Group label="Side wings">
+            <Chip active={(style.wings ?? "none") === "none"} onClick={() => setStyle(storeId, { wings: "none" })}>No wings</Chip>
+            <Chip active={style.wings === "abilene"} onClick={() => setStyle(storeId, { wings: "abilene" })}>Abilene · B-1B swept wings</Chip>
           </Group>
 
           <Group label="Flag">

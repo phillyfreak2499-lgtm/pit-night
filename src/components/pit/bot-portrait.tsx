@@ -16,6 +16,8 @@ export type BotLookProps = {
   classId: ClassId;
   /** Weapon family, or "hidden" when the viewer may not see the loadout. */
   weapon: string;
+  /** The equipped weapon name distinguishes visual variants sharing one combat family. */
+  weaponName?: string;
   look: BotLook;
   number: string;
   hp: number;
@@ -48,6 +50,7 @@ export function useBotLook(storeId: string): BotLookProps | null {
     paint: store.paint,
     classId: bot.classId,
     weapon: see ? weaponFamilyOf(bot) || "none" : "hidden",
+    weaponName: see ? partById((bot.locked ?? bot.draft).weapon)?.name : undefined,
     look: bot.look,
     number: bot.number,
     hp: Math.max(10, hp),
@@ -68,6 +71,7 @@ function stateFor(look: BotLookProps): BotState {
     paint: look.paint,
     classId: look.classId,
     weaponFamily: look.weapon,
+    weaponName: look.weaponName ?? look.weapon,
     look: look.look,
     number: look.number,
     style: look.style,

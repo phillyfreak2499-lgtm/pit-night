@@ -37,7 +37,7 @@ export function checkedCosmeticLoadout(
   )
     return null;
   if (data.week === 1 && bot.style?.body && style.body !== bot.style.body) return null;
-  for (const kind of ["finish", "decal", "trim", "eye", "topper", "mask", "weaponSkin", "wheelColor", "leds"] as const) {
+  for (const kind of ["finish", "decal", "trim", "eye", "topper", "wings", "mask", "weaponSkin", "wheelColor", "leds"] as const) {
     if (!allowed(kind, style[kind] ?? "none")) return null;
   }
   if (!allowed("smoke", style.smoke ?? "")) return null;

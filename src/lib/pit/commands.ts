@@ -3,7 +3,7 @@ import { championshipFinalists } from "./engine";
 import { buildLockMessage, deadlineDue } from "./time";
 import { BOLT_EXCHANGE } from "./training";
 import type { PitData, Session } from "./types";
-import { FINISH_IDS, SMOKE_IDS, STICKER_ART, TOPPER_IDS, type BotDecal } from "./types";
+import { FINISH_IDS, SMOKE_IDS, STICKER_ART, TOPPER_IDS, WING_IDS, type BotDecal } from "./types";
 
 const decalValues = [
   ...STICKER_ART,
@@ -39,6 +39,7 @@ const style = z
   .object({
     body: body.optional(),
     topper: topper.optional(),
+    wings: z.enum(WING_IDS).optional(),
     mask: z.enum(["none", "lantern", "hockey"]).optional(),
     weaponSkin: z.enum(["none", "hockey-machete", "neon-fang", "gold-fang", "ice-fang"]).optional(),
     wheelColor: z.enum(["stock", "neon", "candy", "ice", "gold", "ultraviolet"]).optional(),
@@ -56,7 +57,7 @@ const style = z
   })
   .strict();
 export const cosmeticLoadoutSchema = z.object({
-  paint: id, look: z.enum(["plain", "stripe", "chevron", "rivets", "two-tone", "camouflage", "tie-dye", "texas"]),
+  paint: id, look: z.enum(["plain", "stripe", "chevron", "rivets", "two-tone", "camouflage", "tie-dye", "texas", "louisiana", "cowboys", "seahawks", "raiders", "chiefs", "bumblebee", "chase"]),
   number: z.string().max(3), style: style.required({ finish: true, decal: true, trim: true, eye: true, flag: true }),
 }).strict();
 export const commandArgs = {
@@ -91,7 +92,7 @@ export const commandArgs = {
   renameCaptain: z.tuple([id, text]),
   setPaint: z.tuple([id, id]),
   setGarage: z.tuple([id, z.enum(["hazard", "concrete", "night", "bone", "checker"])]),
-  setLook: z.tuple([id, z.enum(["plain", "stripe", "chevron", "rivets", "two-tone", "camouflage", "tie-dye", "texas"])]),
+  setLook: z.tuple([id, z.enum(["plain", "stripe", "chevron", "rivets", "two-tone", "camouflage", "tie-dye", "texas", "louisiana", "cowboys", "seahawks", "raiders", "chiefs", "bumblebee", "chase"])]),
   setStyle: z.tuple([id, style]),
   completeJob: z.tuple([week, id, text]),
   approveJob: z.tuple([id]),

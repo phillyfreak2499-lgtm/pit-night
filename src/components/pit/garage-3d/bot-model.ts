@@ -1017,6 +1017,24 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
             brass,
             weapon,
           );
+      if (look.weaponName === "Longhorn Ram") {
+        // The real selectable weapon shares wedge combat behavior; its forward
+        // impact bar carries outward-swept, ivory-tipped Texas cattle horns.
+        const horn = new THREE.MeshStandardMaterial({color:"#e7d4ad",roughness:0.38,metalness:0.2});
+        const brown = new THREE.MeshStandardMaterial({color:"#916e40",roughness:0.62});
+        box("Longhorn Ram reinforced nose",[w*0.9,0.14,0.14],[0,0.18,front+0.62],dark,weapon);
+        for(const side of [-1,1]){
+          const segments: [number,number,number][]=[
+            [side*w*0.25,0.23,front+0.6],
+            [side*w*0.52,0.31,front+0.78],
+            [side*w*0.77,0.38,front+0.84],
+            [side*w*0.88,0.52,front+0.9],
+          ];
+          for(let i=0;i<segments.length-1;i++){
+            beam("Longhorn Ram curved horn",segments[i]!,segments[i+1]!,0.064-i*0.017,i===0?brown:horn,weapon);
+          }
+        }
+      }
       break;
     case "drum":
       cylinder(

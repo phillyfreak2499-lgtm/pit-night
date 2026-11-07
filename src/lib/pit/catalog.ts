@@ -150,6 +150,8 @@ const BASE_DECALS: { id: StickerArt; label: string }[] = [
   { id: "tonic", label: "Torque Tonic" },
   { id: "archlabs", label: "Arch Labs" },
   { id: "turbo", label: "Ticket Turbo" },
+  { id: "airforce", label: "Air Force" },
+  { id: "longhorn", label: "Texas Longhorn" },
 ];
 
 export const MASKS: { id: BotMask; label: string }[] = [
@@ -227,6 +229,7 @@ export const DEFAULT_STYLE: BotStyle = {
   eye: "green",
   flag: false,
   topper: "none",
+  wings: "none",
   leds: "none",
   smoke: "",
   banner: "",
@@ -364,6 +367,8 @@ export const TOPPERS: { id: BotTopper; label: string }[] = [
   { id: "dish", label: "Satellite dish" },
   { id: "flagpole", label: "Flag pole" },
   { id: "tyler-roses", label: "Tyler" },
+  { id: "shrek-ears", label: "Shrek Ears" },
+  { id: "wally-eyes", label: "Wally Eyes" },
   { id: "janelle-pink", label: "Team Janelle Heart - pink" },
   { id: "janelle-red", label: "Team Janelle Heart - red" },
   { id: "janelle-purple", label: "Team Janelle Heart - purple" },

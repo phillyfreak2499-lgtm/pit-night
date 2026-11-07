@@ -91,6 +91,25 @@ test("each catalog topper produces finite geometry, including all free heart fla
   }
 });
 
+
+test("Abilene swept wing, Shrek ears, Wally Eyes and new state skins render as cosmetic geometry", () => {
+  const wings = createGarageCosmetics(look({ wings: "abilene" }), dimensions);
+  assertFiniteGeometry(wings);
+  assert.ok(wings.getObjectByName("Abilene port swept wing"));
+  assert.ok(wings.getObjectByName("Abilene starboard swept wing"));
+  const ears = createGarageCosmetics(look({ topper: "shrek-ears" }), dimensions);
+  assertFiniteGeometry(ears);
+  assert.ok(ears.getObjectByName("Shrek ogre ear trumpet"));
+  const eyes = createGarageCosmetics(look({ topper: "wally-eyes" }), dimensions);
+  assertFiniteGeometry(eyes);
+  assert.ok(eyes.getObjectByName("Wally Eyes binocular housing"));
+  for (const paintLook of ["louisiana", "cowboys", "seahawks", "raiders", "chiefs", "bumblebee"] as const) {
+    const decorated = createGarageCosmetics({ ...look({}), look: paintLook }, dimensions);
+    assertFiniteGeometry(decorated);
+    assert.ok(decorated.getObjectByName(paintLook + " roof skin"), paintLook);
+  }
+});
+
 test("Team Janelle hearts retain their six colors and label surfaces on both sides", () => {
   const colors = {
     pink: "ec4899",

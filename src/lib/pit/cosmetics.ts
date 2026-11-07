@@ -4,7 +4,7 @@ import { championshipFinalists, gradesOf, recordOf } from "./engine";
 import { sparkStreak, tunedUp } from "./week";
 import type { BotBody, PitData, StatKey } from "./types";
 
-export type CosmeticKind = "finish" | "decal" | "trim" | "eye" | "paint" | "topper" | "body" | "look" | "mask" | "weaponSkin" | "wheelColor" | "leds" | "smoke" | "banner";
+export type CosmeticKind = "finish" | "decal" | "trim" | "eye" | "paint" | "topper" | "wings" | "body" | "look" | "mask" | "weaponSkin" | "wheelColor" | "leds" | "smoke" | "banner";
 export type CosmeticReward = {
   id: string;
   kind: CosmeticKind;
@@ -246,13 +246,14 @@ export const RECYCLES_REWARD_IDS = ["reward-recycle", "reward-bottlecap", "rewar
 
 const FREE: Record<CosmeticKind, Set<string>> = {
   finish:new Set(["factory"]),
-  decal:new Set(["none","roundel"]),
+  decal:new Set(["none","roundel","airforce","longhorn"]),
   trim:new Set(["steel","black","white"]),
   eye:new Set(["green","amber"]),
   paint:new Set(["amber","rust","bone","teal","crimson","gold","steel","mud","brass","olive","copper","cobalt","sky","lime","forest","violet","magenta","cherry","graphite","lagoon","peach","berry","lemon"]),
-  topper:new Set(["none", "tyler-roses", "janelle-pink", "janelle-red", "janelle-purple", "janelle-blue", "janelle-teal", "janelle-gold"]),
+  topper:new Set(["none", "tyler-roses", "shrek-ears", "wally-eyes", "janelle-pink", "janelle-red", "janelle-purple", "janelle-blue", "janelle-teal", "janelle-gold"]),
+  wings:new Set(["none", "abilene"]),
   body:new Set(),
-  look:new Set(["plain","stripe","chevron","rivets","two-tone","camouflage","tie-dye","texas"]),
+  look:new Set(["plain","stripe","chevron","rivets","two-tone","camouflage","tie-dye","texas","louisiana","cowboys","seahawks","raiders","chiefs","bumblebee","chase"]),
   mask:new Set(["none"]),
   weaponSkin:new Set(["none"]),
   wheelColor:new Set(["stock"]),
