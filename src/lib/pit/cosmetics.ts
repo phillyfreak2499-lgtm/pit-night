@@ -250,7 +250,7 @@ const FREE: Record<CosmeticKind, Set<string>> = {
   trim:new Set(["steel","black","white"]),
   eye:new Set(["green","amber"]),
   paint:new Set(["amber","rust","bone","teal","crimson","gold","steel","mud","brass","olive","copper","cobalt","sky","lime","forest","violet","magenta","cherry","graphite","lagoon","peach","berry","lemon"]),
-  topper:new Set(["none", "janelle-pink", "janelle-red", "janelle-purple", "janelle-blue", "janelle-teal", "janelle-gold"]),
+  topper:new Set(["none", "tyler-roses", "janelle-pink", "janelle-red", "janelle-purple", "janelle-blue", "janelle-teal", "janelle-gold"]),
   body:new Set(),
   look:new Set(["plain","stripe","chevron","rivets","two-tone","camouflage","tie-dye","texas"]),
   mask:new Set(["none"]),
