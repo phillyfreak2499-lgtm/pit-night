@@ -57,7 +57,7 @@ export const STICKER_ART = [
 ] as const;
 export type StickerArt = (typeof STICKER_ART)[number];
 export type BotDecal = StickerArt | `${Exclude<StickerArt, "none">}-foil`;
-export const TOPPER_IDS = ["none", "antenna", "horns", "mohawk", "crown", "beacon", "dish", "flagpole", "janelle-pink", "janelle-red", "janelle-purple", "janelle-blue", "janelle-teal", "janelle-gold", "pilgrimhat", "wreath", "tophat", "bugle", "tincan"] as const;
+export const TOPPER_IDS = ["none", "antenna", "horns", "mohawk", "crown", "beacon", "dish", "flagpole", "janelle-pink", "janelle-red", "janelle-purple", "janelle-blue", "janelle-teal", "janelle-gold", "pilgrimhat", "wreath", "tophat", "bugle", "tincan", "tyler-roses"] as const;
 export type BotTopper = (typeof TOPPER_IDS)[number];
 export type BotMask = "none" | "lantern" | "hockey";
 /** Cosmetic blade only. Premium Halloween weapons are real parts, not skins. */
@@ -472,6 +472,8 @@ export type PitData = {
   craft: { week: number; storeId: string; score: number }[];
   session: Session;
   log: string[];
+  /** Durable, one-time owner grant receipts. Safe to share across devices. */
+  ownerEvents?: string[];
   /** Which tutorial this device has finished. Old saves hold `true` (the first one). */
   tutorialSeen: boolean | number;
   intel: Intel[];
