@@ -15,7 +15,7 @@ export function drawPaintSkin(
   base: string,
   accent: string,
 ) {
-  if (!["two-tone", "camouflage", "tie-dye", "texas", "louisiana", "cowboys", "seahawks", "raiders", "chiefs", "bumblebee"].includes(look)) return;
+  if (!["two-tone", "camouflage", "tie-dye", "texas", "louisiana", "cowboys", "seahawks", "raiders", "chiefs", "bumblebee", "chase"].includes(look)) return;
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(width, height);
@@ -226,6 +226,38 @@ export function drawPaintSkin(
         } ctx.stroke();
       }
     }
+  }
+
+  if (look === "chase") {
+    // CHASE: original green futuristic armor panels, golden mirrored visor,
+    // broad angular chest plating; a homage to sci-fi armored heroes.
+    ctx.fillStyle="#384b2b";ctx.fillRect(0,0,1,1);
+    ctx.fillStyle="#1a2619";
+    for(const x of [0.03,0.36,0.69]) {
+      ctx.fillRect(x,0.06,0.28,0.08);
+      ctx.fillRect(x,0.86,0.28,0.09);
+    }
+    ctx.fillStyle="#647947";ctx.beginPath();
+    ctx.moveTo(0.1,0.22);ctx.lineTo(0.37,0.14);ctx.lineTo(0.63,0.14);
+    ctx.lineTo(0.9,0.22);ctx.lineTo(0.85,0.77);ctx.lineTo(0.5,0.91);
+    ctx.lineTo(0.15,0.77);ctx.closePath();ctx.fill();
+    ctx.strokeStyle="#1a271b";ctx.lineWidth=0.045;ctx.stroke();
+    ctx.fillStyle="#222d23";
+    ctx.fillRect(0.12,0.26,0.76,0.13);
+    ctx.fillStyle="#e5a83b";ctx.beginPath();
+    ctx.moveTo(0.15,0.31);ctx.lineTo(0.78,0.29);ctx.lineTo(0.85,0.42);
+    ctx.lineTo(0.73,0.52);ctx.lineTo(0.28,0.53);ctx.lineTo(0.13,0.44);ctx.closePath();ctx.fill();
+    ctx.fillStyle="#fff1b3";ctx.fillRect(0.22,0.35,0.42,0.025);
+    ctx.fillStyle="#36472a";
+    ctx.beginPath();ctx.moveTo(0.48,0.6);ctx.lineTo(0.77,0.56);
+    ctx.lineTo(0.81,0.79);ctx.lineTo(0.5,0.87);ctx.lineTo(0.19,0.79);
+    ctx.lineTo(0.23,0.56);ctx.closePath();ctx.fill();
+    ctx.strokeStyle="#92b16e";ctx.lineWidth=0.025;
+    ctx.beginPath();ctx.moveTo(0.26,0.66);ctx.lineTo(0.43,0.7);ctx.lineTo(0.5,0.77);
+    ctx.lineTo(0.57,0.7);ctx.lineTo(0.74,0.66);ctx.stroke();
+    ctx.fillStyle="#a7ca81";
+    ctx.font="bold 0.11px Arial, sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.fillText("CHASE",0.5,0.955,0.75);
   }
 
   ctx.restore();
