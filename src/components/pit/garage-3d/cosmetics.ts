@@ -224,7 +224,7 @@ export function createGarageCosmetics(
       );
     }
   }
-  if (look.look === "two-tone" || look.look === "camouflage" || look.look === "tie-dye" || look.look === "texas") {
+  if (look.look === "two-tone" || look.look === "camouflage" || look.look === "tie-dye" || look.look === "texas" || ["louisiana", "cowboys", "seahawks", "raiders", "chiefs", "bumblebee"].includes(look.look)) {
     const paint = PAINT[look.paint] ?? PAINT.amber;
     const accent = TRIM[style.trim] ?? TRIM.white;
     const roofMap = canvasMap((ctx, w, h) => drawPaintSkin(ctx, look.look, 0, 0, w, h, paint, accent));
@@ -332,6 +332,42 @@ export function createGarageCosmetics(
     );
   }
 
+
+  // Side-mounted swing-wing bomber kit. Wings extend beyond the armor without
+  // ever entering the loadout or collision / combat physics.
+  if (style.wings === "abilene") {
+    const bomberGray = new THREE.MeshStandardMaterial({color:"#626e7c",metalness:0.76,roughness:0.4,side:THREE.DoubleSide});
+    const seam = new THREE.MeshStandardMaterial({color:"#e3e8ec",metalness:0.64,roughness:0.35});
+    for (const side of [-1, 1] as const) {
+      const wing = new THREE.Group();
+      wing.name = side < 0 ? "Abilene port swept wing" : "Abilene starboard swept wing";
+      group.add(wing);
+      const rootX = width * 0.32, tipX = sidePanelX + Math.max(0.52, width * 0.47);
+      const coords = [
+        side * rootX, roofY + 0.035, depth * 0.26,
+        side * tipX, roofY + 0.09, -depth * 0.10,
+        side * (tipX - 0.035), roofY + 0.09, -depth * 0.29,
+        side * rootX, roofY + 0.035, -depth * 0.41,
+      ];
+      const geo = new THREE.BufferGeometry();
+      const positions = [ ...coords.slice(0,3), ...coords.slice(3,6), ...coords.slice(6,9),
+        ...coords.slice(0,3), ...coords.slice(6,9), ...coords.slice(9,12) ];
+      geo.setAttribute("position", new THREE.Float32BufferAttribute(positions,3));
+      geo.computeVertexNormals();
+      add(new THREE.Mesh(geo,bomberGray),"Abilene variable-sweep wing panel",[0,0,0],wing);
+      const armFrom=new THREE.Vector3(side*rootX,roofY+0.06,depth*0.25);
+      const armTo=new THREE.Vector3(side*tipX,roofY+0.12,-depth*0.1);
+      const travel=armTo.clone().sub(armFrom);
+      const strip=add(new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,travel.length(),8),seam),
+        "Abilene titanium leading edge",armFrom.clone().add(armTo).multiplyScalar(0.5).toArray() as Point,wing);
+      strip.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),travel.normalize());
+      box("Abilene wingtip navigation light",[0.065,0.037,0.075],
+        [side*tipX,roofY+0.104,-depth*0.16],
+        new THREE.MeshStandardMaterial({color:side<0?"#ec4150":"#75eaaa",emissive:side<0?"#ad182d":"#159966",emissiveIntensity:0.7}),wing);
+      cylinder("Abilene sweep pivot",0.095,0.036,[side*rootX,roofY+0.06,0.0],black,wing);
+    }
+  }
+
   const topper = style.topper ?? "none";
   const mount = new THREE.Group();
   mount.name = `Topper ${topper}`;
@@ -429,6 +465,22 @@ export function createGarageCosmetics(
       greenery.scale.set(1.6, 0.28, 0.65);
     }
     surface("Tyler bouquet nameplate", labelMap("TYLER", "#f2d4b8", "#9b1433"), [0.19, 0.085], [0, 0.19, 0.24], [0, 0, 0], mount);
+
+  } else if (topper === "shrek-ears") {
+    // Original soft-green ogre trumpet ears with flared cups (no character portrait).
+    const ogreGreen = new THREE.MeshStandardMaterial({color:"#86aa35",roughness:0.86,side:THREE.DoubleSide});
+    const ogreShadow = new THREE.MeshStandardMaterial({color:"#4c6e28",roughness:0.91});
+    box("Ogre ear base",[0.68,0.065,0.13],[0,0.042,0],ogreGreen,mount);
+    for (const side of [-1, 1]) {
+      const ear=add(new THREE.Mesh(new THREE.CylinderGeometry(0.115,0.047,0.33,16,1,true),ogreGreen),
+        "Shrek ogre ear trumpet",[side*0.34,0.22,0],mount);
+      ear.rotation.z=-side*1.08;
+      const cup=add(new THREE.Mesh(new THREE.TorusGeometry(0.116,0.028,8,18),ogreGreen),
+        "Shrek ogre ear rim",[side*0.5,0.35,0],mount);
+      cup.rotation.set(Math.PI/2,side*0.27,-side*0.4);
+      const inner=sphere("Shrek ogre ear dark inner",0.079,[side*0.5,0.35,-0.006],ogreShadow,mount);
+      inner.scale.set(0.97,0.87,0.2);
+    }
   } else if (topper === "antenna") {
     cylinder("Whip antenna base", 0.06, 0.07, [0, 0.035, 0], black, mount);
     cylinder("Whip antenna", 0.008, 0.67, [0, 0.37, 0], steel, mount);
