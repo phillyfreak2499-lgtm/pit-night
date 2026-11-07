@@ -451,6 +451,7 @@ export function makeData(): PitData {
     craft: [],
     session: { role: "public", storeId: null, crewId: null },
     log: ["Period 12 opened. Fourteen bays. Two conferences. Four Monday cards, then Championship Saturday Nov 28."],
+    ownerEvents: [],
     tutorialSeen: false,
     intel: [],
     jobLog: [],

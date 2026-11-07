@@ -55,13 +55,24 @@ async function load(options?: { deadlines?: boolean }) {
     const matchedStores = [...new Set(matches.map((member) => member.storeId))].sort();
     const cleaned = isNewCleanup ? s.store.pruneRemovePlaceholders(merged) : merged;
     const removedCount = merged.crew.length - cleaned.crew.length;
-    const due = deadlines ? s.store.applyDueLock(cleaned, new Date()) : null;
-    const effective = due ?? cleaned;
+    // Commissioner gifts are committed once, against the authoritative season.
+    const ownerGift = s.store.ownerGiftDue(cleaned, new Date());
+    const gifted = s.store.grantOwnerGifts(cleaned, ownerGift);
+    const due = deadlines ? s.store.applyDueLock(gifted, new Date()) : null;
+    const effective = due ?? gifted;
     const normalizedDoc = JSON.stringify(s.store.sharedDoc(effective));
     let rev = Number(row.rev);
     let doc = row.doc;
     if (normalizedDoc !== row.doc || row.schema_tag !== SCHEMA_TAG) {
       let backupId: string | null = null;
+      if (ownerGift.repairs || ownerGift.roses) {
+        // Save and verify the exact pre-gift document before changing any bot.
+        const giftBackupId = `backup-owner-gifts-2026-11-07-rev-${row.rev}`;
+        await s.sql`insert into pit_season (id, rev, doc) values (${giftBackupId}, ${row.rev}, ${row.doc}) on conflict (id) do nothing`;
+        const backup = (await s.sql<{ doc: string }>`select doc from pit_season where id = ${giftBackupId}`)[0];
+        if (!backup || backup.doc !== row.doc)
+          throw new Error("Owner gift halted: pre-change backup verification failed.");
+      }
       if (removedCount > 0) {
         // Keep a separate, immutable copy of exactly the source revision.
         // Never change the season if the backup cannot be read back byte-for-byte.
@@ -80,6 +91,25 @@ async function load(options?: { deadlines?: boolean }) {
       if (!changed[0]) continue; // A concurrent command won. Read again, up to 8 tries.
       rev = Number(changed[0].rev);
       doc = normalizedDoc;
+      if (ownerGift.repairs || ownerGift.roses) {
+        const saved = (await s.sql<{ doc: string }>`select doc from pit_season where id = 'main'`)[0];
+        if (!saved) throw new Error("Owner gift verification failed: season row missing.");
+        const verified = JSON.parse(saved.doc) as import("./types").PitData;
+        const markerOK =
+          (!ownerGift.repairs || verified.ownerEvents?.includes(s.store.WEEK2_REPAIR_GIFT)) &&
+          (!ownerGift.roses || verified.ownerEvents?.includes(s.store.TYLER_ROSES_GIFT));
+        const repairsOK = !ownerGift.repairs || verified.bots.every((bot) =>
+          Object.values(bot.wear).every((w) => w === "clean") &&
+          Object.values(bot.partWear ?? {}).every((w) => w === "clean") &&
+          Object.keys(bot.weldedParts ?? {}).length === 0 &&
+          Object.values(bot.weldForWeek ?? {}).every((v) => v == null),
+        );
+        const rosesOK = !ownerGift.roses ||
+          verified.bots.find((bot) => bot.storeId === "tyler")?.style?.topper === "tyler-roses";
+        if (!markerOK || !repairsOK || !rosesOK)
+          throw new Error("Owner gift verification failed: check the league state before retrying.");
+        console.info(`[pit] owner gifts committed: repairs=${ownerGift.repairs}; roses=${ownerGift.roses}; bots=${verified.bots.length}; week=${verified.week}`);
+      }
       if (isNewCleanup) {
         // Verify the actual production database after committing the changed revision.
         const saved = (await s.sql<{ doc: string }>`select doc from pit_season where id = 'main'`)[0];

@@ -2,7 +2,7 @@ import test, { beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createStore } from "zustand/vanilla";
-import { pitCreator, sharedDoc, clientDoc, applyLeague14, applyDueLock, pruneRemovePlaceholders } from "../src/lib/pit/store.ts";
+import { pitCreator, sharedDoc, clientDoc, applyLeague14, applyDueLock, pruneRemovePlaceholders, ownerGiftDue, grantOwnerGifts, WEEK2_REPAIR_GIFT, TYLER_ROSES_GIFT } from "../src/lib/pit/store.ts";
 import { makeData } from "../src/lib/pit/seed.ts";
 import { nsnuOf, rankedStores, simulateDuel, simulateChampionshipDuel, buildCard, conferenceStandings, championshipFinalists, coinMath, coinsByJar, type GradeSet } from "../src/lib/pit/engine.ts";
 import { weekProgress, boltsOf, lockerItem } from "../src/lib/pit/week.ts";
@@ -48,6 +48,56 @@ test("one-time placeholder cleanup removes only exact specialist names and prese
   assert.strictEqual(cleaned.jobLog, data.jobLog);
   assert.strictEqual(cleaned.sparkLog, data.sparkLog);
   assert.strictEqual(pruneRemovePlaceholders(cleaned), cleaned);
+});
+
+
+test("owner's week 2 gift repairs every bot and every owned part without cost or history changes", () => {
+  const seed = makeData();
+  const data = {
+    ...seed,
+    week: 2,
+    bots: seed.bots.map((bot) => ({
+      ...bot,
+      wear: { ...bot.wear, armor: "disabled" as const },
+      partWear: { ...bot.partWear, [bot.equipped.armor]: "disabled" as const, "owned-spare": "bent" as const },
+      weldForWeek: { armor: 2 },
+      weldedParts: { [bot.equipped.armor]: 2 },
+    })),
+    quotes: Object.fromEntries(seed.bots.map((bot) => [bot.storeId, [{ slot: "armor", condition: "disabled", repairCost: 4 }]])) as typeof seed.quotes,
+  };
+  const first = grantOwnerGifts(data, ownerGiftDue(data, new Date("2026-11-07T20:00:00Z")));
+  assert.equal(first.bots.length, seed.bots.length);
+  assert.ok(first.bots.every((bot) =>
+    Object.values(bot.wear).every((wear) => wear === "clean") &&
+    Object.keys(bot.partWear).length === 0 &&
+    Object.keys(bot.weldedParts ?? {}).length === 0 &&
+    Object.keys(bot.weldForWeek).length === 0
+  ));
+  assert.ok(first.bots.every((bot, i) => bot.coins === data.bots[i]!.coins && bot.voucher === data.bots[i]!.voucher));
+  assert.ok(first.bots.every((bot, i) => bot.repairSpent === data.bots[i]!.repairSpent));
+  assert.ok(Object.values(first.quotes).every((quotes) => quotes.length === 0));
+  assert.equal(first.bots.find((bot) => bot.storeId === "tyler")?.style?.topper, "tyler-roses");
+  assert.strictEqual(first.bouts, data.bouts);
+  assert.strictEqual(first.replays, data.replays);
+  assert.strictEqual(first.storeCards, data.storeCards);
+  assert.deepEqual(first.ownerEvents, [WEEK2_REPAIR_GIFT, TYLER_ROSES_GIFT]);
+  assert.deepEqual(ownerGiftDue(first, new Date("2026-11-07T21:00:00Z")), { repairs: false, roses: false });
+  assert.strictEqual(grantOwnerGifts(first, ownerGiftDue(first, new Date("2026-11-07T21:00:00Z"))), first);
+  const snapshot = sharedDoc(first);
+  assert.deepEqual(snapshot.ownerEvents, first.ownerEvents);
+});
+
+test("free Tyler rose topper is available to all stores and never heals a future week", () => {
+  const data = makeData();
+  for (const store of data.stores) {
+    assert.equal(cosmeticUnlocked(data, store.id, "topper", "tyler-roses"), true);
+  }
+  const after = { ...data, week: 3, ownerEvents: [] };
+  const due = ownerGiftDue(after, new Date("2026-11-10T20:00:00Z"));
+  assert.deepEqual(due, { repairs: false, roses: true });
+  const gifted = grantOwnerGifts(after, due);
+  assert.ok(gifted.ownerEvents?.includes(TYLER_ROSES_GIFT));
+  assert.ok(!gifted.ownerEvents?.includes(WEEK2_REPAIR_GIFT));
 });
 
 test("transient state updates neither project nor serialize unchanged persisted data", () => {

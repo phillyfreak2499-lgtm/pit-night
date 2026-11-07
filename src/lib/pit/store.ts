@@ -402,7 +402,7 @@ export const TUTORIAL_REV = 3;
 export const SHARED_KEYS = [
   "version", "seasonName", "tagline", "week", "phase", "stores", "crew", "bots", "weeks", "storeCards", "bouts", "replays",
   "gazette", "quotes", "proposals", "mvps", "honors", "craft", "log", "intel", "jobLog", "rallies", "sparkLog", "shouts", "picks",
-  "trainingOpenAll", "kickoff", "cosmeticProposals", "halloweenArcade",
+  "trainingOpenAll", "kickoff", "cosmeticProposals", "halloweenArcade", "ownerEvents",
 ] as const satisfies readonly (keyof PitData)[];
 
 export type SharedDoc = Pick<PitData, (typeof SHARED_KEYS)[number]>;
@@ -440,6 +440,57 @@ export function clientDoc(state: PitData, session: Session): SharedDoc {
     return { ...bot, draft: stock, equipped: stock, locked: bot.locked ? stock : null, owned: [], partWear: {}, weldForWeek: {}, weldedParts: {}, coins: { chassis: 0, armor: 0, drive: 0, weapon: 0, utility: 0, brain: 0 }, voucher: 0, repairSpent: 0, shows: [] };
   });
   return out;
+}
+
+
+/** One-time commissioner gifts, recorded in the authoritative season so a new device cannot repeat them. */
+export const WEEK2_REPAIR_GIFT = "owner-week2-free-repairs-2026-11-07";
+export const TYLER_ROSES_GIFT = "owner-tyler-roses-2026-11-07";
+export type OwnerGiftDue = { repairs: boolean; roses: boolean };
+
+export function ownerGiftDue(data: PitData, now: Date): OwnerGiftDue {
+  const events = data.ownerEvents ?? [];
+  return {
+    // This is the Nov 2–8 Pit Week only; a late deployment must never heal a future week.
+    repairs:
+      data.week === 2 &&
+      now.getTime() < Date.parse("2026-11-09T06:00:00.000Z") &&
+      !events.includes(WEEK2_REPAIR_GIFT),
+    roses:
+      data.bots.some((bot) => bot.storeId === "tyler") &&
+      !events.includes(TYLER_ROSES_GIFT),
+  };
+}
+
+/** Restore all owned/equipped parts without spending any coins, Bolts, vouchers, or changing fight history. */
+export function grantOwnerGifts(data: PitData, due: OwnerGiftDue): PitData {
+  if (!due.repairs && !due.roses) return data;
+  const cleanWear = Object.fromEntries(SLOTS.map((slot) => [slot, "clean"])) as Record<Slot, Condition>;
+  return {
+    ...data,
+    bots: data.bots.map((bot) => {
+      const roses = due.roses && bot.storeId === "tyler";
+      if (!due.repairs && !roses) return bot;
+      return {
+        ...bot,
+        ...(due.repairs
+          ? { wear: { ...cleanWear }, partWear: {}, weldForWeek: {}, weldedParts: {} }
+          : {}),
+        ...(roses ? { style: { ...styleOf(bot), topper: "tyler-roses" as const } } : {}),
+      };
+    }),
+    ...(due.repairs ? { quotes: Object.fromEntries(data.bots.map((bot) => [bot.storeId, [] as PitData["quotes"][string]])) } : {}),
+    ownerEvents: [
+      ...(data.ownerEvents ?? []),
+      ...(due.repairs ? [WEEK2_REPAIR_GIFT] : []),
+      ...(due.roses ? [TYLER_ROSES_GIFT] : []),
+    ],
+    log: [
+      ...(due.roses ? ["Tyler's ROSE CITY received its bouquet of roses topper, available free to every store."] : []),
+      ...(due.repairs ? ["Commissioner gift: every bot repaired to 100% for Pit Week 2. No coins, vouchers, or Bolts spent."] : []),
+      ...data.log,
+    ].slice(0, 24),
+  };
 }
 
 export const pitCreator: StateCreator<PitState> = (set, get) => ({

@@ -389,6 +389,46 @@ export function createGarageCosmetics(
       ctx.fillText("JANELLE", w / 2, h * 0.7, w * 0.96);
     });
     doubleLabel("Team Janelle lettering", lettering, [0.72, 0.378], [0.3, 0.6716, 0], mount);
+  } else if (topper === "tyler-roses") {
+    // The "Tyler" topper is a free bouquet of red roses, never combat equipment.
+    const rose = new THREE.MeshStandardMaterial({ color: "#c61d3c", roughness: 0.72, side: THREE.DoubleSide });
+    const roseLight = new THREE.MeshStandardMaterial({ color: "#f04764", roughness: 0.72, side: THREE.DoubleSide });
+    const leaf = new THREE.MeshStandardMaterial({ color: "#317b40", roughness: 0.86, side: THREE.DoubleSide });
+    const paper = new THREE.MeshStandardMaterial({ color: "#f2d4b8", roughness: 0.92, side: THREE.DoubleSide });
+    // Flower wrap widens toward the top, with a pale label tied around the base.
+    add(new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.055, 0.34, 12, 1, true), paper), "Tyler bouquet wrap", [0, 0.20, 0], mount);
+    cylinder("Tyler bouquet ribbon", 0.087, 0.045, [0, 0.10, 0], gold, mount);
+    const bouquet = [
+      [-0.18, 0.50, -0.05], [-0.08, 0.64, -0.12], [0.09, 0.62, -0.10],
+      [0.2, 0.48, -0.03], [-0.1, 0.55, 0.13], [0.08, 0.57, 0.14], [0, 0.72, 0.04],
+    ] as const;
+    for (const [i, [x, y, z]] of bouquet.entries()) {
+      const base = new THREE.Vector3(0, 0.30, 0);
+      const tip = new THREE.Vector3(x, y, z);
+      const delta = tip.clone().sub(base);
+      const stem = add(
+        new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, delta.length(), 7), leaf),
+        "Tyler rose stem",
+        [...base.clone().addScaledVector(delta, 0.5).toArray()] as Point,
+        mount,
+      );
+      stem.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.normalize());
+      sphere("Tyler rose blossom", 0.08, [x, y, z], i % 3 === 0 ? roseLight : rose, mount);
+      for (let j = 0; j < 5; j++) {
+        const angle = j * Math.PI * 2 / 5;
+        const petal = sphere(
+          "Tyler rose petal",
+          0.053,
+          [x + Math.cos(angle) * 0.055, y + Math.sin(angle) * 0.028 + 0.008, z + Math.sin(angle) * 0.055],
+          j % 2 ? rose : roseLight,
+          mount,
+        );
+        petal.scale.set(1.05, 0.66, 0.75);
+      }
+      const greenery = sphere("Tyler rose leaf", 0.065, [x * 0.55, 0.36 + (i % 2) * 0.09, z * 0.7], leaf, mount);
+      greenery.scale.set(1.6, 0.28, 0.65);
+    }
+    surface("Tyler bouquet nameplate", labelMap("TYLER", "#f2d4b8", "#9b1433"), [0.19, 0.085], [0, 0.19, 0.24], [0, 0, 0], mount);
   } else if (topper === "antenna") {
     cylinder("Whip antenna base", 0.06, 0.07, [0, 0.035, 0], black, mount);
     cylinder("Whip antenna", 0.008, 0.67, [0, 0.37, 0], steel, mount);

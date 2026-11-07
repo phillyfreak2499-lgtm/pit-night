@@ -2825,7 +2825,56 @@ function drawTopper(
     ctx.restore();
     return;
   }
-  if (topper === "antenna") {
+  if (topper === "tyler-roses") {
+    // Fan of red roses in a kraft paper bouquet, mounted above the bot roof.
+    const flowers = [
+      [-0.19, -0.39], [-0.10, -0.49], [0.01, -0.51], [0.14, -0.4],
+      [-0.09, -0.34], [0.09, -0.32], [0, -0.43],
+    ] as const;
+    ctx.lineWidth = Math.max(1, u * 0.012);
+    ctx.strokeStyle = "#387849";
+    for (const [x, y] of flowers) {
+      ctx.beginPath();
+      ctx.moveTo(0, top - u * 0.08);
+      ctx.lineTo(x * u, top + y * u);
+      ctx.stroke();
+      ctx.fillStyle = "#398b4f";
+      ctx.beginPath();
+      ctx.ellipse(x * u * 0.6 - u * 0.025, top + y * u * 0.65, u * 0.045, u * 0.014, -0.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = "#efd3b1";
+    ctx.strokeStyle = "#c69c75";
+    ctx.lineWidth = Math.max(1, u * 0.006);
+    ctx.beginPath();
+    ctx.moveTo(-u * 0.22, top - u * 0.26);
+    ctx.lineTo(u * 0.22, top - u * 0.26);
+    ctx.lineTo(u * 0.04, top - u * 0.005);
+    ctx.lineTo(-u * 0.04, top - u * 0.005);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#a41e43";
+    ctx.fillRect(-u * 0.075, top - u * 0.09, u * 0.15, u * 0.045);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `bold ${Math.max(6, u * 0.035)}px Arial, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.fillText("TYLER", 0, top - u * 0.054);
+    for (const [i, [x, y]] of flowers.entries()) {
+      const cx = x * u, cy = top + y * u;
+      ctx.fillStyle = i % 2 ? "#d62646" : "#ef3c5b";
+      for (let j = 0; j < 5; j++) {
+        const a = j * Math.PI * 2 / 5;
+        ctx.beginPath();
+        ctx.arc(cx + Math.cos(a) * u * 0.026, cy + Math.sin(a) * u * 0.026, u * 0.033, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = "#93152b";
+      ctx.beginPath();
+      ctx.arc(cx, cy, u * 0.024, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (topper === "antenna") {
     ctx.strokeStyle = "#b8c2cc";
     ctx.lineWidth = Math.max(1.2, u * 0.009);
     ctx.beginPath();
@@ -5057,9 +5106,30 @@ function drawTopperPlan(
   time: number,
   eye: string,
 ) {
-  if (!topper || topper === "none" || (!["beacon", "dish", "flagpole"].includes(topper) && !topper.startsWith("janelle-"))) return;
+  if (!topper || topper === "none" || (!["beacon", "dish", "flagpole", "tyler-roses"].includes(topper) && !topper.startsWith("janelle-"))) return;
   ctx.save();
-  if (topper.startsWith("janelle-")) {
+  if (topper === "tyler-roses") {
+    // Overhead view shows the roses clustered above the paper wrap.
+    ctx.fillStyle = "#ead0af";
+    ctx.beginPath();
+    ctx.ellipse(0, -wid * 0.16, len * 0.14, wid * 0.28, -0.1, 0, Math.PI * 2);
+    ctx.fill();
+    const blossoms = [[-0.17, -0.27], [-0.11, -0.4], [0.02, -0.42], [0.16, -0.28], [-0.06, -0.18], [0.1, -0.13]] as const;
+    for (const [i, [x, y]] of blossoms.entries()) {
+      ctx.fillStyle = "#287746";
+      ctx.beginPath();
+      ctx.ellipse(x * len * 0.8, y * wid * 0.8, len * 0.045, wid * 0.085, 0.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = i % 2 ? "#d62646" : "#f04764";
+      ctx.beginPath();
+      ctx.arc(x * len * 0.8, y * wid * 0.8, wid * 0.09, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#911831";
+      ctx.beginPath();
+      ctx.arc(x * len * 0.8, y * wid * 0.8, wid * 0.032, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (topper.startsWith("janelle-")) {
     drawJanelleFlag(ctx, topper, 0, -wid * 0.3, wid * 0.75);
   } else if (topper === "beacon") {
     const pulse = 0.55 + Math.sin(time * 6) * 0.35;
