@@ -197,6 +197,14 @@ const DRIVES: Part[] = [
 ];
 
 const WEAPONS: Part[] = [
+  // Named weapon with the same family, tier, price, tags, and stat nudge as Sport Wedge.
+  // Combat treats it exactly as a wedge. The difference is a front-mounted longhorn ram.
+  {
+    id: "weapon-longhorn-sport", slot: "weapon", family: "wedge",
+    name: "Longhorn Ram", tier: "sport", stat: "demoClose", key: "weapon",
+    tags: ["control", "wedge"], nudge: n(2, -1, 3, 0), price: 3,
+    job: "A heavy front bumper with sweeping Texas longhorn tips. Same fight math and price as Sport Wedge.",
+  },
   ...ladder(
     "weapon",
     "flail",
