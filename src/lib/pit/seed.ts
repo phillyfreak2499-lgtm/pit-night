@@ -1,4 +1,4 @@
-import { stockPart, VERSION } from "./catalog";
+import { DEFAULT_STYLE, stockPart, VERSION } from "./catalog";
 import type { Bot, BotLook, ClassId, Conference, Crew, GarageLook, Loadout, PitData, Store, StoreCard, WeekMeta } from "./types";
 
 const ZERO_COINS = { chassis: 0, drive: 0, weapon: 0, armor: 0, utility: 0, brain: 0 };
@@ -347,6 +347,7 @@ function botFrom(row: Row): Bot {
     weldForWeek: {},
     look: row.look,
     number: row.number,
+    ...(row.id === "tyler" ? { style: { ...DEFAULT_STYLE, topper: "tyler-roses" as const } } : {}),
   };
 }
 
@@ -451,6 +452,7 @@ export function makeData(): PitData {
     craft: [],
     session: { role: "public", storeId: null, crewId: null },
     log: ["Period 12 opened. Fourteen bays. Two conferences. Four Monday cards, then Championship Saturday Nov 28."],
+    ownerEvents: [],
     tutorialSeen: false,
     intel: [],
     jobLog: [],
