@@ -448,6 +448,7 @@ const LOOKS: { id: BotLook; label: string }[] = [
   { id: "raiders", label: "Oakland Raiders colors" },
   { id: "chiefs", label: "Kansas City Chiefs colors" },
   { id: "bumblebee", label: "Bumblebee" },
+  { id: "chase", label: "Chase · Spartan armor" },
 ];
 
 function garageClass(look: GarageLook) {
