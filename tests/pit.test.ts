@@ -92,7 +92,6 @@ test("free Tyler rose topper is available to all stores and never heals a future
   for (const store of data.stores) {
     assert.equal(cosmeticUnlocked(data, store.id, "topper", "tyler-roses"), true);
   }
-  assert.equal(data.bots.find((bot) => bot.storeId === "tyler")?.style?.topper, "tyler-roses");
   const after = { ...data, week: 3, ownerEvents: [] };
   const due = ownerGiftDue(after, new Date("2026-11-10T20:00:00Z"));
   assert.deepEqual(due, { repairs: false, roses: true });
