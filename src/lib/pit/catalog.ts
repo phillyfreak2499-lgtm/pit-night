@@ -367,6 +367,7 @@ export const TOPPERS: { id: BotTopper; label: string }[] = [
   { id: "dish", label: "Satellite dish" },
   { id: "flagpole", label: "Flag pole" },
   { id: "tyler-roses", label: "Tyler" },
+  { id: "shrek-ears", label: "Shrek Ears" },
   { id: "janelle-pink", label: "Team Janelle Heart - pink" },
   { id: "janelle-red", label: "Team Janelle Heart - red" },
   { id: "janelle-purple", label: "Team Janelle Heart - purple" },
