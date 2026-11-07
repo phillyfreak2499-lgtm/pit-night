@@ -253,7 +253,7 @@ const FREE: Record<CosmeticKind, Set<string>> = {
   topper:new Set(["none", "tyler-roses", "janelle-pink", "janelle-red", "janelle-purple", "janelle-blue", "janelle-teal", "janelle-gold"]),
   wings:new Set(["none", "abilene"]),
   body:new Set(),
-  look:new Set(["plain","stripe","chevron","rivets","two-tone","camouflage","tie-dye","texas","louisiana","cowboys","seahawks","raiders","chiefs"]),
+  look:new Set(["plain","stripe","chevron","rivets","two-tone","camouflage","tie-dye","texas","louisiana","cowboys","seahawks","raiders","chiefs","bumblebee"]),
   mask:new Set(["none"]),
   weaponSkin:new Set(["none"]),
   wheelColor:new Set(["stock"]),
