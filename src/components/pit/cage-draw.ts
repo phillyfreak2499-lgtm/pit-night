@@ -1920,7 +1920,7 @@ export function drawSideBot(
       ctx.stroke();
     }
     ctx.restore();
-  } else if (look === "two-tone" || look === "camouflage" || look === "tie-dye" || look === "texas") {
+  } else if (look === "two-tone" || look === "camouflage" || look === "tie-dye" || look === "texas" || ["louisiana","cowboys","seahawks","raiders","chiefs","bumblebee"].includes(look)) {
     ctx.save();
     poly(ctx, f.hull, u2);
     ctx.clip();
@@ -2087,6 +2087,15 @@ export function drawSideBot(
   ctx.arc(-0.33 * u2, top + u2 * 0.035, u2 * 0.022, 0, Math.PI * 2);
   ctx.fill();
 
+  if (style.wings === "abilene") {
+    // Visible side silhouette of the wing root and rearward-swept tip.
+    ctx.fillStyle="#71808f";ctx.strokeStyle="#d4dbe1";ctx.lineWidth=Math.max(1,u2*0.008);
+    ctx.beginPath();ctx.moveTo(-0.06*u2,top+0.075*u2);
+    ctx.lineTo(0.17*u2,top+0.08*u2);
+    ctx.lineTo(-0.38*u2,top+0.17*u2);
+    ctx.lineTo(-0.48*u2,top+0.15*u2);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.fillStyle="#a6becb";ctx.fillRect(-0.44*u2,top+0.137*u2,u2*0.06,u2*0.02);
+  }
   weaponFront(ctx, s, f, u2, spin, dark);
   drawFangSkin(ctx, style.weaponSkin, f.front * u2, (f.deck + 0.12) * u2, u2 * 0.24);
 
@@ -2289,6 +2298,36 @@ function drawFreshSticker(
   const cx = X(0.5);
   const cy = Y(0.5);
   const r = Math.min(w, h) * u * 0.42;
+
+  if (art === "airforce") {
+    // Original aviation roundel, not a replica of a service insignia.
+    ctx.fillStyle = "#143869"; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = "#dbe9ff"; ctx.lineWidth=Math.max(1,r*0.13); ctx.stroke();
+    ctx.fillStyle="#ffffff"; ctx.beginPath();
+    for(let i=0;i<10;i++){
+      const a=-Math.PI/2+i*Math.PI/5, rad=r*(i%2?0.23:0.49);
+      const px=cx+Math.cos(a)*rad, py=cy+Math.sin(a)*rad;
+      if(i===0)ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    }
+    ctx.closePath();ctx.fill();
+    ctx.fillStyle="#e54042";ctx.fillRect(cx-r*0.63,cy+r*0.46,r*1.26,r*0.11);
+    return true;
+  }
+  if (art === "longhorn") {
+    // Longhorn silhouette with large outward curling horns, no team insignia.
+    ctx.fillStyle="#b77a3c";
+    ctx.beginPath(); ctx.ellipse(cx,cy+r*0.28,r*0.28,r*0.31,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle="#e1c59b";ctx.lineWidth=Math.max(1,r*0.17);ctx.lineCap="round";
+    ctx.beginPath();
+    ctx.moveTo(cx-r*0.2,cy+r*0.1);
+    ctx.bezierCurveTo(cx-r*0.7,cy-r*0.15,cx-r*1.14,cy+r*0.11,cx-r*1.06,cy-r*0.36);
+    ctx.moveTo(cx+r*0.2,cy+r*0.1);
+    ctx.bezierCurveTo(cx+r*0.7,cy-r*0.15,cx+r*1.14,cy+r*0.11,cx+r*1.06,cy-r*0.36);
+    ctx.stroke();
+    ctx.fillStyle="#161412";
+    for(const sign of [-1,1]){ctx.beginPath();ctx.arc(cx+sign*r*0.13,cy+r*0.22,r*0.035,0,Math.PI*2);ctx.fill();}
+    return true;
+  }
   if (art === "roundel") {
     ctx.fillStyle = "#f4f1ea";
     ctx.beginPath();
@@ -2825,7 +2864,30 @@ function drawTopper(
     ctx.restore();
     return;
   }
-  if (topper === "tyler-roses") {
+
+  if (topper === "shrek-ears") {
+    ctx.fillStyle="#79a637";
+    ctx.fillRect(-u*0.17,top-u*0.09,u*0.34,u*0.07);
+    for(const sign of [-1,1]){
+      ctx.strokeStyle="#75a13a";ctx.lineWidth=u*0.085;ctx.lineCap="round";
+      ctx.beginPath();ctx.moveTo(sign*u*0.13,top-u*0.06);
+      ctx.quadraticCurveTo(sign*u*0.26,top-u*0.21,sign*u*0.35,top-u*0.23);ctx.stroke();
+      ctx.fillStyle="#83ad3f";
+      ctx.beginPath();ctx.ellipse(sign*u*0.38,top-u*0.24,u*0.11,u*0.064,-sign*0.28,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle="#456b29";
+      ctx.beginPath();ctx.ellipse(sign*u*0.395,top-u*0.238,u*0.058,u*0.031,-sign*0.28,0,Math.PI*2);ctx.fill();
+    }
+  } else if (topper === "wally-eyes") {
+    ctx.fillStyle="#bda16e";ctx.fillRect(-u*0.04,top-u*0.23,u*0.08,u*0.19);
+    ctx.fillStyle="#373b40";ctx.fillRect(-u*0.16,top-u*0.33,u*0.32,u*0.07);
+    for(const sign of [-1,1]){
+      const x=sign*u*0.165,y=top-u*0.4;
+      ctx.fillStyle="#d1a652";ctx.beginPath();ctx.ellipse(x,y,u*0.18,u*0.155,sign*0.14,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle="#1f323d";ctx.beginPath();ctx.ellipse(x,y,u*0.126,u*0.115,0,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle="#4b8899";ctx.beginPath();ctx.ellipse(x+sign*u*0.012,y,u*0.062,u*0.067,0,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle="#dcf7ff";ctx.beginPath();ctx.arc(x-u*0.045,y-u*0.053,u*0.027,0,Math.PI*2);ctx.fill();
+    }
+  } else if (topper === "tyler-roses") {
     // Fan of red roses in a kraft paper bouquet, mounted above the bot roof.
     const flowers = [
       [-0.19, -0.39], [-0.10, -0.49], [0.01, -0.51], [0.14, -0.4],
@@ -3597,36 +3659,35 @@ function weaponFront(
       );
       ctx.stroke();
     }
+
   } else if (fam === "claw") {
-    // Lower jaw on the floor, upper jaw bites down.
-    ctx.fillStyle = steel(ctx, fx, -0.1 * u, fx, 0);
-    ctx.beginPath();
-    ctx.moveTo(fx - 0.04 * u, -0.1 * u);
-    ctx.lineTo(fx + 0.32 * u, -0.02 * u);
-    ctx.lineTo(fx + 0.32 * u, -0.005 * u);
-    ctx.lineTo(fx - 0.04 * u, -0.02 * u);
-    ctx.closePath();
-    ctx.fill();
-    const a = lerp(-0.55, 0.22, s.stroke);
-    const px = fx - 0.06 * u;
-    const py = f.deck * u * 0.85;
-    ctx.save();
-    ctx.translate(px, py);
-    ctx.rotate(a);
-    ctx.fillStyle = steel(ctx, 0, -0.03 * u, 0, 0.04 * u);
-    ctx.beginPath();
-    ctx.moveTo(0, -0.03 * u);
-    ctx.lineTo(0.36 * u, -0.02 * u);
-    ctx.lineTo(0.42 * u, 0.1 * u);
-    ctx.lineTo(0.36 * u, 0.04 * u);
-    ctx.lineTo(0, 0.035 * u);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-    ctx.fillStyle = dark;
-    ctx.beginPath();
-    ctx.arc(px, py, 0.045 * u, 0, Math.PI * 2);
-    ctx.fill();
+    // Twin industrial grapple arms: paired knuckles, hydraulic ram, hooked steel jaws.
+    const bite = Math.max(0,Math.min(1,s.stroke));
+    const gap = (1-bite)*0.17*u;
+    const baseX=fx-0.08*u, baseY=f.deck*u*0.58;
+    ctx.lineJoin="round";ctx.lineCap="round";
+    ctx.fillStyle="#313c44";ctx.fillRect(baseX-0.11*u,baseY-0.125*u,0.17*u,0.25*u);
+    for(const sign of [-1,1]){
+      const upper=sign<0;
+      const rootY=baseY+sign*0.085*u;
+      const tipY=baseY+sign*(0.055*u+gap);
+      ctx.strokeStyle="#20262d";ctx.lineWidth=0.093*u;ctx.beginPath();
+      ctx.moveTo(baseX,rootY);ctx.lineTo(fx+0.27*u,tipY);ctx.stroke();
+      ctx.strokeStyle=upper?"#e1e7eb":"#a1b2bf";ctx.lineWidth=0.052*u;ctx.beginPath();
+      ctx.moveTo(baseX,rootY);ctx.lineTo(fx+0.27*u,tipY);ctx.stroke();
+      const tipX=fx+0.43*u,hookY=baseY+sign*0.012*u;
+      ctx.fillStyle=upper?"#d4e0e6":"#8a9da8";
+      ctx.beginPath();ctx.moveTo(fx+0.22*u,tipY-sign*0.045*u);
+      ctx.lineTo(tipX,tipY-sign*0.055*u);
+      ctx.lineTo(tipX+0.045*u,hookY);
+      ctx.lineTo(fx+0.31*u,tipY+sign*0.026*u);
+      ctx.closePath();ctx.fill();
+      ctx.strokeStyle="#17202a";ctx.lineWidth=Math.max(1,u*0.012);ctx.stroke();
+      ctx.fillStyle="#1b242e";ctx.beginPath();ctx.arc(baseX,rootY,0.049*u,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle="#eeb84d";ctx.beginPath();ctx.arc(baseX,rootY,0.021*u,0,Math.PI*2);ctx.fill();
+    }
+    ctx.strokeStyle="#dba948";ctx.lineWidth=0.029*u;ctx.beginPath();
+    ctx.moveTo(baseX+0.02*u,baseY);ctx.lineTo(fx+0.22*u,baseY);ctx.stroke();
   } else if (fam !== "hammer" && fam !== "axe" && fam !== "saw" && fam !== "hidden" && fam !== "none") {
     // Ram spike.
     const cy = f.deck * u * 0.5;
@@ -5053,7 +5114,7 @@ export function drawTopBot(
   if (s.bot.look === "stripe") {
     ctx.fillStyle = "#f3efe6";
     ctx.fillRect(-len * 0.5, -wid * 0.05, len * 0.9, wid * 0.1);
-  } else if (s.bot.look === "two-tone" || s.bot.look === "camouflage" || s.bot.look === "tie-dye" || s.bot.look === "texas") {
+  } else if (s.bot.look === "two-tone" || s.bot.look === "camouflage" || s.bot.look === "tie-dye" || s.bot.look === "texas" || ["louisiana","cowboys","seahawks","raiders","chiefs","bumblebee"].includes(s.bot.look)) {
     ctx.save();
     traceTopHull(ctx, s.bot.classId, style.body, len, wid);
     ctx.clip();
@@ -5070,6 +5131,20 @@ export function drawTopBot(
   stickerBadge(ctx, stickers.hood, len * 0.12, 0, len * 0.32, wid * 0.44, paint, s.bot.id, s.bot.number);
   stickerBadge(ctx, stickers.rear, -len * 0.39, 0, len * 0.16, wid * 0.5, paint, s.bot.id, s.bot.number);
   ctx.restore();
+  if (style.wings === "abilene") {
+    // Extended, swept-back wings on each side. No hitbox or fighter stat changes.
+    for (const sign of [-1,1]) {
+      ctx.fillStyle="#788491";ctx.strokeStyle="#d7dfe5";ctx.lineWidth=Math.max(1,wid*0.018);
+      ctx.beginPath();
+      ctx.moveTo(len*0.23,sign*wid*0.34);
+      ctx.lineTo(-len*0.12,sign*wid*1.08);
+      ctx.lineTo(-len*0.5,sign*wid*1.03);
+      ctx.lineTo(-len*0.34,sign*wid*0.34);
+      ctx.closePath();ctx.fill();ctx.stroke();
+      ctx.fillStyle=sign<0?"#eb4c4b":"#64edb3";
+      ctx.beginPath();ctx.arc(-len*0.14,sign*wid*1.04,Math.max(1,wid*0.03),0,Math.PI*2);ctx.fill();
+    }
+  }
   drawInstalledTop(ctx, s, len, wid, time);
   // LED.
   const blink = s.dead ? 0 : Math.sin(time * 6 + hash(s.bot.id)) > 0 ? 1 : 0.35;
@@ -5106,9 +5181,25 @@ function drawTopperPlan(
   time: number,
   eye: string,
 ) {
-  if (!topper || topper === "none" || (!["beacon", "dish", "flagpole", "tyler-roses"].includes(topper) && !topper.startsWith("janelle-"))) return;
+  if (!topper || topper === "none" || (!["beacon", "dish", "flagpole", "tyler-roses", "shrek-ears", "wally-eyes"].includes(topper) && !topper.startsWith("janelle-"))) return;
   ctx.save();
-  if (topper === "tyler-roses") {
+
+  if (topper === "shrek-ears") {
+    for(const sign of [-1,1]){
+      ctx.strokeStyle="#8aaa48";ctx.lineWidth=wid*0.11;ctx.lineCap="round";
+      ctx.beginPath();ctx.moveTo(-len*0.13,sign*wid*0.2);ctx.lineTo(-len*0.2,sign*wid*0.79);ctx.stroke();
+      ctx.fillStyle="#8bae49";ctx.beginPath();
+      ctx.ellipse(-len*0.2,sign*wid*0.84,len*0.075,wid*0.15,0,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle="#476728";ctx.beginPath();ctx.arc(-len*0.2,sign*wid*0.87,wid*0.075,0,Math.PI*2);ctx.fill();
+    }
+  } else if (topper === "wally-eyes") {
+    ctx.fillStyle="#d0a351";ctx.fillRect(-len*0.15,-wid*0.08,len*0.28,wid*0.16);
+    for(const sign of [-1,1]){
+      ctx.fillStyle="#dab162";ctx.beginPath();ctx.arc(-len*0.13,sign*wid*0.26,wid*0.2,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle="#203642";ctx.beginPath();ctx.arc(-len*0.13,sign*wid*0.26,wid*0.135,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle="#6bb4c8";ctx.beginPath();ctx.arc(-len*0.13,sign*wid*0.26,wid*0.064,0,Math.PI*2);ctx.fill();
+    }
+  } else if (topper === "tyler-roses") {
     // Overhead view shows the roses clustered above the paper wrap.
     ctx.fillStyle = "#ead0af";
     ctx.beginPath();
@@ -5319,11 +5410,22 @@ function topWeapon(
     ctx.beginPath();
     ctx.arc(len * 0.45, 0, wid * 0.42, -spin, -spin + 1);
     ctx.stroke();
+
   } else if (fam === "claw") {
-    const open = (1 - s.stroke) * wid * 0.2;
-    ctx.fillStyle = "#b9b4aa";
-    ctx.fillRect(len * 0.4, -wid * 0.42 - open, len * 0.38, wid * 0.14);
-    ctx.fillRect(len * 0.4, wid * 0.28 + open, len * 0.38, wid * 0.14);
+    const bite = Math.max(0,Math.min(1,s.stroke));
+    const spread=(1-bite)*wid*0.25;
+    ctx.fillStyle="#252e34";ctx.fillRect(len*0.28,-wid*0.2,len*0.2,wid*0.4);
+    for(const sign of [-1,1]){
+      const baseY=sign*wid*0.19, jawY=sign*(wid*0.3+spread);
+      ctx.strokeStyle="#1c232a";ctx.lineWidth=wid*0.23;ctx.lineCap="round";
+      ctx.beginPath();ctx.moveTo(len*0.34,baseY);ctx.lineTo(len*0.7,jawY);ctx.stroke();
+      ctx.strokeStyle=sign<0?"#dce5eb":"#94a7b2";ctx.lineWidth=wid*0.13;ctx.beginPath();
+      ctx.moveTo(len*0.34,baseY);ctx.lineTo(len*0.7,jawY);ctx.stroke();
+      ctx.fillStyle="#d4dee4";ctx.beginPath();ctx.moveTo(len*0.66,jawY-sign*wid*0.09);
+      ctx.lineTo(len*0.91,jawY);ctx.lineTo(len*0.83,sign*wid*0.08);
+      ctx.lineTo(len*0.7,jawY+sign*wid*0.06);ctx.closePath();ctx.fill();
+      ctx.fillStyle="#d4a547";ctx.beginPath();ctx.arc(len*0.35,baseY,wid*0.06,0,Math.PI*2);ctx.fill();
+    }
   } else if (fam !== "hidden" && fam !== "none") {
     ctx.fillStyle = "#d9d5cc";
     ctx.beginPath();
