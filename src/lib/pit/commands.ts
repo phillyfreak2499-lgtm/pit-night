@@ -57,7 +57,7 @@ const style = z
   })
   .strict();
 export const cosmeticLoadoutSchema = z.object({
-  paint: id, look: z.enum(["plain", "stripe", "chevron", "rivets", "two-tone", "camouflage", "tie-dye", "texas", "louisiana", "cowboys", "seahawks", "raiders", "chiefs"]),
+  paint: id, look: z.enum(["plain", "stripe", "chevron", "rivets", "two-tone", "camouflage", "tie-dye", "texas", "louisiana", "cowboys", "seahawks", "raiders", "chiefs", "bumblebee"]),
   number: z.string().max(3), style: style.required({ finish: true, decal: true, trim: true, eye: true, flag: true }),
 }).strict();
 export const commandArgs = {
@@ -92,7 +92,7 @@ export const commandArgs = {
   renameCaptain: z.tuple([id, text]),
   setPaint: z.tuple([id, id]),
   setGarage: z.tuple([id, z.enum(["hazard", "concrete", "night", "bone", "checker"])]),
-  setLook: z.tuple([id, z.enum(["plain", "stripe", "chevron", "rivets", "two-tone", "camouflage", "tie-dye", "texas", "louisiana", "cowboys", "seahawks", "raiders", "chiefs"])]),
+  setLook: z.tuple([id, z.enum(["plain", "stripe", "chevron", "rivets", "two-tone", "camouflage", "tie-dye", "texas", "louisiana", "cowboys", "seahawks", "raiders", "chiefs", "bumblebee"])]),
   setStyle: z.tuple([id, style]),
   completeJob: z.tuple([week, id, text]),
   approveJob: z.tuple([id]),
