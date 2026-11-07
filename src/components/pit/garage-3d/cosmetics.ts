@@ -481,6 +481,27 @@ export function createGarageCosmetics(
       const inner=sphere("Shrek ogre ear dark inner",0.079,[side*0.5,0.35,-0.006],ogreShadow,mount);
       inner.scale.set(0.97,0.87,0.2);
     }
+
+  } else if (topper === "wally-eyes") {
+    // An original twin-lens scavenger scope on a swivel neck.
+    const housing = new THREE.MeshStandardMaterial({color:"#d5a442",metalness:0.6,roughness:0.44});
+    const iris = new THREE.MeshStandardMaterial({color:"#243543",metalness:0.3,roughness:0.12});
+    const glint = new THREE.MeshStandardMaterial({color:"#b8ebf0",emissive:"#81cbdb",emissiveIntensity:0.4,roughness:0.08});
+    cylinder("Wally Eyes neck pedestal",0.09,0.32,[0,0.16,0],steel,mount);
+    cylinder("Wally Eyes swivel",0.15,0.07,[0,0.34,0],black,mount);
+    box("Wally Eyes bridge",[0.24,0.10,0.13],[0,0.48,0.02],housing,mount);
+    for(const side of [-1,1]){
+      const eye=sphere("Wally Eyes binocular housing",0.19,[side*0.19,0.5,0.02],housing,mount);
+      eye.scale.set(1.0,0.82,0.72);
+      const bezel=add(new THREE.Mesh(new THREE.TorusGeometry(0.133,0.029,10,24),steel),
+        "Wally Eyes metal lens bezel",[side*0.19,0.50,0.142],mount);
+      bezel.rotation.z=side*0.12;
+      const lens=sphere("Wally Eyes blue lens",0.117,[side*0.19,0.50,0.145],iris,mount);
+      lens.scale.z=0.25;
+      const pupil=sphere("Wally Eyes bright pupil",0.047,[side*0.19+side*0.014,0.502,0.179],glint,mount);
+      pupil.scale.z=0.22;
+      sphere("Wally Eyes lens highlight",0.026,[side*0.19-0.038,0.545,0.182],glint,mount).scale.z=0.3;
+    }
   } else if (topper === "antenna") {
     cylinder("Whip antenna base", 0.06, 0.07, [0, 0.035, 0], black, mount);
     cylinder("Whip antenna", 0.008, 0.67, [0, 0.37, 0], steel, mount);
