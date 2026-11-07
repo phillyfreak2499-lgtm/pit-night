@@ -3553,6 +3553,18 @@ function weaponFront(
     ctx.beginPath();
     ctx.arc(hx, hy, 0.04 * u, 0, Math.PI * 2);
     ctx.fill();
+  } else if (fam === "wedge" && s.bot.weaponName === "Longhorn Ram") {
+    // Impact bumper and sweeping horns, visibly different from the regular wedge.
+    const lift=s.stroke*0.018*u,cy=f.deck*u*0.56-lift;
+    ctx.fillStyle="#39424a";ctx.fillRect(fx-0.07*u,cy-0.105*u,0.36*u,0.19*u);
+    ctx.strokeStyle="#d5b989";ctx.lineCap="round";ctx.lineWidth=0.075*u;
+    ctx.beginPath();ctx.moveTo(fx+0.1*u,cy-0.045*u);
+    ctx.bezierCurveTo(fx+0.24*u,cy-0.22*u,fx+0.48*u,cy-0.18*u,fx+0.49*u,cy-0.34*u);
+    ctx.stroke();
+    ctx.strokeStyle="#f0e1ba";ctx.lineWidth=0.034*u;
+    ctx.beginPath();ctx.moveTo(fx+0.38*u,cy-0.185*u);
+    ctx.quadraticCurveTo(fx+0.49*u,cy-0.22*u,fx+0.49*u,cy-0.34*u);ctx.stroke();
+    ctx.fillStyle="#c4cbd0";ctx.fillRect(fx+0.23*u,cy-0.08*u,0.065*u,0.13*u);
   } else if (fam === "wedge") {
     const lift = s.stroke * 0.05;
     ctx.fillStyle = steel(ctx, fx, f.deck * u * 0.6, fx + 0.3 * u, 0);
@@ -5336,6 +5348,19 @@ function topWeapon(
     ctx.strokeStyle = "rgba(0,0,0,0.5)";
     ctx.lineWidth = 1;
     ctx.stroke();
+  } else if (fam === "wedge" && s.bot.weaponName === "Longhorn Ram") {
+    const bx=len*0.54;
+    ctx.fillStyle="#48525a";ctx.fillRect(len*0.28,-wid*0.43,len*0.32,wid*0.86);
+    ctx.strokeStyle="#e0c69c";ctx.lineCap="round";ctx.lineWidth=Math.max(2,wid*0.13);
+    for(const sign of [-1,1]){
+      ctx.beginPath();ctx.moveTo(bx,sign*wid*0.24);
+      ctx.bezierCurveTo(len*0.73,sign*wid*0.46,len*0.89,sign*wid*0.88,len*0.99,sign*wid*0.93);
+      ctx.stroke();
+      ctx.strokeStyle="#fff0cb";ctx.lineWidth=Math.max(1,wid*0.068);
+      ctx.beginPath();ctx.moveTo(len*0.84,sign*wid*0.75);
+      ctx.lineTo(len*0.99,sign*wid*0.93);ctx.stroke();
+      ctx.strokeStyle="#e0c69c";ctx.lineWidth=Math.max(2,wid*0.13);
+    }
   } else if (fam === "wedge") {
     ctx.fillStyle = "#b9b4aa";
     ctx.beginPath();
