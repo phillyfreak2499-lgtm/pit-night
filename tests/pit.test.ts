@@ -122,7 +122,7 @@ test("every new state, football and Bumblebee skin and sticker is unlocked witho
       number: bot.number,
       style: { ...styleOf(bot), wings: "abilene", topper: "wally-eyes",
         stickers: { left: "airforce", right: "longhorn", hood: "none", rear: "none" } },
-    });
+    }, true);
     assert.ok(proposed, "New mixed cosmetic loadout rejected");
     assert.equal(proposed.style.wings, "abilene");
     assert.deepEqual(data.bots.find((b) => b.storeId === store.id), before, "Preview mutated a bot");
