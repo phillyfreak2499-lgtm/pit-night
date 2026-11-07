@@ -447,6 +447,7 @@ const LOOKS: { id: BotLook; label: string }[] = [
   { id: "seahawks", label: "Seattle Seahawks colors" },
   { id: "raiders", label: "Oakland Raiders colors" },
   { id: "chiefs", label: "Kansas City Chiefs colors" },
+  { id: "bumblebee", label: "Bumblebee" },
 ];
 
 function garageClass(look: GarageLook) {
