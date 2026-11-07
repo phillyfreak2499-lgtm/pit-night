@@ -59,7 +59,7 @@ export const STICKER_ART = [
 ] as const;
 export type StickerArt = (typeof STICKER_ART)[number];
 export type BotDecal = StickerArt | `${Exclude<StickerArt, "none">}-foil`;
-export const TOPPER_IDS = ["none", "antenna", "horns", "mohawk", "crown", "beacon", "dish", "flagpole", "janelle-pink", "janelle-red", "janelle-purple", "janelle-blue", "janelle-teal", "janelle-gold", "pilgrimhat", "wreath", "tophat", "bugle", "tincan", "tyler-roses", "shrek-ears"] as const;
+export const TOPPER_IDS = ["none", "antenna", "horns", "mohawk", "crown", "beacon", "dish", "flagpole", "janelle-pink", "janelle-red", "janelle-purple", "janelle-blue", "janelle-teal", "janelle-gold", "pilgrimhat", "wreath", "tophat", "bugle", "tincan", "tyler-roses", "shrek-ears", "wally-eyes"] as const;
 export type BotTopper = (typeof TOPPER_IDS)[number];
 /** Optional side-mounted B-1B-inspired swept wing kit. Visual only. */
 export const WING_IDS = ["none", "abilene"] as const;
