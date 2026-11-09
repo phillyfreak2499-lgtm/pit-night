@@ -45,7 +45,7 @@ import { makeData } from "./seed";
 import { BOLTS, BOLT_EXCHANGE, STREAK_BADGE, allJobs, boltsForCoins, crateFor, dayOpen, programWeek, type DayKey } from "./training";
 import { eligibilityClosed } from "./eligibility";
 import { blockedName } from "../../../scripts/copy-guard.mjs";
-import { bannerVerdict, cosmeticUnlocked, earnedRewardIds, HALLOWEEN_REWARD_IDS, THANKSGIVING_REWARD_IDS, validBodyForClass } from "./cosmetics";
+import { bannerVerdict, cosmeticUnlocked, earnedRewardIds, garageThemeUnlocked, HALLOWEEN_REWARD_IDS, THANKSGIVING_REWARD_IDS, validBodyForClass } from "./cosmetics";
 import { boltCoinsLeft, boltsOf, lockerItem, sparkStreak } from "./week";
 import { checkedCosmeticLoadout } from "./cosmetic-loadout";
 import { authorize } from "./commands";
@@ -1320,6 +1320,10 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
       setGarage: (storeId, garage) => {
         const data = get();
         if (!isCaptainOf(data, storeId)) return;
+        if (!garageThemeUnlocked(storeId, garage)) {
+          set({ flash: "Rain City is Southlake's bay theme." });
+          return;
+        }
         set({
           stores: data.stores.map((s) => (s.id === storeId ? { ...s, garage } : s)),
           flash: "Garage floor changed. Decoration only.",

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { LEDS, PAINT, SMOKE, TRIM, styleOf } from "@/lib/pit/catalog";
+import { RAIN_CITY } from "@/lib/pit/rain-city";
 import type { BotLookProps } from "../bot-portrait";
 import { stickerBadge } from "../cage-draw";
 import { drawPaintSkin } from "../paint-skins";
@@ -224,7 +225,7 @@ export function createGarageCosmetics(
       );
     }
   }
-  if (look.look === "two-tone" || look.look === "camouflage" || look.look === "tie-dye" || look.look === "texas" || ["louisiana", "cowboys", "seahawks", "raiders", "chiefs", "bumblebee"].includes(look.look)) {
+  if (look.look === "two-tone" || look.look === "camouflage" || look.look === "tie-dye" || look.look === "texas" || ["louisiana", "cowboys", "seahawks", "raiders", "chiefs", "bumblebee", "rain-city"].includes(look.look)) {
     const paint = PAINT[look.paint] ?? PAINT.amber;
     const accent = TRIM[style.trim] ?? TRIM.white;
     const roofMap = canvasMap((ctx, w, h) => drawPaintSkin(ctx, look.look, 0, 0, w, h, paint, accent));
@@ -653,6 +654,24 @@ export function createGarageCosmetics(
       [0, 0, 0],
       mount,
     );
+  } else if (topper === "loudest") {
+    const navy = new THREE.MeshStandardMaterial({ color: RAIN_CITY.navy, metalness: 0.45, roughness: 0.42 });
+    const action = new THREE.MeshStandardMaterial({ color: RAIN_CITY.green, metalness: 0.3, roughness: 0.48 });
+    const wolf = new THREE.MeshStandardMaterial({ color: RAIN_CITY.gray, metalness: 0.72, roughness: 0.32 });
+    const horn = cylinder("Crowd megaphone", 0.16, 0.3, [0.1, 0.18, 0], navy, mount, 0.045);
+    horn.rotation.z = Math.PI / 2;
+    const lip = cylinder("Crowd megaphone lip", 0.175, 0.035, [0.26, 0.18, 0], action, mount);
+    lip.rotation.z = Math.PI / 2;
+    cylinder("Crowd megaphone grip", 0.04, 0.12, [-0.02, 0.07, 0], wolf, mount);
+    for (let i = 0; i < 3; i++) {
+      const arc = add(
+        new THREE.Mesh(new THREE.TorusGeometry(0.07 + i * 0.045, 0.008, 8, 18, Math.PI * 1.15), wolf),
+        "Crowd noise arc",
+        [0.34, 0.18, 0],
+        mount,
+      );
+      arc.rotation.y = Math.PI / 2;
+    }
   }
 
   if (style.flag) {

@@ -29,12 +29,29 @@ export function garageFloorTexture(look: GarageLook) {
       night: "#303947",
       bone: "#99968b",
       checker: "#343b43",
+      raincity: "#002244",
     }[look];
     ctx.fillRect(0, 0, 512, 512);
     if (look === "checker") {
       ctx.fillStyle = "#9199a1";
       ctx.fillRect(0, 0, 256, 256);
       ctx.fillRect(256, 256, 256, 256);
+    }
+    if (look === "raincity") {
+      ctx.fillStyle = "#69BE28";
+      ctx.fillRect(0, 292, 512, 34);
+      ctx.fillStyle = "#A5ACAF";
+      ctx.fillRect(0, 326, 512, 8);
+      ctx.strokeStyle = "rgba(165,172,175,0.7)";
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 36; i++) {
+        const x = (i * 47) % 512;
+        const y = (i * 29) % 250;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + 12, y + 30);
+        ctx.stroke();
+      }
     }
     let seed = 241;
     const random = () => {

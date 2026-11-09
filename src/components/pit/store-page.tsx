@@ -2,9 +2,11 @@ import { Link } from "@tanstack/react-router";
 import { CLASS_META, batteryOf, partById, SLOT_LABEL } from "@/lib/pit/catalog";
 import { canSeeLoadout, cardFor, loadSignature, printedStats, recordOf, weaponFamilyOf, weekQuality, gradesOf } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
+import { RAIN_CITY } from "@/lib/pit/rain-city";
 import type { Slot } from "@/lib/pit/types";
 import { ClassTag, GradeRow, SectionLabel, StatStrip } from "./bits";
 import { BotPortrait, useBotLook } from "./bot-portrait";
+import { RainCityBanner } from "./rain-city-banner";
 import { StreakBadge } from "./streak-badge";
 
 const SLOTS: Slot[] = ["chassis", "drive", "weapon", "armor", "utility", "brain"];
@@ -34,10 +36,16 @@ export function StorePage({ storeId }: { storeId: string }) {
       <div className="h-2" style={{ background: paintHex(store.paint) }} />
       <SectionLabel>{store.region}</SectionLabel>
       <h1 className="font-display text-4xl leading-tight md:text-5xl">{store.name}</h1>
+      {store.garage === RAIN_CITY.garage ? <RainCityBanner flair={bot.style?.topper === RAIN_CITY.topper} /> : null}
       {store.teamName ? <p className="mt-1 break-words font-display text-xl text-amber">Team {store.teamName}</p> : null}
       <p className="mt-2 font-display text-2xl leading-tight text-muted">
         Bay {bot.number} · {bot.name}
       </p>
+      {bot.style?.topper === RAIN_CITY.topper && store.garage !== RAIN_CITY.garage ? (
+        <p className="mt-1 font-display text-lg tracking-wide" style={{ color: RAIN_CITY.green }} data-testid="loudest-flair">
+          {RAIN_CITY.flair}
+        </p>
+      ) : null}
       <Link to="/recap/$storeId" params={{ storeId }} className="mt-1 inline-flex min-h-11 items-center text-sm text-amber">
         Season recap →
       </Link>

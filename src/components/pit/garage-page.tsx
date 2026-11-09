@@ -23,7 +23,8 @@ import {
   wonThisWeek,
 } from "@/lib/pit/engine";
 import { paintHex, usePit, type PitState } from "@/lib/pit/store";
-import { cosmeticProgress, cosmeticUnlocked, rewardFor, type CosmeticKind } from "@/lib/pit/cosmetics";
+import { cosmeticOffered, cosmeticProgress, cosmeticUnlocked, rewardFor, type CosmeticKind } from "@/lib/pit/cosmetics";
+import { RAIN_CITY } from "@/lib/pit/rain-city";
 import type { BotLook, ClassId, GarageLook, Slot } from "@/lib/pit/types";
 import { garageSpinStartsPlaying } from "@/lib/pit/turntable";
 import { BotPortrait, useBotLook, type BotLookProps } from "./bot-portrait";
@@ -34,6 +35,7 @@ import { Btn, Field, SectionLabel, StatStrip, TextInput } from "./bits";
 import { ScrimmagePanel } from "./scrimmage-panel";
 import { SpyPanel } from "./spy-panel";
 import { StreakBadge } from "./streak-badge";
+import { RainCityBanner } from "./rain-city-banner";
 
 const SLOTS: Slot[] = ["chassis", "drive", "weapon", "armor", "utility", "brain"];
 
@@ -459,6 +461,7 @@ const LOOKS: { id: BotLook; label: string }[] = [
   { id: "chiefs", label: "Kansas City Chiefs colors" },
   { id: "bumblebee", label: "Bumblebee" },
   { id: "chase", label: "Chase · Spartan armor" },
+  { id: "rain-city", label: "Rain City" },
 ];
 
 function garageClass(look: GarageLook) {
@@ -609,12 +612,14 @@ function Chip({
   children,
   disabled = false,
   title,
+  testId,
 }: {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
   disabled?: boolean;
   title?: string;
+  testId?: string;
 }) {
   const ownedOnly = useContext(OwnedOnly);
   const [inspect, setInspect] = useState(false);
@@ -624,6 +629,7 @@ function Chip({
       type="button"
       aria-pressed={active}
       data-locked={disabled || undefined}
+      data-testid={testId}
       title={title}
       className={`min-h-11 border px-3 font-display text-sm tracking-wide uppercase transition-colors ${disabled ? "cursor-help border-line text-muted opacity-70" : active ? "border-amber bg-amber/10 text-amber" : "border-line hover:border-muted"}`}
       onClick={() => disabled ? setInspect(true) : onClick()}
@@ -693,13 +699,14 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
   const availableTrim = Object.keys(TRIM).filter((key) => unlocked("trim", key));
   const availableEye = Object.keys(EYES).filter((key) => unlocked("eye", key));
   const availableTopper = TOPPERS.filter((row) => unlocked("topper", row.id));
+  const availableLooks = LOOKS.filter((row) => unlocked("look", row.id));
   const surprise = () => {
     if (proposalMode) {
-      setDraft({ ...current, paint: pick(availablePaint), look: pick(LOOKS).id, style: { ...style, finish: pick(availableFinish).id, trim: pick(availableTrim), eye: pick(availableEye), topper: pick(availableTopper).id, stickers: { left: pick(availableDecal).id, right: pick(availableDecal).id, hood: pick(availableDecal).id, rear: pick(availableDecal).id } } });
+      setDraft({ ...current, paint: pick(availablePaint), look: pick(availableLooks).id, style: { ...style, finish: pick(availableFinish).id, trim: pick(availableTrim), eye: pick(availableEye), topper: pick(availableTopper).id, stickers: { left: pick(availableDecal).id, right: pick(availableDecal).id, hood: pick(availableDecal).id, rear: pick(availableDecal).id } } });
       return;
     }
     if (availablePaint.length) setPaint(storeId, pick(availablePaint));
-    setLook(storeId, pick(LOOKS).id);
+    setLook(storeId, pick(availableLooks).id);
     setStyle(storeId, {
       finish: pick(availableFinish).id,
       decal: pick(availableDecal).id,
@@ -761,7 +768,8 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
         </div>
 
         <div className="flex flex-col gap-3">
-          <div className="border border-line bg-deep p-3"><p className="text-xs tracking-widest text-amber uppercase">Current look</p><p className="mt-1 text-sm">{style.body} · {store.paint} · {style.finish} · #{bot.number || "—"}{style.banner ? ` · ${style.banner}` : ""}</p><p className="mt-1 text-xs text-muted">{style.trim} trim · {style.leds && style.leds !== "none" ? `${LEDS[style.leds].label} · ` : ""}{style.eye} visor · {style.topper ?? "none"} topper{style.smoke ? ` · ${SMOKE[style.smoke].label}` : ""}</p></div>
+          {store.garage === RAIN_CITY.garage ? <RainCityBanner flair={style.topper === RAIN_CITY.topper} /> : null}
+          <div className="border border-line bg-deep p-3"><p className="text-xs tracking-widest text-amber uppercase">Current look</p><p className="mt-1 text-sm">{style.body} · {store.paint} · {style.finish} · #{bot.number || "—"}{style.banner ? ` · ${style.banner}` : ""}</p><p className="mt-1 text-xs text-muted">{style.trim} trim · {style.leds && style.leds !== "none" ? `${LEDS[style.leds].label} · ` : ""}{style.eye} visor · {style.topper === RAIN_CITY.topper ? RAIN_CITY.flair : `${style.topper ?? "none"} topper`}{style.smoke ? ` · ${SMOKE[style.smoke].label}` : ""}</p></div>
           <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm"><input type="checkbox" checked={ownedOnly} onChange={e => setOwnedOnly(e.target.checked)} className="h-5 w-5 accent-amber"/>Show owned / unlocked items only</label>
           <Group label="Body shell">
             {BODY_STYLES.filter((row) => row.classId === bot.classId).map((row) => {
@@ -810,17 +818,18 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
 
           {([['left','Left armor'],['right','Right armor'],['hood','Top / hood'],['rear','Rear panel']] as [StickerSlot,string][]).map(([slot,label]) => (
             <Group key={slot} label={label + ' sticker'}>
-              {DECALS.map(row => {
+              {DECALS.filter((row) => cosmeticOffered(storeId, "decal", row.id)).map(row => {
                 const open = unlocked('decal', row.id);
-                return <Chip key={row.id} active={style.stickers?.[slot] === row.id} disabled={!open} title={open ? row.label : lockTitle('decal',row.id)} onClick={() => proposalMode ? setStyle(storeId, { stickers: { ...style.stickers!, [slot]: row.id } }) : data.setSticker(storeId, slot, row.id)}>{row.label}{!open ? ' 🔒' : ''}</Chip>;
+                return <Chip key={row.id} testId={slot === "hood" && row.id === RAIN_CITY.decal ? "rain-feather-decal" : undefined} active={style.stickers?.[slot] === row.id} disabled={!open} title={open ? row.label : lockTitle('decal',row.id)} onClick={() => proposalMode ? setStyle(storeId, { stickers: { ...style.stickers!, [slot]: row.id } }) : data.setSticker(storeId, slot, row.id)}>{row.label}{!open ? ' 🔒' : ''}</Chip>;
               })}
             </Group>
           ))}
 
           <Group label="Stripes, patterns & skins">
             <p className="mb-2 text-xs text-muted">Choose state flags or original, football-inspired team-color graphics. These fan-theme skins are not official NFL logos.</p>
-            {LOOKS.map((row) => (
-              <Chip key={row.id} active={bot.look === row.id} onClick={() => setLook(storeId, row.id)}>
+            {storeId === RAIN_CITY.storeId ? <p className="mb-2 w-full text-xs text-muted">Rain City is this bay’s free scheme: navy, action green, and wolf gray.</p> : null}
+            {LOOKS.filter((row) => cosmeticOffered(storeId, "look", row.id)).map((row) => (
+              <Chip key={row.id} testId={row.id === RAIN_CITY.look ? "rain-city-look" : undefined} title={row.id === RAIN_CITY.look ? `${RAIN_CITY.scheme} · ${RAIN_CITY.navy}, ${RAIN_CITY.green}, ${RAIN_CITY.gray}` : row.label} active={bot.look === row.id} onClick={() => setLook(storeId, row.id)}>
                 {row.label}
               </Chip>
             ))}
@@ -894,10 +903,10 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
           </Group>
 
           <Group label="Topper">
-            {TOPPERS.map((row) => {
+            {TOPPERS.filter((row) => cosmeticOffered(storeId, "topper", row.id)).map((row) => {
               const open = unlocked("topper", row.id);
               return (
-                <Chip key={row.id} active={(style.topper ?? "none") === row.id} disabled={!open} title={open ? row.label : lockTitle("topper", row.id)} onClick={() => setStyle(storeId, { topper: row.id })}>
+                <Chip key={row.id} testId={row.id === RAIN_CITY.topper ? "loudest-bay-topper" : undefined} active={(style.topper ?? "none") === row.id} disabled={!open} title={open ? row.label : lockTitle("topper", row.id)} onClick={() => setStyle(storeId, { topper: row.id })}>
                   {row.label}{!open ? " 🔒" : ""}
                 </Chip>
               );
@@ -915,9 +924,13 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
           </Group>
 
           {!proposalMode ? <Group label="Garage floor">
+            {storeId === RAIN_CITY.storeId ? <p className="mb-2 w-full text-xs text-muted">Rain City paints this bay navy, with an action-green stripe and wolf-gray rain.</p> : null}
             {GARAGES.map((row) => (
               <Chip key={row.id} active={store.garage === row.id} onClick={() => setGarage(storeId, row.id)}>{row.label}</Chip>
             ))}
+            {storeId === RAIN_CITY.storeId ? (
+              <Chip testId="rain-city-bay" active={store.garage === RAIN_CITY.garage} onClick={() => setGarage(storeId, RAIN_CITY.garage)}>{RAIN_CITY.scheme}</Chip>
+            ) : null}
           </Group> : null}
 
           {(["walkout", "victory"] as const).map(kind => <Group key={kind} label={kind}>
