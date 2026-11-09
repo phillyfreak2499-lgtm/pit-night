@@ -787,3 +787,16 @@
     background-image: linear-gradient(to bottom, #15130c, var(--color-bg) 32%);
   }
 }
+
+
+/* A separate, unmistakably metallic reward; bought yellow wheels do not shimmer. */
+@keyframes perfect-card-gold-shimmer {
+  from { background-position: 0% center; }
+  to { background-position: 100% center; }
+}
+.perfect-card-gold-swatch:not([data-locked]) {
+  animation: perfect-card-gold-shimmer 2.2s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .perfect-card-gold-swatch { animation: none !important; }
+}
