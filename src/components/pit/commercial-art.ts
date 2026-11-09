@@ -23,38 +23,61 @@ export function paintCommercial(ctx: CanvasRenderingContext2D, w: number, h: num
   ctx.translate((w - vw * scale) / 2, (h - vh * scale) / 2);
   ctx.scale(scale, scale);
   backdrop(ctx, vw, vh, scene);
-  if (scene === "mutual") paintMutual(ctx, t);
-  else if (scene === "voltage") paintVoltage(ctx, t);
-  else if (scene === "sals") paintSals(ctx, t);
-  else if (scene === "brain") paintBrain(ctx, t);
-  else if (scene === "hotline") paintHotline(ctx, t);
-  else paintNap(ctx, t);
+  switch (scene) {
+    case "mutual":
+      paintMutual(ctx, t);
+      break;
+    case "voltage":
+      paintVoltage(ctx, t);
+      break;
+    case "sals":
+      paintSals(ctx, t);
+      break;
+    case "brain":
+      paintBrain(ctx, t);
+      break;
+    case "hotline":
+      paintHotline(ctx, t);
+      break;
+    case "nap":
+      paintNap(ctx, t);
+      break;
+    case "bank":
+      paintBank(ctx, t);
+      break;
+    case "gravy":
+      paintGravy(ctx, t);
+      break;
+    case "movers":
+      paintMovers(ctx, t);
+      break;
+    default: {
+      const uncovered: never = scene;
+      void uncovered;
+    }
+  }
   hazardBand(ctx, vw, vh - 16);
   vignette(ctx, vw, vh);
   ctx.restore();
 }
 
+const SKY: Record<CommercialScene, readonly [string, string]> = {
+  mutual: ["#141a12", "#0a0c09"],
+  voltage: ["#1a1204", "#070604"],
+  sals: ["#2a160c", "#100c09"],
+  brain: ["#10161c", "#080a0c"],
+  hotline: ["#16120e", "#090807"],
+  nap: ["#10141c", "#07080c"],
+  bank: ["#121a14", "#070a08"],
+  gravy: ["#2a160e", "#100904"],
+  movers: ["#241c14", "#0c0a08"],
+};
+
 function backdrop(ctx: CanvasRenderingContext2D, w: number, h: number, scene: CommercialScene) {
   const g = ctx.createLinearGradient(0, 0, 0, h);
-  if (scene === "voltage") {
-    g.addColorStop(0, "#1a1204");
-    g.addColorStop(1, "#070604");
-  } else if (scene === "sals") {
-    g.addColorStop(0, "#2a160c");
-    g.addColorStop(1, "#100c09");
-  } else if (scene === "brain") {
-    g.addColorStop(0, "#10161c");
-    g.addColorStop(1, "#080a0c");
-  } else if (scene === "nap") {
-    g.addColorStop(0, "#10141c");
-    g.addColorStop(1, "#07080c");
-  } else if (scene === "mutual") {
-    g.addColorStop(0, "#141a12");
-    g.addColorStop(1, "#0a0c09");
-  } else {
-    g.addColorStop(0, "#16120e");
-    g.addColorStop(1, "#090807");
-  }
+  const sky = SKY[scene];
+  g.addColorStop(0, sky[0]);
+  g.addColorStop(1, sky[1]);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
 
@@ -569,4 +592,183 @@ function paintNap(ctx: CanvasRenderingContext2D, t: number) {
   ctx.beginPath();
   ctx.ellipse(500, 300, 260, 80, 0, 0, Math.PI * 2);
   ctx.fill();
+}
+
+function paintBank(ctx: CanvasRenderingContext2D, t: number) {
+  ctx.fillStyle = "#1c2820";
+  ctx.beginPath();
+  ctx.arc(220, 300, 148, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#c6a15a";
+  ctx.lineWidth = 8;
+  ctx.stroke();
+  for (let i = 0; i < 8; i++) {
+    const a = t * 0.35 + i * (Math.PI / 4);
+    ctx.fillStyle = i % 2 ? AMBER : "#8a8478";
+    ctx.beginPath();
+    ctx.arc(220 + Math.cos(a) * 128, 300 + Math.sin(a) * 128, 7, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  label(ctx, "VAULT", 220, 268, 28, "#c6a15a");
+  label(ctx, "10 = 1", 220, 318, 40, FG);
+
+  const rock = Math.sin(t * 2.2) * 0.14;
+  ctx.save();
+  ctx.translate(500, 340);
+  ctx.rotate(rock);
+  ctx.fillStyle = "#8d6844";
+  roundRect(ctx, -40, -78, 80, 130, 10);
+  ctx.fill();
+  ctx.fillStyle = "#c4622d";
+  ctx.fillRect(-40, -78, 80, 22);
+  label(ctx, "BOLTS", 0, -10, 18, FG);
+  ctx.restore();
+
+  for (let i = 0; i < 6; i++) {
+    const fall = (t * 36 + i * 22) % 90;
+    ctx.fillStyle = AMBER;
+    ctx.beginPath();
+    ctx.arc(540 + Math.sin(i * 1.7) * 26, 230 + fall, 5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  drawBot(ctx, 780, 330, 160, t, { eyes: "spiral", body: "#6a7a68" });
+  const wrong = ["7", "11", "4"][Math.floor(t * 1.5) % 3]!;
+  label(ctx, wrong, 780, 130, 52, SPARK);
+  label(ctx, "COUNT", 780, 172, 18, MUTED);
+}
+
+function paintGravy(ctx: CanvasRenderingContext2D, t: number) {
+  label(ctx, "GOBBLE-GRADE", 500, 72, 40, "#e0a15a");
+  ctx.fillStyle = "#3a2418";
+  ctx.fillRect(70, 460, 860, 28);
+
+  const pour = 0.45 + 0.55 * Math.sin(t * 1.6);
+  ctx.save();
+  ctx.translate(250, 250);
+  ctx.rotate(-0.15 - pour * 0.28);
+  ctx.fillStyle = "#e6d2a8";
+  roundRect(ctx, -78, -40, 150, 78, 22);
+  ctx.fill();
+  ctx.strokeStyle = "#8a6844";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.fillStyle = "#6a3a18";
+  ctx.beginPath();
+  ctx.ellipse(0, -8, 42, 16, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#e6d2a8";
+  ctx.beginPath();
+  ctx.moveTo(64, -6);
+  ctx.lineTo(118, 16);
+  ctx.lineTo(64, 24);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  ctx.strokeStyle = `rgba(122, 72, 28, ${0.4 + pour * 0.55})`;
+  ctx.lineWidth = 10;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(340, 230);
+  ctx.quadraticCurveTo(390, 310 + pour * 24, 470, 430);
+  ctx.stroke();
+
+  ctx.save();
+  ctx.translate(620, 300);
+  ctx.rotate(t * 0.7);
+  ctx.strokeStyle = "#c6a15a";
+  ctx.lineWidth = 10;
+  ctx.beginPath();
+  ctx.arc(0, 0, 48, 0, Math.PI * 2);
+  ctx.stroke();
+  for (let i = 0; i < 6; i++) {
+    const a = i * (Math.PI / 3);
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * 40, Math.sin(a) * 40);
+    ctx.lineTo(Math.cos(a) * 62, Math.sin(a) * 62);
+    ctx.stroke();
+  }
+  ctx.fillStyle = `rgba(122, 72, 28, ${0.2 + pour * 0.5})`;
+  ctx.beginPath();
+  ctx.arc(0, 0, 36, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.strokeStyle = "#e0a15a";
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 3; i++) {
+    const rise = (t * 22 + i * 26) % 72;
+    ctx.globalAlpha = 1 - rise / 72;
+    ctx.beginPath();
+    ctx.arc(760 + i * 18, 200 - rise, 10 + i * 2, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  drawBot(ctx, 820, 360, 130, t, { eyes: "shut", body: "#8d6844" });
+}
+
+function paintMovers(ctx: CanvasRenderingContext2D, t: number) {
+  label(ctx, "CLASS ACT", 210, 78, 36, "#e0a15a");
+
+  ctx.strokeStyle = STEEL;
+  ctx.lineWidth = 8;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(150, 450);
+  ctx.lineTo(150, 200);
+  ctx.lineTo(210, 188);
+  ctx.stroke();
+  ctx.fillStyle = "#1c1a17";
+  ctx.beginPath();
+  ctx.arc(132, 462, 18, 0, Math.PI * 2);
+  ctx.arc(188, 462, 18, 0, Math.PI * 2);
+  ctx.fill();
+
+  const packed: [number, number, string][] = [
+    [150, 250, "ARM"],
+    [146, 340, "WHEEL"],
+  ];
+  for (const [x, y, name] of packed) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(Math.sin(t + y) * 0.03);
+    ctx.fillStyle = "#c4a574";
+    roundRect(ctx, -46, -40, 92, 78, 4);
+    ctx.fill();
+    ctx.strokeStyle = "#6a4a28";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    label(ctx, name, 0, 2, 16, "#3a2418");
+    ctx.restore();
+  }
+
+  const drop = Math.sin(t * 2.4) * 10;
+  ctx.save();
+  ctx.translate(430, 310 + drop);
+  ctx.rotate(0.18);
+  ctx.fillStyle = "#e6d2a8";
+  roundRect(ctx, -58, -44, 116, 88, 4);
+  ctx.fill();
+  ctx.strokeStyle = SPARK;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  label(ctx, "IMPORTANT", 0, 4, 16, SPARK);
+  ctx.save();
+  ctx.translate(-58, -44);
+  ctx.rotate(-0.55);
+  ctx.fillStyle = "#c4a574";
+  ctx.fillRect(0, -12, 116, 16);
+  ctx.restore();
+  ctx.restore();
+
+  const boltY = 250 + ((t * 36) % 70);
+  ctx.fillStyle = AMBER;
+  ctx.fillRect(468, boltY, 8, 22);
+  ctx.beginPath();
+  ctx.arc(472, boltY, 7, 0, Math.PI * 2);
+  ctx.fill();
+
+  drawBot(ctx, 760, 330, 170, t, { missingArm: "right", eyes: "sad", arm: "up", body: "#7a756c" });
+  label(ctx, "60 BOLTS", 760, 120, 32, AMBER);
 }
