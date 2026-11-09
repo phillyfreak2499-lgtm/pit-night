@@ -57,7 +57,7 @@ const style = z
   })
   .strict();
 export const cosmeticLoadoutSchema = z.object({
-  paint: id, look: z.enum(["plain", "stripe", "chevron", "rivets", "two-tone", "camouflage", "tie-dye", "texas", "louisiana", "cowboys", "seahawks", "raiders", "chiefs", "bumblebee", "chase"]),
+  paint: id, look: z.enum(["plain", "stripe", "chevron", "rivets", "two-tone", "camouflage", "tie-dye", "texas", "louisiana", "cowboys", "seahawks", "raiders", "chiefs", "bumblebee", "chase", "rain-city"]),
   number: z.string().max(3), style: style.required({ finish: true, decal: true, trim: true, eye: true, flag: true }),
 }).strict();
 export const commandArgs = {
@@ -91,8 +91,8 @@ export const commandArgs = {
   renameIdentity: z.tuple([id, z.string().trim().min(1).max(22).regex(/^[^\u0000-\u001f\u007f]+$/), z.string().trim().min(1).max(40).regex(/^[^\u0000-\u001f\u007f]+$/)]),
   renameCaptain: z.tuple([id, text]),
   setPaint: z.tuple([id, id]),
-  setGarage: z.tuple([id, z.enum(["hazard", "concrete", "night", "bone", "checker"])]),
-  setLook: z.tuple([id, z.enum(["plain", "stripe", "chevron", "rivets", "two-tone", "camouflage", "tie-dye", "texas", "louisiana", "cowboys", "seahawks", "raiders", "chiefs", "bumblebee", "chase"])]),
+  setGarage: z.tuple([id, z.enum(["hazard", "concrete", "night", "bone", "checker", "raincity"])]),
+  setLook: z.tuple([id, z.enum(["plain", "stripe", "chevron", "rivets", "two-tone", "camouflage", "tie-dye", "texas", "louisiana", "cowboys", "seahawks", "raiders", "chiefs", "bumblebee", "chase", "rain-city"])]),
   setStyle: z.tuple([id, style]),
   completeJob: z.tuple([week, id, text]),
   approveJob: z.tuple([id]),

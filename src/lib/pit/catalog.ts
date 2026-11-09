@@ -152,6 +152,7 @@ const BASE_DECALS: { id: StickerArt; label: string }[] = [
   { id: "turbo", label: "Ticket Turbo" },
   { id: "airforce", label: "Air Force" },
   { id: "longhorn", label: "Texas Longhorn" },
+  { id: "rainfeather", label: "Rain Feather" },
 ];
 
 export const MASKS: { id: BotMask; label: string }[] = [
@@ -380,6 +381,7 @@ export const TOPPERS: { id: BotTopper; label: string }[] = [
   { id: "tincan", label: "Tin can hat" },
   { id: "pilgrimhat", label: "Pilgrim hat" },
   { id: "wreath", label: "Harvest wreath" },
+  { id: "loudest", label: "Loudest Bay in Texas" },
 ];
 
 export function bodyStyle(id: string | undefined) {

@@ -3,6 +3,7 @@ import { sawPoseOf } from "./bot-weapons";
 import { drawPaintSkin } from "./paint-skins";
 import { bannerVerdict } from "../../../scripts/copy-guard.mjs";
 import { EYES, LEDS, PAINT, SMOKE, TRIM, WHEEL_COLORS, decalArt, styleOf } from "@/lib/pit/catalog";
+import { RAIN_CITY } from "@/lib/pit/rain-city";
 import { ELECTION_COLORS } from "@/lib/pit/election";
 import { arenaTheme, drawArenaHazards, drawArenaTopScene, paintArenaScene, paintArenaJanelleBanner, type ArenaId, type ArenaTheme } from "./arena-scenes";
 import { paintTeamJanelleBanner } from "./team-janelle-banner";
@@ -1920,7 +1921,7 @@ export function drawSideBot(
       ctx.stroke();
     }
     ctx.restore();
-  } else if (look === "two-tone" || look === "camouflage" || look === "tie-dye" || look === "texas" || ["louisiana","cowboys","seahawks","raiders","chiefs","bumblebee"].includes(look)) {
+  } else if (look === "two-tone" || look === "camouflage" || look === "tie-dye" || look === "texas" || ["louisiana","cowboys","seahawks","raiders","chiefs","bumblebee","rain-city"].includes(look)) {
     ctx.save();
     poly(ctx, f.hull, u2);
     ctx.clip();
@@ -2311,6 +2312,76 @@ function drawFreshSticker(
     }
     ctx.closePath();ctx.fill();
     ctx.fillStyle="#e54042";ctx.fillRect(cx-r*0.63,cy+r*0.46,r*1.26,r*0.11);
+    return true;
+  }
+  if (art === "rainfeather") {
+    // Primary feather under a rain cloud. No bird head, eye, or beak.
+    const { navy, green, gray } = RAIN_CITY;
+    ctx.fillStyle = navy;
+    ctx.beginPath();
+    ctx.roundRect(cx - r, cy - r * 0.92, r * 2, r * 1.84, r * 0.16);
+    ctx.fill();
+    ctx.fillStyle = gray;
+    ctx.beginPath();
+    ctx.ellipse(cx - r * 0.12, cy - r * 0.58, r * 0.28, r * 0.15, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + r * 0.14, cy - r * 0.66, r * 0.22, r * 0.14, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + r * 0.32, cy - r * 0.52, r * 0.16, r * 0.11, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = green;
+    ctx.lineWidth = Math.max(1.4, r * 0.08);
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(cx + r * 0.02, cy - r * 0.48);
+    ctx.quadraticCurveTo(cx + r * 0.2, cy - r * 0.7, cx + r * 0.42, cy - r * 0.5);
+    ctx.stroke();
+    const p0 = { x: cx - r * 0.52, y: cy + r * 0.62 };
+    const p1 = { x: cx - r * 0.02, y: cy + r * 0.02 };
+    const p2 = { x: cx + r * 0.46, y: cy - r * 0.28 };
+    const at = (t: number) => {
+      const x = (1 - t) * (1 - t) * p0.x + 2 * (1 - t) * t * p1.x + t * t * p2.x;
+      const y = (1 - t) * (1 - t) * p0.y + 2 * (1 - t) * t * p1.y + t * t * p2.y;
+      const dx = 2 * (1 - t) * (p1.x - p0.x) + 2 * t * (p2.x - p1.x);
+      const dy = 2 * (1 - t) * (p1.y - p0.y) + 2 * t * (p2.y - p1.y);
+      const len = Math.hypot(dx, dy) || 1;
+      return { x, y, nx: -dy / len, ny: dx / len };
+    };
+    ctx.strokeStyle = green;
+    ctx.lineWidth = Math.max(1.3, r * 0.07);
+    ctx.beginPath();
+    ctx.moveTo(p0.x, p0.y);
+    ctx.quadraticCurveTo(p1.x, p1.y, p2.x, p2.y);
+    ctx.stroke();
+    ctx.strokeStyle = gray;
+    ctx.lineWidth = Math.max(1, r * 0.035);
+    for (let i = 1; i <= 8; i++) {
+      const p = at(i / 10);
+      const reach = r * (0.16 + (1 - i / 10) * 0.36);
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x + p.nx * reach, p.y + p.ny * reach);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x - p.nx * reach * 0.28, p.y - p.ny * reach * 0.28);
+      ctx.stroke();
+    }
+    ctx.fillStyle = green;
+    ctx.beginPath();
+    ctx.moveTo(p2.x, p2.y - r * 0.06);
+    ctx.lineTo(p2.x + r * 0.12, p2.y);
+    ctx.lineTo(p2.x, p2.y + r * 0.06);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = gray;
+    for (const [ox, oy] of [[-0.2, 0.22], [0.08, 0.34], [0.34, 0.2]] as const) {
+      const dx = cx + ox * r;
+      const dy = cy + oy * r;
+      ctx.beginPath();
+      ctx.moveTo(dx, dy);
+      ctx.bezierCurveTo(dx - r * 0.05, dy + r * 0.07, dx - r * 0.04, dy + r * 0.13, dx, dy + r * 0.16);
+      ctx.bezierCurveTo(dx + r * 0.04, dy + r * 0.13, dx + r * 0.05, dy + r * 0.07, dx, dy);
+      ctx.fill();
+    }
     return true;
   }
   if (art === "longhorn") {
@@ -3023,6 +3094,32 @@ function drawTopper(
     ctx.fill();
   } else if (topper?.startsWith("janelle-")) {
     drawJanelleFlag(ctx, topper, u * 0.15, top - u * 0.34, u * 0.42, facing);
+  } else if (topper === "loudest") {
+    const { navy, green, gray } = RAIN_CITY;
+    ctx.fillStyle = navy;
+    ctx.beginPath();
+    ctx.moveTo(-u * 0.05, top - u * 0.05);
+    ctx.lineTo(u * 0.16, top - u * 0.01);
+    ctx.lineTo(u * 0.16, top - u * 0.2);
+    ctx.lineTo(-u * 0.05, top - u * 0.16);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = green;
+    ctx.beginPath();
+    ctx.ellipse(u * 0.17, top - u * 0.105, u * 0.035, u * 0.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = gray;
+    ctx.lineWidth = Math.max(1.2, u * 0.012);
+    ctx.lineCap = "round";
+    for (let i = 0; i < 3; i++) {
+      ctx.globalAlpha = 0.95 - i * 0.2;
+      ctx.beginPath();
+      ctx.arc(u * 0.18, top - u * 0.105, u * (0.07 + i * 0.045), -1.05, 1.05);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = gray;
+    ctx.fillRect(-u * 0.08, top - u * 0.14, u * 0.06, u * 0.07);
   } else if (topper === "flagpole") {
     ctx.strokeStyle = "#f3efe6";
     ctx.lineWidth = Math.max(1.2, u * 0.01);
@@ -5126,7 +5223,7 @@ export function drawTopBot(
   if (s.bot.look === "stripe") {
     ctx.fillStyle = "#f3efe6";
     ctx.fillRect(-len * 0.5, -wid * 0.05, len * 0.9, wid * 0.1);
-  } else if (s.bot.look === "two-tone" || s.bot.look === "camouflage" || s.bot.look === "tie-dye" || s.bot.look === "texas" || ["louisiana","cowboys","seahawks","raiders","chiefs","bumblebee"].includes(s.bot.look)) {
+  } else if (s.bot.look === "two-tone" || s.bot.look === "camouflage" || s.bot.look === "tie-dye" || s.bot.look === "texas" || ["louisiana","cowboys","seahawks","raiders","chiefs","bumblebee","rain-city"].includes(s.bot.look)) {
     ctx.save();
     traceTopHull(ctx, s.bot.classId, style.body, len, wid);
     ctx.clip();
@@ -5193,7 +5290,7 @@ function drawTopperPlan(
   time: number,
   eye: string,
 ) {
-  if (!topper || topper === "none" || (!["beacon", "dish", "flagpole", "tyler-roses", "shrek-ears", "wally-eyes"].includes(topper) && !topper.startsWith("janelle-"))) return;
+  if (!topper || topper === "none" || (!["beacon", "dish", "flagpole", "tyler-roses", "shrek-ears", "wally-eyes", "loudest"].includes(topper) && !topper.startsWith("janelle-"))) return;
   ctx.save();
 
   if (topper === "shrek-ears") {
@@ -5234,6 +5331,23 @@ function drawTopperPlan(
     }
   } else if (topper.startsWith("janelle-")) {
     drawJanelleFlag(ctx, topper, 0, -wid * 0.3, wid * 0.75);
+  } else if (topper === "loudest") {
+    const { navy, green, gray } = RAIN_CITY;
+    ctx.fillStyle = navy;
+    ctx.beginPath();
+    ctx.ellipse(-len * 0.02, 0, len * 0.12, wid * 0.16, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = green;
+    ctx.beginPath();
+    ctx.arc(len * 0.1, 0, wid * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = gray;
+    ctx.lineWidth = Math.max(1, wid * 0.04);
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.arc(len * 0.12, 0, wid * (0.16 + i * 0.1), -1.1, 1.1);
+      ctx.stroke();
+    }
   } else if (topper === "beacon") {
     const pulse = 0.55 + Math.sin(time * 6) * 0.35;
     ctx.fillStyle = `rgba(255,70,40,${0.45 * pulse})`;

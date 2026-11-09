@@ -1,3 +1,4 @@
+import { RAIN_CITY } from "@/lib/pit/rain-city";
 import type { BotLook } from "@/lib/pit/types";
 
 /**
@@ -15,7 +16,7 @@ export function drawPaintSkin(
   base: string,
   accent: string,
 ) {
-  if (!["two-tone", "camouflage", "tie-dye", "texas", "louisiana", "cowboys", "seahawks", "raiders", "chiefs", "bumblebee", "chase"].includes(look)) return;
+  if (!["two-tone", "camouflage", "tie-dye", "texas", "louisiana", "cowboys", "seahawks", "raiders", "chiefs", "bumblebee", "chase", "rain-city"].includes(look)) return;
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(width, height);
@@ -225,6 +226,69 @@ export function drawPaintSkin(
           if (j === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
         } ctx.stroke();
       }
+    }
+  }
+
+  if (look === "rain-city") {
+    // Weather scheme: navy field, action-green sash, wolf-gray rain and cloud.
+    // A cloud and falling streaks, not a bird head.
+    const { navy, green, gray } = RAIN_CITY;
+    ctx.fillStyle = navy;
+    ctx.fillRect(0, 0, 1, 1);
+    const mist = ctx.createLinearGradient(0, 0, 0, 1);
+    mist.addColorStop(0, "rgba(165,172,175,0.28)");
+    mist.addColorStop(0.42, "rgba(165,172,175,0)");
+    mist.addColorStop(1, "rgba(0,16,32,0.45)");
+    ctx.fillStyle = mist;
+    ctx.fillRect(0, 0, 1, 1);
+    ctx.strokeStyle = gray;
+    ctx.lineCap = "round";
+    for (let i = 0; i < 16; i++) {
+      const x = ((i * 61) % 97) / 100;
+      const y0 = ((i * 23) % 48) / 100;
+      ctx.globalAlpha = 0.28 + (i % 3) * 0.16;
+      ctx.lineWidth = i % 4 === 0 ? 0.014 : 0.006;
+      ctx.beginPath();
+      ctx.moveTo(x, y0);
+      ctx.lineTo(x + 0.025, y0 + 0.18 + (i % 4) * 0.03);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = green;
+    ctx.beginPath();
+    ctx.moveTo(0, 0.74);
+    ctx.lineTo(1, 0.56);
+    ctx.lineTo(1, 0.67);
+    ctx.lineTo(0, 0.85);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = gray;
+    ctx.lineWidth = 0.012;
+    ctx.beginPath();
+    ctx.moveTo(0, 0.71);
+    ctx.lineTo(1, 0.53);
+    ctx.stroke();
+    ctx.fillStyle = gray;
+    ctx.beginPath();
+    ctx.ellipse(0.32, 0.26, 0.15, 0.09, 0, 0, Math.PI * 2);
+    ctx.ellipse(0.46, 0.22, 0.13, 0.1, 0, 0, Math.PI * 2);
+    ctx.ellipse(0.58, 0.28, 0.11, 0.075, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = green;
+    ctx.beginPath();
+    ctx.ellipse(0.46, 0.33, 0.2, 0.032, -0.08, 0, Math.PI);
+    ctx.fill();
+    ctx.fillStyle = gray;
+    for (const [dx, dy] of [
+      [0.28, 0.4],
+      [0.46, 0.44],
+      [0.6, 0.39],
+    ] as const) {
+      ctx.beginPath();
+      ctx.moveTo(dx, dy);
+      ctx.bezierCurveTo(dx - 0.022, dy + 0.04, dx - 0.018, dy + 0.07, dx, dy + 0.085);
+      ctx.bezierCurveTo(dx + 0.018, dy + 0.07, dx + 0.022, dy + 0.04, dx, dy);
+      ctx.fill();
     }
   }
 

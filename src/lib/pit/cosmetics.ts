@@ -1,6 +1,7 @@
 import { bannerVerdict } from "../../../scripts/copy-guard.mjs";
 import { BODY_STYLES, METRICS, bodyStyle } from "./catalog";
 import { championshipFinalists, gradesOf, recordOf } from "./engine";
+import { RAIN_CITY } from "./rain-city";
 import { sparkStreak, tunedUp } from "./week";
 import type { BotBody, PitData, StatKey } from "./types";
 
@@ -262,6 +263,35 @@ const FREE: Record<CosmeticKind, Set<string>> = {
   banner:new Set([""]),
 };
 
+/** Free cosmetics that belong to one bay. Other stores never unlock them. */
+const STORE_EXCLUSIVE: Record<string, Partial<Record<CosmeticKind, readonly string[]>>> = {
+  [RAIN_CITY.storeId]: {
+    look: [RAIN_CITY.look],
+    decal: [RAIN_CITY.decal],
+    topper: [RAIN_CITY.topper],
+  },
+};
+
+function exclusiveOwner(kind: CosmeticKind, value: string): string | null {
+  for (const [storeId, kinds] of Object.entries(STORE_EXCLUSIVE)) {
+    if (kinds[kind]?.includes(value)) return storeId;
+  }
+  return null;
+}
+
+/** Hide another bay's free cosmetics. Foil copies follow the base art. */
+export function cosmeticOffered(storeId: string, kind: CosmeticKind, value: string) {
+  const base = kind === "decal" && value.endsWith("-foil") ? value.slice(0, -5) : value;
+  const owner = exclusiveOwner(kind, base);
+  return owner === null || owner === storeId;
+}
+
+/** Garage floors are store themes. Rain City is Southlake's floor. */
+export function garageThemeUnlocked(storeId: string, theme: string) {
+  if (theme === RAIN_CITY.garage) return storeId === RAIN_CITY.storeId;
+  return true;
+}
+
 export function earnedRewardIds(data: PitData, storeId: string) {
   return new Set(COSMETIC_REWARDS.filter(r=>{const x=r.progress(data,storeId);return x.current>=x.target}).map(r=>r.id));
 }
@@ -301,6 +331,8 @@ export function cosmeticUnlocked(data:PitData,storeId:string,kind:CosmeticKind,v
     const earned=earnedRewardIds(data,storeId);
     return rewardHeld(data,storeId,"reward-foil",earned);
   }
+  const owner = exclusiveOwner(kind, value);
+  if (owner) return storeId === owner;
   if(FREE[kind].has(value)) return true;
   const earned=earnedRewardIds(data,storeId);
   const reward=rewardFor(kind,value);

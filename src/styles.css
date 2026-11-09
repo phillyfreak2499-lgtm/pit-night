@@ -101,6 +101,30 @@
   background-size: 1.5rem 1.5rem;
 }
 
+.garage-raincity {
+  background-color: #002244;
+  background-image:
+    repeating-linear-gradient(100deg, transparent 0 12px, rgba(165, 172, 175, 0.28) 12px 13px),
+    linear-gradient(#002244 0 68%, #69be28 68% 78%, #a5acaf 78% 82%, #002244 82%);
+}
+
+.rain-city-banner {
+  background-color: #002244;
+  background-image: repeating-linear-gradient(
+    108deg,
+    transparent 0 12px,
+    rgba(165, 172, 175, 0.2) 12px 13px
+  );
+  box-shadow: inset 0 -6px 0 #69be28;
+  color: #a5acaf;
+}
+
+.rain-city-mark {
+  width: 4.5rem;
+  height: 3.25rem;
+  flex: none;
+}
+
 .ticker {
   animation: ticker 28s linear infinite;
 }
