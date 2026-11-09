@@ -1465,16 +1465,26 @@ function drawWheel(
   r: number,
   roll: number,
   paint: string,
+  solidGold = false,
 ) {
-  const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
-  g.addColorStop(0, "#3a3835");
-  g.addColorStop(1, "#111");
+  const g = ctx.createRadialGradient(x - r * 0.34, y - r * 0.4, r * 0.03, x, y, r);
+  if (solidGold) {
+    // The entire wheel is precious metal. Standard yellow wheels keep black rubber.
+    g.addColorStop(0, "#fffbd7");
+    g.addColorStop(0.19, "#fff2a0");
+    g.addColorStop(0.42, "#ffd34d");
+    g.addColorStop(0.74, "#cf8c0d");
+    g.addColorStop(1, "#704007");
+  } else {
+    g.addColorStop(0, "#3a3835");
+    g.addColorStop(1, "#111");
+  }
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fill();
-  // Tread blocks.
-  ctx.strokeStyle = "#060606";
+  // Tread blocks move with the wheel and catch specular light on solid gold.
+  ctx.strokeStyle = solidGold ? "#a56b0b" : "#060606";
   ctx.lineWidth = Math.max(1, r * 0.12);
   for (let i = 0; i < 10; i++) {
     const a = roll + (i / 10) * Math.PI * 2;
@@ -1483,28 +1493,49 @@ function drawWheel(
     ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
     ctx.stroke();
   }
-  // Hub.
   const rim = ctx.createLinearGradient(x-r,y-r,x+r,y+r);
-  rim.addColorStop(0,"#eff4f8");rim.addColorStop(0.2,"#788896");rim.addColorStop(0.5,"#253440");rim.addColorStop(0.8,"#a7b8c5");rim.addColorStop(1,"#17212b");
+  if (solidGold) {
+    rim.addColorStop(0, "#fff7b8");
+    rim.addColorStop(0.2, "#a76b08");
+    rim.addColorStop(0.45, "#ffdb59");
+    rim.addColorStop(0.68, "#ffeeb0");
+    rim.addColorStop(1, "#9e6100");
+  } else {
+    rim.addColorStop(0,"#eff4f8");rim.addColorStop(0.2,"#788896");rim.addColorStop(0.5,"#253440");rim.addColorStop(0.8,"#a7b8c5");rim.addColorStop(1,"#17212b");
+  }
   ctx.fillStyle = rim;
   ctx.beginPath();
   ctx.arc(x, y, r * 0.45, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = paint;
+  ctx.fillStyle = solidGold ? "#ffe27b" : paint;
   ctx.beginPath();
   ctx.arc(x, y, r * 0.3, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = paint;
+  ctx.strokeStyle = solidGold ? "#fff5bb" : paint;
   ctx.lineWidth = Math.max(1.5, r * 0.095);
   ctx.beginPath();
   ctx.arc(x, y, r * 0.69, 0, Math.PI * 2);
   ctx.stroke();
-  ctx.fillStyle = "#1a1918";
+  ctx.fillStyle = solidGold ? "#b7790b" : "#1a1918";
   for (let i = 0; i < 5; i++) {
     const a = roll + (i / 5) * Math.PI * 2;
     ctx.beginPath();
     ctx.arc(x + Math.cos(a) * r * 0.2, y + Math.sin(a) * r * 0.2, r * 0.05, 0, Math.PI * 2);
     ctx.fill();
+  }
+  if (solidGold) {
+    // A moving, high-contrast highlight makes the rare metal shimmer during fights.
+    const glint = roll * 0.4;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(glint);
+    ctx.strokeStyle = "rgba(255,255,236,0.95)";
+    ctx.lineWidth = Math.max(1, r * 0.07);
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.43, -r * 0.48);
+    ctx.lineTo(r * 0.16, -r * 0.67);
+    ctx.stroke();
+    ctx.restore();
   }
 }
 
@@ -1613,6 +1644,7 @@ export function drawSideBot(
   const trim = TRIM[style.trim] ?? TRIM.steel!;
   const eye = EYES[style.eye] ?? EYES.green!;
   const hub = style.wheelColor && style.wheelColor !== "stock" ? WHEEL_COLORS[style.wheelColor]?.hex ?? trim : style.trim === "steel" ? shade(paint, -40) : trim;
+  const solidGoldWheels = style.wheelColor === "solid-gold";
 
   // Weapon behind the hull (arms, hammer back swing).
   weaponBack(ctx, s, f, u2, spin);
@@ -1638,13 +1670,13 @@ export function drawSideBot(
       ctx.lineTo(tx, 0);
       ctx.stroke();
     }
-    for (const wh of f.wheels) drawWheel(ctx, wh.x * u2, -0.125 * u2, wh.r * u2, s.roll * 3, hub);
+    for (const wh of f.wheels) drawWheel(ctx, wh.x * u2, -0.125 * u2, wh.r * u2, s.roll * 3, hub, solidGoldWheels);
   } else {
     // Far-side wheels peek out behind the hull.
     for (const wh of f.wheels) {
       ctx.save();
       ctx.globalAlpha *= 0.55;
-      drawWheel(ctx, (wh.x + 0.05) * u2, -wh.r * u2 - 0.015 * u2, wh.r * u2, s.roll * 3, hub);
+      drawWheel(ctx, (wh.x + 0.05) * u2, -wh.r * u2 - 0.015 * u2, wh.r * u2, s.roll * 3, hub, solidGoldWheels);
       ctx.restore();
     }
   }
@@ -1979,7 +2011,7 @@ export function drawSideBot(
       ctx.beginPath();
       ctx.arc(wh.x * u2, -wh.r * u2, wh.r * u2 * 1.12, Math.PI, 0);
       ctx.fill();
-      drawWheel(ctx, wh.x * u2, -wh.r * u2, wh.r * u2, s.roll * 3, hub);
+      drawWheel(ctx, wh.x * u2, -wh.r * u2, wh.r * u2, s.roll * 3, hub, solidGoldWheels);
     }
   } else {
     // Armour skirt over the upper run of the track.

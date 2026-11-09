@@ -42,7 +42,7 @@ const style = z
     wings: z.enum(WING_IDS).optional(),
     mask: z.enum(["none", "lantern", "hockey"]).optional(),
     weaponSkin: z.enum(["none", "hockey-machete", "neon-fang", "gold-fang", "ice-fang"]).optional(),
-    wheelColor: z.enum(["stock", "neon", "candy", "ice", "gold", "ultraviolet"]).optional(),
+    wheelColor: z.enum(["stock", "neon", "candy", "ice", "gold", "ultraviolet", "solid-gold"]).optional(),
     trim: id.optional(),
     eye: id.optional(),
     finish: finish.optional(),

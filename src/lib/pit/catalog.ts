@@ -96,7 +96,8 @@ export const WHEEL_COLORS: Record<string, { label: string; hex: string }> = {
   neon: { label: "Neon wheels", hex: "#39ff6a" },
   candy: { label: "Candy wheels", hex: "#e3123f" },
   ice: { label: "Glacier wheels", hex: "#bfe8ff" },
-  gold: { label: "Gold wheels", hex: "#f4c44e" },
+  gold: { label: "Yellow wheels", hex: "#f6d64b" },
+  "solid-gold": { label: "24K Solid Gold Wheels · Perfect Card", hex: "#ffce47" },
   ultraviolet: { label: "Ultraviolet wheels", hex: "#aa56ff" },
 };
 

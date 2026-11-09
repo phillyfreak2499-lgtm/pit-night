@@ -188,9 +188,24 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
     style.trim === "steel"
       ? `rgb(${[1, 3, 5].map((offset) => Math.max(0, parseInt(color.slice(offset, offset + 2), 16) - 40)).join(",")})`
       : (TRIM[style.trim] ?? TRIM.steel);
-  const wheelHub = metal(hubColor, 0.48, 0.65);
+  // Perfect Card is an actual gold wheel body, not the purchasable yellow wheel paint.
+  // Polished gold catches the Garage's rotating light; light/dark gold faces make the
+  // wheel read as solid metal at every angle without affecting physics or combat.
+  const solidGoldWheels = style.wheelColor === "solid-gold";
+  const solidGold = new THREE.MeshPhysicalMaterial({
+    color: "#ffd04e", metalness: 1, roughness: 0.075,
+    clearcoat: 1, clearcoatRoughness: 0.025,
+    emissive: "#8d5100", emissiveIntensity: 0.12,
+  });
+  const goldHighlight = new THREE.MeshPhysicalMaterial({
+    color: "#fff0a6", metalness: 1, roughness: 0.055,
+    clearcoat: 1, clearcoatRoughness: 0.025,
+  });
+  const goldInset = metal("#a66b08", 0.12, 1);
+  const wheelHub = solidGoldWheels ? goldHighlight : metal(hubColor, 0.48, 0.65);
   const rubber = metal("#171b1e", 0.91, 0.03),
     brass = metal("#ae8750", 0.42, 0.72);
+  const wheelBody = solidGoldWheels ? solidGold : rubber;
   const white = metal("#e4e1cd", 0.64, 0.12),
     orange = metal("#b34e16", 0.6, 0.18);
   const lens = new THREE.MeshStandardMaterial({
@@ -483,13 +498,13 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
       for (const wh of frame.wheels) {
         const z = wh.x * unit;
         const r = wh.r * unit;
-        cylinder("Road wheel", r, 0.19, [side * wheelX, 0.25, z], rubber, "x", drive);
+        cylinder("Road wheel", r, 0.19, [side * wheelX, 0.25, z], wheelBody, "x", drive);
         cylinder(
           "Road wheel rim",
           r * 0.77,
           0.027,
           [side * (wheelX + 0.112), 0.25, z],
-          steel,
+          solidGoldWheels ? goldHighlight : steel,
           "x",
           drive,
         );
@@ -498,7 +513,7 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
           r * 0.56,
           0.03,
           [side * (wheelX + 0.13), 0.25, z],
-          dark,
+          solidGoldWheels ? goldInset : dark,
           "x",
           drive,
         );
@@ -553,7 +568,7 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
           radius,
           0.22,
           [side * wheelX, radius + 0.025, z],
-          rubber,
+          wheelBody,
           "x",
           wheel,
         );
@@ -562,7 +577,7 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
           radius * 0.7,
           0.03,
           [side * (wheelX + 0.12), radius + 0.025, z],
-          driveFamily === "haywagon" ? brass : trim,
+          solidGoldWheels ? goldHighlight : driveFamily === "haywagon" ? brass : trim,
           "x",
           wheel,
         );
@@ -580,7 +595,7 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
           radius * 0.48,
           0.035,
           [side * (wheelX + 0.13), radius + 0.025, z],
-          dark,
+          solidGoldWheels ? goldInset : dark,
           "x",
           wheel,
         );
@@ -607,7 +622,7 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
                 radius + 0.025 + Math.cos(angle) * radius,
                 z + Math.sin(angle) * radius,
               ],
-              dark,
+              solidGoldWheels ? goldHighlight : dark,
               "z",
               wheel,
             );
@@ -621,7 +636,7 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
             radius * 0.86,
             0.022,
             [side * (wheelX + 0.109), radius + 0.025, z],
-            dark,
+            solidGoldWheels ? goldHighlight : dark,
             "x",
             wheel,
           );
