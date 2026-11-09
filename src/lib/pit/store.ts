@@ -42,7 +42,7 @@ import {
 } from "./engine";
 import { backfillReplays, sealReplay } from "./replay";
 import { makeData } from "./seed";
-import { BOLTS, BOLT_EXCHANGE, STREAK_BADGE, allJobs, crateFor, dayOpen, programWeek, type DayKey } from "./training";
+import { BOLTS, BOLT_EXCHANGE, STREAK_BADGE, allJobs, boltsForCoins, crateFor, dayOpen, programWeek, type DayKey } from "./training";
 import { eligibilityClosed } from "./eligibility";
 import { blockedName } from "../../../scripts/copy-guard.mjs";
 import { bannerVerdict, cosmeticUnlocked, earnedRewardIds, HALLOWEEN_REWARD_IDS, THANKSGIVING_REWARD_IDS, validBodyForClass } from "./cosmetics";
@@ -85,10 +85,10 @@ export type PitState = PitData & {
   propose: (storeId: string, partId: string, note: string) => void;
   acceptProposal: (id: string) => void;
   dismissProposal: (id: string) => void;
-  buyPart: (storeId: string, partId: string) => void;
+  buyPart: (storeId: string, partId: string, pay?: "coins" | "bolts") => void;
   sellPart: (storeId: string, partId: string) => void;
   buyShow: (storeId: string, effectId: ShowEffectId) => void;
-  repairSlot: (storeId: string, slot: Slot, mode: "full" | "weld" | "salvage" | "crown" | "bolts") => void;
+  repairSlot: (storeId: string, slot: Slot, mode: "full" | "weld" | "weldBolts" | "salvage" | "crown" | "bolts") => void;
   convertBolts: (storeId: string, slot: Slot, coins: number) => void;
   nameMvp: (storeId: string, crewId: string) => void;
   renameBot: (storeId: string, name: string) => void;
@@ -946,7 +946,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         if (!proposal || !isCaptainOf(data, proposal.storeId)) return;
         set({ proposals: data.proposals.filter((p) => p.id !== id) });
       },
-      buyPart: (storeId, partId) => {
+      buyPart: (storeId, partId, pay = "coins") => {
         const data = get();
         const championshipBlock = championshipPrepGuard(data, storeId);
         if (championshipBlock && !isBoss(data)) { set({ flash: championshipBlock }); return; }
@@ -963,12 +963,21 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         }
         const part = partById(partId);
         if (!part) return;
-        const check = buyCheck(data, storeId, part);
+        const withBolts = pay === "bolts";
+        const check = buyCheck(data, storeId, part, withBolts ? "bolts" : "coins");
         if (!check.ok) {
           set({ flash: check.reason });
           return;
         }
+        const bolts = withBolts ? boltsForCoins(check.cost) : 0;
+        if (withBolts && boltsOf(data, storeId).balance < bolts) {
+          set({ flash: `Needs ${bolts} Bolts. This bay has ${boltsOf(data, storeId).balance}.` });
+          return;
+        }
         set({
+          stores: withBolts
+            ? data.stores.map((s) => (s.id === storeId ? { ...s, boltsSpent: (s.boltsSpent ?? 0) + bolts } : s))
+            : data.stores,
           bots: patchBot(data.bots, storeId, (bot) => {
             const classChange = Boolean(part.classLock && part.classLock !== bot.classId);
             const draft = { ...bot.draft, [part.slot]: part.id };
@@ -976,7 +985,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
             const nextClass = part.classLock ?? bot.classId;
             return syncWear({
               ...bot,
-              coins: { ...bot.coins, [part.key]: (bot.coins[part.key] ?? 0) - check.cost },
+              coins: withBolts ? bot.coins : { ...bot.coins, [part.key]: (bot.coins[part.key] ?? 0) - check.cost },
               owned,
               classId: nextClass,
               style: classChange
@@ -987,11 +996,8 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
               locked: null,
             });
           }),
-          flash: classChangeNote(part.name, check.cost),
+          flash: withBolts ? `${part.name} bought for ${bolts} Bolts.` : `${part.name} bought for ${check.cost} coins.`,
         });
-        function classChangeNote(name: string, cost: number) {
-          return `${name} bought for ${cost} coins.`;
-        }
       },
       sellPart: (storeId, partId) => {
         const data = get();
@@ -1113,9 +1119,30 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "That part is already clean." });
           return;
         }
-        if (mode === "weld") {
+        if (mode === "weld" || mode === "weldBolts") {
           if (cond !== "disabled") {
             set({ flash: "Emergency weld is only for a dead part." });
+            return;
+          }
+          const week = nextFightWeek(data);
+          const weldBot = (bot: typeof current) =>
+            setPartWear(
+              { ...bot, services: (bot.services ?? 0) + 1, weldedParts: { ...bot.weldedParts, [partId]: week } },
+              partId,
+              "bent",
+            );
+          if (mode === "weldBolts") {
+            const bolts = boltsForCoins(REPAIR_PRICE.weld);
+            const balance = boltsOf(data, storeId).balance;
+            if (balance < bolts) {
+              set({ flash: `A Bolt weld is ${bolts} Bolts. The bay has ${balance}.` });
+              return;
+            }
+            set({
+              stores: data.stores.map((s) => (s.id === storeId ? { ...s, boltsSpent: (s.boltsSpent ?? 0) + bolts } : s)),
+              bots: patchBot(data.bots, storeId, () => weldBot(current)),
+              flash: `${part.name} is welded to Bent for week ${week}. ${bolts} Bolts. Then it dies again if you do not finish the job.`,
+            });
             return;
           }
           const paid = payRepair(current, slot, REPAIR_PRICE.weld);
@@ -1123,15 +1150,8 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
             set({ flash: `Weld is ${REPAIR_PRICE.weld} ${slot} coin. The jar cannot cover it.` });
             return;
           }
-          const week = nextFightWeek(data);
           set({
-            bots: patchBot(data.bots, storeId, () =>
-              setPartWear(
-                { ...paid, services: (paid.services ?? 0) + 1, weldedParts: { ...paid.weldedParts, [partId]: week } },
-                partId,
-                "bent",
-              ),
-            ),
+            bots: patchBot(data.bots, storeId, () => weldBot(paid)),
             flash: `${part.name} is welded to Bent for week ${week}. Then it dies again if you do not finish the job.`,
           });
           return;
@@ -1191,7 +1211,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           return;
         }
         if (mode === "bolts") {
-          const bolts = REPAIR_PRICE[cond] * BOLT_EXCHANGE.repairBoltsPerCoin;
+          const bolts = boltsForCoins(REPAIR_PRICE[cond]);
           const balance = boltsOf(data, storeId).balance;
           if (balance < bolts) {
             set({ flash: `A Bolt repair is ${bolts} Bolts. The bay has ${balance}.` });
@@ -1512,7 +1532,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: `Only ${left} more coin${left === 1 ? "" : "s"} from Bolts this week.` });
           return;
         }
-        const bolts = want * BOLT_EXCHANGE.boltsPerCoin;
+        const bolts = boltsForCoins(want);
         const balance = boltsOf(data, storeId).balance;
         if (balance < bolts) {
           set({ flash: `${want} coin${want === 1 ? " is" : "s are"} ${bolts} Bolts. The bay has ${balance}.` });

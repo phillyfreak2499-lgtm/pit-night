@@ -1,5 +1,5 @@
 import { CLASS_META, SLOT_LABEL, batteryOf, partById, tierWord, type Part } from "@/lib/pit/catalog";
-import { cardFor, gradesOf, printedStats, weekQuality } from "@/lib/pit/engine";
+import { CLASS_SWITCH_BOLTS, cardFor, gradesOf, printedStats, weekQuality } from "@/lib/pit/engine";
 import type { PitData, Slot, StatBlock } from "@/lib/pit/types";
 import { BotPortrait, useBotLook } from "./bot-portrait";
 import { Btn, SectionLabel } from "./bits";
@@ -68,7 +68,7 @@ export function PartDetails({ part }: { part: Part }) {
           {tierWord(part.tier)} tier
           {fit ? ` · Best on a ${fit}` : ""}
           {part.slot === "chassis" ? ` · Battery ${batteryOf(part)}` : ""}
-          {part.classLock ? ` · ${CLASS_META[part.classLock].label} chassis only (switch class in the Garage for 60 Bolts after Week 1 before buying this chassis)` : ""}
+          {part.classLock ? ` · ${CLASS_META[part.classLock].label} chassis only (switch class in the Garage for ${CLASS_SWITCH_BOLTS} Bolts after Week 1 before buying this chassis)` : ""}
         </p>
       </div>
     </details>

@@ -1,7 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { ChevronDown, Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import { BOLTS, BOLT_EXCHANGE, STREAK_BADGE, TUNE_UP_BONUS } from "@/lib/pit/training";
+import { REPAIR_PRICE } from "@/lib/pit/catalog";
+import { CLASS_SWITCH_BOLTS } from "@/lib/pit/engine";
+import { BOLTS, BOLT_EXCHANGE, STREAK_BADGE, TUNE_UP_BONUS, boltsForCoins } from "@/lib/pit/training";
 import { usePit } from "@/lib/pit/store";
 import { SectionLabel } from "./bits";
 
@@ -57,7 +59,7 @@ export const GROUPS: Group[] = [
       ),
       faq(
         "What are Bolts?",
-        `Points for doing the work. An approved job is ${BOLTS.job} Bolts, each right Spark answer is ${BOLTS.sparkCorrect}, each right Monday pick is ${BOLTS.pickCorrect}, and the Wednesday Mystery Crate is ${BOLTS.crate}. The captain spends them three ways. The Bolt Locker sells looks: walk-out pyro, smoke, sparks, victory confetti, fireworks, and special paints. In the Garage, any repair quote can be paid in Bolts at ${BOLT_EXCHANGE.repairBoltsPerCoin} Bolts per coin of the quote. And the Bolt exchange trades ${BOLT_EXCHANGE.boltsPerCoin} Bolts for 1 coin in any part's jar, up to ${BOLT_EXCHANGE.weeklyCoinCap} coins a Pit Week, so green grades stay the main way to upgrade.`,
+        `Points for doing the work. An approved job is ${BOLTS.job} Bolts, each right Spark answer is ${BOLTS.sparkCorrect}, each right Monday pick is ${BOLTS.pickCorrect}, and the Wednesday Mystery Crate is ${BOLTS.crate}. The Bolt Locker sells looks: walk-out pyro, smoke, sparks, victory confetti, fireworks, and special paints. In the Garage, any repair quote and an emergency weld can be paid in Bolts at ${BOLT_EXCHANGE.boltsPerCoin} Bolts per coin. In the Shop, a part that is already on the peg can be bought with Bolts at the same rate. Bolts do not skip a grade week, a date window, a class, a lock, or a captain-only rule. The Bolt exchange trades ${BOLT_EXCHANGE.boltsPerCoin} Bolts for 1 coin in any part's jar, up to ${BOLT_EXCHANGE.weeklyCoinCap} coins a Pit Week, so green grades stay the main way to upgrade. A class change stays ${CLASS_SWITCH_BOLTS} Bolts, and show effects keep their own Bolt prices.`,
       ),
       faq(
         "What is the Full Tune-Up?",
@@ -126,7 +128,7 @@ export const GROUPS: Group[] = [
       ),
       faq(
         "Can we change our bot's class?",
-        "Not in Week 1. After the first fight the captain can switch between Striker, Tank and Specialist in the Garage for 60 Bolts earned from Pit Week jobs and Daily Sparks. Owned parts stay in the locker; incompatible equipped parts return to stock.",
+        `Not in Week 1. After the first fight the captain can switch between Striker, Tank and Specialist in the Garage for ${CLASS_SWITCH_BOLTS} Bolts earned from Pit Week jobs and Daily Sparks. Owned parts stay in the locker; incompatible equipped parts return to stock.`,
       ),
     ],
   },
@@ -167,7 +169,7 @@ export const GROUPS: Group[] = [
       ),
       faq(
         "What happens to damage?",
-        "After the fights the desk posts the damage report. Scratched parts cost 1 coin to fix, bent 2, dead 4, all from that part's jar. An emergency weld turns a dead part into a bent one for a week for 1 coin. Unrepaired damage stays visible on the bot. Last place gets a 3-coin repair voucher.",
+        `After the fights the desk posts the damage report. Scratched parts cost ${REPAIR_PRICE.scratched} coin to fix, bent ${REPAIR_PRICE.bent}, dead ${REPAIR_PRICE.disabled}, all from that part's jar, or ${BOLT_EXCHANGE.boltsPerCoin} Bolts per coin of the same quote. An emergency weld turns a dead part into a bent one for a week for ${REPAIR_PRICE.weld} coin, or ${boltsForCoins(REPAIR_PRICE.weld)} Bolts. Unrepaired damage stays visible on the bot. Last place gets a 3-coin repair voucher.`,
       ),
     ],
   },

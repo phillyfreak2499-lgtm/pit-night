@@ -1,6 +1,6 @@
 import { Modal } from "./modal";
 import { boltsOf } from "@/lib/pit/week";
-import { BOLT_EXCHANGE } from "@/lib/pit/training";
+import { boltsForCoins } from "@/lib/pit/training";
 import { LockerIdentity } from "./locker-identity";
 import { CosmeticBoard, CosmeticTheme } from "./cosmetic-board";
 import { EffectLockerPreview } from "./effect-locker-preview";
@@ -10,6 +10,7 @@ import { Link } from "@tanstack/react-router";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { BODY_STYLES, CLASS_META, DECALS, EYES, FINISHES, LEDS, MASKS, PAINT, SMOKE, TOPPERS, WEAPON_SKINS, WHEEL_COLORS, batteryOf, partById, partsFor, SLOT_LABEL, styleOf, TRIM } from "@/lib/pit/catalog";
 import {
+  CLASS_SWITCH_BOLTS,
   buyCheck,
   classSwitchCheck,
   canSeeLoadout,
@@ -116,7 +117,7 @@ export function GaragePage({ storeId }: { storeId: string }) {
       <section className="border border-line bg-surface p-4" data-testid="class-switch-panel">
         <SectionLabel>Change fighting class</SectionLabel>
         <p className="mt-2 text-sm text-muted">
-          Switch between Striker, Tank and Specialist for 60 Bolts, earned from jobs and Daily Sparks.
+          Switch between Striker, Tank and Specialist for {CLASS_SWITCH_BOLTS} Bolts, earned from jobs and Daily Sparks.
           Your bay has {boltBalance} Bolts. Purchased parts stay owned; incompatible parts are replaced with stock gear.
           The original Week 1 class lock and Saturday build lock still apply.
         </p>
@@ -138,7 +139,7 @@ export function GaragePage({ storeId }: { storeId: string }) {
                     else setConfirmClass(next);
                   }}
                 >
-                  {current ? "Current class" : confirm ? "Confirm 60 Bolts" : "Switch · 60 Bolts"}
+                  {current ? "Current class" : confirm ? `Confirm ${CLASS_SWITCH_BOLTS} Bolts` : `Switch · ${CLASS_SWITCH_BOLTS} Bolts`}
                 </Btn>
                 {!current && !check.ok ? <p className="mt-2 text-xs text-muted">{check.reason}</p> : null}
               </div>
@@ -288,15 +289,24 @@ export function GaragePage({ storeId }: { storeId: string }) {
                     </Btn>
                     <Btn
                       tone="line"
-                      disabled={boltBalance < quote.repairCost * BOLT_EXCHANGE.repairBoltsPerCoin}
+                      disabled={boltBalance < boltsForCoins(quote.repairCost)}
                       onClick={() => repairSlot(storeId, quote.slot, "bolts")}
                     >
-                      Fix with {quote.repairCost * BOLT_EXCHANGE.repairBoltsPerCoin} Bolts
+                      Fix with {boltsForCoins(quote.repairCost)} Bolts
                     </Btn>
                     {quote.weldCost ? (
-                      <Btn tone="line" onClick={() => repairSlot(storeId, quote.slot, "weld")}>
-                        Weld {quote.weldCost}
-                      </Btn>
+                      <>
+                        <Btn tone="line" onClick={() => repairSlot(storeId, quote.slot, "weld")}>
+                          Weld {quote.weldCost}
+                        </Btn>
+                        <Btn
+                          tone="line"
+                          disabled={boltBalance < boltsForCoins(quote.weldCost)}
+                          onClick={() => repairSlot(storeId, quote.slot, "weldBolts")}
+                        >
+                          Weld with {boltsForCoins(quote.weldCost)} Bolts
+                        </Btn>
+                      </>
                     ) : null}
                     {quote.salvageScrap ? (
                       <Btn tone="ghost" onClick={() => repairSlot(storeId, quote.slot, "salvage")}>
