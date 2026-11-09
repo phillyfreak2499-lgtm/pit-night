@@ -7,6 +7,7 @@ import { isElectionPart } from "@/lib/pit/election";
 import { isVeteransPart } from "@/lib/pit/veterans";
 import { isRecyclesPart } from "@/lib/pit/recycles";
 import { SELL_BACK, buyCheck, canSeeLoadout, sellCheck, shopOpen, showCheck } from "@/lib/pit/engine";
+import { boltsForCoins } from "@/lib/pit/training";
 import { usePit } from "@/lib/pit/store";
 import { boltsOf } from "@/lib/pit/week";
 import type { Slot } from "@/lib/pit/types";
@@ -64,6 +65,7 @@ export function ShopPage({ storeId }: { storeId: string }) {
           <CoinStack n={bot.coins[slot] ?? 0} />
           <span className="font-display text-sm tracking-wide text-muted uppercase">{SLOT_LABEL[slot]} coins</span>
         </span>
+        <span className="border border-line bg-surface px-3 py-2 font-display text-sm tracking-wide uppercase">{showBolts} Bolts</span>
         <span className={`px-3 py-2 font-display text-sm tracking-widest uppercase ${open ? "bg-ok/15 text-ok" : "bg-bad/15 text-bad"}`}>{open ? "Shop open" : "Shop shut"}</span>
       </div>
       <div className="mt-5">
@@ -94,10 +96,12 @@ export function ShopPage({ storeId }: { storeId: string }) {
           <ul className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {parts.map((part) => {
               const check = buyCheck(data, storeId, part);
+              const boltCheck = buyCheck(data, storeId, part, "bolts");
               const owned = bot.owned.includes(part.id);
               const sell = owned ? sellCheck(data, storeId, part) : null;
               const have = bot.coins[part.key] ?? 0;
               const price = Math.max(check.cost, part.price);
+              const boltPrice = boltsForCoins(part.price);
               const coinsOk = have >= price;
               const src = KEY_SOURCE[part.key];
               return (
@@ -137,12 +141,15 @@ export function ShopPage({ storeId }: { storeId: string }) {
                       : check.ok
                         ? "Ready to buy."
                         : !coinsOk
-                          ? `${price - have} more ${SLOT_LABEL[part.key].toLowerCase()} coins. ${src.label} pays them: green 3, blue 2, orange 1, red 0.`
+                          ? `${price - have} more ${SLOT_LABEL[part.key].toLowerCase()} coins. ${src.label} pays them: green 3, blue 2, orange 1, red 0.${boltCheck.ok ? ` Or buy it with ${boltPrice} Bolts.` : ""}`
                           : check.reason}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Btn disabled={!check.ok} onClick={() => buyPart(storeId, part.id)}>
                       Buy
+                    </Btn>
+                    <Btn tone="line" disabled={!boltCheck.ok} onClick={() => buyPart(storeId, part.id, "bolts")}>
+                      Buy with {boltPrice} Bolts
                     </Btn>
                     {sell ? (
                       <Btn

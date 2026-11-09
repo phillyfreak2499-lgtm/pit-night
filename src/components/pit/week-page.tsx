@@ -689,8 +689,11 @@ const EXCHANGE_SLOTS: Slot[] = ["chassis", "drive", "weapon", "armor", "utility"
 function BoltExchange({ data, storeId, canBuy, balance }: { data: PitData; storeId: string; canBuy: boolean; balance: number }) {
   const convertBolts = usePit((s) => s.convertBolts);
   const [slot, setSlot] = useState<Slot>("weapon");
+  const [amount, setAmount] = useState(1);
   const left = boltCoinsLeft(data, storeId);
   const rate = BOLT_EXCHANGE.boltsPerCoin;
+  const pick = left > 0 ? Math.min(Math.max(1, amount), left) : 0;
+  const cost = pick * rate;
   return (
     <div className="flex flex-col gap-2 border-b border-line px-4 py-3" data-testid="bolt-exchange">
       <p className="text-[10px] tracking-widest text-muted uppercase">Bolt exchange</p>
@@ -711,8 +714,37 @@ function BoltExchange({ data, storeId, canBuy, balance }: { data: PitData; store
             </option>
           ))}
         </select>
-        <Btn disabled={!canBuy || left < 1 || balance < rate} onClick={() => convertBolts(storeId, slot, 1)}>
-          {rate} Bolts → 1 coin
+        <div className="flex items-center gap-1" role="group" aria-label="Coins to buy">
+          <button
+            type="button"
+            className="min-h-11 min-w-11 border border-line px-2 disabled:opacity-40"
+            disabled={!canBuy || pick <= 1}
+            onClick={() => setAmount(pick - 1)}
+          >
+            −1
+          </button>
+          <span className="min-w-8 text-center font-display" data-testid="bolt-exchange-amount">
+            {pick}
+          </span>
+          <button
+            type="button"
+            className="min-h-11 border border-line px-2 disabled:opacity-40"
+            disabled={!canBuy || pick >= left}
+            onClick={() => setAmount(Math.min(left, pick + 1))}
+          >
+            +1
+          </button>
+          <button
+            type="button"
+            className="min-h-11 border border-line px-2 disabled:opacity-40"
+            disabled={!canBuy || pick >= left}
+            onClick={() => setAmount(Math.min(left, pick + 5))}
+          >
+            +5
+          </button>
+        </div>
+        <Btn disabled={!canBuy || pick < 1 || balance < cost} onClick={() => convertBolts(storeId, slot, pick)}>
+          {cost} Bolts → {pick} coin{pick === 1 ? "" : "s"}
         </Btn>
       </div>
     </div>
@@ -732,7 +764,7 @@ function BoltLocker({ data, storeId, canBuy }: { data: PitData; storeId: string;
       <div className="flex flex-wrap items-end justify-between gap-2 border-b border-line px-4 py-3">
         <div>
           <SectionLabel>Bolt Locker</SectionLabel>
-          <p className="text-sm text-muted">Bolts buy looks, fix parts, and trade for a few coins. Jobs +{BOLTS.job}, Spark answers +{BOLTS.sparkCorrect}, right picks +{BOLTS.pickCorrect}.</p>
+          <p className="text-sm text-muted">Bolts buy looks, fix parts, pay welds, buy parts already on the peg, and trade for up to {BOLT_EXCHANGE.weeklyCoinCap} coins a week at {BOLT_EXCHANGE.boltsPerCoin} Bolts each. Jobs +{BOLTS.job}, Spark answers +{BOLTS.sparkCorrect}, right picks +{BOLTS.pickCorrect}.</p>
         </div>
         <p className="font-display text-xl">
           {bolts.balance} <span className="text-sm text-muted">bolts</span>

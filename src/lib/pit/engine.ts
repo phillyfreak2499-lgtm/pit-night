@@ -31,7 +31,7 @@ import {
 import { buildScore, duelWear, fightDuel, fightGroup, preferFighter, type DuelOpts } from "./combat";
 import { centralDay } from "./time";
 export { halloweenStrikeAdjust } from "./combat";
-import { BOLTS, BOLT_EXCHANGE, TUNE_UP_BONUS } from "./training";
+import { BOLTS, TUNE_UP_BONUS, boltsForCoins } from "./training";
 import { boltsOf, tunedUp } from "./week";
 import type {
   Bot,
@@ -2090,9 +2090,12 @@ export function ownsPart(bot: Bot, part: Part): boolean {
   return bot.owned.includes(part.id);
 }
 
-/** The original three-coin reclass cost, paid from earned Bolts at the standard exchange. */
+/**
+ * The original three-coin reclass, frozen at 60 Bolts (the old 20-Bolt rate).
+ * The cheaper coin rate does not change a class switch.
+ */
 export const RECLASS_FEE = 3;
-export const CLASS_SWITCH_BOLTS = RECLASS_FEE * BOLT_EXCHANGE.boltsPerCoin;
+export const CLASS_SWITCH_BOLTS = 60;
 
 /** The authoritative gate shared by the captain's Garage UI and the server action. */
 export function classSwitchCheck(
@@ -2158,6 +2161,7 @@ export function buyCheck(
   data: PitData,
   storeId: string,
   part: Part,
+  pay: "coins" | "bolts" = "coins",
 ): { ok: boolean; reason: string; cost: number } {
   const bot = botFor(data, storeId);
   if (data.phase === "open" && bot.locked)
@@ -2209,6 +2213,14 @@ export function buyCheck(
         : `${part.greenWeeks} green ${src.label} week${part.greenWeeks === 1 ? "" : "s"}`;
       return { ok: false, reason: `Needs ${need}. You have ${earned}.`, cost };
     }
+  }
+  if (pay === "bolts") {
+    const bolts = boltsForCoins(cost);
+    const haveBolts = boltsOf(data, storeId).balance;
+    if (haveBolts < bolts) {
+      return { ok: false, reason: `Needs ${bolts} Bolts. This bay has ${haveBolts}.`, cost };
+    }
+    return { ok: true, reason: "On the peg.", cost };
   }
   const have = bot.coins[part.key] ?? 0;
   if (have < cost) {

@@ -50,16 +50,28 @@ export type TrainingWeek = {
 export const DAY_LABEL: Record<DayKey, string> = { tue: "Tuesday", wed: "Wednesday", thu: "Thursday", fri: "Friday", sat: "Saturday" };
 export const DAY_ORDER: DayKey[] = ["tue", "wed", "thu", "fri", "sat"];
 
-/** Coins are performance. Bolts are effort. Bolts buy looks only. Completing the Full Tune-Up earns the separate +4 fight bonus. */
+/** Coins are performance. Bolts are effort. Completing the Full Tune-Up earns the separate +4 fight bonus. */
 export const BOLTS = { job: 2, sparkCorrect: 1, pickCorrect: 2, crate: 5 } as const;
 
 /**
- * What Bolts can do beyond the Locker. Grades stay the main coin source:
- * a green week pays 3 coins, and the Bolt exchange tops out at
- * `weeklyCoinCap` coins a Pit Week. Repairs paid in Bolts are not capped,
- * because a repair only puts a part back to clean.
+ * One Bolt price for a coin of work: repairs, emergency welds, the exchange,
+ * and buying a part that is already on the peg. Grades stay the main coin
+ * source. A green week pays 3 coins, and the Bolt exchange tops out at
+ * `weeklyCoinCap` coins a Pit Week. Repairs, welds, and part purchases paid
+ * in Bolts are not capped. Class switches and show effects keep their own prices.
  */
-export const BOLT_EXCHANGE = { boltsPerCoin: 20, weeklyCoinCap: 2, repairBoltsPerCoin: 20 } as const;
+export const BOLTS_PER_COIN = 10;
+export const BOLT_EXCHANGE = {
+  boltsPerCoin: BOLTS_PER_COIN,
+  weeklyCoinCap: 5,
+  /** Same number as `boltsPerCoin`. Older call sites stay on the one rate. */
+  repairBoltsPerCoin: BOLTS_PER_COIN,
+} as const;
+
+/** Bolt cost of a coin-priced quote, repair, weld, or part. */
+export function boltsForCoins(coins: number) {
+  return coins * BOLT_EXCHANGE.boltsPerCoin;
+}
 
 /** Perfect Sparks in a row for the streak badge. */
 export const STREAK_BADGE = 5;

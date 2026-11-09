@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { CLASS_META, starterBodies } from "@/lib/pit/catalog";
+import { CLASS_SWITCH_BOLTS } from "@/lib/pit/engine";
 import type { BotBody, ClassId } from "@/lib/pit/types";
 import { usePit } from "@/lib/pit/store";
 import { BotPortrait } from "./bot-portrait";
@@ -111,7 +112,7 @@ export default function StarterBodyPicker({
           Lock {selected.label} for Week 1
         </button>
         <p className="mt-2 text-center text-xs text-muted">
-          After the first fight, captains can change class in the Garage for 60 Bolts earned through jobs and Daily Sparks.
+          After the first fight, captains can change class in the Garage for {CLASS_SWITCH_BOLTS} Bolts earned through jobs and Daily Sparks.
         </p>
       </div>
     </div>

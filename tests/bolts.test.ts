@@ -4,9 +4,11 @@ import assert from "node:assert/strict";
 import { createStore } from "zustand/vanilla";
 import { pitCreator, sharedDoc } from "../src/lib/pit/store.ts";
 import { boltCoinsLeft, boltsOf } from "../src/lib/pit/week.ts";
-import { BOLT_EXCHANGE, BOLTS } from "../src/lib/pit/training.ts";
+import { BOLT_EXCHANGE, BOLTS, boltsForCoins } from "../src/lib/pit/training.ts";
 import { REPAIR_PRICE, stockPart, partById } from "../src/lib/pit/catalog.ts";
 import { CLASS_SWITCH_BOLTS, classSwitchCheck, buyCheck, simulateDuel } from "../src/lib/pit/engine.ts";
+import { SHOW_PRICE } from "../src/lib/pit/halloween.ts";
+import { central } from "../src/lib/pit/time.ts";
 import { authorize, CAPTAIN_BUILD_COMMANDS, commandArgs } from "../src/lib/pit/commands.ts";
 import { cosmeticUnlocked } from "../src/lib/pit/cosmetics.ts";
 
@@ -218,6 +220,265 @@ test("class switching refuses insufficient Bolts, crew members, Week 1, and lock
   assert.equal(bot(bypass).draft.chassis, stockPart("chassis", "striker").id);
   assert.equal(buyCheck(bypass.getState(), STORE, partById("chassis-keystone-sport")!).ok, false);
   assert.match(buyCheck(bypass.getState(), STORE, partById("chassis-keystone-sport")!).reason, /Change class/);
+});
+
+function snapshot(store: ReturnType<typeof setup>) {
+  const row = bot(store);
+  return JSON.stringify({
+    owned: row.owned,
+    coins: row.coins,
+    classId: row.classId,
+    draft: row.draft,
+    equipped: row.equipped,
+    wear: row.wear,
+    partWear: row.partWear,
+    welded: row.weldedParts ?? {},
+    bolts: balance(store),
+    spent: store.getState().stores.find((s) => s.id === STORE)?.boltsSpent ?? 0,
+  });
+}
+
+function zeroJars(store: ReturnType<typeof setup>) {
+  store.setState({
+    bots: store.getState().bots.map((row) =>
+      row.storeId === STORE
+        ? { ...row, coins: { chassis: 0, armor: 0, drive: 0, weapon: 0, utility: 0, brain: 0 } }
+        : row,
+    ),
+  });
+}
+
+test("the coin rate is 10 Bolts and the weekly exchange cap is 5", () => {
+  assert.equal(BOLT_EXCHANGE.boltsPerCoin, 10);
+  assert.equal(BOLT_EXCHANGE.repairBoltsPerCoin, BOLT_EXCHANGE.boltsPerCoin);
+  assert.equal(BOLT_EXCHANGE.weeklyCoinCap, 5);
+  assert.equal(boltsForCoins(1), 10);
+  assert.equal(boltsForCoins(REPAIR_PRICE.weld), 10);
+  assert.equal(CLASS_SWITCH_BOLTS, 60);
+  assert.equal(SHOW_PRICE, 100);
+});
+
+test("the exchange can trade several coins at once and still stops at the weekly cap", () => {
+  const store = setup();
+  zeroJars(store);
+  const start = balance(store);
+  store.getState().convertBolts(STORE, "armor", 3);
+  assert.equal(bot(store).coins.armor, 3);
+  assert.equal(balance(store), start - boltsForCoins(3));
+  assert.equal(boltCoinsLeft(store.getState(), STORE), BOLT_EXCHANGE.weeklyCoinCap - 3);
+
+  const mid = snapshot(store);
+  store.getState().convertBolts(STORE, "armor", 5);
+  assert.equal(snapshot(store), mid, "a trade past the remaining cap changes nothing");
+  assert.match(store.getState().flash, /2 more coins/);
+
+  store.getState().convertBolts(STORE, "brain", 2);
+  assert.equal(bot(store).coins.brain, 2);
+  assert.equal(bot(store).coins.armor, 3);
+  assert.equal(boltCoinsLeft(store.getState(), STORE), 0);
+  assert.equal(balance(store), start - boltsForCoins(BOLT_EXCHANGE.weeklyCoinCap));
+
+  const capped = snapshot(store);
+  store.getState().convertBolts(STORE, "drive", 1);
+  assert.equal(snapshot(store), capped);
+  assert.match(store.getState().flash, /used/);
+});
+
+test("an emergency weld can be paid in Bolts and a short bay changes nothing", () => {
+  const store = setup();
+  store.setState({
+    bots: store.getState().bots.map((row) =>
+      row.storeId === STORE
+        ? {
+            ...row,
+            coins: { ...row.coins, weapon: 4 },
+            wear: { ...row.wear, weapon: "disabled" as const },
+            partWear: { ...row.partWear, [PART]: "disabled" as const },
+          }
+        : row,
+    ),
+  });
+  const start = balance(store);
+  store.getState().repairSlot(STORE, "weapon", "weldBolts");
+  assert.equal(bot(store).partWear[PART], "bent");
+  assert.equal(bot(store).wear.weapon, "bent");
+  assert.equal(bot(store).coins.weapon, 4, "the coin jar is untouched");
+  assert.equal(bot(store).weldedParts?.[PART], 2);
+  assert.equal(balance(store), start - boltsForCoins(REPAIR_PRICE.weld));
+  assert.match(store.getState().flash, new RegExp(`${boltsForCoins(REPAIR_PRICE.weld)} Bolts`));
+
+  const paid = setup();
+  paid.setState({
+    bots: paid.getState().bots.map((row) =>
+      row.storeId === STORE
+        ? {
+            ...row,
+            coins: { ...row.coins, weapon: 3 },
+            wear: { ...row.wear, weapon: "disabled" as const },
+            partWear: { ...row.partWear, [PART]: "disabled" as const },
+          }
+        : row,
+    ),
+  });
+  const boltsBefore = balance(paid);
+  paid.getState().repairSlot(STORE, "weapon", "weld");
+  assert.equal(bot(paid).partWear[PART], "bent");
+  assert.equal(bot(paid).coins.weapon, 2);
+  assert.equal(balance(paid), boltsBefore, "a coin weld does not spend Bolts");
+
+  const short = setup(1);
+  short.setState({
+    bots: short.getState().bots.map((row) =>
+      row.storeId === STORE
+        ? {
+            ...row,
+            coins: { ...row.coins, weapon: 4 },
+            wear: { ...row.wear, weapon: "disabled" as const },
+            partWear: { ...row.partWear, [PART]: "disabled" as const },
+          }
+        : row,
+    ),
+  });
+  const before = snapshot(short);
+  short.getState().repairSlot(STORE, "weapon", "weldBolts");
+  assert.equal(snapshot(short), before);
+  assert.match(short.getState().flash, /A Bolt weld is 10 Bolts\. The bay has 2/);
+});
+
+test("a captain can buy every slot with Bolts when the part is already on the peg", () => {
+  const store = setup(120);
+  zeroJars(store);
+  const ids = [
+    "chassis-shrike-sport",
+    "armor-plate-sport",
+    "drive-omni-sport",
+    "weapon-saw-sport",
+    "utility-peace-sport",
+    "brain-logic-sport",
+  ];
+  const start = balance(store);
+  for (const id of ids) {
+    const part = partById(id)!;
+    assert.equal(part.price * BOLT_EXCHANGE.boltsPerCoin, boltsForCoins(part.price));
+    assert.equal(buyCheck(store.getState(), STORE, part).ok, false, `${id} has no coins`);
+    assert.equal(buyCheck(store.getState(), STORE, part, "bolts").ok, true, id);
+    store.getState().buyPart(STORE, id, "bolts");
+    assert.ok(bot(store).owned.includes(id), id);
+    assert.equal(bot(store).equipped[part.slot], id);
+    assert.equal(bot(store).coins[part.key], 0);
+  }
+  assert.equal(balance(store), start - ids.reduce((n, id) => n + boltsForCoins(partById(id)!.price), 0));
+  assert.equal(commandArgs.buyPart.safeParse([STORE, ids[0]]).success, true);
+  assert.equal(commandArgs.buyPart.safeParse([STORE, ids[0], "bolts"]).success, true);
+  assert.equal(commandArgs.buyPart.safeParse([STORE, ids[0], "coins"]).success, true);
+  assert.equal(commandArgs.buyPart.safeParse([STORE, ids[0], "gold"]).success, false);
+  assert.equal(commandArgs.repairSlot.safeParse([STORE, "weapon", "weldBolts"]).success, true);
+  assert.equal(commandArgs.repairSlot.safeParse([STORE, "weapon", "weld"]).success, true);
+});
+
+test("too few Bolts leaves a part, its coins, and the bay exactly as they were", () => {
+  const store = setup(14);
+  zeroJars(store);
+  const before = snapshot(store);
+  const part = partById("weapon-saw-sport")!;
+  assert.equal(buyCheck(store.getState(), STORE, part, "bolts").ok, false);
+  store.getState().buyPart(STORE, part.id, "bolts");
+  assert.equal(snapshot(store), before);
+  assert.match(store.getState().flash, /Needs 30 Bolts\. This bay has 28/);
+});
+
+test("Bolts do not skip grade, class, championship, date, captain, or lock gates", (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: central(2026, 12, 1, 12).getTime() });
+  const rich = setup(200);
+  zeroJars(rich);
+
+  const flail = partById("weapon-flail-super")!;
+  assert.match(buyCheck(rich.getState(), STORE, flail, "bolts").reason, /2 green/);
+  const flailBefore = snapshot(rich);
+  rich.getState().buyPart(STORE, flail.id, "bolts");
+  assert.equal(snapshot(rich), flailBefore);
+  assert.match(rich.getState().flash, /2 green/);
+
+  const axe = partById("weapon-axe-super")!;
+  const rivet = partById("weapon-rivetgun-super")!;
+  assert.match(buyCheck(rich.getState(), STORE, axe, "bolts").reason, /not on the peg/);
+  assert.match(buyCheck(rich.getState(), STORE, rivet, "bolts").reason, /not on the peg/);
+  const closed = snapshot(rich);
+  rich.getState().buyPart(STORE, axe.id, "bolts");
+  rich.getState().buyPart(STORE, rivet.id, "bolts");
+  assert.equal(snapshot(rich), closed);
+
+  const title = partById("weapon-saw-championship")!;
+  assert.match(buyCheck(rich.getState(), STORE, title, "bolts").reason, /never sold/);
+  rich.getState().buyPart(STORE, title.id, "bolts");
+  assert.equal(bot(rich).owned.includes(title.id), false);
+
+  const tankChassis = partById("chassis-keystone-sport")!;
+  assert.match(buyCheck(rich.getState(), STORE, tankChassis, "bolts").reason, /Change class/);
+  const classBefore = snapshot(rich);
+  rich.getState().buyPart(STORE, tankChassis.id, "bolts");
+  assert.equal(snapshot(rich), classBefore);
+  assert.equal(bot(rich).classId, "striker");
+
+  const crewStore = setup(80);
+  zeroJars(crewStore);
+  const crew = crewStore.getState().crew.find((c) => c.storeId === STORE && c.role === "specialist")!;
+  crewStore.setState({ session: { role: "crew", storeId: STORE, crewId: crew.id } });
+  const crewBefore = snapshot(crewStore);
+  crewStore.getState().buyPart(STORE, "weapon-saw-sport", "bolts");
+  assert.equal(snapshot(crewStore), crewBefore);
+  assert.match(crewStore.getState().flash, /captain/);
+  assert.throws(() => authorize(crewStore.getState(), crewStore.getState().session, "buyPart", [STORE, "weapon-saw-sport", "bolts"]));
+
+  const locked = setup(80);
+  zeroJars(locked);
+  locked.setState({
+    bots: locked.getState().bots.map((row) => (row.storeId === STORE ? { ...row, locked: { ...row.draft } } : row)),
+  });
+  const lockedBefore = snapshot(locked);
+  locked.getState().buyPart(STORE, "armor-plate-sport", "bolts");
+  assert.equal(snapshot(locked), lockedBefore);
+  assert.match(locked.getState().flash, /locked/);
+
+  const week5 = setup(80);
+  zeroJars(week5);
+  week5.setState({ week: 5, phase: "open" });
+  const weekBefore = snapshot(week5);
+  week5.getState().buyPart(STORE, "drive-omni-sport", "bolts");
+  assert.equal(snapshot(week5), weekBefore);
+  assert.match(week5.getState().flash, /Championship Week/);
+
+  const shut = setup(80);
+  zeroJars(shut);
+  shut.setState({ phase: "locked" });
+  const shutBefore = snapshot(shut);
+  shut.getState().buyPart(STORE, "brain-logic-sport", "bolts");
+  assert.equal(snapshot(shut), shutBefore);
+  assert.match(shut.getState().flash, /shop shuts/i);
+});
+
+test("a seasonal part opens for Bolts only inside its window, and coins stay in the jar", (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: central(2026, 11, 3, 12).getTime() });
+  const store = setup(80);
+  zeroJars(store);
+  const axe = partById("weapon-axe-super")!;
+  assert.equal(buyCheck(store.getState(), STORE, axe).ok, false);
+  assert.equal(buyCheck(store.getState(), STORE, axe, "bolts").ok, true);
+  const start = balance(store);
+  store.getState().buyPart(STORE, axe.id, "bolts");
+  assert.ok(bot(store).owned.includes(axe.id));
+  assert.equal(bot(store).coins.weapon, 0);
+  assert.equal(balance(store), start - boltsForCoins(axe.price));
+
+  t.mock.timers.setTime(central(2026, 11, 10, 12).getTime());
+  const later = setup(80);
+  zeroJars(later);
+  const rivet = partById("weapon-rivetgun-super")!;
+  assert.equal(buyCheck(later.getState(), STORE, rivet, "bolts").ok, true);
+  later.getState().buyPart(STORE, rivet.id, "bolts");
+  assert.ok(bot(later).owned.includes(rivet.id));
+  assert.equal(bot(later).coins.weapon, 0);
+  assert.equal(buyCheck(later.getState(), STORE, partById("weapon-axe-super")!, "bolts").ok, false);
 });
 
 test("new two-tone, camouflage, tie-dye and Texas skins can be applied without changing fights", () => {
