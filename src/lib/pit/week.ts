@@ -131,7 +131,7 @@ export const LOCKER: LockerItem[] = [
   { id: "wheel-neon", kind: "wheelColor", name: "Neon wheels", price: 5, blurb: "Glowing green hubs and rim rings.", hex: "#39ff6a" },
   { id: "wheel-candy", kind: "wheelColor", name: "Candy wheels", price: 5, blurb: "Red hubs and rim rings.", hex: "#e3123f" },
   { id: "wheel-ice", kind: "wheelColor", name: "Glacier wheels", price: 5, blurb: "Icy blue hubs and rim rings.", hex: "#bfe8ff" },
-  { id: "wheel-gold", kind: "wheelColor", name: "Gold wheels", price: 5, blurb: "Golden hubs and rim rings.", hex: "#f4c44e" },
+  { id: "wheel-gold", kind: "wheelColor", name: "Yellow wheels", price: 5, blurb: "Yellow-painted hubs and rim rings. Not precious metal.", hex: "#f6d64b" },
   { id: "wheel-ultraviolet", kind: "wheelColor", name: "Ultraviolet wheels", price: 5, blurb: "Purple hubs and rim rings.", hex: "#aa56ff" },
   { id: "weapon-neon-fang", kind: "weaponSkin", name: "Neon Fang", price: 8, blurb: "Green weapon edge and glowing fang guard. No combat effect.", hex: "#39ff6a" },
   { id: "weapon-gold-fang", kind: "weaponSkin", name: "Gold Fang", price: 8, blurb: "Gold weapon edge and fang guard. No combat effect.", hex: "#f4c44e" },
