@@ -594,8 +594,8 @@ function Swatch({
       aria-pressed={active}
       data-locked={disabled || undefined}
       title={title ?? label}
-      className={`relative min-h-11 min-w-11 border-2 transition-transform ${disabled ? "cursor-help opacity-70" : "hover:scale-105"} ${active ? "border-amber" : "border-line"}`}
-      style={{ background: color, boxShadow: glow && !disabled ? `0 0 12px ${color}` : undefined }}
+      className={`relative min-h-11 min-w-11 border-2 transition-transform ${label.startsWith("24K Solid Gold") ? "perfect-card-gold-swatch" : ""} ${disabled ? "cursor-help opacity-70" : "hover:scale-105"} ${active ? "border-amber" : "border-line"}`}
+      style={{ background: label.startsWith("24K Solid Gold") ? "linear-gradient(110deg,#6d3700,#d89813,#fff9ce,#ffd039,#ab6803,#fff2a4,#704000)" : color, backgroundSize: label.startsWith("24K Solid Gold") ? "300% 100%" : undefined, boxShadow: (glow || label.startsWith("24K Solid Gold")) && !disabled ? `0 0 16px ${color}` : undefined }}
       onClick={() => disabled ? setInspect(true) : onClick()}
     >
       {active ? <span className="absolute inset-0 grid place-items-center font-display text-lg text-deep mix-blend-difference">✓</span> : null}
@@ -683,6 +683,7 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
     if (kind === "decal" && value.endsWith("-foil")) return "Foil stickers: 4 Bolts, or one perfect week with 6 greens";
     if (kind === "finish" && value === "holographic") return "Full Tune-Ups in 3 weeks, or 14 Bolts";
     if (kind === "smoke" && value && value !== "black") return "10 Bolts in the Bolt Locker";
+    if (kind === "wheelColor" && value === "solid-gold") return "Perfect Card: correctly pick every fight on one Monday card. Alliance received the commissioner-awarded set.";
     if (kind === "wheelColor" && value !== "stock") return "5 Bolts in the Bolt Locker";
     if (kind === "weaponSkin" && value.endsWith("-fang")) return "8 Bolts in the Bolt Locker";
     const reward = rewardFor(kind, value);
@@ -876,6 +877,8 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
           </Group>
 
           <Group label="Wheel colors">
+            <p className="w-full text-xs text-muted">Yellow wheels are paint. The shimmering 24K Solid Gold Wheels are a rare Perfect Card prize, not sold for Bolts.</p>
+            {unlocked("wheelColor", "solid-gold") ? <p className="w-full font-display text-sm tracking-wide text-amber" data-testid="perfect-card-earned">24K SOLID GOLD WHEELS UNLOCKED · PERFECT CARD</p> : null}
             {Object.entries(WHEEL_COLORS).map(([key, row]) => {
               const open = unlocked("wheelColor", key);
               return <Swatch key={key} color={row.hex} active={(style.wheelColor ?? "stock") === key} label={row.label} disabled={!open} title={open ? row.label : lockTitle("wheelColor", key)} onClick={() => setStyle(storeId, { wheelColor: key })} />;
