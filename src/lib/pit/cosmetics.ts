@@ -63,6 +63,28 @@ function correctPicks(data: PitData, storeId: string) {
     return Boolean(bout?.result?.winnerIds.includes(p.pick));
   }).length;
 }
+/** A perfect Monday card means one crew member called every actual fight on a complete regular-season card.
+ * Never treat a partial slate, pending result, bye, or a mixture of different people's picks as a sweep.
+ * Historical bouts and picks are retained after the week advances, so this is retroactive.
+ */
+export function perfectMondayCard(data: PitData, storeId: string) {
+  const expected = Math.floor(data.stores.length / 2);
+  if (expected < 2) return 0;
+  for (let week = 1; week <= 4; week++) {
+    const fights = data.bouts.filter((b) =>
+      b.week === week && b.kind === "bout" && b.teamA.length === 1 && b.teamB.length === 1,
+    );
+    if (fights.length !== expected || fights.some((b) => !b.result || b.result.method === "scrimmage")) continue;
+    const crewIds = new Set(data.picks.filter((p) => p.week === week && p.storeId === storeId).map((p) => p.crewId));
+    for (const crewId of crewIds) {
+      if (fights.every((b) => data.picks.some((p) =>
+        p.week === week && p.storeId === storeId && p.crewId === crewId &&
+        p.boutId === b.id && b.result!.winnerIds.includes(p.pick),
+      ))) return 1;
+    }
+  }
+  return 0;
+}
 function tuneUps(data: PitData, storeId: string) {
   return data.weeks.filter(w=>w.number <= Math.min(5,data.week)).filter(w=>tunedUp(data,storeId,w.number)).length;
 }
@@ -170,6 +192,7 @@ export const COSMETIC_REWARDS: CosmeticReward[] = [
   { id:"reward-satin", kind:"finish", value:"satin", label:"Satin Finish", requirement:"Complete 2 Mystery Crates", progress:p(crates,2) },
   { id:"reward-pearl", kind:"paint", value:"pearl", label:"Pearl White Paint", requirement:"Complete 3 Mystery Crates", progress:p(crates,3) },
   { id:"reward-camo", kind:"decal", value:"camo", label:"Camo Decal", requirement:"Complete 4 Mystery Crates", progress:p(crates,4) },
+  { id:"reward-perfect-card-gold", kind:"wheelColor", value:"solid-gold", label:"24K Solid Gold Wheels", requirement:"Perfect Card: one person predicts every winner on a full Monday fight card (Alliance received a commissioner gift)", progress:p(perfectMondayCard,1) },
   { id:"reward-red-eye", kind:"eye", value:"red", label:"Red Visor", requirement:"Hit one Monday pick", progress:p(correctPicks,1) },
   { id:"reward-horns", kind:"topper", value:"horns", label:"Pit Horns", requirement:"Hit 3 Monday picks", progress:p(correctPicks,3) },
   { id:"reward-stars", kind:"decal", value:"stars", label:"Victory Stars", requirement:"Post 3 shout-outs", progress:p(shouts,3) },
@@ -303,6 +326,7 @@ function lockerOwned(data: PitData, storeId: string, itemId: string) {
 }
 function rewardHeld(data: PitData, storeId: string, rewardId: string, earned: Set<string>) {
   if (earned.has(rewardId)) return true;
+  if (rewardId === "reward-perfect-card-gold" && lockerOwned(data, storeId, "wheel-solid-gold")) return true;
   if (rewardId === "reward-foil" && lockerOwned(data, storeId, "sticker-foil")) return true;
   if (rewardId === "reward-holo" && lockerOwned(data, storeId, "finish-holographic")) return true;
   return false;
