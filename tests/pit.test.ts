@@ -2,13 +2,13 @@ import test, { beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createStore } from "zustand/vanilla";
-import { pitCreator, sharedDoc, clientDoc, applyLeague14, applyDueLock, pruneRemovePlaceholders, ownerGiftDue, grantOwnerGifts, WEEK2_REPAIR_GIFT, TYLER_ROSES_GIFT } from "../src/lib/pit/store.ts";
+import { pitCreator, sharedDoc, clientDoc, applyLeague14, applyDueLock, pruneRemovePlaceholders, ownerGiftDue, grantOwnerGifts, WEEK2_REPAIR_GIFT, TYLER_ROSES_GIFT, ALLIANCE_GOLD_GIFT } from "../src/lib/pit/store.ts";
 import { makeData } from "../src/lib/pit/seed.ts";
 import { nsnuOf, rankedStores, simulateDuel, simulateChampionshipDuel, buildCard, conferenceStandings, championshipFinalists, coinMath, coinsByJar, type GradeSet } from "../src/lib/pit/engine.ts";
 import { weekProgress, boltsOf, lockerItem } from "../src/lib/pit/week.ts";
 import { programWeek, allJobs, crateFor } from "../src/lib/pit/training.ts";
 import { eligibilityClosed } from "../src/lib/pit/eligibility.ts";
-import { cosmeticUnlocked, cosmeticProgress, bannerVerdict } from "../src/lib/pit/cosmetics.ts";
+import { cosmeticUnlocked, cosmeticProgress, bannerVerdict, perfectMondayCard } from "../src/lib/pit/cosmetics.ts";
 import { checkedCosmeticLoadout } from "../src/lib/pit/cosmetic-loadout.ts";
 import { PRODUCT_QUIZ, productQuestion } from "../src/lib/pit/product-quiz.ts";
 import { authorize, commandArgs, CAPTAIN_BUILD_COMMANDS, captainBuildRejection, type Command } from "../src/lib/pit/commands.ts";
@@ -80,8 +80,8 @@ test("owner's week 2 gift repairs every bot and every owned part without cost or
   assert.strictEqual(first.bouts, data.bouts);
   assert.strictEqual(first.replays, data.replays);
   assert.strictEqual(first.storeCards, data.storeCards);
-  assert.deepEqual(first.ownerEvents, [WEEK2_REPAIR_GIFT, TYLER_ROSES_GIFT]);
-  assert.deepEqual(ownerGiftDue(first, new Date("2026-11-07T21:00:00Z")), { repairs: false, roses: false });
+  assert.deepEqual(first.ownerEvents, [WEEK2_REPAIR_GIFT, TYLER_ROSES_GIFT, ALLIANCE_GOLD_GIFT]);
+  assert.deepEqual(ownerGiftDue(first, new Date("2026-11-07T21:00:00Z")), { repairs: false, roses: false, gold: false });
   assert.strictEqual(grantOwnerGifts(first, ownerGiftDue(first, new Date("2026-11-07T21:00:00Z"))), first);
   const snapshot = sharedDoc(first);
   assert.deepEqual(snapshot.ownerEvents, first.ownerEvents);
@@ -94,12 +94,67 @@ test("free Tyler rose topper is available to all stores and never heals a future
   }
   const after = { ...data, week: 3, ownerEvents: [] };
   const due = ownerGiftDue(after, new Date("2026-11-10T20:00:00Z"));
-  assert.deepEqual(due, { repairs: false, roses: true });
+  assert.deepEqual(due, { repairs: false, roses: true, gold: true });
   const gifted = grantOwnerGifts(after, due);
   assert.ok(gifted.ownerEvents?.includes(TYLER_ROSES_GIFT));
   assert.ok(!gifted.ownerEvents?.includes(WEEK2_REPAIR_GIFT));
 });
 
+
+test("Perfect Card solid-gold wheels require one person to sweep all seven settled Monday fights", () => {
+  const seed = makeData();
+  const slate = buildCard(seed).filter((bout) => bout.kind === "bout");
+  assert.equal(slate.length, 7);
+  const bouts = slate.map((bout) => ({
+    ...bout,
+    result: {
+      winnerIds: [bout.storeIds[0]!],
+      loserIds: [bout.storeIds[1]!],
+      method: "decision",
+    } as FightResult,
+  }));
+  const picks = bouts.map((bout, index) => ({
+    id: `sweep-${index}`,
+    week: 1,
+    boutId: bout.id,
+    storeId: "plano",
+    crewId: "plano-specialist",
+    pick: bout.storeIds[0]!,
+    at: index,
+  }));
+  const complete = { ...seed, bouts, picks };
+  assert.equal(perfectMondayCard(complete, "plano"), 1);
+  assert.equal(cosmeticUnlocked(complete, "plano", "wheelColor", "solid-gold"), true);
+  assert.equal(cosmeticUnlocked(complete, "allen", "wheelColor", "solid-gold"), false);
+  assert.equal(cosmeticUnlocked({ ...complete, week: 3 }, "plano", "wheelColor", "solid-gold"), true);
+  assert.equal(commandArgs.setStyle.safeParse(["plano", { wheelColor: "solid-gold" }]).success, true);
+  assert.equal(perfectMondayCard({ ...complete, picks: picks.slice(1) }, "plano"), 0, "missed fight");
+  assert.equal(perfectMondayCard({ ...complete, bouts: bouts.slice(1) }, "plano"), 0, "partial fight card");
+  assert.equal(perfectMondayCard({ ...complete, bouts: bouts.map((b, i) => i === 0 ? { ...b, result: null } : b) }, "plano"), 0, "unsettled fight");
+  assert.equal(perfectMondayCard({ ...complete, picks: picks.map((p, i) => i === 0 ? { ...p, pick: bouts[0]!.storeIds[1]! } : p) }, "plano"), 0, "wrong pick");
+  assert.equal(perfectMondayCard({ ...complete, picks: picks.map((p, i) => i === 0 ? { ...p, crewId: "another-specialist" } : p) }, "plano"), 0, "cannot combine members");
+});
+
+test("Alliance gets solid-gold wheels as a once-only commissioner gift without spending currency or altering results", () => {
+  const seed = makeData();
+  assert.equal(cosmeticUnlocked(seed, "alliance", "wheelColor", "solid-gold"), false);
+  assert.equal(cosmeticUnlocked(seed, "alliance", "wheelColor", "gold"), false, "yellow stays in paid locker");
+  const due = ownerGiftDue(seed, new Date("2026-11-09T20:00:00Z"));
+  assert.equal(due.gold, true);
+  const gifted = grantOwnerGifts(seed, due);
+  assert.equal(gifted.bots.find((b) => b.storeId === "alliance")?.style?.wheelColor, "solid-gold");
+  assert.ok(gifted.stores.find((s) => s.id === "alliance")?.unlocks?.includes("wheel-solid-gold"));
+  assert.equal(cosmeticUnlocked(gifted, "alliance", "wheelColor", "solid-gold"), true);
+  assert.equal(cosmeticProgress(gifted, "alliance").find((r) => r.reward.id === "reward-perfect-card-gold")?.earned, true);
+  assert.equal(cosmeticUnlocked(gifted, "allen", "wheelColor", "solid-gold"), false);
+  assert.ok(gifted.ownerEvents?.includes(ALLIANCE_GOLD_GIFT));
+  assert.strictEqual(gifted.bouts, seed.bouts);
+  assert.strictEqual(gifted.replays, seed.replays);
+  assert.strictEqual(gifted.picks, seed.picks);
+  assert.ok(gifted.bots.every((bot, i) => bot.coins === seed.bots[i]!.coins && bot.voucher === seed.bots[i]!.voucher));
+  assert.equal(ownerGiftDue(gifted, new Date("2026-11-10T20:00:00Z")).gold, false);
+  assert.strictEqual(grantOwnerGifts(gifted, ownerGiftDue(gifted, new Date("2026-11-10T20:00:00Z"))), gifted);
+});
 
 test("every new state, football and Bumblebee skin and sticker is unlocked without stat effect", () => {
   const data = makeData();
