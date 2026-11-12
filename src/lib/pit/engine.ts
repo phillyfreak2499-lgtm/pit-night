@@ -31,7 +31,7 @@ import {
 import { buildScore, duelWear, fightDuel, fightGroup, preferFighter, type DuelOpts } from "./combat";
 import { centralDay } from "./time";
 export { halloweenStrikeAdjust } from "./combat";
-import { BOLTS, TUNE_UP_BONUS, boltsForCoins } from "./training";
+import { BOLTS, TUNE_UP_BONUS } from "./training";
 import { boltsOf, tunedUp } from "./week";
 import type {
   Bot,
@@ -2215,7 +2215,7 @@ export function buyCheck(
     }
   }
   if (pay === "bolts") {
-    const bolts = boltsForCoins(cost);
+    const bolts = part.boltPrice;
     const haveBolts = boltsOf(data, storeId).balance;
     if (haveBolts < bolts) {
       return { ok: false, reason: `Needs ${bolts} Bolts. This bay has ${haveBolts}.`, cost };

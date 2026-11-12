@@ -979,7 +979,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: check.reason });
           return;
         }
-        const bolts = withBolts ? boltsForCoins(check.cost) : 0;
+        const bolts = withBolts ? part.boltPrice : 0;
         if (withBolts && boltsOf(data, storeId).balance < bolts) {
           set({ flash: `Needs ${bolts} Bolts. This bay has ${boltsOf(data, storeId).balance}.` });
           return;

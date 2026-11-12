@@ -3,9 +3,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createStore } from "zustand/vanilla";
 import { pitCreator, sharedDoc } from "../src/lib/pit/store.ts";
-import { boltCoinsLeft, boltsOf } from "../src/lib/pit/week.ts";
+import { LOCKER, boltCoinsLeft, boltsOf } from "../src/lib/pit/week.ts";
 import { BOLT_EXCHANGE, BOLTS, boltsForCoins } from "../src/lib/pit/training.ts";
-import { REPAIR_PRICE, stockPart, partById } from "../src/lib/pit/catalog.ts";
+import { PARTS, PART_BOLTS_PER_COIN, REPAIR_PRICE, stockPart, partById } from "../src/lib/pit/catalog.ts";
 import { CLASS_SWITCH_BOLTS, classSwitchCheck, buyCheck, simulateDuel } from "../src/lib/pit/engine.ts";
 import { SHOW_PRICE } from "../src/lib/pit/halloween.ts";
 import { central } from "../src/lib/pit/time.ts";
@@ -256,6 +256,64 @@ test("the coin rate is 10 Bolts and the weekly exchange cap is 5", () => {
   assert.equal(boltsForCoins(REPAIR_PRICE.weld), 10);
   assert.equal(CLASS_SWITCH_BOLTS, 60);
   assert.equal(SHOW_PRICE, 100);
+  assert.equal(PART_BOLTS_PER_COIN, BOLT_EXCHANGE.boltsPerCoin * 2);
+});
+
+test("gameplay parts cost double Bolts and a saved bay keeps what it already owns", () => {
+  for (const part of PARTS) {
+    if (part.price > 0) assert.equal(part.boltPrice, part.price * BOLT_EXCHANGE.boltsPerCoin * 2, part.id);
+    else assert.equal(part.boltPrice, 0, part.id);
+  }
+  const lockerPrices: Record<string, number> = {
+    "walkout-pyro": 12,
+    "walkout-smoke": 10,
+    "walkout-sparks": 10,
+    "victory-confetti": 8,
+    "victory-fireworks": 14,
+    "paint-neon": 6,
+    "paint-candy": 6,
+    "paint-ice": 6,
+    "paint-royal": 6,
+    "paint-coral": 6,
+    "paint-mint": 6,
+    "paint-sunset": 6,
+    "paint-ultraviolet": 6,
+    "paint-midnight": 6,
+    "paint-bubblegum": 6,
+    "wheel-neon": 5,
+    "wheel-candy": 5,
+    "wheel-ice": 5,
+    "wheel-gold": 5,
+    "wheel-ultraviolet": 5,
+    "weapon-neon-fang": 8,
+    "weapon-gold-fang": 8,
+    "weapon-ice-fang": 8,
+    "sticker-foil": 4,
+    "finish-holographic": 14,
+    "smoke-neon": 10,
+    "smoke-candy": 10,
+    "smoke-ice": 10,
+    "smoke-royal": 10,
+  };
+  assert.deepEqual(
+    Object.fromEntries(LOCKER.map((item) => [item.id, item.price])),
+    lockerPrices,
+  );
+  const store = setup(0);
+  store.setState({
+    stores: store.getState().stores.map((row) =>
+      row.id === STORE ? { ...row, boltsSpent: 30, unlocks: ["paint-neon"] } : row,
+    ),
+    bots: store.getState().bots.map((row) =>
+      row.storeId === STORE ? { ...row, owned: [...row.owned, "weapon-saw-sport"] } : row,
+    ),
+  });
+  assert.ok(bot(store).owned.includes("weapon-saw-sport"));
+  assert.equal(store.getState().stores.find((row) => row.id === STORE)?.boltsSpent, 30);
+  assert.equal(partById("weapon-saw-sport")!.price, 3);
+  assert.equal(partById("weapon-saw-sport")!.boltPrice, 60);
+  assert.equal(partById("weapon-saw-stock")!.boltPrice, 0);
+  assert.equal(partById("weapon-saw-championship")!.boltPrice, 0);
 });
 
 test("the exchange can trade several coins at once and still stops at the weekly cap", () => {
@@ -346,7 +404,7 @@ test("an emergency weld can be paid in Bolts and a short bay changes nothing", (
 });
 
 test("a captain can buy every slot with Bolts when the part is already on the peg", () => {
-  const store = setup(120);
+  const store = setup(200);
   zeroJars(store);
   const ids = [
     "chassis-shrike-sport",
@@ -359,7 +417,8 @@ test("a captain can buy every slot with Bolts when the part is already on the pe
   const start = balance(store);
   for (const id of ids) {
     const part = partById(id)!;
-    assert.equal(part.price * BOLT_EXCHANGE.boltsPerCoin, boltsForCoins(part.price));
+    assert.equal(part.boltPrice, part.price * PART_BOLTS_PER_COIN);
+    assert.equal(part.price * BOLT_EXCHANGE.boltsPerCoin * 2, part.boltPrice);
     assert.equal(buyCheck(store.getState(), STORE, part).ok, false, `${id} has no coins`);
     assert.equal(buyCheck(store.getState(), STORE, part, "bolts").ok, true, id);
     store.getState().buyPart(STORE, id, "bolts");
@@ -367,7 +426,7 @@ test("a captain can buy every slot with Bolts when the part is already on the pe
     assert.equal(bot(store).equipped[part.slot], id);
     assert.equal(bot(store).coins[part.key], 0);
   }
-  assert.equal(balance(store), start - ids.reduce((n, id) => n + boltsForCoins(partById(id)!.price), 0));
+  assert.equal(balance(store), start - ids.reduce((n, id) => n + partById(id)!.boltPrice, 0));
   assert.equal(commandArgs.buyPart.safeParse([STORE, ids[0]]).success, true);
   assert.equal(commandArgs.buyPart.safeParse([STORE, ids[0], "bolts"]).success, true);
   assert.equal(commandArgs.buyPart.safeParse([STORE, ids[0], "coins"]).success, true);
@@ -384,7 +443,7 @@ test("too few Bolts leaves a part, its coins, and the bay exactly as they were",
   assert.equal(buyCheck(store.getState(), STORE, part, "bolts").ok, false);
   store.getState().buyPart(STORE, part.id, "bolts");
   assert.equal(snapshot(store), before);
-  assert.match(store.getState().flash, /Needs 30 Bolts\. This bay has 28/);
+  assert.match(store.getState().flash, /Needs 60 Bolts\. This bay has 28/);
 });
 
 test("Bolts do not skip grade, class, championship, date, captain, or lock gates", (t) => {
@@ -468,7 +527,9 @@ test("a seasonal part opens for Bolts only inside its window, and coins stay in 
   store.getState().buyPart(STORE, axe.id, "bolts");
   assert.ok(bot(store).owned.includes(axe.id));
   assert.equal(bot(store).coins.weapon, 0);
-  assert.equal(balance(store), start - boltsForCoins(axe.price));
+  assert.equal(balance(store), start - axe.boltPrice);
+  assert.equal(axe.price, 8);
+  assert.equal(axe.boltPrice, 160);
 
   t.mock.timers.setTime(central(2026, 11, 10, 12).getTime());
   const later = setup(80);

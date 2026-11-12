@@ -23,7 +23,7 @@ import {
 } from "@/lib/pit/training";
 import type { PitData } from "@/lib/pit/types";
 import { LOCKER, boltCoinsLeft, boltsOf, sparkStreak, weekProgress } from "@/lib/pit/week";
-import { SLOT_LABEL } from "@/lib/pit/catalog";
+import { PART_BOLTS_PER_COIN, SLOT_LABEL } from "@/lib/pit/catalog";
 import type { Slot } from "@/lib/pit/types";
 import { Btn, SectionLabel, TextInput, useNow } from "./bits";
 import { BotPortrait, useBotLook } from "./bot-portrait";
@@ -764,7 +764,7 @@ function BoltLocker({ data, storeId, canBuy }: { data: PitData; storeId: string;
       <div className="flex flex-wrap items-end justify-between gap-2 border-b border-line px-4 py-3">
         <div>
           <SectionLabel>Bolt Locker</SectionLabel>
-          <p className="text-sm text-muted">Bolts buy looks, fix parts, pay welds, buy parts already on the peg, and trade for up to {BOLT_EXCHANGE.weeklyCoinCap} coins a week at {BOLT_EXCHANGE.boltsPerCoin} Bolts each. Jobs +{BOLTS.job}, Spark answers +{BOLTS.sparkCorrect}, right picks +{BOLTS.pickCorrect}.</p>
+          <p className="text-sm text-muted">Bolts buy looks, fix parts, and pay welds at {BOLT_EXCHANGE.boltsPerCoin} Bolts per coin. Parts already on the peg are {PART_BOLTS_PER_COIN} Bolts per coin. The exchange trades up to {BOLT_EXCHANGE.weeklyCoinCap} coins a week at {BOLT_EXCHANGE.boltsPerCoin} Bolts each. Jobs +{BOLTS.job}, Spark answers +{BOLTS.sparkCorrect}, right picks +{BOLTS.pickCorrect}.</p>
         </div>
         <p className="font-display text-xl">
           {bolts.balance} <span className="text-sm text-muted">bolts</span>

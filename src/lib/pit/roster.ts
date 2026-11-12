@@ -1,4 +1,4 @@
-import type { Affinity, Part, PartWindow } from "./catalog";
+import type { Affinity, Part, PartSpec, PartWindow } from "./catalog";
 import type { Tier } from "./types";
 import { THANKSGIVING_WINDOW } from "./thanksgiving";
 
@@ -32,7 +32,7 @@ function ladder(
   tags: string[],
   rows: Row[],
   affinity?: Affinity,
-): Part[] {
+): PartSpec[] {
   return rows.map((row) => ({
     id: `${slot}-${family}-${row.tier}`,
     slot,
@@ -56,7 +56,7 @@ function ladder(
 
 const n = (power = 0, speed = 0, armor = 0, heat = 0) => ({ power, speed, armor, heat });
 
-const DRIVES: Part[] = [
+const DRIVES: PartSpec[] = [
   ...ladder(
     "drive",
     "swerve",
@@ -196,7 +196,7 @@ const DRIVES: Part[] = [
   ]),
 ];
 
-const WEAPONS: Part[] = [
+const WEAPONS: PartSpec[] = [
   // Named weapon with the same family, tier, price, tags, and stat nudge as Sport Wedge.
   // Combat treats it exactly as a wedge. The difference is a front-mounted longhorn ram.
   {
@@ -339,7 +339,7 @@ const WEAPONS: Part[] = [
   ),
 ];
 
-const ARMOR: Part[] = [
+const ARMOR: PartSpec[] = [
   ...ladder(
     "armor",
     "ablative",
@@ -589,7 +589,7 @@ const ARMOR: Part[] = [
   ]),
 ];
 
-const CHASSIS: Part[] = [
+const CHASSIS: PartSpec[] = [
   ...ladder(
     "chassis",
     "hover",
@@ -881,7 +881,7 @@ const CHASSIS: Part[] = [
   ),
 ];
 
-const UTILITIES: Part[] = [
+const UTILITIES: PartSpec[] = [
   ...ladder(
     "utility",
     "spotlight",
@@ -1066,7 +1066,7 @@ const UTILITIES: Part[] = [
   ),
 ];
 
-const BRAINS: Part[] = [
+const BRAINS: PartSpec[] = [
   ...ladder(
     "brain",
     "berserker",
@@ -1163,7 +1163,7 @@ const BRAINS: Part[] = [
   ),
 ];
 
-export const ROSTER_PARTS: Part[] = [
+export const ROSTER_PARTS: PartSpec[] = [
   ...DRIVES,
   ...WEAPONS,
   ...ARMOR,
