@@ -164,9 +164,9 @@ export const COMMERCIALS: readonly Commercial[] = [
     lines: [
       { tone: "lead", text: "Switching from Tank to Striker? Striker to Specialist? Specialist to… whatever that was?" },
       { tone: "vo", text: "Class Act Movers! We pack your bot, label every bolt, and only lose the important ones." },
-      { tone: "end", text: "Sixty Bolts and a strong back!" },
+      { tone: "end", text: "One hundred twenty Bolts and a strong back!" },
     ],
-    fine: "Class switch fee: 60 Bolts. Movers not responsible for lost wheels, arms, antennas, dignity or personality. Strong back not included. Some assembly required. Some disassembly already occurred.",
+    fine: "Class switch fee: 120 Bolts. Movers not responsible for lost wheels, arms, antennas, dignity or personality. Strong back not included. Some assembly required. Some disassembly already occurred.",
   },
 ];
 

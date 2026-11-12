@@ -36,7 +36,7 @@ const SCRIPT = [
   "Gobble-Grade. Pass it to the left.",
   "Switching from Tank to Striker? Striker to Specialist? Specialist to… whatever that was?",
   "Class Act Movers! We pack your bot, label every bolt, and only lose the important ones.",
-  "Sixty Bolts and a strong back!",
+  "One hundred twenty Bolts and a strong back!",
 ];
 
 function breaks(fightCount: number): number[] {
@@ -178,7 +178,7 @@ test("commercial copy stays on the approved script", () => {
   assert.equal(movers?.sponsor, "Class Act Movers");
   assert.match(bank?.fine ?? "", /10 Bolts = 1 coin/);
   assert.match(gravy?.fine ?? "", /Not a food/);
-  assert.match(movers?.fine ?? "", /Class switch fee: 60 Bolts/);
+  assert.match(movers?.fine ?? "", /Class switch fee: 120 Bolts/);
   assert.equal(bank?.lines.at(-1)?.tone, "aside");
 });
 

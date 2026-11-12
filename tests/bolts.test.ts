@@ -159,12 +159,12 @@ test("Bolt-only looks require purchase and equip without changing the build", ()
 });
 
 test("captain may switch Striker, Tank and Specialist for Bolts without spending part coins", () => {
-  const store = setup(100); // 200 earned Bolts.
+  const store = setup(150); // 300 earned Bolts. Two class changes cost 240.
   const origCoins = JSON.stringify(bot(store).coins);
   const originalParts = [...bot(store).owned];
   const first = balance(store);
   const oldChassis = bot(store).draft.chassis;
-  assert.equal(CLASS_SWITCH_BOLTS, 60);
+  assert.equal(CLASS_SWITCH_BOLTS, 120);
   assert.ok(classSwitchCheck(store.getState(), STORE, "tank").ok);
   store.getState().switchClass(STORE, "tank");
   assert.equal(bot(store).classId, "tank");
@@ -189,11 +189,11 @@ test("captain may switch Striker, Tank and Specialist for Bolts without spending
 });
 
 test("class switching refuses insufficient Bolts, crew members, Week 1, and locked builds", () => {
-  const short = setup(29); // 58 Bolts.
+  const short = setup(29); // 58 Bolts, short of a 120 Bolt class change.
   const before = JSON.stringify(bot(short));
   short.getState().switchClass(STORE, "tank");
   assert.equal(JSON.stringify(bot(short)), before);
-  assert.match(short.getState().flash, /Needs 60 Bolts/);
+  assert.match(short.getState().flash, /Needs 120 Bolts/);
   assert.equal(balance(short), 58);
   const crewStore = setup(50);
   const crew = crewStore.getState().crew.find((c) => c.storeId === STORE && c.role === "specialist")!;
@@ -254,7 +254,7 @@ test("the coin rate is 10 Bolts and the weekly exchange cap is 5", () => {
   assert.equal(BOLT_EXCHANGE.weeklyCoinCap, 5);
   assert.equal(boltsForCoins(1), 10);
   assert.equal(boltsForCoins(REPAIR_PRICE.weld), 10);
-  assert.equal(CLASS_SWITCH_BOLTS, 60);
+  assert.equal(CLASS_SWITCH_BOLTS, 120);
   assert.equal(SHOW_PRICE, 100);
   assert.equal(PART_BOLTS_PER_COIN, BOLT_EXCHANGE.boltsPerCoin * 2);
 });
