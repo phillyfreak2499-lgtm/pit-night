@@ -7,7 +7,6 @@ import { isElectionPart } from "@/lib/pit/election";
 import { isVeteransPart } from "@/lib/pit/veterans";
 import { isRecyclesPart } from "@/lib/pit/recycles";
 import { SELL_BACK, buyCheck, canSeeLoadout, sellCheck, shopOpen, showCheck } from "@/lib/pit/engine";
-import { boltsForCoins } from "@/lib/pit/training";
 import { usePit } from "@/lib/pit/store";
 import { boltsOf } from "@/lib/pit/week";
 import type { Slot } from "@/lib/pit/types";
@@ -101,7 +100,7 @@ export function ShopPage({ storeId }: { storeId: string }) {
               const sell = owned ? sellCheck(data, storeId, part) : null;
               const have = bot.coins[part.key] ?? 0;
               const price = Math.max(check.cost, part.price);
-              const boltPrice = boltsForCoins(part.price);
+              const boltPrice = part.boltPrice;
               const coinsOk = have >= price;
               const src = KEY_SOURCE[part.key];
               return (

@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ChevronDown, Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import { REPAIR_PRICE } from "@/lib/pit/catalog";
+import { PART_BOLTS_PER_COIN, REPAIR_PRICE } from "@/lib/pit/catalog";
 import { CLASS_SWITCH_BOLTS } from "@/lib/pit/engine";
 import { BOLTS, BOLT_EXCHANGE, STREAK_BADGE, TUNE_UP_BONUS, boltsForCoins } from "@/lib/pit/training";
 import { usePit } from "@/lib/pit/store";
@@ -59,7 +59,7 @@ export const GROUPS: Group[] = [
       ),
       faq(
         "What are Bolts?",
-        `Points for doing the work. An approved job is ${BOLTS.job} Bolts, each right Spark answer is ${BOLTS.sparkCorrect}, each right Monday pick is ${BOLTS.pickCorrect}, and the Wednesday Mystery Crate is ${BOLTS.crate}. The Bolt Locker sells looks: walk-out pyro, smoke, sparks, victory confetti, fireworks, and special paints. In the Garage, any repair quote and an emergency weld can be paid in Bolts at ${BOLT_EXCHANGE.boltsPerCoin} Bolts per coin. In the Shop, a part that is already on the peg can be bought with Bolts at the same rate. Bolts do not skip a grade week, a date window, a class, a lock, or a captain-only rule. The Bolt exchange trades ${BOLT_EXCHANGE.boltsPerCoin} Bolts for 1 coin in any part's jar, up to ${BOLT_EXCHANGE.weeklyCoinCap} coins a Pit Week, so green grades stay the main way to upgrade. A class change stays ${CLASS_SWITCH_BOLTS} Bolts, and show effects keep their own Bolt prices.`,
+        `Points for doing the work. An approved job is ${BOLTS.job} Bolts, each right Spark answer is ${BOLTS.sparkCorrect}, each right Monday pick is ${BOLTS.pickCorrect}, and the Wednesday Mystery Crate is ${BOLTS.crate}. The Bolt Locker sells looks: walk-out pyro, smoke, sparks, victory confetti, fireworks, and special paints. In the Garage, any repair quote and an emergency weld can be paid in Bolts at ${BOLT_EXCHANGE.boltsPerCoin} Bolts per coin. In the Shop, a part that is already on the peg can be bought with Bolts at ${PART_BOLTS_PER_COIN} Bolts per coin of its price. Bolts do not skip a grade week, a date window, a class, a lock, or a captain-only rule. The Bolt exchange trades ${BOLT_EXCHANGE.boltsPerCoin} Bolts for 1 coin in any part's jar, up to ${BOLT_EXCHANGE.weeklyCoinCap} coins a Pit Week, so green grades stay the main way to upgrade. A class change costs ${CLASS_SWITCH_BOLTS} Bolts, and show effects keep their own Bolt prices.`,
       ),
       faq(
         "What is the Full Tune-Up?",

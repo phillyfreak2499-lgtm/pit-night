@@ -54,11 +54,12 @@ export const DAY_ORDER: DayKey[] = ["tue", "wed", "thu", "fri", "sat"];
 export const BOLTS = { job: 2, sparkCorrect: 1, pickCorrect: 2, crate: 5 } as const;
 
 /**
- * One Bolt price for a coin of work: repairs, emergency welds, the exchange,
- * and buying a part that is already on the peg. Grades stay the main coin
- * source. A green week pays 3 coins, and the Bolt exchange tops out at
- * `weeklyCoinCap` coins a Pit Week. Repairs, welds, and part purchases paid
- * in Bolts are not capped. Class switches and show effects keep their own prices.
+ * One Bolt price for a coin of work: repairs, emergency welds, and the exchange.
+ * Gameplay parts on the peg use `PART_BOLTS_PER_COIN` (double this rate) instead.
+ * Grades stay the main coin source. A green week pays 3 coins, and the Bolt
+ * exchange tops out at `weeklyCoinCap` coins a Pit Week. Repairs, welds, and
+ * part purchases paid in Bolts are not capped. Class switches and show effects
+ * keep their own prices.
  */
 export const BOLTS_PER_COIN = 10;
 export const BOLT_EXCHANGE = {
@@ -68,7 +69,7 @@ export const BOLT_EXCHANGE = {
   repairBoltsPerCoin: BOLTS_PER_COIN,
 } as const;
 
-/** Bolt cost of a coin-priced quote, repair, weld, or part. */
+/** Bolt cost of a coin-priced repair, weld, or exchange. Not a part's shop price. */
 export function boltsForCoins(coins: number) {
   return coins * BOLT_EXCHANGE.boltsPerCoin;
 }

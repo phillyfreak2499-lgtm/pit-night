@@ -2,6 +2,7 @@ import { Modal } from "./modal";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { CLASS_SWITCH_BOLTS } from "@/lib/pit/engine";
+import { PART_BOLTS_PER_COIN } from "@/lib/pit/catalog";
 import { BOLT_EXCHANGE } from "@/lib/pit/training";
 import { SectionLabel } from "./bits";
 
@@ -34,7 +35,7 @@ const STEPS = [
   {
     kicker: "The garage",
     title: "Spend coins. Build smart. Lock by Saturday close.",
-    body: `Sport parts cost 3 coins, Pro 5, Super 8, from that part's own jar. Some chassis cost more because the battery is the part, up to Reactor at 12. The top armor, weapons, and brains also want green weeks on their number. Skeleton and Ghost Veil are on the peg all season. Paint and decals are just for looks. Every other part changes the fight. Bolt a Scry on the utility slot to scout, and to hit cleaner when you are behind. Whatever is on the bot at Saturday close is what fights Monday. A part that is already allowed on the peg, a repair, or an emergency weld can also be paid at ${BOLT_EXCHANGE.boltsPerCoin} Bolts per coin. The Bolt exchange turns Bolts into jar coins, up to ${BOLT_EXCHANGE.weeklyCoinCap} coins a Pit Week. A class change stays ${CLASS_SWITCH_BOLTS} Bolts.`,
+    body: `Sport parts cost 3 coins, Pro 5, Super 8, from that part's own jar. Some chassis cost more because the battery is the part, up to Reactor at 12. The top armor, weapons, and brains also want green weeks on their number. Skeleton and Ghost Veil are on the peg all season. Paint and decals are just for looks. Every other part changes the fight. Bolt a Scry on the utility slot to scout, and to hit cleaner when you are behind. Whatever is on the bot at Saturday close is what fights Monday. A part that is already allowed on the peg can be paid at ${PART_BOLTS_PER_COIN} Bolts per coin. A repair or an emergency weld stays ${BOLT_EXCHANGE.boltsPerCoin} Bolts per coin. The Bolt exchange turns Bolts into jar coins, up to ${BOLT_EXCHANGE.weeklyCoinCap} coins a Pit Week. A class change costs ${CLASS_SWITCH_BOLTS} Bolts.`,
   },
   {
     kicker: "Monday morning",

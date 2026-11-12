@@ -31,7 +31,7 @@ import {
 import { buildScore, duelWear, fightDuel, fightGroup, preferFighter, type DuelOpts } from "./combat";
 import { centralDay } from "./time";
 export { halloweenStrikeAdjust } from "./combat";
-import { BOLTS, TUNE_UP_BONUS, boltsForCoins } from "./training";
+import { BOLTS, TUNE_UP_BONUS } from "./training";
 import { boltsOf, tunedUp } from "./week";
 import type {
   Bot,
@@ -2091,11 +2091,11 @@ export function ownsPart(bot: Bot, part: Part): boolean {
 }
 
 /**
- * The original three-coin reclass, frozen at 60 Bolts (the old 20-Bolt rate).
- * The cheaper coin rate does not change a class switch.
+ * Class change, paid in Bolts. Doubled with the other gameplay Bolt prices,
+ * from 60 to 120. Coin jars are not charged. Owned parts stay owned.
  */
 export const RECLASS_FEE = 3;
-export const CLASS_SWITCH_BOLTS = 60;
+export const CLASS_SWITCH_BOLTS = 120;
 
 /** The authoritative gate shared by the captain's Garage UI and the server action. */
 export function classSwitchCheck(
@@ -2215,7 +2215,7 @@ export function buyCheck(
     }
   }
   if (pay === "bolts") {
-    const bolts = boltsForCoins(cost);
+    const bolts = part.boltPrice;
     const haveBolts = boltsOf(data, storeId).balance;
     if (haveBolts < bolts) {
       return { ok: false, reason: `Needs ${bolts} Bolts. This bay has ${haveBolts}.`, cost };

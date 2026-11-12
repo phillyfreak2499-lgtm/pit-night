@@ -428,8 +428,14 @@ export type Part = {
   job: string;
   tags: string[];
   nudge: { power: number; speed: number; armor: number; heat: number };
-  /** Coins from this part's own jar. */
+  /** Coins from this part's own jar. Unchanged by the Bolt rate. */
   price: number;
+  /**
+   * Bolts to buy this part when it is already on the peg.
+   * Stamped once from `price` and `PART_BOLTS_PER_COIN`. Free parts stay 0.
+   * Season saves store owned part ids and bolts already spent, not this number.
+   */
+  boltPrice: number;
   /** Green weeks of this part's own stat required before it can be bought. */
   greenWeeks?: number;
   /** Those green weeks have to be the most recent ones, with no break. */
@@ -478,6 +484,22 @@ export const TIER_PRICE: Record<Tier, number> = {
   super: 8,
   championship: 0,
 };
+
+/**
+ * Bolts charged for one coin of a gameplay part (chassis, armor, drive,
+ * weapon, utility, brain). Double the previous shop rate of 10, which is
+ * still the rate for repairs, welds, and the Bolt exchange (`BOLTS_PER_COIN`).
+ * Cosmetic Bolt prices (locker looks, show effects) do not use this.
+ */
+export const PART_BOLTS_PER_COIN = 20;
+
+/** A catalog row before its Bolt price is stamped. Builders set coins only. */
+export type PartSpec = Omit<Part, "boltPrice">;
+
+/** The one place a part's Bolt price is decided. Price 0 stays 0. */
+export function stampBoltPrice(part: PartSpec): Part {
+  return { ...part, boltPrice: part.price > 0 ? part.price * PART_BOLTS_PER_COIN : 0 };
+}
 
 /** Coins a grade pays into its part's jar. */
 export const GRADE_COINS: Record<"green" | "blue" | "orange" | "red", number> = {
@@ -1317,8 +1339,8 @@ const FAMILIES: Family[] = [
   },
 ];
 
-function buildParts(): Part[] {
-  const parts: Part[] = [];
+function buildParts(): PartSpec[] {
+  const parts: PartSpec[] = [];
   for (const family of FAMILIES) {
     (Object.keys(family.names) as Tier[]).forEach((tier) => {
       const name = family.names[tier];
@@ -1350,7 +1372,7 @@ function buildParts(): Part[] {
   return parts;
 }
 
-export const PARTS: Part[] = [...buildParts(), ...ROSTER_PARTS];
+export const PARTS: Part[] = [...buildParts(), ...ROSTER_PARTS].map(stampBoltPrice);
 
 /** Cell size when a chassis does not name its own battery. */
 export const STOCK_BATTERY = 64;
