@@ -348,6 +348,8 @@ export type FightResult = {
   wear: Record<string, Record<Slot, Condition>>;
   seed: string;
   meleeOrder?: string[];
+  /** Recorded arena pit position; old tapes may omit it. */
+  pitTarget?: { x: number; y: number };
   /**
    * Battery and stamina at the bell, keyed by fighter id.
    * Absent on tapes fought before those pools were tracked.
@@ -427,6 +429,7 @@ export type Mvp = {
 };
 
 export type Honors = {
+  thirdPlace?: string | null;
   pitBelt: string | null;
   plate: string | null;
   bestBuild: string | null;

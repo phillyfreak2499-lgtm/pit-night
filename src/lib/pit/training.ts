@@ -1086,7 +1086,7 @@ export const PROGRAM: TrainingWeek[] = [
           { id: "w5-fri-skill", kind: "skill", title: "Finish with the ask", do: "On your next three qualified presentations, make the recommendation clearly and finish with a direct ask.", proof: "Which ask sounded most natural and why." },
         ],
         spark: [
-          { q: "Championship Saturday ends when…", choices: ["Round 3 ends", "A judge picks a winner", "One bot is knocked out", "The crowd votes"], answer: 2, why: "No judges. The title fight continues until knockout." },
+          { q: "Championship Saturday ends when…", choices: ["Round 3 ends", "A judge picks a winner", "One bot is thrown completely into the pit", "The crowd votes"], answer: 2, why: "No judges or round cap. The title fight continues until a complete pit elimination." },
           { q: "Who can earn the Championship Tune-Up?", choices: ["Every store", "Only the two conference finalists", "Only the Desk", "Whichever side has more rally votes"], answer: 1, why: "Only finalist work can prepare a championship bot." },
           { q: "What is the purpose of Rally?", choices: ["Transfer coins", "Increase Power", "Let the rest of the league choose a side and amplify the show", "Repair damage"], answer: 2, why: "Rally belongs to the atmosphere, not combat math." },
         ],

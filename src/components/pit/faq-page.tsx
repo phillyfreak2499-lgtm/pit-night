@@ -186,7 +186,7 @@ export const GROUPS: Group[] = [
       ),
       faq(
         "How does the Championship fight end?",
-        "There are no judges and no decision. Rounds 1 through 3 use normal fight damage, then overtime gets more dangerous. The fight continues until one bot is knocked out.",
+        "There are no judges and no decision. The championship continues for as many rounds as needed until a bot is completely thrown into the pit. Before it, all non-finalists battle simultaneously in the larger-arena Royal Rumble for third place.",
       ),
     ],
   },
@@ -195,7 +195,7 @@ export const GROUPS: Group[] = [
     items: [
       faq(
         "How are the standings ranked?",
-        "Conference berths use record first, then head-to-head when applicable, conference record, cumulative Period 12 NSNU, total green grades, and Bolts earned through Week 4. If the championship berth is still tied, the tied stores settle it in the cage.",
+        "Conference berths use regular-season win-loss record. A first-place tie goes straight to a fight at the end of Week 4. Two bots duel; three or more battle together. Sales, grades, head-to-head results, and Bolts never decide the berth.",
       ),
       faq(
         "What if stores tie for first?",

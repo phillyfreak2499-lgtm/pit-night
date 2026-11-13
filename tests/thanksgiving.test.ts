@@ -479,29 +479,19 @@ function syntheticSeasonBouts(data: PitData): Bout[] {
     wear: {},
     seed: `synthetic-${winner}-${loser}`,
   });
-  const pairs: [string, string][] = [];
-  for (const conference of ["metro", "frontier"] as const) {
-    const stores = data.stores.filter((s) => s.conference === conference).map((s) => s.id);
-    const champion = stores[0]!;
-    const rest = stores.slice(1);
-    for (const rival of rest.slice(0, 4)) pairs.push([champion, rival]);
-    const cycle: [number, number][] = [[0, 1], [1, 2], [2, 0], [3, 4], [4, 5], [5, 3]];
-    for (const [a, b] of cycle) pairs.push([rest[a]!, rest[b]!]);
+  const metro = data.stores.filter(s => s.conference === "metro").map(s => s.id);
+  const frontier = data.stores.filter(s => s.conference === "frontier").map(s => s.id);
+  const bouts: Bout[] = [];
+  const wins: Record<string, number> = {};
+  for (let week = 1; week <= 4; week++) for (let i = 0; i < 7; i++) {
+    const a = metro[i]!, b = frontier[(i + week) % 7]!;
+    const winner = a === metro[0] ? a : b === frontier[0] ? b : (wins[a] ?? 0) <= (wins[b] ?? 0) ? a : b;
+    const loser = winner === a ? b : a;
+    wins[winner] = (wins[winner] ?? 0) + 1;
+    bouts.push({ id: `synthetic-${week}-${i}`, week, slot: i + 1, kind: "bout", title: "Synthetic card",
+      storeIds: [a, b], teamA: [a], teamB: [b], result: result(winner, loser) });
   }
-  const metroRest = data.stores.filter((s) => s.conference === "metro").map((s) => s.id).slice(1);
-  const frontierRest = data.stores.filter((s) => s.conference === "frontier").map((s) => s.id).slice(1);
-  for (let i = 0; i < 8; i++) pairs.push([metroRest[i % metroRest.length]!, frontierRest[(i + 3) % frontierRest.length]!]);
-  return pairs.map(([winner, loser], i) => ({
-    id: `synthetic-${i}`,
-    week: (i % 4) + 1,
-    slot: Math.floor(i / 4),
-    kind: "bout" as const,
-    title: "Synthetic card",
-    storeIds: [winner, loser],
-    teamA: [winner],
-    teamB: [loser],
-    result: result(winner, loser),
-  }));
+  return bouts;
 }
 
 function week5Season(store: ReturnType<typeof state>): PitData {

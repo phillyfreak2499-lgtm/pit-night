@@ -25,6 +25,7 @@ import {
   showCheck,
   cardFor,
   championshipFinalists,
+  ROYAL_RUMBLE_TITLE,
   craftScore,
   equippedScry,
   foesThisWeek,
@@ -225,7 +226,7 @@ function lockPatch(data: PitData, at: number) {
         : { ...b, locked: { ...(b.locked ?? b.draft) }, equipped: { ...(b.locked ?? b.draft) } },
     ),
     flash: championship
-      ? "Championship builds frozen. Saturday ends only with a knockout."
+      ? "Championship builds frozen. Saturday ends only with a complete pit elimination."
       : `Locked. ${data.stores.length} builds frozen for Monday. Click in Sunday's colors, then run the card.`,
     log: [`Week ${data.week} locked.`, ...data.log.slice(0, 23)],
   };
@@ -1902,10 +1903,14 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
         }
         const unrecorded = data.week === 5 ? [] : data.stores.filter(s => !data.storeCards.find(c => c.storeId === s.id && c.week === data.week)?.nsnuOfficial);
         if (unrecorded.length) {
-          set({ flash: `Record official Sunday NSNU for the tiebreak first: ${unrecorded.map(s => s.name).join(", ")}.` });
+          set({ flash: `Record official Sunday NSNU for the weekly card first: ${unrecorded.map(s => s.name).join(", ")}.` });
           return;
         }
         const finalists = championshipFinalists(data);
+        if (data.week === 5 && finalists.length !== 2) {
+          set({ flash: "Finish the Week 4 conference berth fights before running Championship Saturday." });
+          return;
+        }
         const lockedBots = data.bots.map((b) =>
           data.week === 5 && !finalists.includes(b.storeId)
             ? { ...b, locked: null }
@@ -1928,6 +1933,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           honors = {
             pitBelt: belt,
             plate,
+            thirdPlace: bouts.find((bout) => bout.title === ROYAL_RUMBLE_TITLE)?.result?.winnerIds[0] ?? null,
             bestBuild: bestStore ?? null,
             bestBuildWhy: bestStore ? (data.honors.bestBuildWhy || craftWhy(staged,bestStore,"")) : "",
             titleDrop: belt ? titlePart(lockedBots.find((bot) => bot.storeId === belt)?.classId ?? "striker") : null,
@@ -2070,7 +2076,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           // Advance pays coins and moves the week. It does not drop the fight.
           bouts: data.bouts,
           replays: sealReplay(data),
-          flash: next === 5 ? "Championship Week is open. Only the two conference champions can work on their bots; everyone else can Rally. The regular season stays on Fight Day as a replay." : `Week ${next} is open. ${data.week === 1 ? "Coins are in the jars and the shop is open." : "Cards are house projections until the desk clicks in Sunday's colors."} Week ${data.week} stays on Fight Day as a replay.`,
+          flash: next === 5 ? "Championship Week is open. Only the two conference champions can work on their bots; everyone else enters the third-place Royal Rumble and can Rally. The regular season stays on Fight Day as a replay." : `Week ${next} is open. ${data.week === 1 ? "Coins are in the jars and the shop is open." : "Cards are house projections until the desk clicks in Sunday's colors."} Week ${data.week} stays on Fight Day as a replay.`,
           log: [...lines, ...data.log].slice(0, 24),
         });
       },
@@ -2269,6 +2275,7 @@ export function applyHulen<T extends Partial<PitData>>(data: T): T {
           ...data.honors,
           pitBelt: data.honors.pitBelt ? mapStoreId(data.honors.pitBelt) : null,
           plate: data.honors.plate ? mapStoreId(data.honors.plate) : null,
+          thirdPlace: data.honors.thirdPlace ? mapStoreId(data.honors.thirdPlace) : null,
           bestBuild: data.honors.bestBuild ? mapStoreId(data.honors.bestBuild) : null,
         }
       : data.honors,

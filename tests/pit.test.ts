@@ -564,7 +564,7 @@ test("legitimate planned vacation before Pit Week is allowed", () => {
       ?.offWeeks?.includes(1),
   );
 });
-test("standings use current posted actual NSNU, never other colors", () => {
+test("sales remain accurate but do not break tied standings", () => {
   const data = makeData();
   data.week = 3;
   data.phase = "fought";
@@ -583,9 +583,9 @@ test("standings use current posted actual NSNU, never other colors", () => {
       };
     }
   assert.equal(nsnuOf(data, "plano", 3), 1500);
-  assert.equal(rankedStores(data)[0]!.id, "plano");
+  assert.deepEqual(rankedStores(data).map(s => s.name), data.stores.map(s => s.name).sort((a,b) => a.localeCompare(b)));
 });
-test("conference standings use published tiebreak order and cosmetic spending never reduces earned Bolts", () => {
+test("conference standings preserve tied records and cosmetic spending", () => {
   const data = makeData();
   data.week = 4;
   data.phase = "fought";
@@ -941,7 +941,7 @@ test("every eligible specialist completing all ten jobs and five Sparks plus CAR
   assert.equal(weekProgress(store.getState(), "plano", 1).tuned, true);
 });
 
-test("four 14-store cards lead to two conference champions and a knockout Championship Saturday", () => {
+test("four 14-store cards lead to two conference champions and a pit-only Championship Saturday", () => {
   const store = state("commissioner");
   for (let week = 1; week <= 4; week++) {
     for (const row of store.getState().stores) {
@@ -963,7 +963,7 @@ test("four 14-store cards lead to two conference champions and a knockout Champi
   store.getState().runSaturday();
   const championship = store.getState().bouts.find((bout) => bout.week === 5 && bout.title === "Waterman Championship");
   assert.ok(championship?.result);
-  assert.equal(championship!.result!.method, "ko");
+  assert.equal(championship!.result!.method, "dump");
   store.getState().dropDamage();
   store.getState().advanceWeek();
   assert.equal(store.getState().phase, "complete");
@@ -1203,10 +1203,10 @@ test("season load retries a bounded number of times and skips closed-week deadli
   assert.match(source, /doc::json->>'phase'/);
 });
 
-test("KO fixtures always contain a replay and particle budgets stay bounded", () => {
+test("Pit elimination fixtures always contain a replay and particle budgets stay bounded", () => {
   const data = makeData();
   const result = simulateChampionshipDuel(data, "plano", "allen", "title");
-  assert.equal(result.method, "ko");
+  assert.equal(result.method, "dump");
   assert.ok(buildBeats(result).some((b) => b.kind === "replay"));
   const fx = new Fx();
   for (let i = 0; i < 1000; i++) fx.dust(0, 0, 1, 1);

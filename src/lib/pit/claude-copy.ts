@@ -16,7 +16,7 @@ import {
   buildCard,
   championshipFinalists,
   conferenceRecordOf,
-  conferenceStandings,
+  conferenceStandings, conferencePlace,
   gradesOf,
   hashString,
   methodLabel,
@@ -152,8 +152,8 @@ export function recapSubject(data: PitData, week: number): CopySubject | null {
       }),
       standings: (["metro", "frontier"] as const).map((conference) => ({
         conference: conference === "metro" ? "Metro" : "Frontier",
-        table: conferenceStandings(then, conference).map((s, i) => ({
-          place: i + 1,
+        table: conferenceStandings(then, conference).map((s) => ({
+          place: conferencePlace(then, s.id),
           store: s.name,
           team: s.teamName ?? null,
           record: record(regularSeasonRecordOf(then, s.id)),
