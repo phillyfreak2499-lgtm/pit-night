@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Flame, Package, Printer, Trophy, Wrench } from "lucide-react";
 import { CLASS_META } from "@/lib/pit/catalog";
-import { botFor, conferenceStandings, regularSeasonRecordOf } from "@/lib/pit/engine";
+import { botFor, conferencePlace, regularSeasonRecordOf } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
 import type { Bout, PitData } from "@/lib/pit/types";
 import { boltsOf, sparkStreak } from "@/lib/pit/week";
@@ -63,7 +63,7 @@ export function RecapPage({ storeId }: { storeId: string }) {
   }
   const bot = botFor(data, storeId);
   const rec = regularSeasonRecordOf(data, storeId);
-  const place = conferenceStandings(data, store.conference).findIndex((row) => row.id === storeId) + 1;
+  const place = conferencePlace(data, storeId);
   const rows = weekRows(data, storeId);
   const best = bestFight(rows, storeId);
   const tuneUps = rows.filter((r) => r.tuned).length;
@@ -78,6 +78,7 @@ export function RecapPage({ storeId }: { storeId: string }) {
   const honors = [
     data.honors.pitBelt === storeId ? "Period 12 trophy" : null,
     data.honors.plate === storeId ? "Runner-up plate" : null,
+    data.honors.thirdPlace === storeId ? "Royal Rumble third place" : null,
     data.honors.bestBuild === storeId ? "Best Build" : null,
   ].filter(Boolean) as string[];
   const done = data.phase === "complete";

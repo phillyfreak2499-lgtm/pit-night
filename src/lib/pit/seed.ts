@@ -378,7 +378,7 @@ export const WEEK_META: WeekMeta[] = [
   {
     number: 5,
     name: "Championship Week",
-    blurb: "Nov 24–28. Finalists prepare Tuesday through Friday. Title builds lock automatically Friday, Nov 27, at 6:00 PM CT. Saturday Nov 28: Waterman Championship, no judges, fight until knockout.",
+    blurb: "Nov 24–28. Finalists prepare Tuesday through Friday. Title builds lock automatically Friday, Nov 27, at 6:00 PM CT. Saturday Nov 28: Third Place Royal Rumble, then Waterman Championship. No judges; the title ends only in the pit.",
     tagsEnabled: false,
   },
 ];
@@ -447,7 +447,7 @@ export function makeData(): PitData {
     cosmeticProposals: [],
     halloweenArcade: [],
     mvps: [],
-    honors: { pitBelt: null, plate: null, bestBuild: null, bestBuildWhy: "", titleDrop: null },
+    honors: { pitBelt: null, thirdPlace: null, plate: null, bestBuild: null, bestBuildWhy: "", titleDrop: null },
     craft: [],
     session: { role: "public", storeId: null, crewId: null },
     log: ["Period 12 opened. Fourteen bays. Two conferences. Four Monday cards, then Championship Saturday Nov 28."],

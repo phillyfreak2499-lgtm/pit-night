@@ -1,3 +1,4 @@
+import { arenaBotScale, largeFieldSlot } from "./arena-layout";
 import type { ClassId, Exchange, FightResult, FighterSnap } from "@/lib/pit/types";
 
 /**
@@ -101,6 +102,8 @@ function isDuel(result: FightResult) {
 
 /** The blow that ended it, for the slow-motion replay. */
 function finalBlow(result: FightResult): "finisher" | number | null {
+  const pitFinish = result.exchanges.findIndex((ex) => (ex.tags ?? []).includes("pit-elimination"));
+  if (pitFinish >= 0 && result.fighters.length === 2) return pitFinish;
   if (result.method !== "ko") return null;
   if (result.finisher && (result.hp[result.finisher.against] ?? 1) <= 0) return "finisher";
   const i = result.exchanges.findIndex((ex) => ex.defenderHp <= 0);
@@ -163,9 +166,9 @@ export function buildBeats(result: FightResult): Beat[] {
   if (result.fighters[1]) push(6.5, { kind: "intro", side: 1 });
   push(5.5, { kind: "stats" });
   if (result.exchanges.length) push(4, { kind: "countdown" });
-  result.exchanges.forEach((_, index) => {
+  result.exchanges.forEach((ex, index) => {
     if (duel) push(DUEL_CLASH_SEC, { kind: "clash", index });
-    push(duel ? DUEL_EXCHANGE_SEC : GROUP_EXCHANGE_SEC, { kind: "exchange", index });
+    push(duel ? DUEL_EXCHANGE_SEC : result.fighters.length > 4 ? (ex.defenderHp <= 0 ? 4 : 1) : GROUP_EXCHANGE_SEC, { kind: "exchange", index });
   });
   if (result.finisher) push(8, { kind: "finisher" });
   if (duel && finalBlow(result) !== null) push(7.5, { kind: "replay" });
@@ -340,13 +343,14 @@ function strike(
   hpDefAfter: number,
   flameHit: boolean,
   pace = 1,
+  floorScale = 1,
 ): StrikeOut {
   const family = atkBot.weaponFamily;
   const dir = unit(P0, Q0);
   const back = { x: P0.x - dir.x * 0.04, y: P0.y - dir.y * 0.04 };
   const qBrace = keepIn({ x: Q0.x - dir.x * 0.025, y: Q0.y - dir.y * 0.025 });
-  const contactP = { x: qBrace.x - dir.x * REACH, y: qBrace.y - dir.y * REACH };
-  const kb = flameHit ? 0.03 : knockFor(family, damage);
+  const contactP = { x: qBrace.x - dir.x * REACH * floorScale, y: qBrace.y - dir.y * REACH * floorScale };
+  const kb = (flameHit ? 0.03 : knockFor(family, damage)) * floorScale;
   const qEnd = keepIn({ x: qBrace.x + dir.x * kb, y: qBrace.y + dir.y * kb });
   const recoil = isSpinner(family) ? 0.07 : family === "hammer" ? 0.015 : 0.03;
   const pEnd = keepIn({ x: contactP.x - dir.x * recoil, y: contactP.y - dir.y * recoil });
@@ -657,6 +661,19 @@ function botsFromFoot(
   return { atk, def, focus: mix(atk.spot, def.spot, 0.5) };
 }
 
+/** Recorded pit eliminations are throws, not ordinary KO wrecks. */
+function pitFall(out: StrikeOut, ex: Exchange, local: number, result: FightResult) {
+  if (!(ex.tags ?? []).includes("pit-elimination") || local < HIT_AT) return;
+  const t = ease(clamp((local - HIT_AT) / 0.42, 0, 1));
+  out.def.spot = mix(out.def.spot, result.pitTarget ?? { x: PIT.x, y: PIT.y }, t);
+  out.def.lift = Math.sin(t * Math.PI) * 0.7;
+  out.def.pitch = t * Math.PI;
+  out.def.gone = clamp((t - 0.65) / 0.35, 0, 1);
+  out.def.dead = true;
+  out.def.hp = 0;
+  out.focus = mix(out.atk.spot, out.def.spot, 0.5);
+}
+
 /** The scoring strike alone. Replay samples this, not the footwork around it. */
 function exchangeStrike(result: FightResult, index: number, local: number, time: number) {
   const a = result.fighters[0]!;
@@ -685,6 +702,7 @@ function exchangeStrike(result: FightResult, index: number, local: number, time:
     false,
     drivePace(result, atkBot.id, index),
   );
+  pitFall(out, ex, local, result);
   return aAttacks ? { a: out.atk, b: out.def, out } : { a: out.def, b: out.atk, out };
 }
 
@@ -797,6 +815,7 @@ function exchangeDisengage(result: FightResult, index: number, local: number, ti
  * falls on `duelExchangeHitAt`, then a clear. Ends where the next beat starts.
  */
 function exchangeState(result: FightResult, index: number, local: number, time: number) {
+  if (local >= EX_STRIKE_END && (result.exchanges[index]?.tags ?? []).includes("pit-elimination")) return exchangeStrike(result, index, 1, time);
   if (local >= EX_STRIKE_END) return exchangeDisengage(result, index, local, time);
   if (local > EX_STALK_END) {
     const strikeLocal = clamp((local - EX_STALK_END) / EX_STRIKE_SPAN, 0, 1);
@@ -1093,7 +1112,8 @@ export function fightDrive(result: FightResult, beat: Beat, local: number, time:
     const replayLead = 0.12;
     const replaySpan = 0.34;
     const replayHold = 0.92;
-    const u = HIT_AT - replayLead + clamp(local / replayHold, 0, 1) * replaySpan;
+    const pitReplay = typeof blow === "number" && (result.exchanges[blow]?.tags ?? []).includes("pit-elimination");
+    const u = pitReplay ? lerp(HIT_AT - replayLead, 1, clamp(local / replayHold, 0, 1)) : HIT_AT - replayLead + clamp(local / replayHold, 0, 1) * replaySpan;
     const s = blow === "finisher" ? finisherState(result, u, time) : exchangeStrike(result, blow ?? 0, u, time);
     const ex = typeof blow === "number" ? result.exchanges[blow] : undefined;
     return {
@@ -1101,7 +1121,7 @@ export function fightDrive(result: FightResult, beat: Beat, local: number, time:
       impact: s.out.impact,
       power: s.out.power,
       hitKey: "replay",
-      hitAt: (replayLead / replaySpan) * replayHold,
+      hitAt: (replayLead / (pitReplay ? 1 - HIT_AT + replayLead : replaySpan)) * replayHold,
       weapon: blow === "finisher" ? "burn" : (ex?.attackerId === a.id ? a : b).weaponFamily,
       victim: blow === "finisher" ? (result.finisher?.against ?? null) : (ex?.defenderId ?? null),
       focus: s.out.focus,
@@ -1132,7 +1152,7 @@ export function fightDrive(result: FightResult, beat: Beat, local: number, time:
   let impact: Spot | null = null;
   let power = 0;
 
-  if (result.method === "dump") {
+  if (result.method === "dump" && !result.exchanges.some((ex) => (ex.tags ?? []).includes("pit-elimination"))) {
     // Shove the loser across the floor and into the pit.
     const pit = { x: PIT.x, y: PIT.y + 0.02 };
     const start = lose.spot;
@@ -1205,13 +1225,15 @@ function meleeDrive(result: FightResult, beat: Beat, local: number, time: number
   const bots = result.fighters.filter((f) => f.id !== "house");
   const count = Math.max(1, bots.length);
   const hpNow = meleeHp(result, beat, local);
+  const large = count > 4;
   const slot = (i: number): Spot => {
+    if (large) return largeFieldSlot(i, count);
     const orbit = time * 0.06 + (Math.PI * 2 * i) / count;
     return { x: 0.5 + Math.cos(orbit) * 0.32, y: 0.56 + Math.sin(orbit) * 0.26 };
   };
   const center = { x: 0.5, y: 0.56 };
   const states = bots.map((bot, i) => {
-    const j = juke(`${bot.id}melee`, time, 0.025);
+    const j = juke(`${bot.id}melee`, time, large ? 0.008 : 0.025);
     const base = slot(i);
     const s = blank(
       bot,
@@ -1226,6 +1248,10 @@ function meleeDrive(result: FightResult, beat: Beat, local: number, time: number
       s.rev = 0;
       s.flipped = rand(`${bot.id}flip`) > 0.4;
       s.spot = base;
+      if (result.exchanges.some((ex) => ex.defenderId === bot.id && ex.defenderHp <= 0 && (ex.tags ?? []).includes("pit-elimination"))) {
+        s.spot = result.pitTarget ?? { x: PIT.x, y: PIT.y };
+        s.gone = 1;
+      }
     }
     return s;
   });
@@ -1271,7 +1297,10 @@ function meleeDrive(result: FightResult, beat: Beat, local: number, time: number
         meleeBefore(result, ex),
         ex.defenderHp,
         (ex.tags ?? []).includes("burn") || (ex.tags ?? []).includes("jet") || atkBot.weaponFamily === "flame",
+        1,
+        arenaBotScale(count),
       );
+      pitFall(out, ex, local, result);
       states[ai] = out.atk;
       states[di] = out.def;
       impact = out.impact;
@@ -1299,7 +1328,7 @@ function meleeDrive(result: FightResult, beat: Beat, local: number, time: number
   }
 
   states.forEach((s) => (s.roll = s.spot.x * 34 + s.spot.y * 21));
-  return { bots: states, impact, power, hitKey, hitAt: HIT_AT, weapon, victim, focus, tight };
+  return { bots: states, impact, power, hitKey, hitAt: HIT_AT, weapon, victim, focus: large ? center : focus, tight: large ? 0 : tight, countdown: beat.kind === "countdown" ? Math.max(0, 3 - Math.floor(local * 4)) : undefined };
 }
 
 function meleeBefore(result: FightResult, ex: Exchange) {

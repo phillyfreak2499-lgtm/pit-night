@@ -51,8 +51,17 @@ type Mem = {
   slow: Record<string, number>;
 };
 
-/** `rounds` sets how many exchanges a fight may run (default 3; overtime fights go to 12). */
-export type DuelOpts = { hot?: boolean; overtime?: boolean; pace?: number; rounds?: number };
+/** Normal fights default to 3 exchanges (overtime: 12); pit-only fights have no limit. */
+export type DuelOpts = {
+  hot?: boolean;
+  overtime?: boolean;
+  pace?: number;
+  rounds?: number;
+  /** Only crossing the pit boundary eliminates a fighter. No round limit. */
+  pitOnly?: boolean;
+  /** Free-for-all pit elimination, with exactly one surviving fighter. */
+  lastBotStanding?: boolean;
+};
 
 export type DuelCore = {
   exchanges: Exchange[];
@@ -959,6 +968,7 @@ type BattleState = {
   turns: Record<string, number>;
   exchanges: Exchange[];
   koAt: number;
+  pitPosition: Record<string, number>;
 };
 
 function battleState(bots: FighterSnap[]): BattleState {
@@ -976,6 +986,7 @@ function battleState(bots: FighterSnap[]): BattleState {
       stamina: Object.fromEntries(bots.map((bot) => [bot.id, STAMINA_MAX])),
     },
     turns: {},
+    pitPosition: Object.fromEntries(bots.map((bot) => [bot.id, 0])),
     exchanges: [],
     koAt: -1,
   };
@@ -1097,6 +1108,9 @@ function stepExchange(
   const tryRevive = (bot: FighterSnap) => {
     const before = hp[bot.id]!;
     hp[bot.id] = revive(bot, before, mem);
+    // A disabled chassis must still be physically pushed into the pit.
+    // Simultaneous lethal damage cannot decide a pit-only bout.
+    if (opts.pitOnly) hp[bot.id] = Math.max(1, hp[bot.id]!);
     if (hp[bot.id]! > before) combat[bot.id]!.revived = true;
   };
   for (const bot of bots) {
@@ -1239,10 +1253,68 @@ function stepExchange(
   }
 }
 
+/**
+ * Every chassis can shove, including an exhausted one. Weapon control, drive,
+ * armor, damage, stamina and battery affect distance; none grants pit immunity.
+ * Positions only move outward, with a one-unit minimum per completed shove.
+ * Every engagement therefore progresses even at zero pace or with repair kits.
+ * Initiative alternates by exchange, never by HP, rating or a judge's score.
+ */
+function stepPitExchange(a: FighterSnap, b: FighterSnap, state: BattleState, i: number, opts: DuelOpts) {
+  stepExchange(a, b, state, i, { ...opts, pitOnly: true });
+  const exchange = state.exchanges[state.exchanges.length - 1]!;
+  const pair = [a, b].sort((left, right) => left.id.localeCompare(right.id));
+  if (i % 2) pair.reverse();
+  for (const attacker of pair) {
+    const defender = attacker.id === a.id ? b : a;
+    const kit = kitOf(attacker);
+    const defense = kitOf(defender);
+    const control = ["wedge", "claw", "bones", "crusher"].includes(kit.weapon) ? 5 : 0;
+    const leverage = kit.drive === "flip" ? 4 : 0;
+    const traction = defense.drive === "anchor" || defense.drive === "treads" ? 4 : 0;
+    const integrity = 0.3 + 0.7 * state.hp[defender.id]! / 100;
+    const resistance = (4 + Math.max(0, defender.stats.armor) * 0.08 + traction) * integrity;
+    const force = (4 + Math.max(0, attacker.stats.power) * 0.12 +
+      Math.max(0, attacker.stats.speed) * 0.06 + control + leverage) *
+      batteryCurve(kit.batteryMax, state.mem.battery[attacker.id]!) *
+      staminaCurve(STAMINA_MAX, state.mem.stamina[attacker.id]!, state.turns[attacker.id]!, glassOf(attacker.stats)) *
+      (state.mem.slow[attacker.id] ?? 1) * (state.mem.stun[attacker.id] ?? 1);
+    const distance = Math.max(1, Math.round((force - resistance) * Math.max(0, opts.pace ?? PACE)));
+    const position = Math.min(100, state.pitPosition[defender.id]! + distance);
+    state.pitPosition[defender.id] = position;
+    exchange.tags.push(`pit-position:${defender.id}:${position}`);
+    if (position < 100) continue;
+    const remaining = state.hp[defender.id]!;
+    state.hp[defender.id] = 0;
+    state.koAt = i;
+    exchange.attackerId = attacker.id;
+    exchange.defenderId = defender.id;
+    exchange.attackerHp = state.hp[attacker.id]!;
+    exchange.defenderHp = 0;
+    exchange.damage = remaining;
+    exchange.call = `${attacker.botName} drives ${defender.botName} over the edge and completely into the pit.`;
+    exchange.tags.push("pit-elimination", "dump", "pit", `hazard:${defender.id}:pit`);
+    exchange.combat![attacker.id]!.damageDealt += remaining;
+    exchange.combat![attacker.id]!.hitCount += 1;
+    endTrace([a, b], state, exchange.combat!);
+    // An eliminated bot cannot complete its return shove. Never revive a
+    // double-KO loser or select a survivor using remaining HP.
+    return;
+  }
+  exchange.tags.push("pit-control");
+  exchange.call += ` Both chassis battle for position at the pit edge.`;
+}
+
 export function fightDuel(a: FighterSnap, b: FighterSnap, opts: DuelOpts = {}): DuelCore {
+  if (opts.pitOnly && a.id === b.id) throw new Error("A pit duel needs two distinct fighters.");
   const state = battleState([a, b]);
   const bell = bellFor([a, b]);
   const { hp, mem, exchanges } = state;
+  if (opts.pitOnly) {
+    for (let i = 0; hp[a.id]! > 0 && hp[b.id]! > 0; i++)
+      stepPitExchange(a, b, state, i, opts);
+    return { exchanges, hp, finisher: null, method: "dump", koAt: state.koAt, bell };
+  }
   const limit = Math.max(1, Math.min(12, opts.rounds ?? (opts.overtime ? 12 : 3)));
   for (let i = 0; i < limit && hp[a.id]! > 0 && hp[b.id]! > 0; i++)
     stepExchange(a, b, state, i, opts);
@@ -1345,13 +1417,17 @@ export function fightGroup(
   teams: string[][] | null,
   opts: DuelOpts = {},
 ): Pick<DuelCore, "hp" | "exchanges" | "bell"> & { order: string[] } {
+  if (opts.lastBotStanding && (fighters.length < 2 || new Set(fighters.map((bot) => bot.id)).size !== fighters.length))
+    throw new Error("Last-bot-standing needs at least two distinct fighters.");
+  if (opts.lastBotStanding && teams)
+    throw new Error("Last-bot-standing is a free-for-all, not a team fight.");
   const state = battleState(fighters);
   const bell = bellFor(fighters);
   const ordered = [...fighters].sort((a, b) => a.id.localeCompare(b.id));
   const eliminatedAt: Record<string, number> = {};
   const sameTeam = (a: string, b: string) =>
     teams?.some((team) => team.includes(a) && team.includes(b)) ?? false;
-  for (let round = 0; round < 12; round++) {
+  for (let round = 0; opts.lastBotStanding || round < 12; round++) {
     const alive = ordered.filter((bot) => state.hp[bot.id]! > 0);
     if (alive.length < 2 || alive.every((bot) => sameTeam(alive[0]!.id, bot.id))) break;
     const offset = round % alive.length;
@@ -1362,15 +1438,18 @@ export function fightGroup(
       if (opponent < 0) continue;
       const [b] = queue.splice(opponent, 1);
       const before = state.exchanges.length;
-      stepExchange(a, b!, state, round, { ...opts, overtime: true });
+      if (opts.lastBotStanding) stepPitExchange(a, b!, state, before, { ...opts, overtime: true });
+      else stepExchange(a, b!, state, round, { ...opts, overtime: true });
       for (const exchange of state.exchanges.slice(before)) exchange.index = before + 1;
-      for (const bot of [a, b!]) if (state.hp[bot.id] === 0) eliminatedAt[bot.id] = round;
+      for (const bot of [a, b!]) if (state.hp[bot.id] === 0) eliminatedAt[bot.id] = opts.lastBotStanding ? before : round;
     }
   }
   const order = [...ordered]
     .sort(
       (a, b) =>
-        state.hp[b.id]! - state.hp[a.id]! ||
+        (opts.lastBotStanding
+          ? Number(state.hp[b.id]! > 0) - Number(state.hp[a.id]! > 0)
+          : state.hp[b.id]! - state.hp[a.id]!) ||
         (eliminatedAt[b.id] ?? 12) - (eliminatedAt[a.id] ?? 12) ||
         buildScore(b) - buildScore(a) ||
         a.id.localeCompare(b.id),

@@ -7,7 +7,11 @@ import { armSound, playBell, playClank, playCount, playDecision, playFinisher, p
 import type { Bout, Exchange, FightResult } from "@/lib/pit/types";
 import { Fx, drawSide, drawTop, impactPoints, project, stepBots } from "./cage-draw";
 import { arenaForWeek, arenaTheme, hazardCallout, type ArenaId } from "./arena-scenes";
-import { beatAt, buildBeats, DUEL_CLASH_SEC, fightDrive, lerp, ROUND_CARD_SEC, type Beat, type Spot } from "./cage-motion";
+import { beatAt, DUEL_CLASH_SEC, fightDrive, lerp, ROUND_CARD_SEC, type Beat, type Spot } from "./cage-motion";
+import { broadcastBeats, championshipFinishPhase, hasFinalistEntrances, replayFinishLabel } from "./championship-entrance";
+import { paintFinalistEntrance } from "./championship-entrance-scene";
+import { paintChampionshipFinish } from "./championship-finish-scene";
+import { resizeBroadcastCanvas } from "./broadcast-canvas";
 import { readMeters, type MeterPhase, type MeterRead } from "@/lib/pit/vitals";
 
 const ROUND_SHOW = ROUND_CARD_SEC / DUEL_CLASH_SEC;
@@ -49,6 +53,7 @@ export function Broadcast({
   if (!keep.current || keep.current.key !== tapeKey) keep.current = { key: tapeKey, bout: boutProp };
   const bout = keep.current.bout;
   const result = bout.result;
+  const championship = Boolean(result && hasFinalistEntrances(bout, result));
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const topRef = useRef<HTMLCanvasElement | null>(null);
   const [playingState, setPlayingState] = useState(false);
@@ -64,6 +69,7 @@ export function Broadcast({
     if (speedProp === undefined) setSpeedState(next);
   };
   const [caption, setCaption] = useState("Lights down.");
+  const [entranceId, setEntranceId] = useState<string | null>(null);
   const [hp, setHp] = useState<Record<string, number>>({});
   const [meters, setMeters] = useState<Record<string, MeterRead | null>>({});
   const [clock, setClock] = useState("0:00");
@@ -72,6 +78,8 @@ export function Broadcast({
   const cueRef = useRef("");
   const hitRef = useRef("");
   const fxRef = useRef(new Fx());
+  const titleFxRef = useRef(new Fx());
+  const titleFxKey = useRef("");
   const trailsRef = useRef(new Map<string, Spot[]>());
   const onCompleteRef = useRef(onComplete);
   const onNotableBeatRef = useRef(onNotableBeat);
@@ -89,9 +97,10 @@ export function Broadcast({
     const ctx = canvas.getContext("2d");
     const topCtx = top.getContext("2d");
     if (!ctx || !topCtx) return;
-    const beats = buildBeats(result);
+    const beats = broadcastBeats(bout, result);
     const total = beats.reduce((m, b) => Math.max(m, b.t + b.dur), 0);
     const fx = fxRef.current;
+    const titleFx = titleFxRef.current;
     const trails = trailsRef.current;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     // eslint-disable-next-line prefer-const -- resize() reads loop before assignment; const would throw
@@ -116,13 +125,13 @@ export function Broadcast({
 
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 600 ? 1.5 : 2);
-      for (const node of [canvas, top]) {
-        const rect = node.getBoundingClientRect();
-        node.width = Math.max(1, Math.floor(rect.width * dpr));
-        node.height = Math.max(1, Math.floor(rect.height * dpr));
+      const sideChanged = resizeBroadcastCanvas(canvas, dpr);
+      const topChanged = resizeBroadcastCanvas(top, dpr);
+      if (sideChanged || topChanged) {
+        fx.clear();
+        fx.cam.ready = false;
       }
-      fx.clear();
-      fx.cam.ready = false;
+      if (sideChanged) titleFx.clear();
       loop?.invalidate();
     };
     resize();
@@ -130,9 +139,19 @@ export function Broadcast({
     observer.observe(canvas);
     observer.observe(top);
 
-    const frame = (_now: number, dt: number) => {
+    let lastFrame: number | null = null;
+    const frame = (now: number, dt: number) => {
       const before = timeRef.current;
-      if (playing && freeze <= 0) timeRef.current = Math.min(total, timeRef.current + dt * speed * (hold > 0 ? 0.3 : 1));
+      const previousBeat = beatAt(beats, before);
+      const entranceClock = championship && previousBeat.kind === "intro";
+      const realDelta = lastFrame === null ? 0 : Math.max(0, (now - lastFrame) / 1000);
+      lastFrame = now;
+      if (playing && freeze <= 0) {
+        // Give each finalist twelve real seconds, regardless of fight speed or frame rate.
+        timeRef.current = entranceClock
+          ? Math.min(previousBeat.t + previousBeat.dur, before + realDelta)
+          : Math.min(total, before + dt * speed * (hold > 0 ? 0.3 : 1));
+      }
       if (freeze > 0) freeze -= dt;
       if (hold > 0) hold -= dt;
       const time = timeRef.current;
@@ -224,8 +243,15 @@ export function Broadcast({
       const hype = fighting ? (local > 0.4 && local < 0.75 ? 1 : 0.4) : beat.kind === "decision" || beat.kind === "replay" ? 0.8 : 0.15;
       const lowest = Math.min(...drive.bots.filter((b) => !b.dead && b.bot.id !== "house").map((b) => b.hp), 100);
       const heroSide = beat.kind === "intro" ? result.fighters[beat.side] : undefined;
-      drawSide(ctx, canvas.width, canvas.height, drive, fx, time, dt, {
-        title: beat.kind === "bumper" ? "bumper" : beat.kind === "decision" ? "decision" : null,
+      const titleEntrance = championship && beat.kind === "intro" && heroSide;
+      const finishPhase = championshipFinishPhase(bout, result, beat);
+      const titleKey = titleEntrance ? `entrance-${heroSide.id}` : finishPhase ? `${finishPhase}-${beat.kind}` : "";
+      if (titleFxKey.current !== titleKey) { titleFx.clear(); titleFxKey.current = titleKey; }
+      setEntranceId(titleEntrance ? heroSide.id : null);
+      if (titleEntrance && beat.kind === "intro") {
+        paintFinalistEntrance(ctx, canvas.width, canvas.height, heroSide, beat.side, local, time, playing ? dt : 0, titleFx, reduced);
+      } else drawSide(ctx, canvas.width, canvas.height, drive, fx, time, dt, {
+        title: beat.kind === "bumper" ? "bumper" : beat.kind === "decision" && !finishPhase ? "decision" : null,
         word: decisionWord(result),
         hype,
         reduced,
@@ -233,6 +259,7 @@ export function Broadcast({
         countdown: drive.countdown != null ? { n: drive.countdown, t: (local * 4) % 1 } : null,
         replay: Boolean(drive.replay),
         ko: beat.kind === "replay" && local > 0.68 ? (local - 0.68) / 0.32 : null,
+        finishLabel: replayFinishLabel(result),
         alarm: fighting && lowest < 25 ? (25 - lowest) / 25 : 0,
         round: beat.kind === "clash" && local < ROUND_SHOW ? { n: beat.index + 1, t: local / ROUND_SHOW } : null,
         combo: combo.n >= 2 && time - combo.at < 2.5 ? { n: combo.n, t: (time - combo.at) / 2.5, color: combo.color } : null,
@@ -242,8 +269,9 @@ export function Broadcast({
         finish: hold > 0 ? Math.min(1, hold / 0.4) : 0,
         arena,
       });
-      drawTop(topCtx, top.width, top.height, drive, fx, trails, time, dt, reduced, arena);
-      setCaption(captionFor(result, bout, beat, noDamage));
+      if (!titleEntrance) drawTop(topCtx, top.width, top.height, drive, fx, trails, time, dt, reduced, arena);
+      if (finishPhase) paintChampionshipFinish(ctx, canvas.width, canvas.height, result, drive, finishPhase, playing ? dt : 0, titleFx, reduced, fx.cam);
+      setCaption(titleEntrance ? `Championship finalist: ${heroSide.botName} from ${heroSide.storeName}. The spotlight is yours.` : captionFor(result, bout, beat, noDamage));
       // The bars follow the bots on screen; the replay shows where the fight ended.
       const bars = hpFor(result, beat, local);
       if (beat.kind === "replay") for (const f of result.fighters) bars[f.id] = result.hp[f.id] ?? bars[f.id] ?? 100;
@@ -288,7 +316,7 @@ export function Broadcast({
       return playing && time < total - 0.02;
     };
     loop = createFrameLoop(frame);
-    const visibility = () => loop?.setVisible(visible && !document.hidden);
+    const visibility = () => { lastFrame = null; loop?.setVisible(visible && !document.hidden); };
     const intersection = new IntersectionObserver(rows => { visible = rows.some(row => row.isIntersecting); visibility(); });
     intersection.observe(canvas.closest("[data-testid=broadcast]") ?? canvas);
     document.addEventListener("visibilitychange", visibility);
@@ -299,14 +327,16 @@ export function Broadcast({
       document.removeEventListener("visibilitychange", visibility);
       observer.disconnect();
     };
-  }, [bout, playing, result, speed, noDamage, seek, arenaProp]);
+  }, [bout, playing, result, speed, noDamage, seek, arenaProp, championship]);
 
 
   if (!result) return null;
   const group = result.fighters.length > 2;
+  const largeField = result.fighters.length > 4;
+  const survivors = result.fighters.filter((f) => (hp[f.id] ?? 100) > 0).length;
   const left = group ? undefined : result.fighters[0];
   const right = group ? undefined : result.fighters[1];
-  const beats = buildBeats(result);
+  const beats = broadcastBeats(bout, result);
   const total = beats.reduce((m, b) => Math.max(m, b.t + b.dur), 0);
 
   const meterFor = (id: string | undefined) => {
@@ -314,7 +344,17 @@ export function Broadcast({
     if (Object.prototype.hasOwnProperty.call(meters, id)) return meters[id] ?? null;
     return readMeters(result, id, { kind: "bell" });
   };
-  const healthFor = (fighter: (typeof result.fighters)[number], align: "left" | "right") => (
+  const healthFor = (fighter: (typeof result.fighters)[number], align: "left" | "right") => largeField ? (
+    <div className="min-w-0" aria-label={`${fighter.botName}: ${(hp[fighter.id] ?? 100) <= 0 ? "eliminated" : `${Math.round(hp[fighter.id] ?? 100)} health`}`}>
+      <p className={`truncate font-display text-[11px] ${(hp[fighter.id] ?? 100) <= 0 ? "text-muted" : "text-fg"}`}>
+        <span className="text-amber">#{result.fighters.indexOf(fighter) + 1}</span> {fighter.botName}
+      </p>
+      <div className="flex items-center gap-1">
+        <div className="h-1 flex-1 bg-white/10"><div className="h-full bg-amber" style={{ width: `${Math.max(0, hp[fighter.id] ?? 100)}%` }} /></div>
+        <span className="text-[10px] text-muted">{(hp[fighter.id] ?? 100) <= 0 ? "OUT" : Math.round(hp[fighter.id] ?? 100)}</span>
+      </div>
+    </div>
+  ) : (
     <Health
       name={fighter.botName}
       store={fighter.teamName ? `${fighter.storeName} · ${fighter.teamName}` : fighter.storeName}
@@ -330,12 +370,12 @@ export function Broadcast({
     <div className={stage ? "relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-deep" : "overflow-hidden border border-line bg-deep"} data-testid="broadcast">
       {stage ? null : (
       <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
-        <p className="font-display text-sm tracking-[0.18em] text-amber uppercase">{kicker ?? "Live cage"}</p>
+        <p className="font-display text-sm tracking-[0.18em] text-amber uppercase">{largeField ? `${survivors} / ${result.fighters.length} STILL STANDING` : kicker ?? "Live cage"}</p>
         <p className="font-display text-sm text-muted">{clock} / {Math.round(total)}s</p>
       </div>
       )}
       {group && !stage ? (
-        <div className="grid grid-cols-2 gap-3 border-b border-line p-3" aria-label="All fighters' health">
+        <div className={`grid grid-cols-2 gap-3 border-b border-line p-3 ${largeField ? "sm:grid-cols-3 lg:grid-cols-4" : ""}`} aria-label="All fighters' health">
           {result.fighters.map((fighter) => (
             <div key={fighter.id} data-testid={`group-health-${fighter.id}`}>
               {healthFor(fighter, "left")}
@@ -343,12 +383,13 @@ export function Broadcast({
           ))}
         </div>
       ) : null}
-      <div className={stage ? "relative min-h-0 flex-1" : "grid gap-px bg-line lg:grid-cols-[minmax(0,1.55fr)_minmax(190px,0.72fr)]"}>
+      <div className={stage ? "relative min-h-0 flex-1" : `grid gap-px bg-line ${entranceId ? "lg:grid-cols-1" : "lg:grid-cols-[minmax(0,1.55fr)_minmax(190px,0.72fr)]"}`}>
         <div className={stage ? "absolute inset-0 bg-deep" : "relative min-w-0 bg-deep"}>
-          <canvas ref={canvasRef} aria-label="Battle arena animation" className={stage ? "h-full w-full bg-deep" : "aspect-[4/3] w-full bg-deep sm:aspect-video"} />
-          <div className={`pointer-events-none absolute inset-x-0 top-0 grid items-start gap-2 p-2 pb-6 md:gap-3 md:p-3 md:pb-8 ${group && stage ? "grid-cols-1" : "grid-cols-[1fr_auto_1fr]"}`} style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.82), rgba(0,0,0,0))" }}>
+          <canvas ref={canvasRef} data-testid={entranceId ? "championship-finalist-entrance" : undefined} aria-label={entranceId ? "Championship finalist spotlight entrance" : "Battle arena animation"} className={stage ? "h-full w-full bg-deep" : "aspect-[4/3] w-full bg-deep sm:aspect-video"} />
+          <div className={`${entranceId ? "invisible" : ""} pointer-events-none absolute inset-x-0 top-0 grid items-start gap-2 p-2 pb-6 md:gap-3 md:p-3 md:pb-8 ${group && stage ? "grid-cols-1" : "grid-cols-[1fr_auto_1fr]"}`} style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.82), rgba(0,0,0,0))" }}>
             {group && stage ? (
-              <div className="grid max-h-[42vh] grid-cols-2 gap-2 overflow-y-auto" aria-label="All fighters' health">
+              <div className={`grid max-h-[30vh] gap-2 overflow-y-auto ${largeField ? "grid-cols-3 lg:grid-cols-4" : "grid-cols-2"}`} aria-label="All fighters' health">
+                {largeField ? <p className="col-span-full font-display text-[11px] text-amber">{survivors} / {result.fighters.length} STILL STANDING</p> : null}
                 {result.fighters.map((fighter) => (
                   <div key={fighter.id} data-testid={`group-health-${fighter.id}`}>
                     {healthFor(fighter, "left")}
@@ -368,7 +409,7 @@ export function Broadcast({
           </div>
           <p className={`absolute inset-x-0 bottom-0 bg-deep/95 px-3 py-1.5 text-xs leading-relaxed md:py-3 md:text-base ${stage ? "pr-28 sm:pr-40" : ""}`}>{caption}</p>
         </div>
-        <div className={stage ? "pointer-events-none absolute right-2 bottom-14 z-20 w-24 sm:w-36 md:bottom-16 md:w-44" : "relative min-w-0 bg-deep lg:min-h-full"}>
+        <div hidden={Boolean(entranceId)} className={stage ? "pointer-events-none absolute right-2 bottom-14 z-20 w-24 sm:w-36 md:bottom-16 md:w-44" : "relative min-w-0 bg-deep lg:min-h-full"}>
           <canvas ref={topRef} aria-label="Overhead arena camera" className={stage ? "aspect-square w-full border border-white/25 bg-deep shadow-lg" : "aspect-square w-full bg-deep lg:absolute lg:inset-0 lg:h-full lg:w-full"} />
         </div>
       </div>
@@ -523,7 +564,7 @@ function captionFor(result: FightResult, bout: Bout, beat: Beat, noDamage: boole
     const def = result.fighters.find((f) => f.id === ex?.defenderId);
     return `Round ${beat.index + 1}. They close, circle, and feint. ${def?.botName ?? "The defender"} swings first and bounces off. ${atk?.botName ?? "The attacker"} answers.`;
   }
-  if (beat.kind === "replay") return "One more time, slower. That is the blow that ended it.";
+  if (beat.kind === "replay") return result.method === "dump" ? "One more time, slower. The throw into the pit that ended it." : "One more time, slower. That is the blow that ended it.";
   if (beat.kind === "exchange") return result.exchanges[beat.index]?.call ?? "";
   if (beat.kind === "finisher") return result.finisher?.call ?? "";
   if (result.method === "bye" || bout.kind === "bye") {

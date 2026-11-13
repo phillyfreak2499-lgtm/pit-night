@@ -389,7 +389,7 @@ function ChampionshipDesk() {
         season-earned parts, coins and damage into Championship Week. Only those two stores can
         prepare their bots. Rally support changes presentation only.
       </p>
-      <p className="mt-2 text-sm text-amber">Saturday has no judges and no decision. Run it until knockout.</p>
+      <p className="mt-2 text-sm text-amber">Saturday starts with the third-place Royal Rumble, then the title fight. No judges or round cap: the title ends only with a complete pit elimination.</p>
     </section>
   );
 }
@@ -409,7 +409,7 @@ function SundayScores() {
         <div>
           <SectionLabel>Sunday scorecard · week {data.week}</SectionLabel>
           <p className="mt-2 max-w-3xl text-sm text-muted">
-            Click each store&apos;s color for all six numbers. Green pays 3 coins, blue 2, orange 1, red 0, into that part&apos;s jar when you advance the week. Record actual NSNU dollars as well for the standings tiebreak; this leaves your clicked colors unchanged. Click a color again to clear it. A dashed box is the house projection until you click.
+            Click each store&apos;s color for all six numbers. Green pays 3 coins, blue 2, orange 1, red 0, into that part&apos;s jar when you advance the week. Record actual NSNU dollars as well for the weekly card; this leaves your clicked colors unchanged. Click a color again to clear it. A dashed box is the house projection until you click.
           </p>
         </div>
         <p className="font-display text-2xl leading-none" data-testid="sunday-progress">

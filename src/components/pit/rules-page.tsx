@@ -35,7 +35,7 @@ export const RULES: { title: string; text: string }[] = [
   },
   {
     title: "The card",
-    text: "Fourteen stores. Period 11 colors seed Metro and Frontier separately. Every store gets four regular-season fights and no repeated opponent. Each store gets conference games plus at least one crossover. After Week 4, each conference sends one store to Championship Saturday. The berth tiebreak order is: record, head-to-head when applicable, conference record, cumulative Period 12 NSNU, total green grades, then Bolts earned through Week 4. If the berth is still tied, the tied stores settle it in the cage. Best Build can still come from any bay.",
+    text: "Fourteen stores. Period 11 colors seed Metro and Frontier separately. Every store gets four regular-season fights and no repeated opponent. Each store gets conference games plus at least one crossover. After Week 4, each conference sends one store to Championship Saturday. Conference berths use regular-season win-loss record. A tie for first goes straight to a fight after the Week 4 card: two bots duel; three or more all battle simultaneously. No sales, head-to-head, grades, or Bolts break that tie. Best Build can still come from any bay.",
   },
   {
     title: "Pit Week",
@@ -43,7 +43,7 @@ export const RULES: { title: string; text: string }[] = [
   },
   {
     title: "Championship Saturday",
-    text: "After the fourth Monday, only the Metro Champion and Frontier Champion can work on championship bots. Their Week 4 sales card carries forward; there is no fifth Sunday scorecard. Non-finalist stores may Rally behind either finalist, but Rally is presentation-only and can never change fight math, repairs, parts or resources. The championship has no judges and no decision. After three normal rounds, damage escalates in overtime until one bot is knocked out.",
+    text: "After the fourth Monday, only the Metro Champion and Frontier Champion can work on championship bots. Their Week 4 sales card carries forward; there is no fifth Sunday scorecard. Non-finalist stores may Rally behind either finalist, but Rally is presentation-only and can never change fight math, repairs, parts or resources. The championship has no judges and no decision. All non-finalists first enter a larger-arena, last-bot-standing Royal Rumble for third place. The title fight continues for as many rounds as needed until one bot is completely thrown into the pit.",
   },
   {
     title: "The bay",

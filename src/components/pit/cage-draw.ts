@@ -1,3 +1,4 @@
+import { arenaBotScale } from "./arena-layout";
 import { botFrameOf as frameOf, type BotFrame as Frame } from "./bot-frame";
 import { sawPoseOf } from "./bot-weapons";
 import { drawPaintSkin } from "./paint-skins";
@@ -83,12 +84,12 @@ const FLOOR_FRONT = 0.87;
 const HALF_BACK = 0.35;
 const HALF_FRONT = 0.56;
 
-export function project(spot: Spot, w: number, h: number) {
+export function project(spot: Spot, w: number, h: number, fighterCount = 2) {
   const t = clamp(spot.y, -0.2, 1.1);
   const sy = h * lerp(FLOOR_BACK, FLOOR_FRONT, t);
   const half = w * lerp(HALF_BACK, HALF_FRONT, t);
   const sx = w * 0.5 + (spot.x - 0.5) * 2 * half;
-  const size = w * (0.12 + t * 0.085);
+  const size = w * (0.12 + t * 0.085) * arenaBotScale(fighterCount);
   return { x: sx, y: sy, size };
 }
 
@@ -1565,6 +1566,7 @@ export function drawCosmeticEffect(ctx: CanvasRenderingContext2D, fx: Fx, effect
   if (effect === "victory-fireworks") for (let i = fx.tick("preview-fireworks", 1.6, dt); i > 0; i--) fx.firework(w * (0.25 + Math.random() * 0.5), h * 0.18, size, paint);
   fx.step(dt);
   drawParticles(ctx, fx.side);
+  drawWreck(ctx, fx.wreck);
 }
 
 export function drawSideBot(
@@ -3895,6 +3897,7 @@ export type SideOpts = {
   replay?: boolean;
   /** 0..1 progress of the K.O. stamp. */
   ko?: number | null;
+  finishLabel?: "K.O." | "IN THE PIT";
   /** 0..1 how close someone is to dying: red alarm lights. */
   alarm?: number;
   /** Round banner at the top of a trade. */
@@ -4238,7 +4241,7 @@ function framedBots(drive: Drive, w: number, h: number) {
   for (const bot of drive.bots) {
     if (bot.gone >= 1) continue;
     if (bot.spot.x < 0.02 || bot.spot.x > 0.98 || bot.spot.y < 0.05 || bot.spot.y > 0.98) continue;
-    const p = project(bot.spot, w, h);
+    const p = project(bot.spot, w, h, drive.bots.length);
     const up = p.size * (1.5 + Math.max(0, bot.lift));
     const down = p.size * 0.3;
     const side = p.size * 1.2;
@@ -4262,8 +4265,8 @@ export function drawSide(
   opts: SideOpts,
 ) {
   // Camera: drift toward the action, tighten on the hit.
-  const pts = drive.bots.filter((b) => b.gone < 1).map((b) => project(b.spot, w, h));
-  const focus = project(drive.focus, w, h);
+  const pts = drive.bots.filter((b) => b.gone < 1).map((b) => project(b.spot, w, h, drive.bots.length));
+  const focus = project(drive.focus, w, h, drive.bots.length);
   const spread =
     pts.length > 1 ? Math.max(...pts.map((p) => p.x)) - Math.min(...pts.map((p) => p.x)) : w * 0.3;
   let wantZ = opts.reduced
@@ -4296,6 +4299,8 @@ export function drawSide(
     wantY = opts.reduced ? framedY : lerp(wantY, framedY, 0.72);
     wantX = opts.reduced ? framedX : lerp(wantX, framedX, 0.4);
   }
+  // Stay wide: hit zoom must never crop other entrants.
+  if (drive.bots.length > 4) { wantZ = 1; wantX = w / 2; wantY = h / 2; }
   const cam = fx.cam;
   if (!cam.ready) {
     cam.x = wantX;
@@ -4330,7 +4335,7 @@ export function drawSide(
   if (drive.bots.some((bot) => bot.bot.shows?.includes("embers"))) drawGoldenSparkRain(ctx, w, h, time, opts.reduced);
   // Contact light belongs on the steel and floor, with falloff at arena scale.
   if (drive.impact && fx.flash > 0 && !opts.reduced) {
-    const hit = project(drive.impact, w, h);
+    const hit = project(drive.impact, w, h, drive.bots.length);
     const glow = ctx.createRadialGradient(hit.x, hit.y - hit.size * 0.22, 0, hit.x, hit.y - hit.size * 0.22, hit.size * 1.6);
     glow.addColorStop(0, `rgba(255,222,165,${fx.flash * 0.45})`);
     glow.addColorStop(1, "rgba(255,135,40,0)");
@@ -4346,7 +4351,7 @@ export function drawSide(
   // Emitters: smoke from the hurt, dust from the charge, fire from the burnt.
   const order = [...drive.bots].sort((p, q) => p.spot.y - q.spot.y);
   for (const s of order) {
-    const p = project(s.spot, w, h);
+    const p = project(s.spot, w, h, drive.bots.length);
     const hurt = 1 - clamp(s.hp / 100, 0, 1);
     const facing = facingOf(s.heading);
     if (!opts.reduced && s.gone < 0.5) {
@@ -4468,7 +4473,7 @@ export function drawSide(
 
   // Bots, back to front.
   for (const s of order) {
-    const p = project(s.spot, w, h);
+    const p = project(s.spot, w, h, drive.bots.length);
     const spin = fx.spin.get(s.bot.id) ?? 0;
     const hot = s.spotlight;
     if (hot) spotlight(ctx, p.x, p.y, p.size, h);
@@ -4486,6 +4491,19 @@ export function drawSide(
       continue;
     }
     drawSideBot(ctx, s, p.x, p.y, p.size, time, spin, facingOf(s.heading));
+    if (drive.bots.length > 4 && s.gone < 1) {
+      const number = drive.bots.findIndex((b) => b.bot.id === s.bot.id) + 1;
+      ctx.save();
+      ctx.font = `bold ${Math.max(10, w * 0.012)}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "#090b0e";
+      ctx.fillStyle = s.dead ? "#f87171" : "#f5f1e8";
+      const label = s.dead ? `#${number} OUT` : `#${number}`;
+      ctx.strokeText(label, p.x, p.y + p.size * 0.3);
+      ctx.fillText(label, p.x, p.y + p.size * 0.3);
+      ctx.restore();
+    }
   }
 
   drawParticles(ctx, fx.side);
@@ -4707,20 +4725,21 @@ function drawOverlay(ctx: CanvasRenderingContext2D, w: number, h: number, time: 
 
   if (opts.ko != null && opts.ko > 0) {
     const t = opts.ko;
-    const s = t < 0.25 ? 2.4 - ease(t / 0.25) * 1.4 : 1;
+    const s = opts.reduced ? 1 : t < 0.25 ? 2.4 - ease(t / 0.25) * 1.4 : 1;
+    const finishLabel = opts.finishLabel ?? "K.O.";
     ctx.translate(w / 2, h * 0.42);
-    ctx.rotate(-0.12);
+    ctx.rotate(opts.reduced ? 0 : -0.12);
     ctx.scale(s, s);
     ctx.globalAlpha = clamp(t / 0.1, 0, 1);
-    ctx.font = `700 ${Math.round(big * 1.5)}px Oswald, sans-serif`;
+    ctx.font = `700 ${Math.round(big * (finishLabel === "IN THE PIT" ? 0.72 : 1.5))}px Oswald, sans-serif`;
     ctx.lineWidth = Math.max(6, big * 0.14);
     ctx.strokeStyle = "rgba(0,0,0,0.95)";
-    ctx.strokeText("K.O.", 0, 0);
+    ctx.strokeText(finishLabel, 0, 0);
     ctx.fillStyle = "#e0402a";
-    ctx.fillText("K.O.", 0, 0);
+    ctx.fillText(finishLabel, 0, 0);
     ctx.lineWidth = Math.max(2, big * 0.03);
     ctx.strokeStyle = "#fff3c4";
-    ctx.strokeText("K.O.", 0, 0);
+    ctx.strokeText(finishLabel, 0, 0);
   }
   ctx.restore();
 }
@@ -5048,7 +5067,7 @@ export function drawTop(
         }
       }
     }
-    drawTopBot(ctx, s, p, g.s, fx.spin.get(s.bot.id) ?? 0, time);
+    drawTopBot(ctx, s, p, g.s * arenaBotScale(drive.bots.length), fx.spin.get(s.bot.id) ?? 0, time);
   }
   drawParticles(ctx, fx.top);
   ctx.restore();
@@ -5643,11 +5662,11 @@ export function impactPoints(
   topH: number,
 ) {
   if (!drive.impact) return null;
-  const p = project(drive.impact, sideW, sideH);
+  const p = project(drive.impact, sideW, sideH, drive.bots.length);
   const g = topGeom(topW, topH);
   const t = g.map(drive.impact);
   return {
     side: { x: p.x, y: p.y - p.size * 0.22, ground: p.y, scale: p.size },
-    top: { x: t.x, y: t.y, scale: g.s * 0.12 },
+    top: { x: t.x, y: t.y, scale: g.s * 0.12 * arenaBotScale(drive.bots.length) },
   };
 }

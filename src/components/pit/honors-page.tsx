@@ -15,9 +15,10 @@ export function HonorsPage() {
       <SectionLabel>Hardware</SectionLabel>
       <h1 className="font-display text-5xl leading-none">Honors</h1>
       <p className="mt-3 text-muted">The Waterman Championship belongs to one store. These are the things that hang on a wall after the conference race and Championship Saturday.</p>
-      <div className="pegboard mt-6 grid gap-4 border border-line p-4 md:grid-cols-3 md:p-6">
+      <div className="pegboard mt-6 grid gap-4 border border-line p-4 md:grid-cols-2 md:p-6">
         <Plate kind="trophy" kicker="Period trophy" title={name(data.honors.pitBelt)} detail={bot(data.honors.pitBelt)} href={data.honors.pitBelt} />
         <Plate kind="plate" kicker="Runner-up plate" title={name(data.honors.plate)} detail={bot(data.honors.plate)} href={data.honors.plate} />
+        <Plate kind="bronze" kicker="Royal Rumble · Third place" title={name(data.honors.thirdPlace ?? null)} detail={bot(data.honors.thirdPlace ?? null)} href={data.honors.thirdPlace ?? null} />
         <Plate
           kind="build"
           kicker="Best Build"
@@ -57,7 +58,7 @@ export function HonorsPage() {
   );
 }
 
-type Kind = "trophy" | "plate" | "build";
+type Kind = "trophy" | "plate" | "bronze" | "build";
 
 function Plate({
   kind,
@@ -79,7 +80,7 @@ function Plate({
     <div className={`lift relative flex h-full flex-col items-center border border-line bg-surface/90 px-4 pt-2 pb-4 text-center ${won ? "" : "opacity-95"}`}>
       <Hook />
       <div className={`mt-1 h-40 w-full ${won ? "honor-shine" : "honor-dim"}`}>
-        {kind === "trophy" ? <TrophyArt /> : kind === "plate" ? <PlateArt /> : <BuildArt />}
+        {kind === "trophy" ? <TrophyArt /> : kind === "plate" ? <PlateArt /> : kind === "bronze" ? <PlateArt bronze /> : <BuildArt />}
       </div>
       <p className="mt-3 text-xs tracking-widest text-amber uppercase">{kicker}</p>
       <p className="font-display text-3xl leading-none">{title}</p>
@@ -138,19 +139,19 @@ function TrophyArt() {
   );
 }
 
-function PlateArt() {
+function PlateArt({ bronze = false }: { bronze?: boolean }) {
   return (
     <svg viewBox="0 0 160 160" className="h-full w-full" aria-hidden>
       <defs>
-        <linearGradient id="steelplate" x1="0" x2="1" y1="0" y2="1">
-          <stop offset="0" stopColor="#d9d5cc" />
-          <stop offset="0.5" stopColor="#8e8a82" />
-          <stop offset="1" stopColor="#4a4843" />
+        <linearGradient id={bronze ? "bronzeplate" : "steelplate"} x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0" stopColor={bronze ? "#e6b17a" : "#d9d5cc"} />
+          <stop offset="0.5" stopColor={bronze ? "#b8773f" : "#8e8a82"} />
+          <stop offset="1" stopColor={bronze ? "#754522" : "#4a4843"} />
         </linearGradient>
       </defs>
       <path d="M58 22 L80 8 L102 22" fill="none" stroke="#6d6a64" strokeWidth="2" />
       <rect x="22" y="22" width="116" height="116" rx="6" fill="#1a1918" />
-      <rect x="28" y="28" width="104" height="104" rx="4" fill="url(#steelplate)" />
+      <rect x="28" y="28" width="104" height="104" rx="4" fill={bronze ? "url(#bronzeplate)" : "url(#steelplate)"} />
       <path d="M36 34 L124 34" stroke="#fff" strokeOpacity="0.4" strokeWidth="2" />
       {[
         [38, 38],
@@ -164,7 +165,7 @@ function PlateArt() {
         </g>
       ))}
       <text x="80" y="78" textAnchor="middle" fontFamily="Oswald, sans-serif" fontSize="30" fontWeight="700" fill="#2b2926">
-        2ND
+        {bronze ? "3RD" : "2ND"}
       </text>
       <rect x="44" y="88" width="72" height="3" fill="#2b2926" opacity="0.6" />
       <text x="80" y="108" textAnchor="middle" fontFamily="Oswald, sans-serif" fontSize="11" letterSpacing="2" fill="#2b2926">

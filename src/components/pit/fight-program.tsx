@@ -114,6 +114,19 @@ function Corner({
   );
 }
 
+function RumbleCorner({ fighter, records }: { fighter: FighterSnap; records: Record<string, WinLoss> }) {
+  const rec = records[fighter.id] ?? { w: 0, l: 0 };
+  return <article className="min-w-0 border border-line bg-surface p-2" data-testid={`program-corner-${fighter.id}`}>
+    <div className="h-20 md:h-28"><BotPortrait look={lookFromFighter(fighter)} zoom={0.86} className="h-full w-full" /></div>
+    <h3 className="font-display text-base leading-tight [overflow-wrap:anywhere] md:text-xl">{fighter.botName}</h3>
+    <p className="text-xs text-muted [overflow-wrap:anywhere]">{fighter.storeName}</p>
+    <p className="mt-1 font-display text-lg">{rec.w}–{rec.l}</p>
+    <details className="mt-1 text-xs"><summary className="cursor-pointer text-amber">Build details</summary>
+      <ol data-testid={`program-slots-${fighter.id}`}>{programSlots(fighter).map(row => <li key={row.slot} className="mt-1 [overflow-wrap:anywhere]"><strong>{row.label}:</strong> {row.name}</li>)}</ol>
+    </details>
+  </article>;
+}
+
 /** Boxing-program card shown before a match. Both corners, every slot, the record going in. */
 export function FightProgram({
   bout,
@@ -151,6 +164,10 @@ export function FightProgram({
             <Corner fighter={left[0]!} team={bout.teamA} facing={1} records={records} storeNames={storeNames} />
             <p className="vs-pop py-1 text-center font-display text-5xl leading-none text-amber md:self-center md:px-1 md:text-6xl">VS</p>
             <Corner fighter={right[0]!} team={bout.teamB} facing={-1} records={records} storeNames={storeNames} />
+          </div>
+        ) : corners.length > 4 ? (
+          <div className="grid grid-cols-3 gap-2 md:grid-cols-4" aria-label="All Royal Rumble contestants">
+            {corners.map(({ fighter }) => <RumbleCorner key={fighter.id} fighter={fighter} records={records} />)}
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">

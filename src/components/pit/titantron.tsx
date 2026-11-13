@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { CLASS_META } from "@/lib/pit/catalog";
 import { useEffect, useMemo, useState } from "react";
-import { botFor, buildCard, championshipFinalists, conferenceStandings, fightStreak, randomHouseTape, regularSeasonRecordOf } from "@/lib/pit/engine";
+import { botFor, buildCard, championshipFinalists, conferenceStandings, conferencePlace, fightStreak, randomHouseTape, regularSeasonRecordOf } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
 import { programWeek } from "@/lib/pit/training";
 import { weekDeadline } from "@/lib/pit/time";
@@ -143,8 +143,7 @@ export function Titantron() {
         <div className="mb-3">
           <h2 className="font-display text-3xl leading-none">Conference standings</h2>
           <p className="mt-1 text-sm text-muted">
-            Record · head-to-head when applicable · conference record · cumulative NSNU · green grades · Bolts earned.
-            A still-unresolved championship berth tie goes to the cage.
+            Win-loss record. First-place ties go straight to a fight after Week 4: two duel; three or more battle together. Equal records share a place until the berth is settled.
           </p>
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
@@ -154,7 +153,7 @@ export function Titantron() {
                 {conference} Conference
               </div>
               <ol>
-                {conferenceStandings(data, conference).map((store, index) => {
+                {conferenceStandings(data, conference).map((store) => {
                   const bot = botFor(data, store.id);
                   const rec = regularSeasonRecordOf(data, store.id);
                   const finalist = data.week === 5 && championshipFinalists(data).includes(store.id);
@@ -166,7 +165,7 @@ export function Titantron() {
                         data-bot-hover
                         className={`grid grid-cols-[auto_auto_1fr_auto] items-center gap-3 border-b border-line px-3 py-2 last:border-b-0 ${finalist ? "bg-amber/10" : ""}`}
                       >
-                        <span className="w-6 font-display text-xl text-muted">{index + 1}</span>
+                        <span className="w-6 font-display text-xl text-muted">{conferencePlace(data, store.id)}</span>
                         <MiniBot storeId={store.id} />
                         <span className="min-w-0">
                           <span className="block font-display">{store.name}</span>

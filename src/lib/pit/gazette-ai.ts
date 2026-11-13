@@ -9,7 +9,7 @@
  * never from seed assumptions. No crew names, no captains, no people at all —
  * the Gazette credits stores and bots, per the house rules in the prompt.
  */
-import { botFor, conferenceRecordOf, conferenceStandings, methodLabel, regularSeasonRecordOf, storeFor } from "./engine";
+import { botFor, conferenceRecordOf, conferenceStandings, conferencePlace, methodLabel, regularSeasonRecordOf, storeFor } from "./engine";
 import { weekDeadline } from "./time";
 import type { Bout, GazetteEntry, PitData } from "./types";
 
@@ -106,8 +106,8 @@ export function buildGazetteBrief(data: PitData, mode: GazetteMode, todayISO: st
     })),
     standings: conferences.map((conference) => ({
       conference,
-      table: conferenceStandings(data, conference).map((s, i) => ({
-        place: i + 1,
+      table: conferenceStandings(data, conference).map((s) => ({
+        place: conferencePlace(data, s.id),
         store: s.name,
         record: record(regularSeasonRecordOf(data, s.id)),
         conferenceRecord: record(conferenceRecordOf(data, s.id)),

@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { grantNov13Repairs, nov13RepairDue, nov13RepairDeploymentAllowed, NOV13_REPAIR_GIFT } from "./owner-repair-gift";
 import { commandArgs, type Command } from "./commands";
 export type SyncMode = "live" | "preview" | "off";
 export type PullResult = {
@@ -57,7 +58,10 @@ async function load(options?: { deadlines?: boolean }) {
     const removedCount = merged.crew.length - cleaned.crew.length;
     // Commissioner gifts are committed once, against the authoritative season.
     const ownerGift = s.store.ownerGiftDue(cleaned, new Date());
-    const gifted = s.store.grantOwnerGifts(cleaned, ownerGift);
+    const oldGifts = s.store.grantOwnerGifts(cleaned, ownerGift);
+    const repairNow = new Date();
+    const nov13Repairs = nov13RepairDeploymentAllowed(process.env.VERCEL_ENV) && nov13RepairDue(oldGifts, repairNow);
+    const gifted = nov13Repairs ? grantNov13Repairs(oldGifts, repairNow) : oldGifts;
     const due = deadlines ? s.store.applyDueLock(gifted, new Date()) : null;
     const effective = due ?? gifted;
     const normalizedDoc = JSON.stringify(s.store.sharedDoc(effective));
@@ -65,9 +69,9 @@ async function load(options?: { deadlines?: boolean }) {
     let doc = row.doc;
     if (normalizedDoc !== row.doc || row.schema_tag !== SCHEMA_TAG) {
       let backupId: string | null = null;
-      if (ownerGift.repairs || ownerGift.roses || ownerGift.gold) {
+      if (ownerGift.repairs || ownerGift.roses || ownerGift.gold || nov13Repairs) {
         // Save and verify the exact pre-gift document before changing any bot.
-        const giftBackupId = `backup-owner-gifts-${ownerGift.gold ? "2026-11-09" : "2026-11-07"}-rev-${row.rev}`;
+        const giftBackupId = `backup-owner-gifts-${nov13Repairs ? "2026-11-13" : ownerGift.gold ? "2026-11-09" : "2026-11-07"}-rev-${row.rev}`;
         await s.sql`insert into pit_season (id, rev, doc) values (${giftBackupId}, ${row.rev}, ${row.doc}) on conflict (id) do nothing`;
         const backup = (await s.sql<{ doc: string }>`select doc from pit_season where id = ${giftBackupId}`)[0];
         if (!backup || backup.doc !== row.doc)
@@ -91,15 +95,16 @@ async function load(options?: { deadlines?: boolean }) {
       if (!changed[0]) continue; // A concurrent command won. Read again, up to 8 tries.
       rev = Number(changed[0].rev);
       doc = normalizedDoc;
-      if (ownerGift.repairs || ownerGift.roses || ownerGift.gold) {
+      if (ownerGift.repairs || ownerGift.roses || ownerGift.gold || nov13Repairs) {
         const saved = (await s.sql<{ doc: string }>`select doc from pit_season where id = 'main'`)[0];
         if (!saved) throw new Error("Owner gift verification failed: season row missing.");
         const verified = JSON.parse(saved.doc) as import("./types").PitData;
         const markerOK =
+          (!nov13Repairs || verified.ownerEvents?.includes(NOV13_REPAIR_GIFT)) &&
           (!ownerGift.repairs || verified.ownerEvents?.includes(s.store.WEEK2_REPAIR_GIFT)) &&
           (!ownerGift.roses || verified.ownerEvents?.includes(s.store.TYLER_ROSES_GIFT)) &&
           (!ownerGift.gold || verified.ownerEvents?.includes(s.store.ALLIANCE_GOLD_GIFT));
-        const repairsOK = !ownerGift.repairs || verified.bots.every((bot) =>
+        const repairsOK = !(ownerGift.repairs || nov13Repairs) || verified.bots.every((bot) =>
           Object.values(bot.wear).every((w) => w === "clean") &&
           Object.values(bot.partWear ?? {}).every((w) => w === "clean") &&
           Object.keys(bot.weldedParts ?? {}).length === 0 &&
@@ -113,7 +118,7 @@ async function load(options?: { deadlines?: boolean }) {
         );
         if (!markerOK || !repairsOK || !rosesOK || !goldOK)
           throw new Error("Owner gift verification failed: check the league state before retrying.");
-        console.info(`[pit] owner gifts committed: repairs=${ownerGift.repairs}; roses=${ownerGift.roses}; allianceGold=${ownerGift.gold}; bots=${verified.bots.length}; week=${verified.week}`);
+        console.info(`[pit] owner gifts committed: repairs=${ownerGift.repairs}; nov13Repairs=${nov13Repairs}; roses=${ownerGift.roses}; allianceGold=${ownerGift.gold}; bots=${verified.bots.length}; week=${verified.week}`);
       }
       if (isNewCleanup) {
         // Verify the actual production database after committing the changed revision.
@@ -160,16 +165,30 @@ export const pullSeason = createServerFn({ method: "POST" })
     plain("league sync", async () => {
     const quick = await services();
     const meta = (
-      await quick.sql<{ rev: number; schema_tag: string; phase: string | null }>`
-        select rev, schema_tag, doc::json->>'phase' as phase from pit_season where id = 'main'
+      await quick.sql<{
+        rev: number; schema_tag: string; phase: import("./types").Phase | null;
+        season_name: string | null; week: string | null; owner_events: string | null;
+      }>`
+        select rev, schema_tag, doc::json->>'phase' as phase,
+          doc::json->>'seasonName' as season_name, doc::json->>'week' as week,
+          doc::json->>'ownerEvents' as owner_events
+        from pit_season where id = 'main'
       `
     )[0];
     const { anyDeadlineDue } = await import("./time");
     const closed = meta?.phase != null && meta.phase !== "open";
     const unchanged = meta?.schema_tag === SCHEMA_TAG && Number(meta.rev) === input.rev;
+    const repairPending = nov13RepairDeploymentAllowed(process.env.VERCEL_ENV) && meta != null && nov13RepairDue({
+      seasonName: meta.season_name ?? "",
+      week: Number(meta.week),
+      phase: meta.phase ?? "complete",
+      ownerEvents: meta.owner_events ? JSON.parse(meta.owner_events) : [],
+    }, new Date());
+    // A pending gift bypasses the unchanged closed-week fast path once.
+    // Its persisted marker restores that path after a successful grant.
     // A closed week does not re-run the deadline normalizer on every poll.
     // An open week still loads once a scheduled lock can be due, so it freezes without a Desk button.
-    if (unchanged && (closed || !anyDeadlineDue(new Date()))) {
+    if (unchanged && !repairPending && (closed || !anyDeadlineDue(new Date()))) {
       // Verify expiry and credential generation on every pull, even unchanged ones.
       return { mode: quick.mode, rev: Number(meta.rev), doc: null, session: await quick.auth.session() };
     }

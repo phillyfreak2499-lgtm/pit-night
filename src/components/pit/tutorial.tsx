@@ -45,7 +45,7 @@ const STEPS = [
   {
     kicker: "The trophy",
     title: "Win your conference. Then survive Championship Saturday.",
-    body: "After four Mondays, Metro and Frontier each crown one champion using record, head-to-head when applicable, conference record, cumulative NSNU, green grades, then Bolts earned. A still-unresolved berth tie goes to the cage. In Week 5 only the two finalists can prepare their bots; everybody else can Rally behind either side. Saturday has no judges: the Waterman Championship continues until knockout.",
+    body: "After four Mondays, Metro and Frontier each crown one champion by win-loss record. Ties for first go straight to a fight: two bots duel, three or more battle together, automatically after the Week 4 card. In Week 5 only the two finalists can prepare their bots; everybody else can Rally behind either side. Saturday starts with a larger-arena Royal Rumble: all non-finalists battle together for third place. The Waterman Championship follows with no judges or round cap, ending only when a bot is completely thrown into the pit.",
   },
 ];
 
