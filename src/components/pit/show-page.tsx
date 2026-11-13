@@ -1,7 +1,9 @@
 import { TaleOfTape } from "./tale-of-tape";
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { PROGRAM_HOLD_MS, programRecords, programSegments, storeNameMap, type ProgramSegment } from "@/lib/pit/fight-card";
+import { PROGRAM_HOLD_MS, programRecords, storeNameMap } from "@/lib/pit/fight-card";
+import { championshipProgramSegments, firstPlaybackIndex, hasChampionshipOpening, type ChampionshipSegment } from "@/lib/pit/championship-opening";
+import { TeamJanelleOpening } from "./team-janelle-opening";
 import { cardKey } from "@/lib/pit/engine";
 import { buildTape, isLiveCard, replayWeek, replayWeeks } from "@/lib/pit/replay";
 import { usePit } from "@/lib/pit/store";
@@ -10,7 +12,7 @@ import { ResultLine, SectionLabel } from "./bits";
 import { armBroadcastAudio, Broadcast } from "./broadcast";
 import { FightProgram } from "./fight-program";
 
-type Segment = ProgramSegment<Bout>;
+type Segment = ChampionshipSegment<Bout>;
 
 export function ShowPage() {
   const data = usePit();
@@ -21,7 +23,7 @@ export function ShowPage() {
     () => ({ ...data, bouts: data.bouts.filter((bout) => bout.week <= weekPick) }),
     [data, weekPick],
   );
-  const segments = useMemo(() => programSegments(tape.bouts), [tape]);
+  const segments = useMemo(() => championshipProgramSegments(tape.bouts, weekPick), [tape, weekPick]);
   const [index, setIndex] = useState(0);
   const [rolling, setRolling] = useState(false);
   const [speed, setSpeed] = useState(2);
@@ -66,15 +68,17 @@ export function ShowPage() {
     });
   }, [segments]);
 
+  const onOpeningDone = useCallback(() => {
+    setIndex((i) => segments[i]?.kind === "opening" ? Math.min(segments.length - 1, i + 1) : i);
+  }, [segments]);
+
   const savedWeeks = useMemo(() => replayWeeks(data), [data.bouts, data.replays]);
   const weekChoices = useMemo(() => [...new Set([...savedWeeks, data.week])].sort((a, b) => a - b), [savedWeeks, data.week]);
 
   const start = () => {
     armBroadcastAudio();
     if (segment.kind === "open" || segment.kind === "close") {
-      const card = segments.findIndex((item) => item.kind === "card");
-      const fight = segments.findIndex((item) => item.kind === "fight");
-      const first = card >= 0 ? card : fight;
+      const first = firstPlaybackIndex(segments);
       setIndex(first >= 0 ? first : 0);
       setRolling(first >= 0);
       return;
@@ -86,7 +90,7 @@ export function ShowPage() {
     <div className="mx-auto flex max-w-5xl flex-col gap-4" data-testid="saturday-broadcast">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <SectionLabel>Monday broadcast</SectionLabel>
+          <SectionLabel>{weekPick === 5 ? "Championship broadcast" : "Monday broadcast"}</SectionLabel>
           <h1 className="font-display text-5xl leading-none">{weekName(data, weekPick)}</h1>
           <p className="mt-2 max-w-xl text-sm text-muted">
             {tape.replay
@@ -182,7 +186,7 @@ export function ShowPage() {
             <button
               key={item.id}
               type="button"
-              className={`min-h-11 shrink-0 border px-3 font-display text-sm tracking-wide uppercase ${i === index || (item.kind === "fight" && segment.kind !== "open" && segment.kind !== "close" && segment.bout.id === item.bout.id) ? "border-amber text-amber" : "border-line text-muted"}`}
+              className={`min-h-11 shrink-0 border px-3 font-display text-sm tracking-wide uppercase ${i === index || (item.kind === "fight" && "bout" in segment && segment.bout.id === item.bout.id) ? "border-amber text-amber" : "border-line text-muted"}`}
               onClick={() => {
                 if (item.kind === "fight") {
                   const cardAt = segments.findIndex((row) => row.kind === "card" && row.bout.id === item.bout.id);
@@ -199,7 +203,11 @@ export function ShowPage() {
         )}
       </div>
 
-      {segment.kind === "open" ? <ColdOpen data={data} bouts={tape.bouts} live={tape.live} replay={tape.replay} /> : null}
+      {segment.kind === "open" ? <>
+        {hasChampionshipOpening(weekPick, fightCount) ? <p className="border-l-2 border-amber px-3 py-2 text-sm text-amber">Before the bell: a 30-second Team Janelle celebration with every store bot.</p> : null}
+        <ColdOpen data={data} bouts={tape.bouts} live={tape.live} replay={tape.replay} />
+      </> : null}
+      {segment.kind === "opening" ? <TeamJanelleOpening key={key} data={data} playing={rolling} onComplete={onOpeningDone} /> : null}
       {segment.kind === "card" ? (
         <FightProgram
           bout={segment.bout}
@@ -389,7 +397,9 @@ function cornerName(data: PitData, bout: Bout, id: string) {
 
 export function matchup(data: PitData, bout: Bout) {
   if (bout.kind === "bye") return `${cornerName(data, bout, bout.teamA[0] ?? "")} · bye, counts as a win`;
-  if (bout.kind === "melee") return `${bout.teamA.length} stores battle the tie`;
+  if (bout.kind === "melee") return bout.title === "Third Place Royal Rumble"
+    ? `${bout.teamA.length} stores battle for third place`
+    : `${bout.teamA.length} stores battle the tie`;
   const left = bout.teamA.map((id) => cornerName(data, bout, id)).join(" + ");
   const right = bout.teamB.map((id) => cornerName(data, bout, id)).join(" + ");
   return right ? `${left} vs ${right}` : left;
@@ -397,13 +407,14 @@ export function matchup(data: PitData, bout: Bout) {
 
 function railLabel(data: PitData, segment: Segment) {
   if (segment.kind === "open") return "Open";
+  if (segment.kind === "opening") return "Team Janelle";
   if (segment.kind === "close") return "Sign-off";
   if (segment.kind === "card") return "Program";
   if (segment.kind === "sting") return "Call";
   if (segment.bout.kind === "bye") return "Bye";
   if (segment.bout.kind === "melee") return "Melee";
   if (segment.bout.kind === "tag") return "Tag";
-  if (segment.bout.kind === "final") return "Title";
+  if (segment.bout.kind === "final") return segment.bout.week === 4 ? "Conference Tiebreaker" : segment.bout.week === 5 ? "Title" : "Final";
   const a = data.stores.find((s) => s.id === segment.bout.teamA[0])?.name ?? "A";
   const b = data.stores.find((s) => s.id === segment.bout.teamB[0])?.name ?? "B";
   return `${a}–${b}`;

@@ -3,6 +3,8 @@ import { Link } from "@tanstack/react-router";
 import { Flame, HelpCircle, Maximize, Mic, MicOff, Minimize, Package, Pause, Play, SkipForward, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { hasChampionshipOpening } from "@/lib/pit/championship-opening";
+import { TeamJanelleOpening } from "./team-janelle-opening";
 import { commercialAfter } from "@/lib/pit/commercials";
 import { PROGRAM_HOLD_MS, programRecords, storeNameMap } from "@/lib/pit/fight-card";
 import { recordOf } from "@/lib/pit/engine";
@@ -18,7 +20,7 @@ import { FightProgram } from "./fight-program";
 import { useReactiveCommentary } from "./use-reactive-commentary";
 import { buildTape, matchup, methodWord } from "./show-page";
 
-type Stage = "lobby" | "intro" | "fight" | "result" | "ad" | "final";
+type Stage = "lobby" | "opening" | "intro" | "fight" | "result" | "ad" | "final";
 
 const RESULT_MS = 6500;
 const BYE_MS = 6000;
@@ -43,7 +45,8 @@ export function WatchPage() {
   );
 
   const next = useCallback(() => {
-    if (stage === "intro") setStage(bout?.kind === "bye" ? "result" : "fight");
+    if (stage === "opening") setStage("intro");
+    else if (stage === "intro") setStage(bout?.kind === "bye" ? "result" : "fight");
     else if (stage === "fight") setStage("result");
     else if (stage === "result") {
       if (index + 1 >= bouts.length) setStage("final");
@@ -62,7 +65,7 @@ export function WatchPage() {
   }, [stage, bout, index, bouts.length, week]);
 
   useEffect(() => {
-    if (paused || stage === "lobby" || stage === "final" || stage === "fight" || stage === "ad") return;
+    if (paused || stage === "opening" || stage === "lobby" || stage === "final" || stage === "fight" || stage === "ad") return;
     const ms = stage === "intro" ? (bout?.kind === "bye" ? BYE_MS : PROGRAM_HOLD_MS) : RESULT_MS;
     const id = window.setTimeout(next, ms);
     return () => window.clearTimeout(id);
@@ -91,7 +94,7 @@ export function WatchPage() {
     setTape(liveTape);
     setIndex(0);
     setPaused(false);
-    setStage(liveTape.bouts.length ? "intro" : "final");
+    setStage(hasChampionshipOpening(week, liveTape.bouts.length) ? "opening" : liveTape.bouts.length ? "intro" : "final");
     if (goFull) void document.documentElement.requestFullscreen?.().catch(() => undefined);
   };
   const toggleFull = () => {
@@ -123,7 +126,7 @@ export function WatchPage() {
               Week {week} · {weekName}
               {replaying ? <span className="ml-2 text-base tracking-[0.18em] text-amber uppercase">Replay</span> : null}
             </span>
-            {stage === "ad" ? (
+            {stage === "opening" ? <span className="ml-3 text-base text-amber">Team Janelle · Before the bell</span> : stage === "ad" ? (
               <span className="mt-1 block text-sm tracking-[0.18em] text-muted uppercase md:mt-0 md:ml-3 md:inline md:text-base md:tracking-normal md:normal-case">
                 Commercial
               </span>
@@ -173,6 +176,7 @@ export function WatchPage() {
           {stage === "lobby" ? (
             <Lobby data={data} week={week} weeks={postedWeeks} setWeek={setWeek} tape={liveTape} onStart={start} />
           ) : null}
+          {stage === "opening" ? <TeamJanelleOpening data={data} playing={!paused} onComplete={next} /> : null}
           {stage === "intro" && bout ? <Intro key={bout.id} data={data} bout={bout} seen={seen} order={index + 1} total={bouts.length} /> : null}
           {stage === "result" && bout ? (
             <Result key={bout.id} data={data} bout={bout} seen={seen} next={bouts[index + 1] ?? null} commercialNext={Boolean(commercialAfter(week, index + 1, bouts.length))} />
@@ -183,7 +187,7 @@ export function WatchPage() {
           ) : null}
         </main>
         <aside className="hidden min-h-0 overflow-y-auto border-l border-line bg-surface xl:block">
-          <Scoreboard data={seen} highlight={stage !== "lobby" && stage !== "final" && stage !== "ad" && bout ? bout.storeIds : []} />
+          <Scoreboard data={seen} highlight={stage !== "opening" && stage !== "lobby" && stage !== "final" && stage !== "ad" && bout ? bout.storeIds : []} />
         </aside>
       </div>
 
@@ -252,6 +256,7 @@ function Lobby({
   tape: { live: boolean; replay: boolean; bouts: Bout[] };
   onStart: (full: boolean) => void;
 }) {
+  const final = tape.bouts.find((bout) => bout.kind === "final");
   const choices = [...new Set([...weeks, data.week])].sort((a, b) => a - b);
   const tuned = data.stores.filter((s) => tunedUp(data, s.id, week));
   return (
@@ -268,10 +273,11 @@ function Lobby({
               ? "Replay of Championship Saturday. Same tape as the night it posted. Watching it does not change coins, damage, records, or the week."
               : "Replay of that Monday's card. Same walk-out, tape, and call. A house commercial runs between every fight. Watching it does not change coins, damage, records, or the week."
             : week === 5
-              ? "One title fight. No judges and no decision: it keeps going until one bot is knocked out. Rally support makes the room louder, never the bot stronger."
+              ? "First, the nonfinalists meet in a last-bot-standing Royal Rumble for third place. Then the two conference champions fight for the title, with no round cap: it ends only when one bot is thrown into the pit. Rally support makes the room louder, never the bot stronger."
               : "Put this on the big screen. Every fight plays back to back with a walk-out, the tape, and the call. A house commercial runs between every fight. The live table updates after every fight."}
         </p>
       </div>
+      {hasChampionshipOpening(week, tape.bouts.length) ? <p className="border-l-2 border-amber px-3 py-2 text-amber">Before the bell: a 30-second Team Janelle celebration with every store bot.</p> : null}
       {weeks.length > 0 ? (
         <div className="flex flex-wrap gap-2" data-testid="replay-archive" role="group" aria-label="Replay archive">
           {choices.map((w) => (
@@ -301,9 +307,9 @@ function Lobby({
           <Flame size={18} aria-hidden /> Tuned up for this card (+{TUNE_UP_BONUS}): {tuned.map((s) => s.name).join(", ")}
         </p>
       ) : null}
-      {week === 5 && tape.bouts[0] ? (
+      {week === 5 && final ? (
         <div className="grid gap-2 sm:grid-cols-2">
-          {tape.bouts[0].storeIds.map((id) => {
+          {final.storeIds.map((id) => {
             const store = data.stores.find((row) => row.id === id);
             const supporters = (data.rallies ?? []).filter((row) => row.week === 5 && row.targetId === id);
             const stores = new Set(supporters.map((row) => row.storeId));
@@ -453,7 +459,7 @@ function Ticker({ data, week }: { data: PitData; week: number }) {
     tuned.length ? `Full Tune-Up · ${tuned.join(", ")}` : "",
     ...flames.map((f) => `Spark streak · ${f.crew.name} ${f.best} perfect in a row`),
     crateDone ? `Mystery Crate · ${crate.title} opened ${crateDone} time${crateDone === 1 ? "" : "s"}` : "",
-    week === 5 ? "Championship Saturday · no judges · fight until knockout" : "Pit Week opens Tuesday · Jobs, Sparks, and a Wednesday Mystery Crate",
+    week === 5 ? "Championship Saturday · Royal Rumble for third · no round cap in the final · title decided in the pit" : "Pit Week opens Tuesday · Jobs, Sparks, and a Wednesday Mystery Crate",
   ].filter(Boolean);
   const line = (
     <p className="flex shrink-0 items-center gap-10 px-6 text-sm">

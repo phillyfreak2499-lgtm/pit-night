@@ -1,0 +1,18 @@
+.janelle-opening { width: 100%; margin: auto; overflow: hidden; flex-shrink: 0; border: 1px solid #865373; background: radial-gradient(ellipse at 50% 0%, #50203f 0%, #211725 45%, #120f16 85%); color: #fff4fb; }
+.janelle-opening-heading { padding: 1.5rem 1rem 0; text-align: center; }
+.janelle-opening-kicker { color: #f3badc; font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; }
+.janelle-opening h2 { margin-top: 0.5rem; font-family: var(--font-display, Oswald, sans-serif); font-size: clamp(2rem, 5vw, 4rem); line-height: 1.1; text-transform: uppercase; }
+.janelle-opening h2 span { color: #f68fbd; font-size: 0.75em; vertical-align: 0.05em; }
+.janelle-opening-message { min-height: 3.2rem; margin: 0.75rem auto 0; max-width: 32rem; font-size: clamp(1.05rem, 2.5vw, 1.65rem); line-height: 1.4; font-weight: 500; }
+.janelle-opening-stage { display: block; width: 100%; height: clamp(18rem, 42vh, 30rem); }
+.janelle-opening-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; padding: 1rem 1.25rem; border-top: 1px solid #86537355; font-size: 0.75rem; color: #e3c6da; }
+.janelle-opening-footer span:first-child { color: #f3d393; font-weight: 600; }
+.janelle-opening-progress { height: 3px; background: #302333; }
+.janelle-opening-progress > span { display: block; height: 100%; background: #f3badc; }
+@media (max-width: 600px) {
+ .janelle-opening-heading { padding: 1rem 0.75rem 0; }
+ .janelle-opening-kicker { font-size: 0.6rem; letter-spacing: 0.1em; }
+ .janelle-opening-message { min-height: 3rem; }
+ .janelle-opening-stage { height: 24rem; }
+ .janelle-opening-footer { padding: 0.75rem; font-size: 0.65rem; }
+}
