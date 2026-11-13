@@ -84,7 +84,7 @@ test("a stale or partial conference tiebreaker result cannot name the champion",
 });
 
 test("Week 5 fields all nonfinalists in the third-place Rumble before the title", () => {
-  let data = makeData();
+  const data = makeData();
   for (let week = 1; week <= 4; week++) {
     data.week = week; data.bouts = [...data.bouts, ...runSaturday(data)];
   }
