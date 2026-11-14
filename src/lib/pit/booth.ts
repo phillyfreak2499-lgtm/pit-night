@@ -86,10 +86,14 @@ export function boothScript(data: PitData, scene: BoothScene, id = ""): BoothLin
         cathy([pickRead(data, bout), stakes(data, bout)].filter(Boolean).join(" "))];
       const seed = hashString("shout:" + bout.week);
       if ((bout.slot + seed) % 3 === 0) {
-        const shouts = (data.shouts ?? []).filter(s => s.week === bout.week && s.to.trim());
+        const shouts = (data.shouts ?? []).filter(s => s.week === bout.week && s.to.trim() && s.text?.trim());
         const shout = shouts[hashString(bout.id) % Math.max(1, shouts.length)];
         const crew = fighters[hashString(bout.id) % fighters.length]!.storeName;
-        reads.push(jim(shout ? `Quick shout-out to ${shout.to} from ${shout.fromName} on the Pit Week board!` : `Shout-out to the pit crew in ${crew}!`));
+        if (shout) {
+          reads.push(jim(`A shout-out from ${shout.fromName} to ${shout.to}. Cathy, what did they write?`), cathy(shout.text.trim()));
+        } else {
+          reads.push(jim(`Shout-out to the pit crew in ${crew}!`));
+        }
       }
       return reads;
     }
@@ -112,8 +116,9 @@ export function boothScript(data: PitData, scene: BoothScene, id = ""): BoothLin
   return [jim(opening), cathy(scene === "welcome" ? "Thanks, Jim. " + read : read)];
 }
 
-export function analystReply(m: ReactiveMoment): string | undefined {
-  if (m.kind === "big-hit" && m.index % 3 !== 1) return undefined;
+export function analystReply(m: ReactiveMoment, meterCall?: string): string | undefined {
+  if (meterCall && (m.kind === "big-hit" || m.kind === "momentum-shift" || m.kind === "half-health")) return meterCall;
+  if (m.kind === "big-hit" && m.index > 0 && m.index % 3 !== 1) return undefined;
   const d = m.defender;
   if (m.counterDamage && m.counterDamage > 0)
     return `Costly for the attacker too, Jim. ${d} sent ${m.counterDamage} damage back.`;

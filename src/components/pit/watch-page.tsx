@@ -72,7 +72,8 @@ export function WatchPage() {
 
   useEffect(() => {
     if (paused || stage === "pregame" || stage === "opening" || stage === "lobby" || stage === "final" || stage === "fight" || stage === "ad") return;
-    const ms = stage === "intro" ? (bout?.kind === "bye" ? BYE_MS : walkout ? 45000 : PROGRAM_HOLD_MS) : RESULT_MS;
+    if (walkout) return;
+    const ms = stage === "intro" ? (bout?.kind === "bye" ? BYE_MS : PROGRAM_HOLD_MS) : RESULT_MS;
     const id = window.setTimeout(next, ms);
     return () => window.clearTimeout(id);
   }, [stage, index, paused, next, bout, walkout]);

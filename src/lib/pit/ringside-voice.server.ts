@@ -39,7 +39,8 @@ export async function ringsideVoice(sql: Sql, beat: string, body: string, speake
     if (!response.headers.get("content-type")?.startsWith("audio/"))
       throw new Error("Voice unavailable");
     const bytes = Buffer.from(await response.arrayBuffer());
-    if (!bytes.length || bytes.length > 400_000) throw new Error("Invalid ringside clip");
+    const maxBytes = kind === "league-booth" ? 900_000 : 400_000;
+    if (!bytes.length || bytes.length > maxBytes) throw new Error("Invalid ringside clip");
     const audio = bytes.toString("base64");
     await finishCopy(sql, kind, key, { body: audio });
     return { audio };

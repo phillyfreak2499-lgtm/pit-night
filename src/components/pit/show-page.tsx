@@ -53,10 +53,10 @@ export function ShowPage() {
 
   useEffect(() => {
     const current = segments[index];
-    if (!rolling || current?.kind !== "card") return;
+    if (!rolling || current?.kind !== "card" || walkout) return;
     const id = window.setTimeout(() => {
       setIndex((i) => Math.min(segments.length - 1, i + 1));
-    }, walkout ? 45000 : PROGRAM_HOLD_MS);
+    }, PROGRAM_HOLD_MS);
     return () => window.clearTimeout(id);
   }, [rolling, index, segments, walkout]);
 

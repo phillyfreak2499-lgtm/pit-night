@@ -9,7 +9,7 @@ import { RulebookQa } from "./claude-copy";
 
 /** The rulebook as plain text. The Rules page renders it; the rules Q&A answers only from it. */
 export const RULES: { title: string; text: string }[] = [
-  { title: "Pregame and fan picks", text: "Jim and Cathy preview the selected week's card before the walkouts. Head-to-head cards show each bot's percentage of total picks for that fight. Each person's latest valid pick counts once. A tie has no favorite. Standings and stakes in a walkout use results available before that fight. Fan picks, broadcast shout-outs and announcers never affect the outcome." },
+  { title: "Pregame and fan picks", text: "Jim and Cathy preview the selected week's card before the walkouts. Head-to-head cards show each bot's percentage of total picks for that fight. Each person's latest valid pick counts once. A tie has no favorite. Standings and stakes in a walkout use results available before that fight. During selected walkouts Jim names the sender and recipient of a public Pit Week shout-out and Cathy reads the full message. During fights, Cathy can call out battery, swing power or stamina when the recorded exchange shows a change in weapon output. Fan picks, broadcast shout-outs and announcers never affect the outcome." },
   {
     title: "Watching a card with Jim and Cathy",
     text: "Open Big Broadcast and select Play broadcast, or choose Watch party · big screen and press Start. Both start with commentary and arena sound on. Jim introduces the bots and calls the action. Cathy introduces the opponent and explains turning points. Four fight tracks rotate in card order. Music and cheers dip while the booth speaks. Pause, skip, mute or replay at any time. Playback controls affect your device only. A house tape previews the open week. The Desk posts the official result. Watching either version awards no coins, Bolts or wins.",
@@ -28,7 +28,7 @@ export const RULES: { title: string; text: string }[] = [
   },
   {
     title: "Grades and coins",
-    text: "Each number pays coins into one part's jar every Monday: green 3, blue 2, orange 1, red 0. NSNU fills the chassis jar. Conv % fills armor. Demo Rate fills drive. Demo Close % fills weapon. Arch Supports fill utility. Demo Ticket Avg fills the brain. The brain changes how the bot fights and does not change Power, Speed, Armor, or Heat. Battery is the chassis stamina: it drains during the fight, and a low battery slows the bot and weakens the weapon. A jar only buys its own part, and repairs on that part come out of the same jar. Last place gets a 3-coin repair voucher that fixes any part.",
+    text: "Each number pays coins into one part's jar every Monday: green 3, blue 2, orange 1, red 0. NSNU fills the chassis jar. Conv % fills armor. Demo Rate fills drive. Demo Close % fills weapon. Arch Supports fill utility. Demo Ticket Avg fills the brain. The brain changes how the bot fights and does not change Power, Speed, Armor, or Heat. BAT is the chassis battery. A low charge reduces swing power (PWR). Stamina (STA) dips on a swing and partly recovers. Low stamina can also reduce swing power in longer fights. A jar only buys its own part, and repairs on that part come out of the same jar. Last place gets a 3-coin repair voucher that fixes any part.",
   },
   {
     title: "The triangle",
