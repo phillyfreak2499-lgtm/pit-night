@@ -1,6 +1,9 @@
 import { TaleOfTape } from "./tale-of-tape";
 import { Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { setSoundMuted, soundMuted, subscribeSound } from "@/lib/pit/sound";
+import { BoothSegment } from "./booth-segment";
+import { useFightAudio } from "./use-fight-audio";
 import { PROGRAM_HOLD_MS, programRecords, storeNameMap } from "@/lib/pit/fight-card";
 import { championshipProgramSegments, firstPlaybackIndex, hasChampionshipOpening, type ChampionshipSegment } from "@/lib/pit/championship-opening";
 import { TeamJanelleOpening } from "./team-janelle-opening";
@@ -28,6 +31,9 @@ export function ShowPage() {
   const [rolling, setRolling] = useState(false);
   const [speed, setSpeed] = useState(2);
   const [seek, setSeek] = useState(0);
+  const [mic, setMic] = useState(true);
+  const [sessionKey, setSessionKey] = useState("");
+  const muted = useSyncExternalStore(subscribeSound, soundMuted, () => false);
   const [seen, setSeen] = useState(key);
   if (seen !== key) {
     setSeen(key);
@@ -38,15 +44,18 @@ export function ShowPage() {
   const segment = segments[index] ?? segments[0]!;
   const fightCount = tape.bouts.length;
   const fightOrdinal = segment.kind === "fight" || segment.kind === "sting" || segment.kind === "card" ? tape.bouts.indexOf(segment.bout) + 1 : 0;
+  const { line, onNotableBeat } = useFightAudio(segment.kind === "fight" ? segment.bout : null,
+    rolling && segment.kind === "fight", fightOrdinal + weekPick - 2, mic, muted, !tape.live);
+  const walkout = segment.kind === "card" && segment.bout.kind !== "bye" && mic && !muted;
 
   useEffect(() => {
     const current = segments[index];
     if (!rolling || current?.kind !== "card") return;
     const id = window.setTimeout(() => {
       setIndex((i) => Math.min(segments.length - 1, i + 1));
-    }, PROGRAM_HOLD_MS);
+    }, walkout ? 16000 : PROGRAM_HOLD_MS);
     return () => window.clearTimeout(id);
-  }, [rolling, index, segments]);
+  }, [rolling, index, segments, walkout]);
 
   useEffect(() => {
     const current = segments[index];
@@ -75,8 +84,16 @@ export function ShowPage() {
   const savedWeeks = useMemo(() => replayWeeks(data), [data.bouts, data.replays]);
   const weekChoices = useMemo(() => [...new Set([...savedWeeks, data.week])].sort((a, b) => a - b), [savedWeeks, data.week]);
 
-  const start = () => {
+  const arm = () => {
+    if (sessionKey !== key || segment.kind === "open" || segment.kind === "close") {
+      if (soundMuted()) setSoundMuted(false);
+      setMic(true);
+      setSessionKey(key);
+    }
     armBroadcastAudio();
+  };
+  const start = () => {
+    arm();
     if (segment.kind === "open" || segment.kind === "close") {
       const first = firstPlaybackIndex(segments);
       setIndex(first >= 0 ? first : 0);
@@ -143,7 +160,7 @@ export function ShowPage() {
           type="button"
           className="min-h-11 border border-line px-3 font-display text-muted"
           onClick={() => {
-            armBroadcastAudio();
+            arm();
             setRolling(true);
             setIndex((i) => Math.min(segments.length - 1, i + 1));
           }}
@@ -155,7 +172,7 @@ export function ShowPage() {
             type="button"
             className="min-h-11 border border-line px-3 font-display text-muted"
             onClick={() => {
-              armBroadcastAudio();
+              arm();
               setRolling(true);
               setSeek((n) => n + 1);
             }}
@@ -163,6 +180,8 @@ export function ShowPage() {
             Decision
           </button>
         ) : null}
+        <button type="button" aria-pressed={mic} onClick={() => setMic(v => !v)} className="min-h-11 border border-line px-3 font-display">Booth {mic ? "on" : "off"}</button>
+        <button type="button" onClick={() => setSoundMuted(!muted)} className="min-h-11 border border-line px-3 font-display">{muted ? "Unmute arena" : "Mute arena"}</button>
         {[1, 2, 4].map((n) => (
           <button
             key={n}
@@ -189,6 +208,7 @@ export function ShowPage() {
               className={`min-h-11 shrink-0 border px-3 font-display text-sm tracking-wide uppercase ${i === index || (item.kind === "fight" && "bout" in segment && segment.bout.id === item.bout.id) ? "border-amber text-amber" : "border-line text-muted"}`}
               onClick={() => {
                 if (item.kind === "fight") {
+                  arm();
                   const cardAt = segments.findIndex((row) => row.kind === "card" && row.bout.id === item.bout.id);
                   setIndex(cardAt >= 0 ? cardAt : i);
                   setRolling(true);
@@ -208,6 +228,8 @@ export function ShowPage() {
         <ColdOpen data={data} bouts={tape.bouts} live={tape.live} replay={tape.replay} />
       </> : null}
       {segment.kind === "opening" ? <TeamJanelleOpening key={key} data={data} playing={rolling} onComplete={onOpeningDone} /> : null}
+      {rolling && walkout && segment.kind === "card" && <BoothSegment key={segment.bout.id} scene="walkout" id={segment.bout.id} label="Bot introductions" automatic />}
+      {segment.kind === "fight" && rolling && mic && line && <p aria-live="polite" className="border-l-2 border-amber px-3">{line}</p>}
       {segment.kind === "card" ? (
         <FightProgram
           bout={segment.bout}
@@ -226,6 +248,7 @@ export function ShowPage() {
           chromeless
           kicker={tape.replay ? "Replay" : tape.live ? "On air" : "House tape"}
           onComplete={onFightDone}
+          onNotableBeat={onNotableBeat}
         />
       ) : null}
       {segment.kind === "sting" ? <Sting bout={segment.bout} next={nextFight(segments, index)} data={data} /> : null}

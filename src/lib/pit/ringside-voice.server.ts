@@ -6,8 +6,8 @@ const VOICE = "DduhIyyKkOosbP8VefhP";
 const MODEL = "eleven_v4";
 const KIND = "ringside-audio";
 
-export async function ringsideVoice(sql: Sql, beat: string, body: string, speaker: "David" | "Monika" = "David", kind = KIND) {
-  const voice = speaker === "David" ? VOICE : "Cvv0EXhC1Zv7b4a2QfWl";
+export async function ringsideVoice(sql: Sql, beat: string, body: string, speaker: "Jim" | "Kathy" = "Jim", kind = KIND) {
+  const voice = speaker === "Jim" ? VOICE : "Cvv0EXhC1Zv7b4a2QfWl";
   const key = [voice, MODEL, beat].join(":");
   const row = await readCopy(sql, kind, key);
   if (row?.status === "ready" && row.body) return { audio: row.body };
@@ -23,7 +23,7 @@ export async function ringsideVoice(sql: Sql, beat: string, body: string, speake
   }
 
   try {
-    const direction = speaker === "David" ? "[excited]" : "[conversational]";
+    const direction = speaker === "Jim" ? "[excited]" : "[conversational]";
     const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_44100_128`, {
       method: "POST",
       headers: { "xi-api-key": apiKey, "Content-Type": "application/json", Accept: "audio/mpeg" },

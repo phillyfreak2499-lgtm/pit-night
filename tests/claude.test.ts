@@ -57,11 +57,11 @@ test("booth introduces the taped lineup and answers turning points without revea
   const data = league(true);
   const bout = data.bouts.find(b => b.kind === "bout" && b.result)!;
   const script = boothScript(data, "walkout", bout.id);
-  assert.deepEqual(script.map(l => l.speaker), ["David", "Monika"]);
+  assert.deepEqual(script.map(l => l.speaker), ["Jim", "Kathy"]);
   bout.result!.fighters.forEach((f, i) => assert.ok(script[i]!.text.includes(f.botName)));
   assert.deepEqual(boothScript(data, "walkout", "unknown"), []);
   assert.deepEqual(boothScript(data, "store", "unknown"), []);
-  assert.equal(boothScript(data, "welcome")[0]?.speaker, "David");
+  assert.equal(boothScript(data, "welcome")[0]?.speaker, "Jim");
   const moments = bout.result!.exchanges.flatMap((_, index) => reactiveMoment(bout.result!, { phase: "exchange", index }) ?? []);
   const turning = moments.find(m => m.kind !== "big-hit");
   assert.ok(turning && analystReply(turning)?.includes(turning.defender));
