@@ -6,7 +6,7 @@ const VOICE = "DduhIyyKkOosbP8VefhP";
 const MODEL = "eleven_v4";
 const KIND = "ringside-audio";
 
-export async function ringsideVoice(sql: Sql, beat: string, body: string, speaker: "Jim" | "Kathy" = "Jim", kind = KIND) {
+export async function ringsideVoice(sql: Sql, beat: string, body: string, speaker: "Jim" | "Cathy" = "Jim", kind = KIND) {
   const voice = speaker === "Jim" ? VOICE : "Cvv0EXhC1Zv7b4a2QfWl";
   const key = [voice, MODEL, beat].join(":");
   const row = await readCopy(sql, kind, key);

@@ -346,7 +346,7 @@ function Lobby({
           Start in this window
         </button>
       </div>
-      <p className="text-sm text-muted">Start with Jim, Kathy and full arena sound. During a fight, the mic switches commentary and the speaker mutes all audio. Space pauses and the right arrow skips ahead.</p>
+      <p className="text-sm text-muted">Start with Jim, Cathy and full arena sound. During a fight, the mic switches commentary and the speaker mutes all audio. Space pauses and the right arrow skips ahead.</p>
     </div>
   );
 }

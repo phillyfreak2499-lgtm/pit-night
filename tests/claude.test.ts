@@ -57,7 +57,7 @@ test("booth introduces the taped lineup and answers turning points without revea
   const data = league(true);
   const bout = data.bouts.find(b => b.kind === "bout" && b.result)!;
   const script = boothScript(data, "walkout", bout.id);
-  assert.deepEqual(script.map(l => l.speaker), ["Jim", "Kathy"]);
+  assert.deepEqual(script.map(l => l.speaker), ["Jim", "Cathy"]);
   bout.result!.fighters.forEach((f, i) => assert.ok(script[i]!.text.includes(f.botName)));
   assert.deepEqual(boothScript(data, "walkout", "unknown"), []);
   assert.deepEqual(boothScript(data, "store", "unknown"), []);
