@@ -7,6 +7,7 @@ import { programWeek } from "@/lib/pit/training";
 import { weekDeadline } from "@/lib/pit/time";
 import { tunedUp } from "@/lib/pit/week";
 import { ArenaHero } from "./arena-hero";
+import { BoothSegment } from "./booth-segment";
 import { ARENA_IDS, arenaForWeek, type ArenaId } from "./arena-scenes";
 import { BotPortrait, useBotLook } from "./bot-portrait";
 import { BoutWatch, ClassTag, formatRemain, nextLock, Panel, PERIOD_OPENS, ResultLine, SectionLabel, useNow } from "./bits";
@@ -53,6 +54,7 @@ export function Titantron() {
               <span className="block text-amber">LEAGUE</span>
             </h1>
             <p className="mt-3 max-w-2xl text-lg text-muted">{data.tagline}</p>
+            <BoothSegment key={data.week} scene="welcome" label="Tune in to the booth" />
           </div>
         </div>
         <div className="relative grid gap-3 border-t border-line bg-deep/60 px-4 py-4 md:grid-cols-3 md:px-8">

@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { usePit } from "@/lib/pit/store";
 import { SectionLabel } from "./bits";
 import { ClaudeCopy } from "./claude-copy";
+import { BoothSegment } from "./booth-segment";
 
 export function GazettePage() {
   const gazette = usePit((s) => s.gazette);
@@ -24,6 +25,7 @@ export function GazettePage() {
         Store versus store. No personal records in the column inches.
       </p>
 
+      {lead && <BoothSegment key={lead.id} scene="gazette" label="Hear the lead headline" />}
       {recapWeek ? (
         <ClaudeCopy kind="recap" id={String(recapWeek)} label={`Week ${recapWeek} league recap`} className="mt-6" />
       ) : null}

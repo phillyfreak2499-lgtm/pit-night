@@ -21,6 +21,7 @@ import { armBroadcastAudio, Broadcast } from "./broadcast";
 import { Commercial } from "./commercial";
 import { FightProgram } from "./fight-program";
 import { useReactiveCommentary } from "./use-reactive-commentary";
+import { BoothSegment } from "./booth-segment";
 import { buildTape, matchup, methodWord } from "./show-page";
 
 type Stage = "lobby" | "opening" | "intro" | "fight" | "result" | "ad" | "final";
@@ -44,17 +45,18 @@ export function WatchPage() {
   const bout = bouts[index] ?? null;
   const [commentaryEnabled, setCommentaryEnabled] = useState(true);
   const muted = useSyncExternalStore(subscribeSound, soundMuted, () => false);
+  const walkout = Boolean(stage === "intro" && tape?.live && bout?.result && bout.kind !== "bye" && commentaryEnabled && !muted);
   const mix = useRef<ReturnType<typeof startArenaMix> | null>(null);
   useEffect(() => {
     if (muted || paused || stage !== "fight") return;
     const audio = live();
     if (!audio) return;
-    mix.current = startArenaMix(audio);
+    mix.current = startArenaMix(audio, index + week - 1);
     return () => {
       mix.current?.stop();
       mix.current = null;
     };
-  }, [stage, paused, muted, bout?.id]);
+  }, [stage, paused, muted, bout?.id, index, week]);
   const duck = useCallback((speaking: boolean) => mix.current?.duck(speaking), []);
   const { line: commentaryLine, onBeat: onNotableBeat } = useReactiveCommentary(
     bout, commentaryEnabled && stage === "fight" && !paused, duck,
@@ -82,10 +84,10 @@ export function WatchPage() {
 
   useEffect(() => {
     if (paused || stage === "opening" || stage === "lobby" || stage === "final" || stage === "fight" || stage === "ad") return;
-    const ms = stage === "intro" ? (bout?.kind === "bye" ? BYE_MS : PROGRAM_HOLD_MS) : RESULT_MS;
+    const ms = stage === "intro" ? (bout?.kind === "bye" ? BYE_MS : walkout ? 16000 : PROGRAM_HOLD_MS) : RESULT_MS;
     const id = window.setTimeout(next, ms);
     return () => window.clearTimeout(id);
-  }, [stage, index, paused, next, bout]);
+  }, [stage, index, paused, next, bout, walkout]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -194,6 +196,7 @@ export function WatchPage() {
           ) : null}
           {stage === "opening" ? <TeamJanelleOpening data={data} playing={!paused} onComplete={next} /> : null}
           {stage === "intro" && bout ? <Intro key={bout.id} data={data} bout={bout} seen={seen} order={index + 1} total={bouts.length} /> : null}
+          {walkout && bout && !paused && <BoothSegment key={bout.id} scene="walkout" id={bout.id} label="Bot introductions" automatic />}
           {stage === "result" && bout ? (
             <Result key={bout.id} data={data} bout={bout} seen={seen} next={bouts[index + 1] ?? null} commercialNext={Boolean(commercialAfter(week, index + 1, bouts.length))} />
           ) : null}
