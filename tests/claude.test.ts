@@ -21,6 +21,8 @@ import {
 import { claimCopy, countClaimedOnDay, finishCopy, readCopy, reserveCopy } from "../src/lib/pit/claude-store.ts";
 import { FEATURE_MODEL, HAIKU } from "../src/lib/pit/claude.server.ts";
 import { ringsideVoice } from "../src/lib/pit/ringside-voice.server.ts";
+import { boothScript, analystReply } from "../src/lib/pit/booth.ts";
+import { reactiveMoment } from "../src/lib/pit/reactive-commentary.ts";
 import type { Sql } from "../src/lib/db.ts";
 import type { FightResult } from "../src/lib/pit/types.ts";
 import { coachStore, tapeNote } from "../src/lib/pit/coach-tape.ts";
@@ -50,6 +52,20 @@ function league(run: boolean) {
   }
   return store.getState();
 }
+
+test("booth introduces the taped lineup and answers turning points without revealing the result", () => {
+  const data = league(true);
+  const bout = data.bouts.find(b => b.kind === "bout" && b.result)!;
+  const script = boothScript(data, "walkout", bout.id);
+  assert.deepEqual(script.map(l => l.speaker), ["David", "Monika"]);
+  bout.result!.fighters.forEach((f, i) => assert.ok(script[i]!.text.includes(f.botName)));
+  assert.deepEqual(boothScript(data, "walkout", "unknown"), []);
+  assert.deepEqual(boothScript(data, "store", "unknown"), []);
+  assert.equal(boothScript(data, "welcome")[0]?.speaker, "David");
+  const moments = bout.result!.exchanges.flatMap((_, index) => reactiveMoment(bout.result!, { phase: "exchange", index }) ?? []);
+  const turning = moments.find(m => m.kind !== "big-hit");
+  assert.ok(turning && analystReply(turning)?.includes(turning.defender));
+});
 
 test("commentary and recap come only from posted results, without codes or crew names", () => {
   const d = league(true);

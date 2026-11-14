@@ -8,6 +8,7 @@ import { ClassTag, GradeRow, SectionLabel, StatStrip } from "./bits";
 import { BotPortrait, useBotLook } from "./bot-portrait";
 import { RainCityBanner } from "./rain-city-banner";
 import { StreakBadge } from "./streak-badge";
+import { BoothSegment } from "./booth-segment";
 
 const SLOTS: Slot[] = ["chassis", "drive", "weapon", "armor", "utility", "brain"];
 
@@ -50,6 +51,7 @@ export function StorePage({ storeId }: { storeId: string }) {
         Season recap →
       </Link>
       <StoreBot storeId={storeId} />
+      <BoothSegment key={storeId} scene="store" id={storeId} label={`Introduce ${bot.name}`} />
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <ClassTag classId={bot.classId} />
         <span className="font-display text-2xl">

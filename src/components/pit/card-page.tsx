@@ -6,6 +6,7 @@ import { usePit, type PitState } from "@/lib/pit/store";
 import type { Bout, ClassId } from "@/lib/pit/types";
 import { BoutWatch, Panel, ResultLine, SectionLabel } from "./bits";
 import { MatchupPoster } from "./matchup-poster";
+import { BoothSegment } from "./booth-segment";
 
 export function CardPage() {
   const data = usePit();
@@ -19,6 +20,7 @@ export function CardPage() {
       <SectionLabel>Fight day card</SectionLabel>
       <h1 className="font-display text-5xl leading-none">{meta?.name ?? `Week ${week}`}</h1>
       <p className="mt-3 max-w-2xl text-muted">{meta?.blurb}</p>
+      <BoothSegment key={week} scene="card" label="Hear the card preview" />
       <Link to="/broadcast" className="mt-4 inline-flex min-h-11 items-center text-amber">
         Watch the Monday broadcast
       </Link>

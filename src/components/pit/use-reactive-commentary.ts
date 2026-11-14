@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getReactiveCommentary } from "@/lib/pit/reactive-commentary-server";
+import { playBooth } from "@/lib/pit/booth-playback";
+import type { BoothClip } from "@/lib/pit/booth";
 import { announcerDelivery, reactiveMoment, type ReactiveCue } from "@/lib/pit/reactive-commentary";
 import { live, soundMuted, subscribeSound } from "@/lib/pit/sound";
 import type { Bout } from "@/lib/pit/types";
@@ -21,14 +23,12 @@ export function useReactiveCommentary(bout: Bout | null, active: boolean, duck: 
   const busy = useRef(false);
   const generation = useRef(0);
   const speech = useRef<SpeechSynthesisUtterance | null>(null);
-  const recorded = useRef<AudioBufferSourceNode | null>(null);
+  const recorded = useRef<AbortController | null>(null);
   const releaseTimer = useRef<number | undefined>(undefined);
   const release = useCallback(() => {
     window.clearTimeout(releaseTimer.current);
     if (recorded.current) {
-      recorded.current.onended = null;
-      recorded.current.stop();
-      recorded.current.disconnect();
+      recorded.current.abort();
       recorded.current = null;
     }
     speech.current = null;
@@ -107,27 +107,19 @@ export function useReactiveCommentary(bout: Bout | null, active: boolean, duck: 
       setLastLine({ key: boutKey, body: reply.body });
       const context = live();
       if (reply.audio && context?.state === "running") {
+        const controller = new AbortController();
+        recorded.current = controller;
         try {
-          const bytes = Uint8Array.from(atob(reply.audio), char => char.charCodeAt(0));
-          const buffer = await context.decodeAudioData(bytes.buffer);
-          if (!valid() || Date.now() - started >= MAX_LATENCY_MS) return;
           if (speech.current) return;
-          const source = context.createBufferSource();
-          source.buffer = buffer;
-          source.connect(context.destination);
-          source.onended = () => {
-            if (recorded.current === source) {
-              recorded.current = null;
-              source.disconnect();
-              duck(false);
-            }
-          };
-          source.start();
-          recorded.current = source;
-          duck(true);
+          const clips: BoothClip[] = [{ speaker: "David", text: reply.body, audio: reply.audio }];
+          if (reply.replyClip) clips.push(reply.replyClip);
+          await playBooth(context, clips, controller.signal, line =>
+            setLastLine({ key: boutKey, body: line.speaker + " · " + line.text }), duck);
           return;
         } catch {
           if (!valid() || Date.now() - started >= MAX_LATENCY_MS) return;
+        } finally {
+          if (recorded.current === controller) recorded.current = null;
         }
       }
       if (typeof window === "undefined" || typeof SpeechSynthesisUtterance === "undefined" ||

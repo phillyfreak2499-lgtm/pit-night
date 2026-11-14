@@ -1,9 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { ReactivePhase } from "./reactive-commentary";
+import type { BoothClip } from "./booth";
 
 export type ReactiveCommentaryResponse =
-  | { status: "ready"; body: string; audio?: string; voicePending?: boolean }
+  | { status: "ready"; body: string; audio?: string; replyClip?: BoothClip; voicePending?: boolean }
   | { status: "pending" }
   | { status: "unavailable" };
 
@@ -49,7 +50,15 @@ export const getReactiveCommentary = createServerFn({ method: "POST" })
     async function ready(body: string): Promise<ReactiveCommentaryResponse> {
       try {
         const { ringsideVoice } = await import("./ringside-voice.server");
-        return { status: "ready", body, ...await ringsideVoice(sql, key, body) };
+        const { analystReply } = await import("./booth");
+        const reply = analystReply(moment!);
+        const [lead, analyst] = await Promise.all([
+          ringsideVoice(sql, key, body),
+          reply ? ringsideVoice(sql, key + ":analysis-v1", reply, "Monika", "ringside-analysis") : undefined,
+        ]);
+        return { status: "ready", body, ...lead,
+          voicePending: !!(lead.voicePending || analyst?.voicePending),
+          replyClip: reply && analyst?.audio ? { speaker: "Monika", text: reply, audio: analyst.audio } : undefined };
       } catch {
         return { status: "ready", body };
       }
