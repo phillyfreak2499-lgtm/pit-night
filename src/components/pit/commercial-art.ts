@@ -51,6 +51,24 @@ export function paintCommercial(ctx: CanvasRenderingContext2D, w: number, h: num
     case "movers":
       paintMovers(ctx, t);
       break;
+    case "reach":
+      paintReach(ctx, t);
+      break;
+    case "extra-pass":
+      paintExtraPass(ctx, t);
+      break;
+    case "roses":
+      paintRoses(ctx, t);
+      break;
+    case "machine":
+      paintMachine(ctx, t);
+      break;
+    case "hall-pass":
+      paintHallPass(ctx, t);
+      break;
+    case "spare-parts":
+      paintSpareParts(ctx, t);
+      break;
     default: {
       const uncovered: never = scene;
       void uncovered;
@@ -71,6 +89,12 @@ const SKY: Record<CommercialScene, readonly [string, string]> = {
   bank: ["#121a14", "#070a08"],
   gravy: ["#2a160e", "#100904"],
   movers: ["#241c14", "#0c0a08"],
+  reach: ["#1a1210", "#0c0908"],
+  "extra-pass": ["#141810", "#080a08"],
+  roses: ["#1c1014", "#0c080a"],
+  machine: ["#10141a", "#07080c"],
+  "hall-pass": ["#161410", "#0a0908"],
+  "spare-parts": ["#1a140c", "#0c0a08"],
 };
 
 function backdrop(ctx: CanvasRenderingContext2D, w: number, h: number, scene: CommercialScene) {
@@ -771,4 +795,204 @@ function paintMovers(ctx: CanvasRenderingContext2D, t: number) {
 
   drawBot(ctx, 760, 330, 170, t, { missingArm: "right", eyes: "sad", arm: "up", body: "#7a756c" });
   label(ctx, "60 BOLTS", 760, 120, 32, AMBER);
+}
+
+function bay(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
+  ctx.fillStyle = "#1a1814";
+  roundRect(ctx, x, y, w, h, 6);
+  ctx.fill();
+  ctx.strokeStyle = LINE;
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  rivets(ctx, x, y, w, h);
+}
+
+function paintReach(ctx: CanvasRenderingContext2D, t: number) {
+  label(ctx, "RED RIVER", 250, 78, 36, "#e06a52");
+  bay(ctx, 70, 120, 360, 300);
+  ctx.fillStyle = "#2a2420";
+  ctx.fillRect(110, 300, 280, 18);
+  const pulse = 0.55 + 0.45 * Math.sin(t * 1.8);
+  ctx.fillStyle = AMBER;
+  ctx.beginPath();
+  ctx.arc(250, 292, 8 + pulse * 2, 0, Math.PI * 2);
+  ctx.fill();
+  label(ctx, "MEASURED", 250, 180, 22, MUTED);
+
+  drawBot(ctx, 760, 340, 170, t, { eyes: "open", body: "#8d3a32", arm: "up" });
+  const reach = 90 + pulse * 210;
+  ctx.strokeStyle = STEEL;
+  ctx.lineWidth = 14;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(680, 300);
+  ctx.lineTo(680 - reach, 292);
+  ctx.stroke();
+  ctx.fillStyle = "#c8c0b2";
+  ctx.beginPath();
+  ctx.moveTo(680 - reach, 276);
+  ctx.lineTo(680 - reach - 28, 292);
+  ctx.lineTo(680 - reach, 308);
+  ctx.closePath();
+  ctx.fill();
+  label(ctx, "REACH", 760, 130, 32, AMBER);
+}
+
+function paintExtraPass(ctx: CanvasRenderingContext2D, t: number) {
+  label(ctx, "KEY CITY", 220, 78, 36, "#8fbf78");
+  bay(ctx, 80, 140, 300, 280);
+  drawBot(ctx, 230, 320, 140, t * 0.2, { eyes: "open", body: "#6a7a68" });
+  const lap = t * 1.1;
+  const cx = 230 + Math.cos(lap) * 120;
+  const cy = 250 + Math.sin(lap) * 36;
+  drawBot(ctx, cx, cy, 70, t, { eyes: "open", body: "#7d8a72", arm: "down" });
+
+  for (let i = 0; i < 5; i++) {
+    const last = i === 4;
+    const wobble = last ? Math.sin(t * 8) * 6 : 0;
+    ctx.save();
+    ctx.translate(520 + i * 70, 340 + wobble);
+    ctx.fillStyle = last && Math.sin(t * 8) > 0 ? AMBER : STEEL;
+    roundRect(ctx, -8, -36, 16, 72, 4);
+    ctx.fill();
+    ctx.fillStyle = "#c8c0b2";
+    ctx.beginPath();
+    ctx.arc(0, -36, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  label(ctx, "ONE MORE", 660, 180, 28, AMBER);
+}
+
+function paintRoses(ctx: CanvasRenderingContext2D, t: number) {
+  label(ctx, "ROSE CITY", 250, 78, 36, "#e07a92");
+  bay(ctx, 90, 130, 280, 320);
+  ctx.fillStyle = "#3a242c";
+  roundRect(ctx, 150, 250, 160, 150, 8);
+  ctx.fill();
+  ctx.strokeStyle = "#c4626a";
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  const stems = [
+    [190, "#e07a92"],
+    [230, "#f3efe6"],
+    [270, "#c4485a"],
+  ] as const;
+  for (const [x, color] of stems) {
+    const sway = Math.sin(t * 1.4 + x) * 6;
+    ctx.strokeStyle = "#3d6b3a";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(x, 390);
+    ctx.quadraticCurveTo(x + sway, 330, x + sway, 280);
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(x + sway, 268, 16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = AMBER;
+    ctx.beginPath();
+    ctx.arc(x + sway, 268, 5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  drawBot(ctx, 720, 340, 180, t, { eyes: "open", body: "#8d4458", arm: "up" });
+  label(ctx, "LOCKER", 230, 200, 22, MUTED);
+}
+
+function paintMachine(ctx: CanvasRenderingContext2D, t: number) {
+  label(ctx, "SEACHICKEN", 280, 78, 36, "#8eafc9");
+  bay(ctx, 60, 120, 420, 340);
+  const gears: [number, number, number, number][] = [
+    [160, 240, 54, 1],
+    [250, 300, 40, -1.4],
+    [330, 220, 32, 1.8],
+  ];
+  ctx.strokeStyle = STEEL;
+  ctx.lineCap = "round";
+  for (const [x, y, r, dir] of gears) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(t * dir);
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.55, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.lineWidth = 6;
+    for (let i = 0; i < 6; i++) {
+      const a = i * (Math.PI / 3);
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * r * 0.45, Math.sin(a) * r * 0.45);
+      ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  for (let i = 0; i < 4; i++) {
+    const fall = (t * 40 + i * 28) % 110;
+    ctx.fillStyle = `rgba(198, 161, 90, ${1 - fall / 110})`;
+    ctx.beginPath();
+    ctx.arc(180 + i * 36, 150 + fall, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  drawBot(ctx, 760, 340, 170, t, { eyes: "shut", body: "#607888" });
+  ctx.fillStyle = AMBER;
+  roundRect(ctx, 700, 250, 36, 44, 6);
+  ctx.fill();
+  ctx.fillStyle = DEEP;
+  ctx.beginPath();
+  ctx.arc(718, 268, 6, 0, Math.PI * 2);
+  ctx.fill();
+  const beep = Math.floor(t * 2) % 2 === 0 ? "BEEP" : "····";
+  label(ctx, beep, 760, 150, 32, AMBER);
+}
+
+function paintHallPass(ctx: CanvasRenderingContext2D, t: number) {
+  label(ctx, "HALL PASS", 260, 78, 36, AMBER);
+  bay(ctx, 80, 140, 360, 300);
+  ctx.save();
+  ctx.translate(230, 280);
+  ctx.rotate(-0.08 + Math.sin(t * 1.2) * 0.02);
+  ctx.fillStyle = "#efe8d8";
+  roundRect(ctx, -90, -110, 180, 220, 6);
+  ctx.fill();
+  ctx.strokeStyle = "#8a8478";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  for (let i = 0; i < 5; i++) {
+    ctx.fillStyle = "#c8c0b2";
+    ctx.fillRect(-60, -70 + i * 28, 120, 6);
+  }
+  const stamp = 0.75 + 0.25 * Math.sin(t * 3);
+  ctx.strokeStyle = `rgba(224, 106, 82, ${stamp})`;
+  ctx.lineWidth = 6;
+  ctx.strokeRect(-50, 20, 100, 40);
+  label(ctx, "PASS", 0, 42, 24, "#e06a52");
+  ctx.restore();
+  drawBot(ctx, 740, 340, 180, t, { eyes: "angry", arm: "up", body: "#8a8478" });
+  label(ctx, "CLEARED", 740, 140, 28, AMBER);
+}
+
+function paintSpareParts(ctx: CanvasRenderingContext2D, t: number) {
+  label(ctx, "TEMPLETRON", 240, 78, 36, "#e0a15a");
+  bay(ctx, 70, 130, 400, 320);
+  const bins = ["BOLT", "ARM", "WHEEL"];
+  bins.forEach((name, i) => {
+    const x = 110 + i * 110;
+    ctx.fillStyle = i === 0 ? "#5c3a24" : "#3a342c";
+    roundRect(ctx, x, 250, 90, 140, 6);
+    ctx.fill();
+    ctx.strokeStyle = "#c4622d";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    label(ctx, name, x + 45, 320, 16, FG);
+  });
+  for (let i = 0; i < 3; i++) {
+    const fall = (t * 48 + i * 30) % 100;
+    ctx.fillStyle = AMBER;
+    ctx.beginPath();
+    ctx.arc(155 + i * 18, 180 + fall, 6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  drawBot(ctx, 760, 340, 170, t, { missingArm: "left", eyes: "open", body: "#8d6844" });
+  label(ctx, "SPARES", 760, 140, 32, AMBER);
 }

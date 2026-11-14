@@ -5,23 +5,33 @@
  * On a seven-bout card that is six breaks: one after each of bouts 1–6,
  * none after the main event. A longer card still stops at six.
  *
- * Each week has a three-spot reel. Those three play in order, then repeat
- * from the top so every break still gets a spot. A break never borrows a
- * spot from another week. The same week number always picks the same reel.
+ * Most weeks have a three-spot reel. Those three play in order, then repeat
+ * from the top so every break still gets a spot. Week 3's reel is six spots
+ * and fills a six-break card once. A break never borrows a spot from another
+ * week. The same week number and the same card length always pick the same
+ * reel, so a replay stays put.
  *
  * Rotation:
  *   Week 1 (and any week below 1) stays on catalog 1–3, so a Shakedown
  *   replay keeps Pit Mutual, VOLTAGE, and Scrapyard Sal's.
- *   Week 2 plays the new spots 7–9. The original six already aired on the
- *   Week 1 broadcast, and new spots come before 4–6.
- *   Weeks 3+ walk one disjoint block per week: 4–6, then 1–3, then 7–9,
- *   and so on. A spot therefore never airs in back-to-back weeks. When two
- *   blocks are both eligible, the newer spots win, which puts 7–9 on week 2
- *   ahead of 4–6 and makes the cycle 1–3, 7–9, 4–6, repeat.
+ *   Week 2 stays on spots 7–9. Bolt Bank, Gobble-Grade, and Class Act Movers
+ *   keep the reel they aired, ahead of 4–6.
+ *   Week 3 (Tue Nov 10 – Mon Nov 16, 2026; the card runs Monday Nov 16)
+ *   plays only the new spots 10–15, in catalog order. A card with six or
+ *   more breaks plays all six. A shorter card fills every break from 10
+ *   forward and does not pad with 1–9.
+ *   Week 4 plays whatever of 10–15 that shorter Week 3 card did not reach,
+ *   then its usual 1–3. A seven-bout Week 3 uses every new spot, so that
+ *   Week 4 stays on 1–3 with nothing left over. Regular-season weeks share
+ *   a bout count, so the handoff uses the card length you ask about.
+ *   Weeks 5+ keep the earlier cycle: 7–9, then 4–6, then 1–3, and so on.
+ *   A spot therefore never airs in back-to-back weeks, including every week
+ *   after 3. Spots 10–15 return when that week is replayed, or at the front
+ *   of Week 4 when Week 3 could not fit them.
  *
  *   Week 1: 1, 2, 3
  *   Week 2: 7, 8, 9
- *   Week 3: 4, 5, 6
+ *   Week 3: 10, 11, 12, 13, 14, 15
  *   Week 4: 1, 2, 3
  *   Week 5: 7, 8, 9
  *
@@ -34,13 +44,28 @@ export const AD_MS = 15_000;
 
 /**
  * Breaks that get a house spot on a seven-bout card.
- * The week's reel is shorter than this; it repeats to fill the breaks.
+ * A shorter reel repeats to fill the breaks. Week 3's reel is this long.
  */
 export const COMMERCIAL_ROTATION_BLOCK = 6;
 
 export type CommercialTone = "lead" | "vo" | "end" | "flash" | "aside";
 
-export type CommercialScene = "mutual" | "voltage" | "sals" | "brain" | "hotline" | "nap" | "bank" | "gravy" | "movers";
+export type CommercialScene =
+  | "mutual"
+  | "voltage"
+  | "sals"
+  | "brain"
+  | "hotline"
+  | "nap"
+  | "bank"
+  | "gravy"
+  | "movers"
+  | "reach"
+  | "extra-pass"
+  | "roses"
+  | "machine"
+  | "hall-pass"
+  | "spare-parts";
 
 export type CommercialLine = {
   tone: CommercialTone;
@@ -168,6 +193,102 @@ export const COMMERCIALS: readonly Commercial[] = [
     ],
     fine: "Class switch fee: 120 Bolts. Movers not responsible for lost wheels, arms, antennas, dignity or personality. Strong back not included. Some assembly required. Some disassembly already occurred.",
   },
+  {
+    number: 10,
+    slug: "rios-reach",
+    sponsor: "Rios Reach",
+    scene: "reach",
+    lines: [
+      {
+        tone: "lead",
+        text: "Specialists are supposed to keep their distance. The claw, unfortunately, did not get the memo.",
+      },
+      {
+        tone: "vo",
+        text: "Rios Reach. Shreveport's Daniel Rios measures twice, grabs once, and gives RED RIVER just enough arm to be polite.",
+      },
+      { tone: "end", text: "Rios Reach. Stand back. He already did." },
+    ],
+    fine: "Polite is a hope, not a warranty. Claw length may vary after contact with saws, hammers or the pit. Daniel is pit crew, not a spare part. Do not attempt this reach at home, or in someone else's bay.",
+  },
+  {
+    number: 11,
+    slug: "philips-extra-pass",
+    sponsor: "Philip's Extra Pass",
+    scene: "extra-pass",
+    lines: [
+      { tone: "lead", text: "The tank looks ready. It isn't. The last cotter pin would like a word." },
+      {
+        tone: "vo",
+        text: "Philip's Extra Pass. Abilene specialist Philip Rodriguez walks KEY CITY one more time and only then says now.",
+      },
+      { tone: "end", text: "Philip's Extra Pass. Once is how you lose a nut." },
+      { tone: "aside", text: "The nut was important." },
+    ],
+    fine: "Extra pass is a habit, not a paid upgrade. Tightening is performed with ordinary wrenches and extraordinary patience. Missing nuts remain missing if they already left for the pit. Not responsible for hammers that were already confident.",
+  },
+  {
+    number: 12,
+    slug: "samanthas-spare-rose",
+    sponsor: "Samantha's Spare Rose",
+    scene: "roses",
+    lines: [
+      { tone: "lead", text: "Forgot the finishing touch? ROSE CITY never does, if Samantha's in the bay." },
+      {
+        tone: "vo",
+        text: "Samantha's Spare Rose. Tyler specialist Samantha Rodriguez keeps one extra bouquet in the locker, just in case Monday needs a little ceremony.",
+      },
+      { tone: "end", text: "Samantha's Spare Rose. Armor first. Flowers second." },
+    ],
+    fine: "Bouquet is ceremonial and will not stop a saw, a hammer or a mild breeze. Free in Tyler only. Other bays must bring their own flowers, which we do not recommend placing in the drivetrain. Not a weapon. Not a shield. Cute, though.",
+  },
+  {
+    number: 13,
+    slug: "the-machine",
+    sponsor: "The Machine's Maintenance Plan",
+    scene: "machine",
+    lines: [
+      { tone: "lead", text: "Some captains have a name. Southlake's has a job title." },
+      {
+        tone: "vo",
+        text: "The Machine runs SEACHICKEN like clockwork: oiled, locked, and loudly unbothered.",
+      },
+      { tone: "end", text: "The Machine's Maintenance Plan. Results not human." },
+      { tone: "aside", text: "We asked. It just said beep." },
+    ],
+    fine: "Results not human, and neither is the service schedule. Oiling, locking and being unbothered sold as a set. Beep is not a legally binding answer. SEACHICKEN appears courtesy of the Southlake bay. Clockwork may squeak. Void if you ask too many questions.",
+  },
+  {
+    number: 14,
+    slug: "helens-hall-pass",
+    sponsor: "Helen's Hall Pass",
+    scene: "hall-pass",
+    lines: [
+      { tone: "lead", text: "Double plat. Double smash. Double-check the paperwork." },
+      {
+        tone: "vo",
+        text: "Alliance specialist Helen keeps DOUBLE PLAT SMASHER cleared, cleaned and ready for Monday.",
+      },
+      { tone: "end", text: "Helen's Hall Pass. No bot fights without it." },
+    ],
+    fine: "Hall pass required for entry to Monday. Does not excuse late locks, missing bolts or unsanctioned smashing. Paperwork is ceremonial but the bot is not. Alliance specialist Helen keeps the forms; the forms do not keep the bot. One pass per fight, no copies, no folding.",
+  },
+  {
+    number: 15,
+    slug: "scotts-spare-parts",
+    sponsor: "Scott's Spare Parts",
+    scene: "spare-parts",
+    lines: [
+      { tone: "lead", text: "TEMPLETRON lost a bolt. Scott found three. Nobody asks where." },
+      {
+        tone: "vo",
+        text: "Temple specialist Scott keeps the bay stocked so TEMPLETRON never fights short a part.",
+      },
+      { tone: "end", text: "Scott's Spare Parts. If it fell off, he's got it." },
+      { tone: "aside", text: "Probably." },
+    ],
+    fine: "If it fell off, he's got it, probably. Origin of spare bolts not disclosed, insured or remembered. TEMPLETRON appears courtesy of the Temple bay. Parts may have prior arena experience. Do not ask where. Asking where voids the pile.",
+  },
 ];
 
 export function commercialVideoSrc(ad: Pick<Commercial, "slug">): string {
@@ -179,7 +300,8 @@ function mod(n: number, m: number): number {
 }
 
 /**
- * Week blocks, in cycle order. New spots (7–9) sit ahead of 4–6.
+ * Week blocks, in cycle order, for every week except the Week 3 premiere.
+ * New spots (7–9) sit ahead of 4–6.
  * Week 1 is the first block so replays of that card stay on 1–3.
  */
 const WEEK_REELS: readonly (readonly number[])[] = [
@@ -188,17 +310,49 @@ const WEEK_REELS: readonly (readonly number[])[] = [
   [4, 5, 6],
 ];
 
+/** Catalog 10–15. Week 3 plays these and nothing older. */
+const WEEK_3_PREMIERE = [10, 11, 12, 13, 14, 15] as const;
+
+/** A seven-bout card. `commercialAt` assumes this when the caller omits a length. */
+const SEVEN_BOUT_CARD = 7;
+
 function commercialByNumber(number: number): Commercial {
   const ad = COMMERCIALS.find((item) => item.number === number);
   if (!ad) throw new Error(`Commercial ${number} is not in the catalog`);
   return ad;
 }
 
-/** The three spots for this week, in play order. Weeks below 1 use the week-1 reel. */
-function reelForWeek(week: number): readonly Commercial[] {
+/** Breaks that actually air. The main event takes none, and a longer card stops at six. */
+function breakCount(fightCount: number): number {
+  if (!Number.isInteger(fightCount) || fightCount < 2) return 0;
+  return Math.min(fightCount - 1, COMMERCIAL_ROTATION_BLOCK, COMMERCIALS.length);
+}
+
+function classicNumbers(week: number): readonly number[] {
   const w = Number.isFinite(week) ? Math.trunc(week) : 1;
   const index = w >= 1 ? (w - 1) % WEEK_REELS.length : 0;
-  return WEEK_REELS[index]!.map(commercialByNumber);
+  return WEEK_REELS[index]!;
+}
+
+function reelNumbers(week: number, fightCount: number): readonly number[] {
+  const w = Number.isFinite(week) ? Math.trunc(week) : 1;
+  if (w === 3) {
+    const slots = breakCount(fightCount);
+    const count = slots > 0 ? Math.min(WEEK_3_PREMIERE.length, slots) : WEEK_3_PREMIERE.length;
+    return WEEK_3_PREMIERE.slice(0, count);
+  }
+  if (w === 4) {
+    const slots = breakCount(fightCount);
+    if (slots > 0 && slots < WEEK_3_PREMIERE.length) {
+      return [...WEEK_3_PREMIERE.slice(slots), ...classicNumbers(4)];
+    }
+  }
+  return classicNumbers(w);
+}
+
+/** Spots for this week, in play order. Weeks below 1 use the week-1 reel. */
+function reelForWeek(week: number, fightCount: number): readonly Commercial[] {
+  return reelNumbers(week, fightCount).map(commercialByNumber);
 }
 
 /** True when this 1-based fight should cut to a house spot before the next program. */
@@ -211,10 +365,16 @@ export function commercialAfterFight(fightNumber: number, fightCount: number): b
 
 /**
  * Catalog spot for the slotIndex-th break (0-based).
- * The week's three-spot reel repeats to cover a longer card.
+ * A three-spot reel repeats to cover a longer card. Week 3's six-spot reel
+ * fills a seven-bout card once. Pass fightCount for a shorter card; omitted,
+ * the seven-bout card is assumed.
  */
-export function commercialAt(week: number, slotIndex: number): Commercial {
-  const reel = reelForWeek(week);
+export function commercialAt(
+  week: number,
+  slotIndex: number,
+  fightCount = SEVEN_BOUT_CARD,
+): Commercial {
+  const reel = reelForWeek(week, fightCount);
   const safeSlot = Number.isFinite(slotIndex) ? Math.trunc(slotIndex) : 0;
   return reel[mod(safeSlot, reel.length)]!;
 }
@@ -222,7 +382,7 @@ export function commercialAt(week: number, slotIndex: number): Commercial {
 /** The spot that plays after this fight, or null when the card rolls on. */
 export function commercialAfter(week: number, fightNumber: number, fightCount: number): Commercial | null {
   if (!commercialAfterFight(fightNumber, fightCount)) return null;
-  return commercialAt(week, fightNumber - 1);
+  return commercialAt(week, fightNumber - 1, fightCount);
 }
 
 /** Every spot on a card, in the order the room will see them. */
