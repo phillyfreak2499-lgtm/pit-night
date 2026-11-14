@@ -1,10 +1,10 @@
 import { TaleOfTape } from "./tale-of-tape";
 import { Link } from "@tanstack/react-router";
 import { Flame, HelpCircle, Maximize, Mic, MicOff, Minimize, Package, Pause, Play, SkipForward, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Volume2, VolumeX } from "lucide-react";
-import { live, setSoundMuted, soundMuted, subscribeSound } from "@/lib/pit/sound";
-import { startArenaMix } from "@/lib/pit/arena-mix";
+import { setSoundMuted, soundMuted, subscribeSound } from "@/lib/pit/sound";
+import { useFightAudio } from "./use-fight-audio";
 import { createPortal } from "react-dom";
 import { hasChampionshipOpening } from "@/lib/pit/championship-opening";
 import { TeamJanelleOpening } from "./team-janelle-opening";
@@ -20,7 +20,6 @@ import { ResultLine } from "./bits";
 import { armBroadcastAudio, Broadcast } from "./broadcast";
 import { Commercial } from "./commercial";
 import { FightProgram } from "./fight-program";
-import { useReactiveCommentary } from "./use-reactive-commentary";
 import { BoothSegment } from "./booth-segment";
 import { buildTape, matchup, methodWord } from "./show-page";
 
@@ -45,22 +44,9 @@ export function WatchPage() {
   const bout = bouts[index] ?? null;
   const [commentaryEnabled, setCommentaryEnabled] = useState(true);
   const muted = useSyncExternalStore(subscribeSound, soundMuted, () => false);
-  const walkout = Boolean(stage === "intro" && tape?.live && bout?.result && bout.kind !== "bye" && commentaryEnabled && !muted);
-  const mix = useRef<ReturnType<typeof startArenaMix> | null>(null);
-  useEffect(() => {
-    if (muted || paused || stage !== "fight") return;
-    const audio = live();
-    if (!audio) return;
-    mix.current = startArenaMix(audio, index + week - 1);
-    return () => {
-      mix.current?.stop();
-      mix.current = null;
-    };
-  }, [stage, paused, muted, bout?.id, index, week]);
-  const duck = useCallback((speaking: boolean) => mix.current?.duck(speaking), []);
-  const { line: commentaryLine, onBeat: onNotableBeat } = useReactiveCommentary(
-    bout, commentaryEnabled && stage === "fight" && !paused, duck,
-  );
+  const walkout = Boolean(stage === "intro" && bout?.result && bout.kind !== "bye" && commentaryEnabled && !muted);
+  const { line: commentaryLine, onNotableBeat } = useFightAudio(bout, stage === "fight" && !paused,
+    index + week - 1, commentaryEnabled, muted, !tape?.live);
 
   const next = useCallback(() => {
     if (stage === "opening") setStage("intro");
@@ -108,6 +94,8 @@ export function WatchPage() {
   }, [stage, next]);
 
   const start = (goFull: boolean) => {
+    if (soundMuted()) setSoundMuted(false);
+    setCommentaryEnabled(true);
     armBroadcastAudio();
     setTape(liveTape);
     setIndex(0);
@@ -222,10 +210,7 @@ export function WatchPage() {
             stage
             kicker={replaying ? "Replay" : (tape ?? liveTape).live ? "Live card" : "House tape"}
             onComplete={next}
-            onNotableBeat={cue => {
-              mix.current?.cheer();
-              onNotableBeat(cue);
-            }}
+            onNotableBeat={onNotableBeat}
           />
           {commentaryEnabled && commentaryLine ? <p className="absolute bottom-32 left-2 z-40 max-w-lg border-l-2 border-amber bg-deep/90 px-3 py-2 text-base" aria-live="polite" data-testid="reactive-commentary"><span className="mr-2 font-display text-xs tracking-widest text-amber uppercase">AI color</span>{commentaryLine}</p> : null}
           <div className="absolute bottom-[4.75rem] left-2 z-40 flex gap-1 sm:bottom-20">
@@ -361,7 +346,7 @@ function Lobby({
           Start in this window
         </button>
       </div>
-      <p className="text-sm text-muted">Space pauses. The right arrow skips ahead. AI color reacts to big hits with spoken lines when enabled; turn the sound up.</p>
+      <p className="text-sm text-muted">Start with Jim, Kathy and full arena sound. During a fight, the mic switches commentary and the speaker mutes all audio. Space pauses and the right arrow skips ahead.</p>
     </div>
   );
 }

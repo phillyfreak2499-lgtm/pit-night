@@ -18,6 +18,18 @@ function faq(q: string, text: string, a?: React.ReactNode): Faq {
 /** Exported so the rules Q&A can answer from the same plain text. */
 export const GROUPS: Group[] = [
   {
+    title: "Broadcast, Watch Party and announcers",
+    items: [
+      faq("How do I start the full show?", "Open Big Broadcast and press Play broadcast. For a group, choose Watch party · big screen, select the week and press Start · full screen or Start in this window. Starting a new show turns on voices, fight music, hit sounds and crowd cheers. On a TV, select its speakers or HDMI output on the device running the browser."),
+      faq("Who are Jim and Kathy, and when do they speak?", "Jim calls the impact. Kathy answers when a bot takes the lead, crosses a health threshold or gets knocked out. Listen for both during bot introductions. Routine exchanges leave room for the music and effects. Captions identify the speaker when a recording plays."),
+      faq("How do I turn the voices or all sound off?", "In Watch Party, use the mic or AI color button for commentary. During the fight, use the speaker for all fight audio. In Big Broadcast, use Booth on/off or Mute arena. Pausing stops the fight audio. Resuming keeps your choices for that show. In Watch Party, Space pauses and the right arrow skips ahead when the page has focus."),
+      faq("Why does the music change or get quieter?", "Four upbeat guitar and drum tracks rotate by week and fight order. A replay gets the same track as the original slot. The crowd cheers on standout hits. Both the music and the crowd drop under the booth and rise after the last speaker finishes."),
+      faq("I see captions but hear nothing. What should I check?", "Press Play or Start, check the mic and speaker controls, then check the browser tab, device volume and selected output. A fresh recording can take a few seconds. Fight commentary can use the device voice when a recording is unavailable. On other pages, you can read the caption and tap the audio button to retry. If a button says Booth audio muted, unmute the arena first."),
+      faq("Where else can I hear the announcers?", "On the home page, tap Tune in to the booth. On the fight card, tap Hear the card preview. On a store page, use Introduce next to the bot. In the Gazette, choose Hear the lead headline. These clips play on request and have a Stop audio button."),
+      faq("Is the house tape official, and does watching change my record?", "House tape is a preview of the open week and can change before the card posts. A posted card and its archived replay use recorded fight events. Playback speed, commentary, music and rewatching have no effect on damage, coins, Bolts or standings."),
+    ],
+  },
+  {
     title: "Getting started",
     items: [
       faq(

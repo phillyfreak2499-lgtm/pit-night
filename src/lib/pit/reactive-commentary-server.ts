@@ -14,12 +14,13 @@ export const getReactiveCommentary = createServerFn({ method: "POST" })
     boutId: z.string().min(1).max(160),
     phase: z.enum(["exchange", "finisher"]),
     index: z.number().int().min(0).max(500),
+    preview: z.boolean().optional(),
   }).strict())
   .handler(async ({ data: input }): Promise<ReactiveCommentaryResponse> => {
     const [
       { loadSeason },
       { reactiveMoment, reactivePrompt, shortReactiveLine },
-      { hashString },
+      { hashString, previewSaturday },
       { askClaude, FEATURE_MODEL },
       { getSql },
       store,
@@ -35,17 +36,17 @@ export const getReactiveCommentary = createServerFn({ method: "POST" })
     ]);
     const { data } = await loadSeason();
     const archived = data.replays?.flatMap(replay => replay.bouts).find(b => b.id === input.boutId && b.result);
-    const bout = archived ?? data.bouts.find((b) => b.id === input.boutId);
-    // House previews and unposted matches must never spend API calls.
-    if (!bout?.result || bout.kind === "bye" ||
-        !(data.week > bout.week || ["fought", "inspected", "complete"].includes(data.phase)))
+    const house = input.preview && !data.bouts.some(b => b.week === data.week && b.result);
+    const bout = house ? previewSaturday(data).find(b => b.id === input.boutId) : archived ?? data.bouts.find((b) => b.id === input.boutId);
+    if (!bout?.result || bout.kind === "bye" || (!house &&
+        !(data.week > bout.week || ["fought", "inspected", "complete"].includes(data.phase))))
       return { status: "unavailable" };
 
     const moment = reactiveMoment(bout.result, { phase: input.phase as ReactivePhase, index: input.index });
     if (!moment) return { status: "unavailable" };
 
     const kind = "reactive";
-    const key = bout.id + ":" + hashString(bout.result.seed) + ":ringside-v2:" + moment.beatId;
+    const key = (house ? "house:" + hashString(moment.event) + ":" : "") + bout.id + ":" + hashString(bout.result.seed) + ":ringside-v2:" + moment.beatId;
     const sql = await getSql();
     async function ready(body: string): Promise<ReactiveCommentaryResponse> {
       try {
@@ -54,15 +55,17 @@ export const getReactiveCommentary = createServerFn({ method: "POST" })
         const reply = analystReply(moment!);
         const [lead, analyst] = await Promise.all([
           ringsideVoice(sql, key, body),
-          reply ? ringsideVoice(sql, key + ":analysis-v1", reply, "Monika", "ringside-analysis") : undefined,
+          reply ? ringsideVoice(sql, key + ":analysis-v2", reply, "Kathy", "ringside-analysis") : undefined,
         ]);
         return { status: "ready", body, ...lead,
           voicePending: !!(lead.voicePending || analyst?.voicePending),
-          replyClip: reply && analyst?.audio ? { speaker: "Monika", text: reply, audio: analyst.audio } : undefined };
+          replyClip: reply && analyst?.audio ? { speaker: "Kathy", text: reply, audio: analyst.audio } : undefined };
       } catch {
         return { status: "ready", body };
       }
     }
+    // A house fight uses its simulated event as the script. Keep its clips apart from the official tape.
+    if (house) return ready(moment.event + "!");
     const existing = await store.readCopy(sql, kind, key);
     if (existing?.status === "ready" && existing.body) return ready(existing.body);
     if (existing?.status === "pending") return { status: "pending" };

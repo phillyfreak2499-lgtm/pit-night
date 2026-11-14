@@ -13,7 +13,7 @@ const MAX_LATENCY_MS = 12000;
  * Local speech and display follow the broadcast. One request at a time;
  * no backlog, no per-frame polling, and no stale line after pause or skip.
  */
-export function useReactiveCommentary(bout: Bout | null, active: boolean, duck: (speaking: boolean) => void) {
+export function useReactiveCommentary(bout: Bout | null, active: boolean, duck: (speaking: boolean) => void, preview = false) {
   const boutKey = bout?.result ? bout.id + ":" + bout.result.seed : "";
   const [lastLine, setLastLine] = useState<{ key: string; body: string } | null>(null);
   const current = useRef({ boutKey, active });
@@ -92,6 +92,7 @@ export function useReactiveCommentary(bout: Bout | null, active: boolean, duck: 
         boutId: bout!.id,
         phase: cue.phase,
         index: cue.index,
+        preview,
       } });
       // Another screen may own the server's write-once claim.
       for (let retry = 0; (reply.status === "pending" || (reply.status === "ready" && reply.voicePending)) && retry < 4; retry++) {
@@ -101,6 +102,7 @@ export function useReactiveCommentary(bout: Bout | null, active: boolean, duck: 
           boutId: bout!.id,
           phase: cue.phase,
           index: cue.index,
+          preview,
         } });
       }
       if (!valid() || soundMuted() || reply.status !== "ready" || Date.now() - started >= MAX_LATENCY_MS) return;
@@ -111,7 +113,7 @@ export function useReactiveCommentary(bout: Bout | null, active: boolean, duck: 
         recorded.current = controller;
         try {
           if (speech.current) return;
-          const clips: BoothClip[] = [{ speaker: "David", text: reply.body, audio: reply.audio }];
+          const clips: BoothClip[] = [{ speaker: "Jim", text: reply.body, audio: reply.audio }];
           if (reply.replyClip) clips.push(reply.replyClip);
           await playBooth(context, clips, controller.signal, line =>
             setLastLine({ key: boutKey, body: line.speaker + " · " + line.text }), duck);
@@ -152,7 +154,7 @@ export function useReactiveCommentary(bout: Bout | null, active: boolean, duck: 
     }).finally(() => {
       if (generation.current === requestId) busy.current = false;
     });
-  }, [active, bout, boutKey, duck, release]);
+  }, [active, bout, boutKey, duck, release, preview]);
 
   return {
     line: lastLine?.key === boutKey ? lastLine.body : "",

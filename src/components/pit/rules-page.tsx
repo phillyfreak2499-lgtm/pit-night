@@ -10,6 +10,10 @@ import { RulebookQa } from "./claude-copy";
 /** The rulebook as plain text. The Rules page renders it; the rules Q&A answers only from it. */
 export const RULES: { title: string; text: string }[] = [
   {
+    title: "Watching a card with Jim and Kathy",
+    text: "Open Big Broadcast and select Play broadcast, or choose Watch party · big screen and press Start. Both start with commentary and arena sound on. Jim introduces the bots and calls the action. Kathy introduces the opponent and explains turning points. Four fight tracks rotate in card order. Music and cheers dip while the booth speaks. Pause, skip, mute or replay at any time. Playback controls affect your device only. A house tape previews the open week. The Desk posts the official result. Watching either version awards no coins, Bolts or wins.",
+  },
+  {
     title: "The clock",
     text: "Sunday through Saturday the store runs the floor. That whole week is the card. Saturday at close is one lock: chassis, drive, weapon, armor, utility, brain. The captain locks before the final numbers are in, so the lock is a bet on the week. Sunday the official numbers come out and the Desk clicks in each store's six colors. Monday morning the Desk runs seven fights live: every store fights and there are no byes. Monday afternoon is the damage report, the coins pay out, and the shop opens for the next week. Week 1 is different only because Period 11 colors pay the opening coins and set seeds inside Metro and Frontier.",
   },
