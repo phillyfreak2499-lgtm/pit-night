@@ -66,8 +66,8 @@ export type BotTopper = (typeof TOPPER_IDS)[number];
 export const WING_IDS = ["none", "abilene"] as const;
 export type BotWings = (typeof WING_IDS)[number];
 export type BotMask = "none" | "lantern" | "hockey";
-/** Cosmetic blade only. Premium Halloween weapons are real parts, not skins. */
-export type BotWeaponSkin = "none" | "hockey-machete" | "neon-fang" | "gold-fang" | "ice-fang";
+/** Cosmetic blade only. Premium Halloween weapons are real parts, not skins. Biting Maw redraws a claw as a mouth and leaves every other weapon unchanged. */
+export type BotWeaponSkin = "none" | "hockey-machete" | "neon-fang" | "gold-fang" | "ice-fang" | "biting-maw";
 export type ShowEffectId = "fog" | "blacklight" | "laser" | "spotlights" | "embers" | "leaves";
 export type BotLeds = "none" | StatKey;
 export const SMOKE_IDS = ["", "neon", "candy", "ice", "royal", "black"] as const;

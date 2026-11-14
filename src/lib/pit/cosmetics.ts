@@ -279,7 +279,7 @@ const FREE: Record<CosmeticKind, Set<string>> = {
   body:new Set(),
   look:new Set(["plain","stripe","chevron","rivets","two-tone","camouflage","tie-dye","texas","louisiana","cowboys","seahawks","raiders","chiefs","bumblebee","chase"]),
   mask:new Set(["none"]),
-  weaponSkin:new Set(["none"]),
+  weaponSkin:new Set(["none", "biting-maw"]),
   wheelColor:new Set(["stock"]),
   leds:new Set(["none",""]),
   smoke:new Set(["","none"]),

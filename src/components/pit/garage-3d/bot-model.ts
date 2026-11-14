@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { EYES, PAINT, TRIM, WHEEL_COLORS, styleOf } from "@/lib/pit/catalog";
+import { EYES, PAINT, TRIM, WHEEL_COLORS, bitingMawActive, styleOf } from "@/lib/pit/catalog";
 import type { BotBody } from "@/lib/pit/types";
 import type { BotLookProps } from "../bot-portrait";
 import { botFrameOf } from "../bot-frame";
@@ -1158,38 +1158,135 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
       break;
     }
     case "claw": {
-      profileSolid(
-        "Claw lower jaw",
-        [
-          [front - 0.08, 0.2],
-          [front + 0.64, 0.04],
-          [front + 0.64, 0.01],
-          [front - 0.08, 0.04],
-        ],
-        w * 0.54,
-        steel,
-        weapon,
-      );
       const pivotZ = front - 0.06 * unit;
       const pivotY = h * 0.85;
       const a = 0.55;
-      const profile: [number, number][] = [
-        [0, 0.03],
-        [0.36, 0.02],
-        [0.42, -0.1],
-        [0.36, -0.04],
-        [0, -0.035],
-      ];
-      profileSolid(
-        "Claw raised biting jaw",
-        profile.map(([z, y]) => [
-          pivotZ + (z * Math.cos(a) - y * Math.sin(a)) * unit,
-          pivotY + (z * Math.sin(a) + y * Math.cos(a)) * unit,
-        ]),
-        w * 0.38,
-        steel,
-        weapon,
-      );
+      if (bitingMawActive(style.weaponSkin, look.weapon)) {
+        const mawMetal = metal("#d5dee6", 0.34, 0.82);
+        const mawLip = metal("#8ea0ac", 0.4, 0.74);
+        const gum = metal("#6e2432", 0.72, 0.08);
+        const toothMat = metal("#fff4d6", 0.28, 0.12);
+        const gulletMat = metal("#14080d", 0.94, 0.02);
+        const tongueMat = new THREE.MeshStandardMaterial({
+          color: "#9a3142",
+          roughness: 0.32,
+          metalness: 0.05,
+          emissive: "#3a1018",
+          emissiveIntensity: 0.08,
+        });
+        profileSolid(
+          "Maw lower jaw",
+          [
+            [front - 0.08, 0.22],
+            [front + 0.62, 0.1],
+            [front + 0.7, 0.14],
+            [front + 0.62, 0.02],
+            [front - 0.08, 0.04],
+          ],
+          w * 0.58,
+          mawMetal,
+          weapon,
+        );
+        profileSolid(
+          "Maw lower gum",
+          [
+            [front + 0.02, 0.16],
+            [front + 0.58, 0.1],
+            [front + 0.58, 0.06],
+            [front + 0.02, 0.1],
+          ],
+          w * 0.42,
+          gum,
+          weapon,
+        );
+        const upper: [number, number][] = [
+          [0, 0.05],
+          [0.28, 0.035],
+          [0.4, 0.01],
+          [0.46, -0.09],
+          [0.34, -0.04],
+          [0, -0.04],
+        ];
+        profileSolid(
+          "Maw upper jaw",
+          upper.map(([z, y]) => [
+            pivotZ + (z * Math.cos(a) - y * Math.sin(a)) * unit,
+            pivotY + (z * Math.sin(a) + y * Math.cos(a)) * unit,
+          ]),
+          w * 0.42,
+          mawLip,
+          weapon,
+        );
+        box("Maw gullet", [w * 0.3, 0.14, 0.18], [0, 0.24, front + 0.08], gulletMat, weapon);
+        const tongue = sphere(
+          "Maw tongue",
+          [w * 0.12, 0.028, 0.22],
+          [0, 0.15, front + 0.28],
+          tongueMat,
+          weapon,
+        );
+        tongue.rotation.x = -0.35;
+        const pointTooth = (at: Vec, dir: THREE.Vector3, length: number, radius: number) => {
+          const mesh = cone(
+            "Maw tooth",
+            radius,
+            length,
+            [at[0] + dir.x * length * 0.5, at[1] + dir.y * length * 0.5, at[2] + dir.z * length * 0.5],
+            toothMat,
+            weapon,
+          );
+          mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+          return mesh;
+        };
+        const up = new THREE.Vector3(0, 0.96, 0.28).normalize();
+        for (let i = 0; i < 6; i++) {
+          const t = i / 5;
+          const z = front + 0.08 + t * 0.5;
+          const y = 0.22 - t * 0.08;
+          const length = 0.07 + (i % 2 ? 0.03 : 0);
+          for (const x of [-w * 0.16, 0, w * 0.16]) pointTooth([x, y, z], up, length, 0.018);
+        }
+        const down = new THREE.Vector3(0, -Math.cos(a), Math.sin(a)).normalize();
+        for (let i = 0; i < 5; i++) {
+          const t = (i + 0.4) / 5;
+          const localZ = 0.06 + t * 0.34;
+          const localY = -0.045;
+          const originY = pivotY + (localZ * Math.sin(a) + localY * Math.cos(a)) * unit;
+          const originZ = pivotZ + (localZ * Math.cos(a) - localY * Math.sin(a)) * unit;
+          const length = 0.065 + (i % 2 ? 0.025 : 0);
+          for (const x of [-w * 0.12, 0, w * 0.12]) pointTooth([x, originY, originZ], down, length, 0.016);
+        }
+      } else {
+        profileSolid(
+          "Claw lower jaw",
+          [
+            [front - 0.08, 0.2],
+            [front + 0.64, 0.04],
+            [front + 0.64, 0.01],
+            [front - 0.08, 0.04],
+          ],
+          w * 0.54,
+          steel,
+          weapon,
+        );
+        const profile: [number, number][] = [
+          [0, 0.03],
+          [0.36, 0.02],
+          [0.42, -0.1],
+          [0.36, -0.04],
+          [0, -0.035],
+        ];
+        profileSolid(
+          "Claw raised biting jaw",
+          profile.map(([z, y]) => [
+            pivotZ + (z * Math.cos(a) - y * Math.sin(a)) * unit,
+            pivotY + (z * Math.sin(a) + y * Math.cos(a)) * unit,
+          ]),
+          w * 0.38,
+          steel,
+          weapon,
+        );
+      }
       cylinder("Claw pivot", 0.09, w * 0.6, [0, pivotY, pivotZ], dark, "x", weapon);
       for (const x of [-w * 0.23, w * 0.23])
         beam(
