@@ -19,7 +19,7 @@ export const getReactiveCommentary = createServerFn({ method: "POST" })
   .handler(async ({ data: input }): Promise<ReactiveCommentaryResponse> => {
     const [
       { loadSeason },
-      { reactiveMoment, reactivePrompt, shortReactiveLine },
+      { reactiveMoment, reactivePrompt, shortReactiveLine, repeatsCall, impactLine },
       { hashString, previewSaturday },
       { askClaude, FEATURE_MODEL },
       { getSql },
@@ -46,7 +46,8 @@ export const getReactiveCommentary = createServerFn({ method: "POST" })
     if (!moment) return { status: "unavailable" };
 
     const kind = "reactive";
-    const key = (house ? "house:" + hashString(moment.event) + ":" : "") + bout.id + ":" + hashString(bout.result.seed) + ":ringside-v2:" + moment.beatId;
+    const prefix = (house ? "house:" : "") + bout.id + ":" + hashString(bout.result.seed) + ":ringside-v3:";
+    const key = prefix + (house ? hashString(JSON.stringify(moment)) + ":" : "") + moment.beatId;
     const sql = await getSql();
     async function ready(body: string): Promise<ReactiveCommentaryResponse> {
       try {
@@ -55,17 +56,17 @@ export const getReactiveCommentary = createServerFn({ method: "POST" })
         const reply = analystReply(moment!);
         const [lead, analyst] = await Promise.all([
           ringsideVoice(sql, key, body),
-          reply ? ringsideVoice(sql, key + ":analysis-v2", reply, "Kathy", "ringside-analysis") : undefined,
+          reply ? ringsideVoice(sql, key + ":analysis-v2", reply, "Cathy", "ringside-analysis") : undefined,
         ]);
         return { status: "ready", body, ...lead,
           voicePending: !!(lead.voicePending || analyst?.voicePending),
-          replyClip: reply && analyst?.audio ? { speaker: "Kathy", text: reply, audio: analyst.audio } : undefined };
+          replyClip: reply && analyst?.audio ? { speaker: "Cathy", text: reply, audio: analyst.audio } : undefined };
       } catch {
         return { status: "ready", body };
       }
     }
     // A house fight uses its simulated event as the script. Keep its clips apart from the official tape.
-    if (house) return ready(moment.event + "!");
+    if (house) return ready(impactLine(moment));
     const existing = await store.readCopy(sql, kind, key);
     if (existing?.status === "ready" && existing.body) return ready(existing.body);
     if (existing?.status === "pending") return { status: "pending" };
@@ -83,16 +84,21 @@ export const getReactiveCommentary = createServerFn({ method: "POST" })
     }
 
     try {
-      const request = reactivePrompt(moment);
+      const priorKeys = Array.from({ length: moment.index }, (_, i) => prefix + "x" + i);
+      const prior = priorKeys.length ? await sql<{body: string}>`
+        select body from pit_claude_text where kind = ${kind} and status = 'ready'
+          and key = any(${priorKeys}::text[]) order by array_position(${priorKeys}::text[], key) desc limit 3` : [];
+      const recent = prior.map(row => row.body);
+      const request = reactivePrompt(moment, recent);
       const generated = await askClaude({
         feature: "live",
         system: request.system,
         prompt: request.prompt,
         maxTokens: request.maxTokens,
       });
-      const body = shortReactiveLine(generated.text);
-      if (!body || unsupportedNumbers(body, moment).length)
-        throw new Error("Claude returned an unsupported reactive line.");
+      const proposed = shortReactiveLine(generated.text);
+      const body = proposed && !unsupportedNumbers(proposed, moment).length && !repeatsCall(proposed, recent)
+        ? proposed : impactLine(moment);
       await store.finishCopy(sql, kind, key, { body });
       return ready(body);
     } catch {

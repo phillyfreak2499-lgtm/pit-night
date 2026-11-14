@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { reactiveMoment, reactivePrompt, shortReactiveLine } from "../src/lib/pit/reactive-commentary";
+import { impactLine, reactiveMoment, reactivePrompt, repeatsCall, shortReactiveLine } from "../src/lib/pit/reactive-commentary";
+import { analystReply } from "../src/lib/pit/booth";
 import type { Exchange, FightResult, FighterSnap } from "../src/lib/pit/types";
 
 const fighters = [
@@ -80,4 +81,18 @@ test("model output is one sentence and at most fourteen spoken words", () => {
   assert.equal(shortReactiveLine("What a hit! This second sentence should never be spoken."), "What a hit!");
   assert.equal(shortReactiveLine("A"), "");
   assert.equal(shortReactiveLine("One two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen").split(" ").length, 14);
+});
+
+test("new calls take earlier wording and tape details into account", () => {
+  const result = fight([exchange(0, "a", "b", 22, 100, 78), exchange(1, "b", "a", 25, 78, 75)]);
+  const m = reactiveMoment(result, { phase: "exchange", index: 1 })!;
+  const old = "Iron Jaw connects and sends Road Rage spinning.";
+  assert.ok(reactivePrompt(m, [old]).prompt.includes(old));
+  assert.deepEqual(m.previous, {attacker:"Iron Jaw", defender:"Road Rage", damage:22});
+  assert.ok(repeatsCall("Another hit sends Road Rage spinning!", [old]));
+  assert.ok(repeatsCall("That one really rattled him!", []));
+  assert.ok(!repeatsCall("Road Rage answers with 25 damage!", [old]));
+  assert.match(impactLine(m), /25 damage/);
+  const replies = [1, 2, 3].map(index => analystReply({...m, index, kind:"half-health"}));
+  assert.equal(new Set(replies).size, 3);
 });

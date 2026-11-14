@@ -10,8 +10,8 @@ import { RulebookQa } from "./claude-copy";
 /** The rulebook as plain text. The Rules page renders it; the rules Q&A answers only from it. */
 export const RULES: { title: string; text: string }[] = [
   {
-    title: "Watching a card with Jim and Kathy",
-    text: "Open Big Broadcast and select Play broadcast, or choose Watch party · big screen and press Start. Both start with commentary and arena sound on. Jim introduces the bots and calls the action. Kathy introduces the opponent and explains turning points. Four fight tracks rotate in card order. Music and cheers dip while the booth speaks. Pause, skip, mute or replay at any time. Playback controls affect your device only. A house tape previews the open week. The Desk posts the official result. Watching either version awards no coins, Bolts or wins.",
+    title: "Watching a card with Jim and Cathy",
+    text: "Open Big Broadcast and select Play broadcast, or choose Watch party · big screen and press Start. Both start with commentary and arena sound on. Jim introduces the bots and calls the action. Cathy introduces the opponent and explains turning points. Four fight tracks rotate in card order. Music and cheers dip while the booth speaks. Pause, skip, mute or replay at any time. Playback controls affect your device only. A house tape previews the open week. The Desk posts the official result. Watching either version awards no coins, Bolts or wins.",
   },
   {
     title: "The clock",
