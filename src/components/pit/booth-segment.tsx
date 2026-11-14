@@ -9,7 +9,7 @@ export function BoothSegment({ scene, id, label, automatic = false }: {
   scene: BoothScene; id?: string; label: string; automatic?: boolean;
 }) {
   const active = useRef<AbortController | null>(null);
-  const [state, setState] = useState<"idle" | "loading" | "playing" | "unavailable">("idle");
+  const [state, setState] = useState<"idle" | "loading" | "playing" | "partial" | "unavailable">("idle");
   const [caption, setCaption] = useState("");
   const muted = useSyncExternalStore(subscribeSound, soundMuted, () => false);
   const stop = useCallback(() => {
@@ -43,7 +43,12 @@ export function BoothSegment({ scene, id, label, automatic = false }: {
         setState("playing");
         setCaption(line.speaker + " · " + line.text);
       });
-      if (!controller.signal.aborted) setState("idle");
+      if (!controller.signal.aborted) {
+        if (result.clips.length < result.lines.length) {
+          setCaption(result.lines.map(l => l.speaker + " · " + l.text).join(" "));
+          setState("partial");
+        } else setState("idle");
+      }
     } catch {
       if (!controller.signal.aborted) setState("unavailable");
     } finally {
@@ -62,6 +67,6 @@ export function BoothSegment({ scene, id, label, automatic = false }: {
       {busy ? <Square size={14} /> : <Mic size={16} />}
       {muted ? "Booth audio muted" : state === "loading" ? "Cancel · loading audio" : busy ? "Stop audio" : label}
     </button>}
-    <p aria-live="polite" className="text-sm text-muted">{state === "unavailable" ? "Audio unavailable. " : ""}{caption}</p>
+    <p aria-live="polite" className="text-sm text-muted">{state === "unavailable" ? "Audio unavailable. " : state === "partial" ? "One recording is unavailable. " : ""}{caption}</p>
   </div>;
 }

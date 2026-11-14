@@ -28,7 +28,7 @@ export async function ringsideVoice(sql: Sql, beat: string, body: string, speake
       method: "POST",
       headers: { "xi-api-key": apiKey, "Content-Type": "application/json", Accept: "audio/mpeg" },
       body: JSON.stringify({ model_id: MODEL, text: direction + " " + body.replace(/[\[\]]/g, "") }),
-      signal: AbortSignal.timeout(6500),
+      signal: AbortSignal.timeout(kind === "league-booth" ? 12000 : 6500),
     });
     if (!response.ok) {
       const failure = await response.json().catch(() => null);
@@ -43,7 +43,9 @@ export async function ringsideVoice(sql: Sql, beat: string, body: string, speake
     const audio = bytes.toString("base64");
     await finishCopy(sql, kind, key, { body: audio });
     return { audio };
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message !== "Voice unavailable")
+      console.warn("[ringside] Recording interrupted", speaker, error.name);
     await finishCopy(sql, kind, key, { error: "Ringside recording unavailable." });
     return {};
   }
