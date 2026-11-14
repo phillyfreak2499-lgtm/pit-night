@@ -11,7 +11,7 @@ const MAX_LATENCY_MS = 12000;
  * Local speech and display follow the broadcast. One request at a time;
  * no backlog, no per-frame polling, and no stale line after pause or skip.
  */
-export function useReactiveCommentary(bout: Bout | null, active: boolean) {
+export function useReactiveCommentary(bout: Bout | null, active: boolean, duck: (speaking: boolean) => void) {
   const boutKey = bout?.result ? bout.id + ":" + bout.result.seed : "";
   const [lastLine, setLastLine] = useState<{ key: string; body: string } | null>(null);
   const current = useRef({ boutKey, active });
@@ -20,6 +20,13 @@ export function useReactiveCommentary(bout: Bout | null, active: boolean) {
   const lastRequest = useRef(0);
   const busy = useRef(false);
   const generation = useRef(0);
+  const speech = useRef<SpeechSynthesisUtterance | null>(null);
+  const releaseTimer = useRef<number | undefined>(undefined);
+  const release = useCallback(() => {
+    window.clearTimeout(releaseTimer.current);
+    speech.current = null;
+    duck(false);
+  }, [duck]);
 
   useEffect(() => {
     generation.current++;
@@ -40,15 +47,25 @@ export function useReactiveCommentary(bout: Bout | null, active: boolean) {
   }, [active]);
 
   useEffect(() => {
+    // Prime the voice list. Some browsers populate it asynchronously.
+    window.speechSynthesis?.getVoices();
     const unsubscribe = subscribeSound(() => {
-      if (soundMuted()) window.speechSynthesis?.cancel();
+      if (soundMuted()) {
+        generation.current++;
+        busy.current = false;
+        release();
+        window.speechSynthesis?.cancel();
+      }
     });
     return () => {
       unsubscribe();
       generation.current++;
+      release();
       window.speechSynthesis?.cancel();
     };
-  }, []);
+  }, [release]);
+
+  useEffect(() => release, [active, boutKey, release]);
 
   const onBeat = useCallback((cue: ReactiveCue) => {
     if (!active || !boutKey || busy.current || soundMuted()) return;
@@ -79,21 +96,36 @@ export function useReactiveCommentary(bout: Bout | null, active: boolean) {
           index: cue.index,
         } });
       }
-      if (!valid() || reply.status !== "ready" || Date.now() - started >= MAX_LATENCY_MS) return;
+      if (!valid() || soundMuted() || reply.status !== "ready" || Date.now() - started >= MAX_LATENCY_MS) return;
       setLastLine({ key: boutKey, body: reply.body });
       if (typeof window === "undefined" || typeof SpeechSynthesisUtterance === "undefined" ||
           !window.speechSynthesis) return;
       const utterance = new SpeechSynthesisUtterance(reply.body);
-      utterance.rate = 1.12;
-      utterance.pitch = 0.95;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utterance);
+      const synth = window.speechSynthesis;
+      // Let the announcer finish the previous thought.
+      if (synth.speaking || synth.pending) return;
+      const english = synth.getVoices().filter(voice => /^en(?:[-_]|$)/i.test(voice.lang));
+      const voice = english.find(v => /natural|premium|enhanced|neural/i.test(v.name))
+        ?? english.find(v => v.default) ?? english.find(v => /^en-US$/i.test(v.lang)) ?? english[0];
+      if (voice) utterance.voice = voice;
+      utterance.lang = voice?.lang ?? "en-US";
+      utterance.rate = 1;
+      speech.current = utterance;
+      utterance.onstart = () => {
+        if (speech.current !== utterance) return;
+        duck(true);
+        releaseTimer.current = window.setTimeout(release, 15000);
+      };
+      utterance.onend = utterance.onerror = () => {
+        if (speech.current === utterance) release();
+      };
+      synth.speak(utterance);
     })().catch(() => {
       // Browser voice, networking or Claude failing never holds the fight.
     }).finally(() => {
       if (generation.current === requestId) busy.current = false;
     });
-  }, [active, bout, boutKey]);
+  }, [active, bout, boutKey, duck, release]);
 
   return {
     line: lastLine?.key === boutKey ? lastLine.body : "",

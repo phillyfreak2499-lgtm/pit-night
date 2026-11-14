@@ -1,7 +1,10 @@
 import { TaleOfTape } from "./tale-of-tape";
 import { Link } from "@tanstack/react-router";
 import { Flame, HelpCircle, Maximize, Mic, MicOff, Minimize, Package, Pause, Play, SkipForward, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Volume2, VolumeX } from "lucide-react";
+import { live, setSoundMuted, soundMuted, subscribeSound } from "@/lib/pit/sound";
+import { startArenaMix } from "@/lib/pit/arena-mix";
 import { createPortal } from "react-dom";
 import { hasChampionshipOpening } from "@/lib/pit/championship-opening";
 import { TeamJanelleOpening } from "./team-janelle-opening";
@@ -40,8 +43,21 @@ export function WatchPage() {
   const [full, setFull] = useState(false);
   const bout = bouts[index] ?? null;
   const [commentaryEnabled, setCommentaryEnabled] = useState(true);
+  const muted = useSyncExternalStore(subscribeSound, soundMuted, () => false);
+  const mix = useRef<ReturnType<typeof startArenaMix> | null>(null);
+  useEffect(() => {
+    if (muted || paused || stage !== "fight") return;
+    const audio = live();
+    if (!audio) return;
+    mix.current = startArenaMix(audio);
+    return () => {
+      mix.current?.stop();
+      mix.current = null;
+    };
+  }, [stage, paused, muted, bout?.id]);
+  const duck = useCallback((speaking: boolean) => mix.current?.duck(speaking), []);
   const { line: commentaryLine, onBeat: onNotableBeat } = useReactiveCommentary(
-    bout, commentaryEnabled && stage === "fight" && !paused,
+    bout, commentaryEnabled && stage === "fight" && !paused, duck,
   );
 
   const next = useCallback(() => {
@@ -203,10 +219,16 @@ export function WatchPage() {
             stage
             kicker={replaying ? "Replay" : (tape ?? liveTape).live ? "Live card" : "House tape"}
             onComplete={next}
-            onNotableBeat={onNotableBeat}
+            onNotableBeat={cue => {
+              mix.current?.cheer();
+              onNotableBeat(cue);
+            }}
           />
           {commentaryEnabled && commentaryLine ? <p className="absolute bottom-32 left-2 z-40 max-w-lg border-l-2 border-amber bg-deep/90 px-3 py-2 text-base" aria-live="polite" data-testid="reactive-commentary"><span className="mr-2 font-display text-xs tracking-widest text-amber uppercase">AI color</span>{commentaryLine}</p> : null}
           <div className="absolute bottom-[4.75rem] left-2 z-40 flex gap-1 sm:bottom-20">
+            <IconBtn label={muted ? "Unmute fight audio" : "Mute fight audio"} onClick={() => setSoundMuted(!muted)}>
+              {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+            </IconBtn>
             <IconBtn label={commentaryEnabled ? "Turn AI commentary off" : "Turn AI commentary on"} onClick={() => setCommentaryEnabled((on) => !on)}>
               {commentaryEnabled ? <Mic size={18} /> : <MicOff size={18} />}
             </IconBtn>
