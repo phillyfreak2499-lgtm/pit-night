@@ -3,6 +3,7 @@ import {
   askRulebook,
   claudeHealth,
   getClaudeCopy,
+  getCoachTape,
   getLiveCall,
   rulebookQuota,
   type CopyResult,
@@ -17,7 +18,7 @@ export function ClaudeCopy({
   label,
   className = "",
 }: {
-  kind: "bout" | "recap" | "hype";
+  kind: "bout" | "recap" | "hype" | "coach";
   id: string;
   label: string;
   className?: string;
@@ -28,7 +29,7 @@ export function ClaudeCopy({
     let timer: ReturnType<typeof setTimeout> | undefined;
     let tries = 0;
     const load = () =>
-      getClaudeCopy({ data: { kind, id } })
+      (kind === "coach" ? getCoachTape({ data: { id } }) : getClaudeCopy({ data: { kind, id } }))
         .then((res) => {
           if (!alive) return;
           setCopy(res);

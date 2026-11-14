@@ -6,7 +6,7 @@
  * up to Sonnet only after Haiku measurably fails it; see FEATURE_MODEL.
  */
 export const HAIKU = "claude-haiku-5-5";
-export type ClaudeFeature = "bout" | "recap" | "hype" | "rules" | "live" | "gazette";
+export type ClaudeFeature = "bout" | "recap" | "hype" | "rules" | "live" | "gazette" | "coach";
 export const FEATURE_MODEL: Record<ClaudeFeature, string> = {
   bout: HAIKU,
   recap: HAIKU,
@@ -14,6 +14,7 @@ export const FEATURE_MODEL: Record<ClaudeFeature, string> = {
   rules: HAIKU,
   live: HAIKU,
   gazette: HAIKU,
+  coach: HAIKU,
 };
 
 const KEY_NAMES = ["ANTHROPIC_API_KEY", "CLAUDE_API_KEY", "ANTHROPIC_KEY"];
