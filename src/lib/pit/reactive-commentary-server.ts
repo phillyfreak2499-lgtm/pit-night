@@ -49,14 +49,14 @@ export const getReactiveCommentary = createServerFn({ method: "POST" })
     const prefix = (house ? "house:" : "") + bout.id + ":" + hashString(bout.result.seed) + ":ringside-v3:";
     const key = prefix + (house ? hashString(JSON.stringify(moment)) + ":" : "") + moment.beatId;
     const sql = await getSql();
-    async function ready(body: string): Promise<ReactiveCommentaryResponse> {
+    async function ready(body: string, leadKey = key): Promise<ReactiveCommentaryResponse> {
       try {
         const { ringsideVoice } = await import("./ringside-voice.server");
         const { analystReply } = await import("./booth");
         const { swingMeterCall } = await import("./vitals");
         const reply = analystReply(moment!, input.phase === "exchange" ? swingMeterCall(bout!.result!, input.index) : undefined);
         const [lead, analyst] = await Promise.all([
-          ringsideVoice(sql, key, body),
+          ringsideVoice(sql, leadKey, body),
           reply ? ringsideVoice(sql, key + ":analysis:" + hashString(reply), reply, "Cathy", "ringside-analysis") : undefined,
         ]);
         return { status: "ready", body, ...lead,
@@ -66,12 +66,14 @@ export const getReactiveCommentary = createServerFn({ method: "POST" })
         return { status: "ready", body };
       }
     }
+    // An unavailable writer still leaves a verified impact and its recorded meter readings.
+    const callFromTape = () => ready(impactLine(moment), key + ":tape");
     // A house fight uses its simulated event as the script. Keep its clips apart from the official tape.
     if (house) return ready(impactLine(moment));
     const existing = await store.readCopy(sql, kind, key);
     if (existing?.status === "ready" && existing.body) return ready(existing.body);
     if (existing?.status === "pending") return { status: "pending" };
-    if (existing) return { status: "unavailable" };
+    if (existing) return callFromTape();
 
     const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(new Date());
     const slot = await store.reserveCopy(sql, kind, key, FEATURE_MODEL.live, 80, day);
@@ -81,7 +83,7 @@ export const getReactiveCommentary = createServerFn({ method: "POST" })
         if (row?.status === "ready" && row.body) return ready(row.body);
         if (row?.status === "pending") return { status: "pending" };
       }
-      return { status: "unavailable" };
+      return callFromTape();
     }
 
     try {
@@ -103,8 +105,7 @@ export const getReactiveCommentary = createServerFn({ method: "POST" })
       await store.finishCopy(sql, kind, key, { body });
       return ready(body);
     } catch {
-      // The fight and the original ringside captions continue without AI.
       await store.finishCopy(sql, kind, key, { error: "Reactive commentary unavailable." });
-      return { status: "unavailable" };
+      return callFromTape();
     }
   });
