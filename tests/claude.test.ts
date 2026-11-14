@@ -20,6 +20,7 @@ import {
 } from "../src/lib/pit/claude-copy.ts";
 import { claimCopy, countClaimedOnDay, finishCopy, readCopy, reserveCopy } from "../src/lib/pit/claude-store.ts";
 import { FEATURE_MODEL, HAIKU } from "../src/lib/pit/claude.server.ts";
+import { ringsideVoice } from "../src/lib/pit/ringside-voice.server.ts";
 import type { Sql } from "../src/lib/db.ts";
 import type { FightResult } from "../src/lib/pit/types.ts";
 import { coachStore, tapeNote } from "../src/lib/pit/coach-tape.ts";
@@ -82,7 +83,7 @@ test("hype covers the upcoming card before it runs, hides builds, and stops afte
   assert.equal(upcomingMatchups(league(true)).length, 0);
 });
 
-test("copy is claimed once, written once, and a ready row is never rewritten", async () => {
+test("copy is claimed once, written once, and a ready row is never rewritten", async (t) => {
   const pg = new PGlite();
   const dir = new URL("../migrations/", import.meta.url);
   for (const name of readdirSync(dir).filter((f) => f.endsWith(".sql")).sort()) await pg.exec(readFileSync(new URL(name, dir), "utf8"));
@@ -93,6 +94,27 @@ test("copy is claimed once, written once, and a ready row is never rewritten", a
     return run<T>(text, values);
   }) as unknown as Sql;
   sql.query = (text: string, params: unknown[] = []) => run(text, params);
+
+  await t.test("a replay uses the approved announcer recording without a second voice request", async (t) => {
+    const saved = process.env.ELEVENLABS_API_KEY;
+    t.after(() => {
+      if (saved === undefined) delete process.env.ELEVENLABS_API_KEY;
+      else process.env.ELEVENLABS_API_KEY = saved;
+    });
+    delete process.env.ELEVENLABS_API_KEY;
+    assert.deepEqual(await ringsideVoice(sql, "impact", "Huge hit!"), {});
+    process.env.ELEVENLABS_API_KEY = "test-only";
+    const voice = t.mock.method(globalThis, "fetch", (url: string, init: RequestInit) => {
+      assert.match(url, /text-to-speech\/DduhIyyKkOosbP8VefhP/);
+      assert.equal(JSON.parse(String(init.body)).model_id, "eleven_v4");
+      return Promise.resolve(new Response("recorded-call", { headers: { "content-type": "audio/mpeg" } }));
+    });
+    const recording = await ringsideVoice(sql, "impact", "Huge hit!");
+    assert.equal(recording.audio, Buffer.from("recorded-call").toString("base64"));
+    delete process.env.ELEVENLABS_API_KEY;
+    assert.deepEqual(await ringsideVoice(sql, "impact", "Huge hit!"), recording);
+    assert.equal(voice.mock.callCount(), 1);
+  });
 
   assert.equal(await claimCopy(sql, "bout", "b1", "claude-haiku-5-5"), true);
   assert.equal(await claimCopy(sql, "bout", "b1", "claude-haiku-5-5"), false, "a second viewer waits");

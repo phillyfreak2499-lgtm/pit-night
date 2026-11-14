@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getReactiveCommentary } from "@/lib/pit/reactive-commentary-server";
 import { announcerDelivery, reactiveMoment, type ReactiveCue } from "@/lib/pit/reactive-commentary";
-import { soundMuted, subscribeSound } from "@/lib/pit/sound";
+import { live, soundMuted, subscribeSound } from "@/lib/pit/sound";
 import type { Bout } from "@/lib/pit/types";
 
 const MIN_GAP_MS = 6000;
@@ -21,9 +21,16 @@ export function useReactiveCommentary(bout: Bout | null, active: boolean, duck: 
   const busy = useRef(false);
   const generation = useRef(0);
   const speech = useRef<SpeechSynthesisUtterance | null>(null);
+  const recorded = useRef<AudioBufferSourceNode | null>(null);
   const releaseTimer = useRef<number | undefined>(undefined);
   const release = useCallback(() => {
     window.clearTimeout(releaseTimer.current);
+    if (recorded.current) {
+      recorded.current.onended = null;
+      recorded.current.stop();
+      recorded.current.disconnect();
+      recorded.current = null;
+    }
     speech.current = null;
     duck(false);
   }, [duck]);
@@ -68,7 +75,7 @@ export function useReactiveCommentary(bout: Bout | null, active: boolean, duck: 
   useEffect(() => release, [active, boutKey, release]);
 
   const onBeat = useCallback((cue: ReactiveCue) => {
-    if (!active || !boutKey || busy.current || soundMuted()) return;
+    if (!active || !boutKey || busy.current || recorded.current || soundMuted()) return;
     const beatKey = boutKey + "|" + cue.phase + "|" + cue.index;
     if (seen.current.has(beatKey)) return;
     const started = Date.now();
@@ -87,7 +94,7 @@ export function useReactiveCommentary(bout: Bout | null, active: boolean, duck: 
         index: cue.index,
       } });
       // Another screen may own the server's write-once claim.
-      for (let retry = 0; reply.status === "pending" && retry < 4; retry++) {
+      for (let retry = 0; (reply.status === "pending" || (reply.status === "ready" && reply.voicePending)) && retry < 4; retry++) {
         await new Promise<void>((resolve) => window.setTimeout(resolve, 1500));
         if (!valid() || Date.now() - started >= MAX_LATENCY_MS) return;
         reply = await getReactiveCommentary({ data: {
@@ -98,6 +105,31 @@ export function useReactiveCommentary(bout: Bout | null, active: boolean, duck: 
       }
       if (!valid() || soundMuted() || reply.status !== "ready" || Date.now() - started >= MAX_LATENCY_MS) return;
       setLastLine({ key: boutKey, body: reply.body });
+      const context = live();
+      if (reply.audio && context?.state === "running") {
+        try {
+          const bytes = Uint8Array.from(atob(reply.audio), char => char.charCodeAt(0));
+          const buffer = await context.decodeAudioData(bytes.buffer);
+          if (!valid() || Date.now() - started >= MAX_LATENCY_MS) return;
+          if (speech.current) return;
+          const source = context.createBufferSource();
+          source.buffer = buffer;
+          source.connect(context.destination);
+          source.onended = () => {
+            if (recorded.current === source) {
+              recorded.current = null;
+              source.disconnect();
+              duck(false);
+            }
+          };
+          source.start();
+          recorded.current = source;
+          duck(true);
+          return;
+        } catch {
+          if (!valid() || Date.now() - started >= MAX_LATENCY_MS) return;
+        }
+      }
       if (typeof window === "undefined" || typeof SpeechSynthesisUtterance === "undefined" ||
           !window.speechSynthesis) return;
       const utterance = new SpeechSynthesisUtterance(reply.body);
