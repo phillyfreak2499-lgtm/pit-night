@@ -8,6 +8,8 @@ function makeGroove(audio: BaseAudioContext) {
   const samples = buffer.getChannelData(0);
   const roots = [73.42, 73.42, 87.31, 65.41];
   const bass = [0, 0, 7, 12, 0, 7, 3, 7];
+  // D-minor hook, voiced above the bass so small speakers carry the tune.
+  const lead = [62, 65, 69, 67, 65, 64, 62, 60, 65, 69, 72, 69, 67, 64, 60, 64];
   let previousNoise = 0;
   for (let i = 0; i < samples.length; i++) {
     const beat = i / RATE / BEAT;
@@ -22,68 +24,75 @@ function makeGroove(audio: BaseAudioContext) {
     previousNoise = noise;
     const kick = step % 4 === 0 ? Math.sin(TAU * (49 * t + 0.85 * (1 - Math.exp(-45 * t)))) * Math.exp(-23 * t) : 0;
     const snare = step % 4 === 2 ? noise * Math.exp(-36 * t) : 0;
+    const noteTime = (beat % 1) * BEAT;
+    const notePhase = TAU * 440 * 2 ** ((lead[Math.floor(beat) % 16]! - 69) / 12) * noteTime;
+    const envelope = Math.min(1, noteTime / 0.012) * Math.exp(-4.8 * noteTime) *
+      Math.min(1, (BEAT - noteTime) / 0.055);
+    const melody = envelope * (Math.sin(notePhase) + 0.36 * Math.sin(2 * notePhase) + 0.16 * Math.sin(3 * notePhase));
     const edge = Math.min(1, i / 100, (samples.length - i - 1) / 100);
-    samples[i] = edge * (0.38 * bassNote + 0.44 * kick + 0.16 * snare + hat);
+    samples[i] = edge * (0.35 * melody + 0.34 * bassNote + 0.35 * kick + 0.12 * snare + 0.55 * hat);
   }
   return buffer;
 }
 
-function makeCrowd(audio: BaseAudioContext) {
-  const buffer = audio.createBuffer(2, RATE * 4, RATE);
-  for (let channel = 0; channel < 2; channel++) {
-    const samples = buffer.getChannelData(channel);
-    let rumble = 0;
-    for (let i = 0; i < samples.length; i++) {
-      const t = i / RATE;
-      rumble += 0.22 * (Math.random() * 2 - 1 - rumble);
-      let voices = 0;
-      for (let j = 0; j < 5; j++) {
-        const swell = (1 + Math.sin(TAU * (t * (j + 2) / 4 + j * 0.37 + channel * 0.14))) / 2;
-        const phase = TAU * ((138 + j * 19 + channel * 2) * t + 0.7 * Math.sin(TAU * t * (j + 1) / 4));
-        voices += swell * swell * (Math.sin(phase) + 0.5 * Math.sin(phase * 3));
-      }
-      const edge = Math.min(1, i / 160, (samples.length - i - 1) / 160);
-      samples[i] = edge * (rumble * 0.65 + voices * 0.055);
-    }
-  }
-  return buffer;
+// "Clapping hurray", starlite (public domain). Source recording:
+// https://commons.wikimedia.org/wiki/File:Clapping_hurray.ogg
+let crowd: AudioBuffer | undefined;
+let loading: Promise<void> | undefined;
+export function loadCheer(audio: BaseAudioContext) {
+  loading ??= fetch("/arena-cheers.wav").then(async response => {
+    if (!response.ok) throw new Error("Arena crowd unavailable");
+    crowd = await audio.decodeAudioData(await response.arrayBuffer());
+  }).catch(() => { loading = undefined; });
+  return loading;
 }
 
-let loops: { music: AudioBuffer; crowd: AudioBuffer } | undefined;
+let groove: AudioBuffer | undefined;
 
 export function startArenaMix(audio: AudioContext) {
-  loops ??= { music: makeGroove(audio), crowd: makeCrowd(audio) };
+  groove ??= makeGroove(audio);
+  void loadCheer(audio);
   const master = audio.createGain();
-  master.gain.value = 1;
   master.connect(audio.destination);
-  function layer(buffer: AudioBuffer, volume: number) {
-    const source = audio.createBufferSource();
-    const level = audio.createGain();
-    level.gain.value = volume;
-    source.buffer = buffer;
-    source.loop = true;
-    source.connect(level).connect(master);
-    source.start();
-    return { source, level };
-  }
-  const music = layer(loops.music, 0.105);
-  const crowd = layer(loops.crowd, 0.10);
+  const music = audio.createBufferSource();
+  const musicGain = audio.createGain();
+  musicGain.gain.value = 0.30;
+  music.buffer = groove;
+  music.loop = true;
+  music.connect(musicGain).connect(master);
+  music.start();
+
+  let cheerIndex = 0;
+  let activeCheer: AudioBufferSourceNode | null = null;
   return {
     cheer() {
+      if (!crowd || activeCheer) return;
+      const source = audio.createBufferSource();
+      const level = audio.createGain();
       const now = audio.currentTime;
-      crowd.level.gain.cancelScheduledValues(now);
-      crowd.level.gain.setTargetAtTime(0.30, now, 0.12);
-      crowd.level.gain.setTargetAtTime(0.10, now + 0.48, 0.45);
-    },
-    duck(speaking: boolean) {
-      master.gain.setTargetAtTime(speaking ? 0.18 : 1, audio.currentTime, speaking ? 0.025 : 0.25);
-    },
-    stop() {
-      for (const { source, level } of [music, crowd]) {
-        source.stop();
+      const duration = 1.8;
+      level.gain.setValueAtTime(0, now);
+      level.gain.linearRampToValueAtTime(0.22, now + 0.08);
+      level.gain.setValueAtTime(0.22, now + 0.9);
+      level.gain.linearRampToValueAtTime(0, now + duration);
+      source.buffer = crowd;
+      source.connect(level).connect(master);
+      activeCheer = source;
+      source.onended = () => {
+        activeCheer = null;
         source.disconnect();
         level.disconnect();
-      }
+      };
+      source.start(now, [0.35, 3.1, 5.8][cheerIndex++ % 3], duration);
+    },
+    duck(speaking: boolean) {
+      master.gain.setTargetAtTime(speaking ? 0.14 : 1, audio.currentTime, speaking ? 0.025 : 0.25);
+    },
+    stop() {
+      activeCheer?.stop();
+      music.stop();
+      music.disconnect();
+      musicGain.disconnect();
       master.disconnect();
     },
   };
