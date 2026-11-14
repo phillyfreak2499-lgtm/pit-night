@@ -2,7 +2,7 @@ import test, { beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createStore } from "zustand/vanilla";
-import { pitCreator, sharedDoc, clientDoc, applyLeague14, applyDueLock, pruneRemovePlaceholders, ownerGiftDue, grantOwnerGifts, WEEK2_REPAIR_GIFT, TYLER_ROSES_GIFT, ALLIANCE_GOLD_GIFT } from "../src/lib/pit/store.ts";
+import { pitCreator, sharedDoc, clientDoc, applyLeague14, applyDueLock, pruneRemovePlaceholders, ownerGiftDue, grantOwnerGifts, WEEK2_REPAIR_GIFT, TYLER_ROSES_GIFT, ALLIANCE_GOLD_GIFT, COLLEGE_MAW_GIFT } from "../src/lib/pit/store.ts";
 import { makeData } from "../src/lib/pit/seed.ts";
 import { nsnuOf, rankedStores, simulateDuel, simulateChampionshipDuel, buildCard, conferenceStandings, championshipFinalists, coinMath, coinsByJar, type GradeSet } from "../src/lib/pit/engine.ts";
 import { weekProgress, boltsOf, lockerItem } from "../src/lib/pit/week.ts";
@@ -80,8 +80,8 @@ test("owner's week 2 gift repairs every bot and every owned part without cost or
   assert.strictEqual(first.bouts, data.bouts);
   assert.strictEqual(first.replays, data.replays);
   assert.strictEqual(first.storeCards, data.storeCards);
-  assert.deepEqual(first.ownerEvents, [WEEK2_REPAIR_GIFT, TYLER_ROSES_GIFT, ALLIANCE_GOLD_GIFT]);
-  assert.deepEqual(ownerGiftDue(first, new Date("2026-11-07T21:00:00Z")), { repairs: false, roses: false, gold: false });
+  assert.deepEqual(first.ownerEvents, [WEEK2_REPAIR_GIFT, TYLER_ROSES_GIFT, ALLIANCE_GOLD_GIFT, COLLEGE_MAW_GIFT]);
+  assert.deepEqual(ownerGiftDue(first, new Date("2026-11-07T21:00:00Z")), { repairs: false, roses: false, gold: false, maw: false });
   assert.strictEqual(grantOwnerGifts(first, ownerGiftDue(first, new Date("2026-11-07T21:00:00Z"))), first);
   const snapshot = sharedDoc(first);
   assert.deepEqual(snapshot.ownerEvents, first.ownerEvents);
@@ -94,7 +94,7 @@ test("free Tyler rose topper is available to all stores and never heals a future
   }
   const after = { ...data, week: 3, ownerEvents: [] };
   const due = ownerGiftDue(after, new Date("2026-11-10T20:00:00Z"));
-  assert.deepEqual(due, { repairs: false, roses: true, gold: true });
+  assert.deepEqual(due, { repairs: false, roses: true, gold: true, maw: true });
   const gifted = grantOwnerGifts(after, due);
   assert.ok(gifted.ownerEvents?.includes(TYLER_ROSES_GIFT));
   assert.ok(!gifted.ownerEvents?.includes(WEEK2_REPAIR_GIFT));
@@ -154,6 +154,63 @@ test("Alliance gets solid-gold wheels as a once-only commissioner gift without s
   assert.ok(gifted.bots.every((bot, i) => bot.coins === seed.bots[i]!.coins && bot.voucher === seed.bots[i]!.voucher));
   assert.equal(ownerGiftDue(gifted, new Date("2026-11-10T20:00:00Z")).gold, false);
   assert.strictEqual(grantOwnerGifts(gifted, ownerGiftDue(gifted, new Date("2026-11-10T20:00:00Z"))), gifted);
+});
+
+test("Biting Maw is free, and College Station receives it only when that bot already has a claw", () => {
+  const seed = makeData();
+  for (const store of seed.stores) assert.equal(cosmeticUnlocked(seed, store.id, "weaponSkin", "biting-maw"), true, store.id);
+  assert.equal(commandArgs.setStyle.safeParse(["college", { weaponSkin: "biting-maw" }]).success, true);
+  assert.equal(commandArgs.setStyle.safeParse(["college", { weaponSkin: "none" }]).success, true);
+  const college = seed.bots.find((bot) => bot.storeId === "college")!;
+  assert.equal(partById(college.draft.weapon)?.family, "saw");
+  assert.equal(ownerGiftDue(seed, new Date("2026-11-14T18:00:00Z")).maw, true);
+  const skipped = grantOwnerGifts(seed, { repairs: false, roses: false, gold: false, maw: true });
+  const skippedCollege = skipped.bots.find((bot) => bot.storeId === "college")!;
+  assert.strictEqual(skippedCollege, college);
+  assert.equal(skippedCollege.draft.weapon, "weapon-saw-stock");
+  assert.equal(skippedCollege.equipped.weapon, "weapon-saw-stock");
+  assert.equal(skippedCollege.locked, null);
+  assert.notEqual(skippedCollege.style?.weaponSkin, "biting-maw");
+  assert.ok(skipped.ownerEvents?.includes(COLLEGE_MAW_GIFT));
+  assert.match(skipped.log[0] ?? "", /not a claw/);
+  assert.ok(skipped.bots.filter((bot) => bot.storeId !== "college").every((bot, index) => bot === seed.bots.filter((row) => row.storeId !== "college")[index]));
+  assert.strictEqual(skipped.bouts, seed.bouts);
+  assert.strictEqual(skipped.replays, seed.replays);
+  assert.strictEqual(skipped.stores, seed.stores);
+  assert.equal(ownerGiftDue(skipped, new Date("2026-11-14T19:00:00Z")).maw, false);
+  assert.strictEqual(grantOwnerGifts(skipped, { repairs: false, roses: false, gold: false, maw: false }), skipped);
+
+  const clawed = {
+    ...seed,
+    ownerEvents: [] as string[],
+    bots: seed.bots.map((bot) => bot.storeId === "college" ? {
+      ...bot,
+      draft: { ...bot.draft, weapon: "weapon-saw-stock" },
+      equipped: { ...bot.equipped, weapon: "weapon-saw-stock" },
+      locked: { ...bot.draft, weapon: "weapon-claw-pro" },
+    } : bot),
+  };
+  const before = clawed.bots.find((bot) => bot.storeId === "college")!;
+  const gifted = grantOwnerGifts(clawed, { repairs: false, roses: false, gold: false, maw: true });
+  const next = gifted.bots.find((bot) => bot.storeId === "college")!;
+  assert.equal(next.style?.weaponSkin, "biting-maw");
+  assert.equal(next.locked?.weapon, "weapon-claw-pro");
+  assert.equal(next.draft.weapon, before.draft.weapon);
+  assert.equal(next.equipped.weapon, before.equipped.weapon);
+  assert.notEqual(gifted.bots.find((bot) => bot.storeId === "rockwall")?.style?.weaponSkin, "biting-maw");
+  assert.ok(gifted.bots.every((bot, index) => bot.coins === clawed.bots[index]!.coins && bot.voucher === clawed.bots[index]!.voucher));
+  assert.strictEqual(gifted.bouts, clawed.bouts);
+  assert.strictEqual(gifted.replays, clawed.replays);
+  assert.strictEqual(gifted.stores, clawed.stores);
+  assert.equal(gifted.stores.find((store) => store.id === "college")?.boltsSpent, undefined);
+  const changed = {
+    ...gifted,
+    ownerEvents: [COLLEGE_MAW_GIFT, TYLER_ROSES_GIFT, ALLIANCE_GOLD_GIFT],
+    bots: gifted.bots.map((bot) => bot.storeId === "college" ? { ...bot, style: { ...bot.style!, weaponSkin: "none" as const } } : bot),
+  };
+  assert.equal(ownerGiftDue(changed, new Date("2026-11-14T20:00:00Z")).maw, false);
+  assert.strictEqual(grantOwnerGifts(changed, ownerGiftDue(changed, new Date("2026-11-14T20:00:00Z"))), changed);
+  assert.equal(changed.bots.find((bot) => bot.storeId === "college")?.style?.weaponSkin, "none");
 });
 
 test("every new state, football and Bumblebee skin and sticker is unlocked without stat effect", () => {

@@ -329,3 +329,77 @@ test("the claw has a floor jaw and raised biting jaw like its classic silhouette
   assert.ok(new THREE.Box3().setFromObject(lower).max.y < 0.25);
   assert.ok(new THREE.Box3().setFromObject(upper).max.y > 1.05);
 });
+
+function paintCounts(draw: (ctx: CanvasRenderingContext2D) => void) {
+  const counts = new Map<string, number>();
+  const state: Record<string, unknown> = {};
+  const gradient = { addColorStop() {} };
+  const ctx = new Proxy(state, {
+    get(target, key: string) {
+      if (key === "createLinearGradient" || key === "createRadialGradient") return () => gradient;
+      if (key === "measureText") return () => ({ width: 12 });
+      if (key === "fill") return () => {
+        if (typeof target.fillStyle === "string") counts.set(target.fillStyle, (counts.get(target.fillStyle) ?? 0) + 1);
+      };
+      if (key in target) return target[key];
+      return () => {};
+    },
+  }) as unknown as CanvasRenderingContext2D;
+  draw(ctx);
+  return counts;
+}
+
+function mawState(stroke: number, weapon = "claw"): BotState {
+  return {
+    bot: {
+      id: "rockwall",
+      paint: "teal",
+      classId: "specialist",
+      weaponFamily: weapon,
+      weaponName: weapon,
+      look: "plain",
+      number: "3",
+      style: { ...DEFAULT_STYLE, body: "windlass", weaponSkin: "biting-maw", topper: "none", flag: false },
+      storeName: "Rockwall",
+    },
+    spot: { x: 0.5, y: 0.5 },
+    heading: 0,
+    lift: 0,
+    pitch: 0,
+    flipped: false,
+    stroke,
+    rev: 0,
+    gone: 0,
+    dead: false,
+    roll: 0,
+    hp: 100,
+    charging: false,
+    spotlight: false,
+    flame: 0,
+  } as BotState;
+}
+
+test("biting maw draws teeth on a claw in both cameras and leaves other weapons alone", () => {
+  for (const stroke of [0, 1]) {
+    const side = paintCounts((ctx) => drawSideBot(ctx, mawState(stroke), 0, 0, 220, 0, 0, 1));
+    const top = paintCounts((ctx) => drawTopBot(ctx, mawState(stroke), { x: 0, y: 0 }, 1000, 0, 0));
+    assert.ok((side.get("#fff4d6") ?? 0) >= 8, `side teeth at stroke ${stroke}`);
+    assert.ok((top.get("#fff4d6") ?? 0) >= 8, `overhead teeth at stroke ${stroke}`);
+    if (stroke === 0) {
+      assert.ok((side.get("#14080d") ?? 0) > 0, "open mouth shows the gullet");
+      assert.ok((top.get("#14080d") ?? 0) > 0, "open overhead mouth shows the gullet");
+    } else {
+      assert.equal(side.get("#14080d") ?? 0, 0, "a shut mouth hides the gullet");
+    }
+  }
+  const plain = {
+    ...mawState(0),
+    bot: { ...mawState(0).bot, style: { ...DEFAULT_STYLE, body: "windlass", weaponSkin: "none", topper: "none", flag: false } },
+  } as BotState;
+  const stock = paintCounts((ctx) => drawSideBot(ctx, plain, 0, 0, 220, 0, 0, 1));
+  assert.equal(stock.get("#fff4d6") ?? 0, 0);
+  const saw = paintCounts((ctx) => drawSideBot(ctx, mawState(0, "saw"), 0, 0, 220, 0, 0, 1));
+  assert.equal(saw.get("#fff4d6") ?? 0, 0);
+  const sawTop = paintCounts((ctx) => drawTopBot(ctx, mawState(0, "saw"), { x: 0, y: 0 }, 1000, 0, 0));
+  assert.equal(sawTop.get("#fff4d6") ?? 0, 0);
+});

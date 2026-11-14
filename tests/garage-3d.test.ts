@@ -252,6 +252,28 @@ test("every body shell retains a distinct finite silhouette with heart and team 
   assert.equal(silhouettes.size, BODY_STYLES.length);
 });
 
+test("biting maw replaces only a claw and keeps finite geometry", () => {
+  const claw = createGarageBot({
+    ...look({ weaponSkin: "biting-maw" }),
+    classId: "specialist",
+    weapon: "claw",
+  });
+  assert.ok(names(claw).filter((name) => name === "Maw tooth").length >= 12);
+  assert.ok(names(claw).includes("Maw lower jaw"));
+  assert.ok(names(claw).includes("Maw upper jaw"));
+  assert.ok(names(claw).includes("Maw gullet"));
+  assert.ok(names(claw).includes("Maw tongue"));
+  assert.ok(!names(claw).includes("Claw lower jaw"));
+  assertFiniteGeometry(claw);
+  for (const weapon of ["saw", "hidden", "none"]) {
+    const other = createGarageBot({ ...look({ weaponSkin: "biting-maw" }), weapon });
+    assert.ok(!names(other).some((name) => name.startsWith("Maw")), weapon);
+  }
+  const plain = createGarageBot({ ...look(), classId: "specialist", weapon: "claw" });
+  assert.ok(names(plain).includes("Claw lower jaw"));
+  assert.ok(!names(plain).some((name) => name.startsWith("Maw")));
+});
+
 test("concealed weapons cannot leak model geometry or a cosmetic blade", () => {
   for (const weapon of ["hidden", "none"]) {
     const model = createGarageBot({ ...look({ weaponSkin: "hockey-machete" }), weapon });

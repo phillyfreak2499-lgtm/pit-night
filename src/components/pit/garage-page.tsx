@@ -866,6 +866,7 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
           </Group>
 
           <Group label="Weapon skin">
+            <p className="mb-2 w-full text-xs text-muted">Biting Maw is free for every bay. It turns a claw into a biting mouth and leaves every other weapon alone.</p>
             {WEAPON_SKINS.map((row) => {
               const open = unlocked("weaponSkin", row.id);
               return (

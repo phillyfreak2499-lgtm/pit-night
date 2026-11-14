@@ -38,6 +38,7 @@ import {
   coinsByJar,
   spyRead,
   WEAPON_FAMILIES,
+  weaponFamilyOf,
   wonThisWeek,
   writeGazette,
 } from "./engine";
@@ -448,7 +449,9 @@ export function clientDoc(state: PitData, session: Session): SharedDoc {
 export const WEEK2_REPAIR_GIFT = "owner-week2-free-repairs-2026-11-07";
 export const TYLER_ROSES_GIFT = "owner-tyler-roses-2026-11-07";
 export const ALLIANCE_GOLD_GIFT = "owner-alliance-perfect-card-solid-gold-2026-11-09";
-export type OwnerGiftDue = { repairs: boolean; roses: boolean; gold: boolean };
+/** Equips the free Biting Maw on College Station once, and only when that bot already has a claw. */
+export const COLLEGE_MAW_GIFT = "owner-college-biting-maw-2026-11-14";
+export type OwnerGiftDue = { repairs: boolean; roses: boolean; gold: boolean; maw: boolean };
 
 export function ownerGiftDue(data: PitData, now: Date): OwnerGiftDue {
   const events = data.ownerEvents ?? [];
@@ -464,25 +467,34 @@ export function ownerGiftDue(data: PitData, now: Date): OwnerGiftDue {
     gold:
       data.bots.some((bot) => bot.storeId === "alliance") &&
       !events.includes(ALLIANCE_GOLD_GIFT),
+    maw:
+      data.bots.some((bot) => bot.storeId === "college") &&
+      !events.includes(COLLEGE_MAW_GIFT),
   };
 }
 
 /** Restore all owned/equipped parts without spending any coins, Bolts, vouchers, or changing fight history. */
 export function grantOwnerGifts(data: PitData, due: OwnerGiftDue): PitData {
-  if (!due.repairs && !due.roses && !due.gold) return data;
+  if (!due.repairs && !due.roses && !due.gold && !due.maw) return data;
   const cleanWear = Object.fromEntries(SLOTS.map((slot) => [slot, "clean"])) as Record<Slot, Condition>;
+  const college = data.bots.find((bot) => bot.storeId === "college");
+  const collegeWeapon = college ? (college.locked ?? college.draft).weapon : "";
+  const collegeFamily = college ? weaponFamilyOf(college) : "";
+  const collegeClaw = collegeFamily === "claw";
   return {
     ...data,
     bots: data.bots.map((bot) => {
       const roses = due.roses && bot.storeId === "tyler";
       const gold = due.gold && bot.storeId === "alliance";
-      if (!due.repairs && !roses && !gold) return bot;
+      const maw = due.maw && bot.storeId === "college" && collegeClaw;
+      if (!due.repairs && !roses && !gold && !maw) return bot;
       return {
         ...bot,
         ...(due.repairs
           ? { wear: { ...cleanWear }, partWear: {}, weldForWeek: {}, weldedParts: {} }
           : {}),
         ...(roses || gold ? { style: { ...styleOf(bot), ...(roses ? { topper: "tyler-roses" as const } : {}), ...(gold ? { wheelColor: "solid-gold" } : {}) } } : {}),
+        ...(maw ? { style: { ...styleOf(bot), weaponSkin: "biting-maw" as const } } : {}),
       };
     }),
     ...(due.repairs ? { quotes: Object.fromEntries(data.bots.map((bot) => [bot.storeId, [] as PitData["quotes"][string]])) } : {}),
@@ -494,11 +506,17 @@ export function grantOwnerGifts(data: PitData, due: OwnerGiftDue): PitData {
       ...(due.repairs ? [WEEK2_REPAIR_GIFT] : []),
       ...(due.roses ? [TYLER_ROSES_GIFT] : []),
       ...(due.gold ? [ALLIANCE_GOLD_GIFT] : []),
+      ...(due.maw ? [COLLEGE_MAW_GIFT] : []),
     ],
     log: [
       ...(due.roses ? ["Tyler's ROSE CITY received its bouquet of roses topper, available free to every store."] : []),
       ...(due.gold ? ["Commissioner awarded Alliance the 24K Solid Gold Wheels for its Perfect Card. Permanently unlocked and equipped; no game stats or currencies changed."] : []),
       ...(due.repairs ? ["Commissioner gift: every bot repaired to 100% for Pit Week 2. No coins, vouchers, or Bolts spent."] : []),
+      ...(due.maw
+        ? [collegeClaw
+          ? "College Station's claw wears the Biting Maw. A captain can change the skin later. No coins, Bolts, weapons, or records changed."
+          : `College Station's weapon is ${collegeWeapon || "missing"} (${collegeFamily || "none"}), not a claw. The Biting Maw was not equipped and the weapon was left unchanged.`]
+        : []),
       ...data.log,
     ].slice(0, 24),
   };

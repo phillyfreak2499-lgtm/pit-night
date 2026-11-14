@@ -168,7 +168,13 @@ export const WEAPON_SKINS: { id: BotWeaponSkin; label: string }[] = [
   { id: "neon-fang", label: "Neon Fang" },
   { id: "gold-fang", label: "Gold Fang" },
   { id: "ice-fang", label: "Glacier Fang" },
+  { id: "biting-maw", label: "Biting Maw" },
 ];
+
+/** The mouth skin replaces claw jaws only. Any other weapon stays the part it is. */
+export function bitingMawActive(skin: string | undefined, weapon: string | undefined) {
+  return skin === "biting-maw" && weapon === "claw";
+}
 
 export const DECALS: { id: BotDecal; label: string }[] = [
   ...BASE_DECALS,

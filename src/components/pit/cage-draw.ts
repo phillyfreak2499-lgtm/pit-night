@@ -3,7 +3,7 @@ import { botFrameOf as frameOf, type BotFrame as Frame } from "./bot-frame";
 import { sawPoseOf } from "./bot-weapons";
 import { drawPaintSkin } from "./paint-skins";
 import { bannerVerdict } from "../../../scripts/copy-guard.mjs";
-import { EYES, LEDS, PAINT, SMOKE, TRIM, WHEEL_COLORS, decalArt, styleOf } from "@/lib/pit/catalog";
+import { EYES, LEDS, PAINT, SMOKE, TRIM, WHEEL_COLORS, bitingMawActive, decalArt, styleOf } from "@/lib/pit/catalog";
 import { RAIN_CITY } from "@/lib/pit/rain-city";
 import { ELECTION_COLORS } from "@/lib/pit/election";
 import { arenaTheme, drawArenaHazards, drawArenaTopScene, paintArenaScene, paintArenaJanelleBanner, type ArenaId, type ArenaTheme } from "./arena-scenes";
@@ -3611,6 +3611,197 @@ function weaponBack(ctx: CanvasRenderingContext2D, s: BotState, f: Frame, u: num
   }
 }
 
+const MAW_TOOTH = "#fff4d6";
+const MAW_GUM = "#6e2432";
+const MAW_TONGUE = "#9a3142";
+const MAW_GULLET = "#14080d";
+
+/** Side view: the claw's two jaws become an upper and lower mouth. Stroke 0 is open, 1 is shut. */
+function drawBitingMawSide(ctx: CanvasRenderingContext2D, s: BotState, f: Frame, u: number) {
+  const open = 1 - Math.max(0, Math.min(1, s.stroke));
+  const gap = open * 0.22 * u;
+  const hingeX = f.front * u - 0.12 * u;
+  const baseY = f.deck * u * 0.52;
+  const tipX = f.front * u + 0.5 * u;
+  const span = tipX - hingeX;
+  const sample = (sign: number, t: number, outer: boolean): [number, number] => {
+    const flare = gap * Math.pow(t, 1.08);
+    const hook = t > 0.8 ? ((t - 0.8) / 0.2) * u * (outer ? 0.02 : 0.075) : 0;
+    const thick = outer ? u * (0.078 - t * 0.02) : u * 0.01;
+    const x = hingeX + span * t;
+    const y = baseY + sign * (u * 0.016 + flare + thick - hook);
+    return [x, y];
+  };
+  const trace = (sign: number, outer: boolean, from: number, to: number, steps: number) => {
+    for (let i = 0; i <= steps; i++) {
+      const t = from + ((to - from) * i) / steps;
+      const [x, y] = sample(sign, t, outer);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+  };
+  ctx.save();
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.fillStyle = "#2a333b";
+  ctx.fillRect(hingeX - 0.08 * u, baseY - 0.11 * u, 0.14 * u, 0.22 * u);
+  ctx.fillStyle = "#d7a441";
+  ctx.fillRect(hingeX - 0.015 * u, baseY - 0.012 * u, span * 0.48, 0.024 * u);
+  if (open > 0.05) {
+    ctx.beginPath();
+    trace(-1, false, 0.08, 0.9, 10);
+    for (let i = 10; i >= 0; i--) {
+      const [x, y] = sample(1, 0.08 + (i / 10) * 0.82, false);
+      ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = MAW_GULLET;
+    ctx.fill();
+    const [tx0, ty0] = sample(1, 0.24, false);
+    const [tx1, ty1] = sample(1, 0.74, false);
+    const tongueLift = gap * 0.46;
+    ctx.fillStyle = MAW_TONGUE;
+    ctx.beginPath();
+    ctx.moveTo(tx0, ty0);
+    ctx.quadraticCurveTo((tx0 + tx1) / 2, ty1 - tongueLift, tx1 - u * 0.03, ty1 - tongueLift * 0.28);
+    ctx.quadraticCurveTo((tx0 + tx1) / 2, ty0 - tongueLift * 0.2, tx0, ty0);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,186,196,0.45)";
+    ctx.beginPath();
+    ctx.ellipse((tx0 + tx1) / 2, (ty0 + ty1) / 2 - tongueLift * 0.45, span * 0.11, Math.max(1, gap * 0.16), -0.15, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  for (const sign of [-1, 1]) {
+    ctx.beginPath();
+    trace(sign, true, 0, 1, 12);
+    for (let i = 12; i >= 0; i--) {
+      const [x, y] = sample(sign, i / 12, false);
+      ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    const shade = ctx.createLinearGradient(hingeX, baseY + sign * (gap + u * 0.08), tipX, baseY);
+    if (sign < 0) {
+      shade.addColorStop(0, "#8ea0ac");
+      shade.addColorStop(0.5, "#c5d0d8");
+      shade.addColorStop(1, "#f4f8fb");
+    } else {
+      shade.addColorStop(0, "#3e4a53");
+      shade.addColorStop(0.55, "#7d8b96");
+      shade.addColorStop(1, "#c5d0d8");
+    }
+    ctx.fillStyle = shade;
+    ctx.fill();
+    ctx.strokeStyle = "#1a2228";
+    ctx.lineWidth = Math.max(1, u * 0.012);
+    ctx.stroke();
+    ctx.beginPath();
+    const [gumStartX, gumStartY] = sample(sign, 0.14, false);
+    ctx.moveTo(gumStartX, gumStartY);
+    for (let i = 1; i <= 8; i++) {
+      const [x, y] = sample(sign, 0.14 + (i / 8) * 0.76, false);
+      ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = MAW_GUM;
+    ctx.lineWidth = Math.max(2, u * 0.03);
+    ctx.stroke();
+    for (const row of [0, 1]) {
+      const count = row === 0 ? 8 : 6;
+      for (let i = 0; i < count; i++) {
+        const t = 0.18 + ((i + (sign < 0 ? 0 : 0.42)) / count) * (row === 0 ? 0.72 : 0.5);
+        if (t > 0.94) continue;
+        const [gx, gy] = sample(sign, t, false);
+        const reach = Math.min(u * (row === 0 ? (i % 2 ? 0.064 : 0.046) : 0.03), gap * (row === 0 ? 0.48 : 0.3) + u * 0.011);
+        const half = u * (row === 0 ? 0.016 : 0.011);
+        const tipY = gy - sign * reach;
+        ctx.fillStyle = MAW_TOOTH;
+        ctx.beginPath();
+        ctx.moveTo(gx - half, gy);
+        ctx.lineTo(gx + half, gy);
+        ctx.lineTo(gx + (i % 2 ? half * 0.15 : -half * 0.1), tipY);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = "#2c2618";
+        ctx.lineWidth = Math.max(0.6, u * 0.006);
+        ctx.stroke();
+      }
+    }
+    ctx.fillStyle = "#1b242c";
+    ctx.beginPath();
+    ctx.arc(hingeX, baseY + sign * 0.07 * u, 0.046 * u, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#e7b34a";
+    ctx.beginPath();
+    ctx.arc(hingeX, baseY + sign * 0.07 * u, 0.02 * u, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** Overhead: the same bite opens as a dark gullet between two toothed jaws. */
+function drawBitingMawTop(ctx: CanvasRenderingContext2D, s: BotState, len: number, wid: number) {
+  const open = 1 - Math.max(0, Math.min(1, s.stroke));
+  const spread = open * wid * 0.32;
+  const mouthX = len * 0.58;
+  const rx = len * 0.22;
+  const ry = wid * 0.1 + spread;
+  ctx.save();
+  ctx.fillStyle = "#2a333b";
+  ctx.fillRect(len * 0.28, -wid * 0.16, len * 0.22, wid * 0.32);
+  ctx.fillStyle = MAW_GULLET;
+  ctx.beginPath();
+  ctx.ellipse(mouthX, 0, rx * 0.72, Math.max(wid * 0.035, ry * 0.62), 0, 0, Math.PI * 2);
+  ctx.fill();
+  if (open > 0.08) {
+    ctx.fillStyle = MAW_TONGUE;
+    ctx.beginPath();
+    ctx.ellipse(mouthX + rx * 0.06, spread * 0.08, rx * 0.34, Math.max(wid * 0.02, ry * 0.26), 0.12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,186,196,0.42)";
+    ctx.beginPath();
+    ctx.ellipse(mouthX, 0, rx * 0.12, Math.max(1, ry * 0.1), 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  for (const sign of [-1, 1]) {
+    const inner = sign * (wid * 0.07 + spread * 0.72);
+    const outer = sign * (wid * 0.32 + spread);
+    ctx.beginPath();
+    ctx.moveTo(len * 0.34, outer * 0.28);
+    ctx.quadraticCurveTo(mouthX, outer, mouthX + rx * 0.9, inner * 0.28);
+    ctx.lineTo(mouthX + rx * 0.5, inner);
+    ctx.quadraticCurveTo(mouthX - rx * 0.15, inner * 0.85, len * 0.32, sign * wid * 0.08);
+    ctx.closePath();
+    ctx.fillStyle = sign < 0 ? "#d5dee6" : "#7f8d98";
+    ctx.fill();
+    ctx.strokeStyle = "#1a2228";
+    ctx.lineWidth = Math.max(1, wid * 0.035);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(len * 0.4, inner);
+    ctx.quadraticCurveTo(mouthX, inner * 0.9, mouthX + rx * 0.48, inner * 0.45);
+    ctx.strokeStyle = MAW_GUM;
+    ctx.lineWidth = Math.max(1.5, wid * 0.055);
+    ctx.stroke();
+    for (let i = 0; i < 7; i++) {
+      const t = i / 6;
+      const x = len * 0.4 + t * rx * 1.2;
+      const y = inner * (1 - t * 0.28);
+      const reach = Math.min(wid * (i % 2 ? 0.15 : 0.1), spread * 0.55 + wid * 0.028);
+      ctx.fillStyle = MAW_TOOTH;
+      ctx.beginPath();
+      ctx.moveTo(x - wid * 0.032, y);
+      ctx.lineTo(x + wid * 0.032, y);
+      ctx.lineTo(x, y - sign * reach);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.fillStyle = "#e7b34a";
+    ctx.beginPath();
+    ctx.arc(len * 0.36, sign * wid * 0.11, Math.max(1.5, wid * 0.05), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 function drawFangSkin(ctx: CanvasRenderingContext2D, skin: BotWeaponSkin | undefined, x: number, y: number, size: number) {
   const color = skin === "neon-fang" ? "#39ff6a" : skin === "gold-fang" ? "#f4c44e" : skin === "ice-fang" ? "#bfe8ff" : null;
   if (!color) return;
@@ -3803,6 +3994,8 @@ function weaponFront(
       ctx.stroke();
     }
 
+  } else if (fam === "claw" && bitingMawActive(skin, fam)) {
+    drawBitingMawSide(ctx, s, f, u);
   } else if (fam === "claw") {
     // Twin industrial grapple arms: paired knuckles, hydraulic ram, hooked steel jaws.
     const bite = Math.max(0,Math.min(1,s.stroke));
@@ -5601,6 +5794,8 @@ function topWeapon(
     ctx.arc(len * 0.45, 0, wid * 0.42, -spin, -spin + 1);
     ctx.stroke();
 
+  } else if (fam === "claw" && bitingMawActive(skin, fam)) {
+    drawBitingMawTop(ctx, s, len, wid);
   } else if (fam === "claw") {
     const bite = Math.max(0,Math.min(1,s.stroke));
     const spread=(1-bite)*wid*0.25;
