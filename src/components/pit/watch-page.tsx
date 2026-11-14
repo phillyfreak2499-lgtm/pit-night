@@ -21,9 +21,10 @@ import { armBroadcastAudio, Broadcast } from "./broadcast";
 import { Commercial } from "./commercial";
 import { FightProgram } from "./fight-program";
 import { BoothSegment } from "./booth-segment";
+import { Pregame } from "./pregame";
 import { buildTape, matchup, methodWord } from "./show-page";
 
-type Stage = "lobby" | "opening" | "intro" | "fight" | "result" | "ad" | "final";
+type Stage = "lobby" | "pregame" | "opening" | "intro" | "fight" | "result" | "ad" | "final";
 
 const RESULT_MS = 6500;
 const BYE_MS = 6000;
@@ -49,7 +50,8 @@ export function WatchPage() {
     index + week - 1, commentaryEnabled, muted, !tape?.live);
 
   const next = useCallback(() => {
-    if (stage === "opening") setStage("intro");
+    if (stage === "pregame") setStage(hasChampionshipOpening(week, bouts.length) ? "opening" : "intro");
+    else if (stage === "opening") setStage("intro");
     else if (stage === "intro") setStage(bout?.kind === "bye" ? "result" : "fight");
     else if (stage === "fight") setStage("result");
     else if (stage === "result") {
@@ -69,8 +71,8 @@ export function WatchPage() {
   }, [stage, bout, index, bouts.length, week]);
 
   useEffect(() => {
-    if (paused || stage === "opening" || stage === "lobby" || stage === "final" || stage === "fight" || stage === "ad") return;
-    const ms = stage === "intro" ? (bout?.kind === "bye" ? BYE_MS : walkout ? 16000 : PROGRAM_HOLD_MS) : RESULT_MS;
+    if (paused || stage === "pregame" || stage === "opening" || stage === "lobby" || stage === "final" || stage === "fight" || stage === "ad") return;
+    const ms = stage === "intro" ? (bout?.kind === "bye" ? BYE_MS : walkout ? 45000 : PROGRAM_HOLD_MS) : RESULT_MS;
     const id = window.setTimeout(next, ms);
     return () => window.clearTimeout(id);
   }, [stage, index, paused, next, bout, walkout]);
@@ -100,7 +102,7 @@ export function WatchPage() {
     setTape(liveTape);
     setIndex(0);
     setPaused(false);
-    setStage(hasChampionshipOpening(week, liveTape.bouts.length) ? "opening" : liveTape.bouts.length ? "intro" : "final");
+    setStage(liveTape.bouts.length ? "pregame" : "final");
     if (goFull) void document.documentElement.requestFullscreen?.().catch(() => undefined);
   };
   const toggleFull = () => {
@@ -136,7 +138,7 @@ export function WatchPage() {
               <span className="mt-1 block text-sm tracking-[0.18em] text-muted uppercase md:mt-0 md:ml-3 md:inline md:text-base md:tracking-normal md:normal-case">
                 Commercial
               </span>
-            ) : stage !== "lobby" && stage !== "final" && bouts.length ? (
+            ) : stage !== "lobby" && stage !== "pregame" && stage !== "final" && bouts.length ? (
               <span className="mt-1 block text-sm text-muted md:mt-0 md:ml-3 md:inline md:text-base">
                 Fight {index + 1} of {bouts.length}
               </span>
@@ -183,8 +185,9 @@ export function WatchPage() {
             <Lobby data={data} week={week} weeks={postedWeeks} setWeek={setWeek} tape={liveTape} onStart={start} />
           ) : null}
           {stage === "opening" ? <TeamJanelleOpening data={data} playing={!paused} onComplete={next} /> : null}
+          {stage === "pregame" && <Pregame week={week} title={weekName} bouts={bouts} playing={!paused} mic={commentaryEnabled && !muted} onComplete={next}/>}
           {stage === "intro" && bout ? <Intro key={bout.id} data={data} bout={bout} seen={seen} order={index + 1} total={bouts.length} /> : null}
-          {walkout && bout && !paused && <BoothSegment key={bout.id} scene="walkout" id={bout.id} label="Bot introductions" automatic />}
+          {walkout && bout && !paused && <BoothSegment key={bout.id} scene="walkout" id={bout.id} label="Bot introductions" automatic onComplete={next} />}
           {stage === "result" && bout ? (
             <Result key={bout.id} data={data} bout={bout} seen={seen} next={bouts[index + 1] ?? null} commercialNext={Boolean(commercialAfter(week, index + 1, bouts.length))} />
           ) : null}

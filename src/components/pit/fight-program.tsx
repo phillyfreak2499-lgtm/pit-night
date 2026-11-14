@@ -2,6 +2,7 @@ import { CLASS_META, PAINT } from "@/lib/pit/catalog";
 import { cornerStoreIds, programSides, programSlots, type WinLoss } from "@/lib/pit/fight-card";
 import type { Bout, FighterSnap } from "@/lib/pit/types";
 import { BotPortrait, type BotLookProps } from "./bot-portrait";
+import { FanPicks } from "./fan-picks";
 
 function lookFromFighter(fighter: FighterSnap): BotLookProps {
   const weapon = fighter.weaponFamily && fighter.weaponFamily !== "hidden" ? fighter.weaponFamily : "none";
@@ -156,6 +157,7 @@ export function FightProgram({
         </div>
         {kicker ? <p className="max-w-xs text-sm text-muted">{kicker}</p> : null}
       </header>
+      <FanPicks bout={bout} />
       <div className="p-3 md:p-4">
         {corners.length === 0 ? (
           <p className="border border-line bg-surface p-4 text-sm text-muted">The program prints when both builds are on the card.</p>

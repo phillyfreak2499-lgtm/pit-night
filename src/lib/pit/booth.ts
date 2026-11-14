@@ -1,15 +1,69 @@
-import { hashString, previewSaturday, recordOf } from "./engine";
+import { conferencePlace, hashString, previewSaturday, recordOf, regularSeasonRecordOf } from "./engine";
 import { upcomingMatchups } from "./claude-copy";
 import type { ReactiveMoment } from "./reactive-commentary";
-import type { PitData } from "./types";
+import type { Bout, PitData } from "./types";
+import { buildTape } from "./replay";
+import { fanSplit } from "./fan-picks";
 
-export type BoothScene = "welcome" | "card" | "store" | "gazette" | "walkout";
+export type BoothScene = "welcome" | "card" | "store" | "gazette" | "walkout" | "pregame";
 export type BoothLine = { speaker: "Jim" | "Cathy"; text: string };
 export type BoothClip = BoothLine & { audio: string };
 const jim = (text: string): BoothLine => ({ speaker: "Jim", text });
 const cathy = (text: string): BoothLine => ({ speaker: "Cathy", text });
 
+export function featuredBouts(bouts: Bout[]) {
+  const contests = bouts.filter(b => b.kind !== "bye");
+  const main = contests.find(b => b.kind === "final" || b.title === "Main event") ?? contests.at(-1);
+  return [...new Set([contests[0], main])].filter((b): b is Bout => Boolean(b));
+}
+
+export function matchupName(b: Bout) {
+  const fighters = b.result?.fighters ?? [];
+  return fighters.length === 2 ? fighters.map(f => f.botName).join(" versus ") : b.title;
+}
+
+function pickRead(data: PitData, bout: Bout) {
+  const split = fanSplit(bout, data.picks ?? []);
+  if (!split) return "";
+  if (!split.total) return "No fan picks on this one yet.";
+  const [a, b] = split.sides;
+  if (a!.count === b!.count) return "The fans are split fifty-fifty.";
+  const [fav, dog] = a!.count > b!.count ? [a!, b!] : [b!, a!];
+  const name = (id: string) => bout.result?.fighters.find(f => f.id === id)?.botName ?? data.bots.find(b => b.storeId === id)?.name ?? id;
+  return `${fav.percent} percent picked ${name(fav.id)}. ${name(dog.id)} comes in as the fans' underdog.`;
+}
+
+function stakes(data: PitData, bout: Bout) {
+  if (bout.kind === "final" && bout.week === 5) return "Two conference champions. The winner takes the Waterman title.";
+  if (bout.title.endsWith("Conference Tiebreaker")) return "A championship berth goes to the last bot standing.";
+  if (bout.kind !== "bout") return "Keep an eye on the whole field when that bell rings.";
+  const prior = new Map(data.bouts.map(b => [b.id, b]));
+  for (const replay of data.replays ?? []) for (const b of replay.bouts) prior.set(b.id, b);
+  const before = { ...data, bouts: [...prior.values()].filter(b => b.week < bout.week || b.week === bout.week && b.slot < bout.slot) };
+  const ids = bout.storeIds.filter(id => data.stores.some(s => s.id === id));
+  if (!ids.length) return "A regular-season win is on the line.";
+  const storeId = ids[(bout.slot + bout.week) % ids.length]!;
+  const record = regularSeasonRecordOf(before, storeId);
+  const store = data.stores.find(s => s.id === storeId)!;
+  if (!record.w && !record.l) return `${store.name} is looking for its first win.`;
+  const place = conferencePlace(before, storeId);
+  const tied = before.stores.some(s => s.id !== storeId && s.conference === store.conference && conferencePlace(before,s.id) === place);
+  const places = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh"];
+  return `${store.name} comes in ${record.w} and ${record.l}, ${tied ? "tied for " : ""}${places[place - 1] ?? "number " + place} in ${store.conference}. ${bout.week === 4 ? "Last regular-season chance to add a win." : `A win gets them to ${record.w + 1}.`}`;
+}
+
 export function boothScript(data: PitData, scene: BoothScene, id = ""): BoothLine[] {
+  if (scene === "pregame") {
+    const week = Number(id);
+    if (!Number.isInteger(week) || week < 1 || week > data.week || week > 5) return [];
+    const featured = featuredBouts(buildTape(data, week).bouts);
+    const first = featured[0];
+    if (!first) return [];
+    const other = featured[1];
+    const title = data.weeks.find(w => w.number === week)?.name;
+    return [jim(`Welcome to the Waterman Battle Bot League! Week ${week}${title ? ", " + title : ""}. Up first, ${matchupName(first)}.`),
+      cathy([other ? `Also on the card, ${matchupName(other)}.` : "", stakes(data, other ?? first)].filter(Boolean).join(" "))];
+  }
   if (scene === "store") {
     const store = data.stores.find(s => s.id === id);
     const bot = data.bots.find(b => b.storeId === id);
@@ -27,8 +81,18 @@ export function boothScript(data: PitData, scene: BoothScene, id = ""): BoothLin
     if (!bout?.result || bout.kind === "bye") return [];
     const fighters = bout.result.fighters;
     if (fighters.length < 2) return [];
-    if (fighters.length === 2) return [jim(`From ${fighters[0]!.storeName}, ${fighters[0]!.botName}!`),
-      cathy(`Across the cage, representing ${fighters[1]!.storeName}… ${fighters[1]!.botName}!`)];
+    if (fighters.length === 2) {
+      const reads = [jim(`From ${fighters[0]!.storeName}, ${fighters[0]!.botName}! Across the cage, ${fighters[1]!.botName}!`),
+        cathy([pickRead(data, bout), stakes(data, bout)].filter(Boolean).join(" "))];
+      const seed = hashString("shout:" + bout.week);
+      if ((bout.slot + seed) % 3 === 0) {
+        const shouts = (data.shouts ?? []).filter(s => s.week === bout.week && s.to.trim());
+        const shout = shouts[hashString(bout.id) % Math.max(1, shouts.length)];
+        const crew = fighters[hashString(bout.id) % fighters.length]!.storeName;
+        reads.push(jim(shout ? `Quick shout-out to ${shout.to} from ${shout.fromName} on the Pit Week board!` : `Shout-out to the pit crew in ${crew}!`));
+      }
+      return reads;
+    }
     return [jim(`${fighters.length} bots in the cage! Here come ${fighters.slice(0, 2).map(f => f.botName).join(" and ")}!`),
       cathy(fighters.length <= 4 ? `And joining them, ${fighters.slice(2).map(f => f.botName).join(" and ")}!` : "Watch the outside lanes. Nobody gets a clean one-on-one for long.")];
   }
