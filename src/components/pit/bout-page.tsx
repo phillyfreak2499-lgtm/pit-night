@@ -6,6 +6,7 @@ import { ResultLine, SectionLabel, StatStrip } from "./bits";
 import { Broadcast } from "./broadcast";
 import { ClaudeCopy, LiveCall } from "./claude-copy";
 import { FightProgram } from "./fight-program";
+import { coachStore } from "@/lib/pit/coach-tape";
 
 export function BoutPage({ boutId }: { boutId: string }) {
   const data = usePit();
@@ -21,6 +22,7 @@ export function BoutPage({ boutId }: { boutId: string }) {
     );
   }
   const result = bout.result;
+  const storeId = coachStore(data.session, result);
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
       <div>
@@ -39,6 +41,9 @@ export function BoutPage({ boutId }: { boutId: string }) {
       />
       <Broadcast bout={bout} />
       <TaleOfTape bout={bout} />
+      {storeId && (
+        <ClaudeCopy key={JSON.stringify([storeId, bout.id, result.seed])} kind="coach" id={bout.id} label="Coach’s Tape · crew only" />
+      )}
       <ClaudeCopy kind="bout" id={bout.id} label="Ringside call" />
       <LiveCall boutId={bout.id} />
       <div className="grid gap-3 md:grid-cols-2">

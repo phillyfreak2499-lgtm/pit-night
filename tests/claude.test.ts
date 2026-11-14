@@ -22,6 +22,18 @@ import { claimCopy, countClaimedOnDay, finishCopy, readCopy, reserveCopy } from 
 import { FEATURE_MODEL, HAIKU } from "../src/lib/pit/claude.server.ts";
 import type { Sql } from "../src/lib/db.ts";
 import type { FightResult } from "../src/lib/pit/types.ts";
+import { coachStore, tapeNote } from "../src/lib/pit/coach-tape.ts";
+
+test("coaching is scoped to the participating crew and uses their recorded tape", () => {
+  const result = league(true).bouts.find(b => b.kind === "bout" && b.result)!.result!;
+  const id = result.fighters[0]!.id;
+  assert.equal(coachStore({ role: "crew", storeId: id, crewId: "viewer" }, result), id);
+  assert.equal(coachStore({ role: "public", storeId: null, crewId: null }, result), null);
+  assert.equal(coachStore({ role: "captain", storeId: "unrelated", crewId: "viewer" }, result), null);
+  const note = tapeNote(result, id)!;
+  assert.ok(note.observation === result.finisher?.call || result.exchanges.some(e => e.call === note.observation));
+  assert.equal(tapeNote({ ...result, exchanges: [], finisher: null }, id), null);
+});
 
 /** A week-1 league run by the Desk: kickoff paid, Sunday NSNU recorded, card run. */
 function league(run: boolean) {
@@ -262,7 +274,7 @@ test("the live booth generates in order, under a daily cap, and keeps the key on
   assert.equal(liveRequest(2, 5, true, true, LIVE_LIMIT_PER_DAY), "claim");
   assert.equal(liveRequest(5, 5, true, false, 0), "unavailable");
   assert.equal(liveRequest(-1, 5, true, false, 0), "unavailable");
-  assert.deepEqual(Object.keys(FEATURE_MODEL).sort(), ["bout", "gazette", "hype", "live", "recap", "rules"]);
+  assert.deepEqual(Object.keys(FEATURE_MODEL).sort(), ["bout", "coach", "gazette", "hype", "live", "recap", "rules"]);
   for (const model of Object.values(FEATURE_MODEL)) assert.equal(model, HAIKU);
 
   const widget = readFileSync(new URL("../src/components/pit/claude-copy.tsx", import.meta.url), "utf8");
