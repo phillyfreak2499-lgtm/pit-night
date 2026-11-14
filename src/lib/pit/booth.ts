@@ -40,11 +40,12 @@ export function boothScript(data: PitData, scene: BoothScene, id = ""): BoothLin
   const card = data.bouts.filter(b => b.week === data.week && b.kind !== "bye");
   const featured = card.find(b => b.title === "Main event") ?? card[0] ?? upcomingMatchups(data)[0];
   const names = featured?.storeIds.map(s => data.bots.find(b => b.storeId === s)?.name).filter(Boolean) ?? [];
-  const opening = scene === "welcome" ? `Welcome to Pit Night! I'm Jim, here with Kathy for week ${data.week}.` :
+  const opening = scene === "welcome" ? `Welcome to Pit Night! I'm Jim. Kathy, what have you got for week ${data.week}?` :
     `Week ${data.week}${weekName ? ", " + weekName : ""}. Let's take a look at the card!`;
-  return [jim(opening), kathy(names.length === 2 ? `Here's one to circle. ${names[0]} and ${names[1]} share the cage this week.` :
+  const read = names.length === 2 ? `Here's one to circle. ${names[0]} and ${names[1]} share the cage this week.` :
     names.length > 2 ? `I'd keep an eye on the group fight. ${names.length} bots have to share that floor.` :
-    "The matchups haven't been posted yet. The team pages have the tale of the tape.")];
+    "The matchups haven't been posted yet. The team pages have the tale of the tape.";
+  return [jim(opening), kathy(scene === "welcome" ? "Thanks, Jim. " + read : read)];
 }
 
 export function analystReply(m: ReactiveMoment): string | undefined {
