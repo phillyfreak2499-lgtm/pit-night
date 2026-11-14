@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { setSoundMuted, soundMuted, subscribeSound } from "@/lib/pit/sound";
 import { BoothSegment } from "./booth-segment";
+import { Pregame } from "./pregame";
 import { useFightAudio } from "./use-fight-audio";
 import { PROGRAM_HOLD_MS, programRecords, storeNameMap } from "@/lib/pit/fight-card";
 import { championshipProgramSegments, firstPlaybackIndex, hasChampionshipOpening, type ChampionshipSegment } from "@/lib/pit/championship-opening";
@@ -29,6 +30,7 @@ export function ShowPage() {
   const segments = useMemo(() => championshipProgramSegments(tape.bouts, weekPick), [tape, weekPick]);
   const [index, setIndex] = useState(0);
   const [rolling, setRolling] = useState(false);
+  const [pregame, setPregame] = useState(false);
   const [speed, setSpeed] = useState(2);
   const [seek, setSeek] = useState(0);
   const [mic, setMic] = useState(true);
@@ -39,6 +41,7 @@ export function ShowPage() {
     setSeen(key);
     setIndex(0);
     setRolling(false);
+    setPregame(false);
   }
 
   const segment = segments[index] ?? segments[0]!;
@@ -53,7 +56,7 @@ export function ShowPage() {
     if (!rolling || current?.kind !== "card") return;
     const id = window.setTimeout(() => {
       setIndex((i) => Math.min(segments.length - 1, i + 1));
-    }, walkout ? 16000 : PROGRAM_HOLD_MS);
+    }, walkout ? 45000 : PROGRAM_HOLD_MS);
     return () => window.clearTimeout(id);
   }, [rolling, index, segments, walkout]);
 
@@ -92,12 +95,19 @@ export function ShowPage() {
     }
     armBroadcastAudio();
   };
+  const finishPregame = () => {
+    setPregame(false);
+    const first = firstPlaybackIndex(segments);
+    setIndex(first >= 0 ? first : 0);
+    setRolling(first >= 0);
+  };
   const start = () => {
+    if (pregame) { setRolling(on => !on); return; }
     arm();
     if (segment.kind === "open" || segment.kind === "close") {
-      const first = firstPlaybackIndex(segments);
-      setIndex(first >= 0 ? first : 0);
-      setRolling(first >= 0);
+      setIndex(0);
+      setPregame(true);
+      setRolling(true);
       return;
     }
     setRolling((on) => !on);
@@ -151,15 +161,16 @@ export function ShowPage() {
           onClick={start}
           disabled={!fightCount && segment.kind !== "close"}
         >
-          {segment.kind === "open" ? "Play broadcast" : rolling ? "Pause" : segment.kind === "close" ? "Play again" : "Play"}
+          {pregame ? rolling ? "Pause" : "Play" : segment.kind === "open" ? "Play broadcast" : rolling ? "Pause" : segment.kind === "close" ? "Play again" : "Play"}
         </button>
-        <button type="button" className="min-h-11 border border-line px-3 font-display text-muted" onClick={() => setIndex((i) => Math.max(0, i - 1))}>
+        <button type="button" className="min-h-11 border border-line px-3 font-display text-muted" onClick={() => { if (pregame) { setPregame(false); setRolling(false); } setIndex((i) => Math.max(0, i - 1)); }}>
           Back
         </button>
         <button
           type="button"
           className="min-h-11 border border-line px-3 font-display text-muted"
           onClick={() => {
+            if (pregame) { finishPregame(); return; }
             arm();
             setRolling(true);
             setIndex((i) => Math.min(segments.length - 1, i + 1));
@@ -207,6 +218,7 @@ export function ShowPage() {
               type="button"
               className={`min-h-11 shrink-0 border px-3 font-display text-sm tracking-wide uppercase ${i === index || (item.kind === "fight" && "bout" in segment && segment.bout.id === item.bout.id) ? "border-amber text-amber" : "border-line text-muted"}`}
               onClick={() => {
+                setPregame(false);
                 if (item.kind === "fight") {
                   arm();
                   const cardAt = segments.findIndex((row) => row.kind === "card" && row.bout.id === item.bout.id);
@@ -223,12 +235,13 @@ export function ShowPage() {
         )}
       </div>
 
-      {segment.kind === "open" ? <>
+      {pregame && <Pregame week={weekPick} title={weekName(data, weekPick)} bouts={tape.bouts} playing={rolling} mic={mic && !muted} onComplete={finishPregame}/>}
+      {segment.kind === "open" && !pregame ? <>
         {hasChampionshipOpening(weekPick, fightCount) ? <p className="border-l-2 border-amber px-3 py-2 text-sm text-amber">Before the bell: a 30-second Team Janelle celebration with every store bot.</p> : null}
         <ColdOpen data={data} bouts={tape.bouts} live={tape.live} replay={tape.replay} />
       </> : null}
       {segment.kind === "opening" ? <TeamJanelleOpening key={key} data={data} playing={rolling} onComplete={onOpeningDone} /> : null}
-      {rolling && walkout && segment.kind === "card" && <BoothSegment key={segment.bout.id} scene="walkout" id={segment.bout.id} label="Bot introductions" automatic />}
+      {rolling && walkout && segment.kind === "card" && <BoothSegment key={segment.bout.id} scene="walkout" id={segment.bout.id} label="Bot introductions" automatic onComplete={() => setIndex(i => segments[i]?.kind === "card" ? Math.min(i + 1, segments.length - 1) : i)} />}
       {segment.kind === "fight" && rolling && mic && line && <p aria-live="polite" className="border-l-2 border-amber px-3">{line}</p>}
       {segment.kind === "card" ? (
         <FightProgram

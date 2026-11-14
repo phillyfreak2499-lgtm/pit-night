@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { FanPicks } from "./fan-picks";
 import { CLASS_META } from "@/lib/pit/catalog";
 import { botFor, conferenceRecordOf, fightStreak, regularSeasonRecordOf } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
@@ -60,6 +61,7 @@ export function MatchupPoster({ bout }: { bout: Bout }) {
         </span>
         <Corner storeId={b} facing={-1} won={won(b)} />
       </div>
+      <FanPicks bout={bout} />
       <div className="border-t border-line px-4 py-3">
         {result ? (
           <div className="flex flex-wrap items-center justify-between gap-3">

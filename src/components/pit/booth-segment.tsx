@@ -5,9 +5,11 @@ import { playBooth } from "@/lib/pit/booth-playback";
 import { armSound, live, soundMuted, subscribeSound } from "@/lib/pit/sound";
 import type { BoothScene } from "@/lib/pit/booth";
 
-export function BoothSegment({ scene, id, label, automatic = false }: {
-  scene: BoothScene; id?: string; label: string; automatic?: boolean;
+export function BoothSegment({ scene, id, label, automatic = false, onComplete }: {
+  scene: BoothScene; id?: string; label: string; automatic?: boolean; onComplete?: () => void;
 }) {
+  const complete = useRef(onComplete);
+  complete.current = onComplete;
   const active = useRef<AbortController | null>(null);
   const [state, setState] = useState<"idle" | "loading" | "playing" | "partial" | "unavailable">("idle");
   const [caption, setCaption] = useState("");
@@ -53,6 +55,7 @@ export function BoothSegment({ scene, id, label, automatic = false }: {
       if (!controller.signal.aborted) setState("unavailable");
     } finally {
       if (active.current === controller) active.current = null;
+      if (!controller.signal.aborted) complete.current?.();
     }
   }, [scene, id]);
   useEffect(() => {

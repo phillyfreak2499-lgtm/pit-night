@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { BoothClip, BoothLine } from "./booth";
 
 export const getBoothSegment = createServerFn({ method: "POST" })
-  .validator(z.object({ scene: z.enum(["welcome", "card", "store", "gazette", "walkout"]), id: z.string().max(160).optional() }).strict())
+  .validator(z.object({ scene: z.enum(["welcome", "card", "store", "gazette", "walkout", "pregame"]), id: z.string().max(160).optional() }).strict())
   .handler(async ({ data: input }): Promise<{ lines: BoothLine[]; clips: BoothClip[]; pending: boolean }> => {
     const [{ loadSeason }, { boothScript }, { ringsideVoice }, { createHash }] = await Promise.all([
       import("./authoritative"), import("./booth"), import("./ringside-voice.server"), import("node:crypto"),

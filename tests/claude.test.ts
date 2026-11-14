@@ -22,6 +22,7 @@ import { claimCopy, countClaimedOnDay, finishCopy, readCopy, reserveCopy } from 
 import { FEATURE_MODEL, HAIKU } from "../src/lib/pit/claude.server.ts";
 import { ringsideVoice } from "../src/lib/pit/ringside-voice.server.ts";
 import { boothScript, analystReply } from "../src/lib/pit/booth.ts";
+import { fanSplit } from "../src/lib/pit/fan-picks.ts";
 import { reactiveMoment } from "../src/lib/pit/reactive-commentary.ts";
 import type { Sql } from "../src/lib/db.ts";
 import type { FightResult } from "../src/lib/pit/types.ts";
@@ -57,14 +58,31 @@ test("booth introduces the taped lineup and answers turning points without revea
   const data = league(true);
   const bout = data.bouts.find(b => b.kind === "bout" && b.result)!;
   const script = boothScript(data, "walkout", bout.id);
-  assert.deepEqual(script.map(l => l.speaker), ["Jim", "Cathy"]);
-  bout.result!.fighters.forEach((f, i) => assert.ok(script[i]!.text.includes(f.botName)));
+  assert.deepEqual(script.slice(0, 2).map(l => l.speaker), ["Jim", "Cathy"]);
+  bout.result!.fighters.forEach(f => assert.ok(script[0]!.text.includes(f.botName)));
+  assert.match(script[1]!.text, /No fan picks/);
   assert.deepEqual(boothScript(data, "walkout", "unknown"), []);
   assert.deepEqual(boothScript(data, "store", "unknown"), []);
   assert.equal(boothScript(data, "welcome")[0]?.speaker, "Jim");
   const moments = bout.result!.exchanges.flatMap((_, index) => reactiveMoment(bout.result!, { phase: "exchange", index }) ?? []);
   const turning = moments.find(m => m.kind !== "big-hit");
   assert.ok(turning && analystReply(turning)?.includes(turning.defender));
+});
+
+test("pick share counts the latest ballot per person for this fight and drives the walkout", () => {
+  const data = league(true);
+  const bout = data.bouts.find(b => b.kind === "bout" && b.result)!;
+  const [a, b] = bout.storeIds;
+  const pick = (crewId: string, side: string, at: number) => ({id: bout.id + crewId, boutId:bout.id, week:bout.week, crewId, storeId:a!, pick:side, at});
+  data.picks = [pick("one", b!, 1), pick("one", a!, 2), pick("two", a!, 1), pick("three", a!, 1), pick("four", b!, 1),
+    {...pick("five", b!, 1), boutId:"unrelated"}];
+  assert.deepEqual(fanSplit(bout, data.picks)?.sides.map(s=>s.percent), [75,25]);
+  assert.match(boothScript(data, "walkout", bout.id)[1]!.text, /75 percent.*underdog/);
+  data.picks = [pick("one", a!, 1),pick("two", b!, 1)];
+  assert.match(boothScript(data, "walkout", bout.id)[1]!.text, /fifty-fifty/);
+  assert.equal(boothScript(data,"pregame",String(bout.week)).length, 2);
+  assert.deepEqual(boothScript(data,"pregame","99"), []);
+  assert.ok(data.bouts.some(b=>boothScript(data,"walkout",b.id).some(l=>/shout-out/i.test(l.text))));
 });
 
 test("commentary and recap come only from posted results, without codes or crew names", () => {
