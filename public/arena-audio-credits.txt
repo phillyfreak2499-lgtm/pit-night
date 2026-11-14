@@ -1,0 +1,9 @@
+Watch Party crowd audio
+
+Football-match_Cheering_Large-crowd_Ambience .stereo.wav by Dan_AudioFile
+https://freesound.org/people/Dan_AudioFile/sounds/654085/
+Creative Commons Attribution 4.0 International
+https://creativecommons.org/licenses/by/4.0/
+
+This version excerpts the opening cheer, downmixes it to mono, resamples it,
+and adjusts its level for playback during the fight.

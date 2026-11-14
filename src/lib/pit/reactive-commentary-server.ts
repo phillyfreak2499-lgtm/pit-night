@@ -43,7 +43,7 @@ export const getReactiveCommentary = createServerFn({ method: "POST" })
     if (!moment) return { status: "unavailable" };
 
     const kind = "reactive";
-    const key = bout.id + ":" + hashString(bout.result.seed) + ":reactive:" + moment.beatId;
+    const key = bout.id + ":" + hashString(bout.result.seed) + ":ringside-v2:" + moment.beatId;
     const sql = await getSql();
     const existing = await store.readCopy(sql, kind, key);
     if (existing?.status === "ready" && existing.body) return { status: "ready", body: existing.body };
