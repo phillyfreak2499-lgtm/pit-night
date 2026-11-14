@@ -448,7 +448,9 @@ export function clientDoc(state: PitData, session: Session): SharedDoc {
 export const WEEK2_REPAIR_GIFT = "owner-week2-free-repairs-2026-11-07";
 export const TYLER_ROSES_GIFT = "owner-tyler-roses-2026-11-07";
 export const ALLIANCE_GOLD_GIFT = "owner-alliance-perfect-card-solid-gold-2026-11-09";
-export type OwnerGiftDue = { repairs: boolean; roses: boolean; gold: boolean };
+/** Equips the free CHASE armor on College Station once. A later captain change is left alone. */
+export const COLLEGE_CHASE_GIFT = "owner-college-chase-armor-2026-11-14";
+export type OwnerGiftDue = { repairs: boolean; roses: boolean; gold: boolean; chase: boolean };
 
 export function ownerGiftDue(data: PitData, now: Date): OwnerGiftDue {
   const events = data.ownerEvents ?? [];
@@ -464,25 +466,30 @@ export function ownerGiftDue(data: PitData, now: Date): OwnerGiftDue {
     gold:
       data.bots.some((bot) => bot.storeId === "alliance") &&
       !events.includes(ALLIANCE_GOLD_GIFT),
+    chase:
+      data.bots.some((bot) => bot.storeId === "college") &&
+      !events.includes(COLLEGE_CHASE_GIFT),
   };
 }
 
 /** Restore all owned/equipped parts without spending any coins, Bolts, vouchers, or changing fight history. */
 export function grantOwnerGifts(data: PitData, due: OwnerGiftDue): PitData {
-  if (!due.repairs && !due.roses && !due.gold) return data;
+  if (!due.repairs && !due.roses && !due.gold && !due.chase) return data;
   const cleanWear = Object.fromEntries(SLOTS.map((slot) => [slot, "clean"])) as Record<Slot, Condition>;
   return {
     ...data,
     bots: data.bots.map((bot) => {
       const roses = due.roses && bot.storeId === "tyler";
       const gold = due.gold && bot.storeId === "alliance";
-      if (!due.repairs && !roses && !gold) return bot;
+      const chase = due.chase && bot.storeId === "college";
+      if (!due.repairs && !roses && !gold && !chase) return bot;
       return {
         ...bot,
         ...(due.repairs
           ? { wear: { ...cleanWear }, partWear: {}, weldForWeek: {}, weldedParts: {} }
           : {}),
         ...(roses || gold ? { style: { ...styleOf(bot), ...(roses ? { topper: "tyler-roses" as const } : {}), ...(gold ? { wheelColor: "solid-gold" } : {}) } } : {}),
+        ...(chase ? { look: "chase" as const } : {}),
       };
     }),
     ...(due.repairs ? { quotes: Object.fromEntries(data.bots.map((bot) => [bot.storeId, [] as PitData["quotes"][string]])) } : {}),
@@ -494,11 +501,13 @@ export function grantOwnerGifts(data: PitData, due: OwnerGiftDue): PitData {
       ...(due.repairs ? [WEEK2_REPAIR_GIFT] : []),
       ...(due.roses ? [TYLER_ROSES_GIFT] : []),
       ...(due.gold ? [ALLIANCE_GOLD_GIFT] : []),
+      ...(due.chase ? [COLLEGE_CHASE_GIFT] : []),
     ],
     log: [
       ...(due.roses ? ["Tyler's ROSE CITY received its bouquet of roses topper, available free to every store."] : []),
       ...(due.gold ? ["Commissioner awarded Alliance the 24K Solid Gold Wheels for its Perfect Card. Permanently unlocked and equipped; no game stats or currencies changed."] : []),
       ...(due.repairs ? ["Commissioner gift: every bot repaired to 100% for Pit Week 2. No coins, vouchers, or Bolts spent."] : []),
+      ...(due.chase ? ["College Station's bot wears the CHASE armor. A captain can change the look later. No coins, Bolts, or records changed."] : []),
       ...data.log,
     ].slice(0, 24),
   };

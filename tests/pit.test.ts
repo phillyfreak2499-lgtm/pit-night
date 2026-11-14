@@ -2,7 +2,7 @@ import test, { beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createStore } from "zustand/vanilla";
-import { pitCreator, sharedDoc, clientDoc, applyLeague14, applyDueLock, pruneRemovePlaceholders, ownerGiftDue, grantOwnerGifts, WEEK2_REPAIR_GIFT, TYLER_ROSES_GIFT, ALLIANCE_GOLD_GIFT } from "../src/lib/pit/store.ts";
+import { pitCreator, sharedDoc, clientDoc, applyLeague14, applyDueLock, pruneRemovePlaceholders, ownerGiftDue, grantOwnerGifts, WEEK2_REPAIR_GIFT, TYLER_ROSES_GIFT, ALLIANCE_GOLD_GIFT, COLLEGE_CHASE_GIFT } from "../src/lib/pit/store.ts";
 import { makeData } from "../src/lib/pit/seed.ts";
 import { nsnuOf, rankedStores, simulateDuel, simulateChampionshipDuel, buildCard, conferenceStandings, championshipFinalists, coinMath, coinsByJar, type GradeSet } from "../src/lib/pit/engine.ts";
 import { weekProgress, boltsOf, lockerItem } from "../src/lib/pit/week.ts";
@@ -80,8 +80,8 @@ test("owner's week 2 gift repairs every bot and every owned part without cost or
   assert.strictEqual(first.bouts, data.bouts);
   assert.strictEqual(first.replays, data.replays);
   assert.strictEqual(first.storeCards, data.storeCards);
-  assert.deepEqual(first.ownerEvents, [WEEK2_REPAIR_GIFT, TYLER_ROSES_GIFT, ALLIANCE_GOLD_GIFT]);
-  assert.deepEqual(ownerGiftDue(first, new Date("2026-11-07T21:00:00Z")), { repairs: false, roses: false, gold: false });
+  assert.deepEqual(first.ownerEvents, [WEEK2_REPAIR_GIFT, TYLER_ROSES_GIFT, ALLIANCE_GOLD_GIFT, COLLEGE_CHASE_GIFT]);
+  assert.deepEqual(ownerGiftDue(first, new Date("2026-11-07T21:00:00Z")), { repairs: false, roses: false, gold: false, chase: false });
   assert.strictEqual(grantOwnerGifts(first, ownerGiftDue(first, new Date("2026-11-07T21:00:00Z"))), first);
   const snapshot = sharedDoc(first);
   assert.deepEqual(snapshot.ownerEvents, first.ownerEvents);
@@ -94,7 +94,7 @@ test("free Tyler rose topper is available to all stores and never heals a future
   }
   const after = { ...data, week: 3, ownerEvents: [] };
   const due = ownerGiftDue(after, new Date("2026-11-10T20:00:00Z"));
-  assert.deepEqual(due, { repairs: false, roses: true, gold: true });
+  assert.deepEqual(due, { repairs: false, roses: true, gold: true, chase: true });
   const gifted = grantOwnerGifts(after, due);
   assert.ok(gifted.ownerEvents?.includes(TYLER_ROSES_GIFT));
   assert.ok(!gifted.ownerEvents?.includes(WEEK2_REPAIR_GIFT));
