@@ -46,7 +46,7 @@ export function setSoundMuted(next: boolean) {
   }
 }
 
-function live(): AudioContext | null {
+export function live(): AudioContext | null {
   if (muted || !ctx) return null;
   return ctx;
 }
