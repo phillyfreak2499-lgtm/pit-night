@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getReactiveCommentary } from "@/lib/pit/reactive-commentary-server";
-import type { ReactiveCue } from "@/lib/pit/reactive-commentary";
+import { announcerDelivery, reactiveMoment, type ReactiveCue } from "@/lib/pit/reactive-commentary";
 import { soundMuted, subscribeSound } from "@/lib/pit/sound";
 import type { Bout } from "@/lib/pit/types";
 
@@ -109,7 +109,10 @@ export function useReactiveCommentary(bout: Bout | null, active: boolean, duck: 
         ?? english.find(v => v.default) ?? english.find(v => /^en-US$/i.test(v.lang)) ?? english[0];
       if (voice) utterance.voice = voice;
       utterance.lang = voice?.lang ?? "en-US";
-      utterance.rate = 1;
+      const moment = bout?.result && reactiveMoment(bout.result, cue);
+      const delivery = announcerDelivery[moment?.kind ?? "big-hit"];
+      utterance.rate = delivery.rate;
+      utterance.pitch = delivery.pitch;
       speech.current = utterance;
       utterance.onstart = () => {
         if (speech.current !== utterance) return;
