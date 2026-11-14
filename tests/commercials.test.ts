@@ -295,7 +295,7 @@ test("the watch party cuts to an ad stage and can fall back when the file is mis
   const watch = readFileSync(new URL("../src/components/pit/watch-page.tsx", import.meta.url), "utf8");
   const spot = readFileSync(new URL("../src/components/pit/commercial.tsx", import.meta.url), "utf8");
   const styles = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
-  assert.match(watch, /"lobby" \| "opening" \| "intro" \| "fight" \| "result" \| "ad" \| "final"/);
+  assert.match(watch, /"lobby" \| "pregame" \| "opening" \| "intro" \| "fight" \| "result" \| "ad" \| "final"/);
   assert.match(watch, /commercialAfter\(week, index \+ 1, bouts\.length\)/);
   assert.match(watch, /A house commercial runs between every fight/);
   assert.doesNotMatch(watch, /every other fight/);

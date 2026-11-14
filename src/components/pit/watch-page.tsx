@@ -138,7 +138,7 @@ export function WatchPage() {
               <span className="mt-1 block text-sm tracking-[0.18em] text-muted uppercase md:mt-0 md:ml-3 md:inline md:text-base md:tracking-normal md:normal-case">
                 Commercial
               </span>
-            ) : stage !== "lobby" && stage !== "final" && bouts.length ? (
+            ) : stage !== "lobby" && stage !== "pregame" && stage !== "final" && bouts.length ? (
               <span className="mt-1 block text-sm text-muted md:mt-0 md:ml-3 md:inline md:text-base">
                 Fight {index + 1} of {bouts.length}
               </span>
