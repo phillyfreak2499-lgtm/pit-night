@@ -494,7 +494,7 @@ function ShoutWall({ data, week }: { data: PitData; week: number }) {
     <section className="border border-line bg-surface">
       <div className="border-b border-line px-4 py-3">
         <SectionLabel>Shout-out wall</SectionLabel>
-        <p className="text-sm text-muted">Catch someone being Remarkable. Every store can see it.</p>
+        <p className="text-sm text-muted">Catch someone being Remarkable. Every store can see your post. Jim and Cathy may read your names and full message on the broadcast.</p>
       </div>
       {me ? (
         <form

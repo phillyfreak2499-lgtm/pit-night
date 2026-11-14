@@ -82,7 +82,13 @@ test("pick share counts the latest ballot per person for this fight and drives t
   assert.match(boothScript(data, "walkout", bout.id)[1]!.text, /fifty-fifty/);
   assert.equal(boothScript(data,"pregame",String(bout.week)).length, 2);
   assert.deepEqual(boothScript(data,"pregame","99"), []);
-  assert.ok(data.bouts.some(b=>boothScript(data,"walkout",b.id).some(l=>/shout-out/i.test(l.text))));
+  const shoutBout = data.bouts.find(b => boothScript(data, "walkout", b.id).some(l => /shout-out/i.test(l.text)))!;
+  const message = "Thanks for staying late to get the new crew ready!";
+  const post = { id: "test", week: shoutBout.week, storeId: a!, fromCrewId: "j", fromName: "Jordan", to: "Ari", text: message, at: 1 };
+  data.shouts = [{ ...post, week: 99, text: "Different week" }, { ...post, text: " " }, post];
+  const lines = boothScript(data, "walkout", shoutBout.id).slice(-2);
+  assert.match(lines[0]!.text, /from Jordan to Ari/);
+  assert.deepEqual(lines[1], { speaker: "Cathy", text: message });
 });
 
 test("commentary and recap come only from posted results, without codes or crew names", () => {

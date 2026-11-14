@@ -21,7 +21,7 @@ export const GROUPS: Group[] = [
     title: "Broadcast, Watch Party and announcers",
     items: [
       faq("What do the fan percentages on a fight card mean?", "Each percentage is that bot's share of the current picks for this head-to-head fight. Make or change your pick in Pit Week before lock. An even split has no favorite. No picks yet means nobody has voted. Picks never change a bot's stats or the result."),
-      faq("What's in the pregame show?", "Jim and Cathy open the selected week's broadcast with featured battles and what is at stake. Choose Skip pregame to go straight to the opening or walkouts. Before a duel, the booth covers the fan split and the record going into the fight. Listen for occasional shout-outs from the public Pit Week board or a salute to a pit crew."),
+      faq("What's in the pregame show?", "Jim and Cathy open the selected week's broadcast with featured battles and what is at stake. Choose Skip pregame to go straight to the opening or walkouts. Before a duel, the booth covers the fan split and the record going into the fight. For a selected Pit Week shout-out, Jim names the sender and recipient and Cathy reads their message in full. If the week has no message, Jim salutes a pit crew."),
       faq("How do I start the full show?", "Open Big Broadcast and press Play broadcast. For a group, choose Watch party · big screen, select the week and press Start · full screen or Start in this window. Starting a new show turns on voices, fight music, hit sounds and crowd cheers. On a TV, select its speakers or HDMI output on the device running the browser."),
       faq("Who are Jim and Cathy, and when do they speak?", "Jim calls the impact. Cathy answers when a bot takes the lead, crosses a health threshold or gets knocked out. Listen for both during bot introductions. Routine exchanges leave room for the music and effects. Captions identify the speaker when a recording plays."),
       faq("How do I turn the voices or all sound off?", "In Watch Party, use the mic or AI color button for commentary. During the fight, use the speaker for all fight audio. In Big Broadcast, use Booth on/off or Mute arena. Pausing stops the fight audio. Resuming keeps your choices for that show. In Watch Party, Space pauses and the right arrow skips ahead when the page has focus."),
@@ -167,7 +167,7 @@ export const GROUPS: Group[] = [
       ),
       faq(
         "What is battery?",
-        "Battery is the chassis stamina. It drains every exchange. When it is low the bot slows and the weapon weakens. Armor does not sag with it. Reactor holds the most. Sprinter and Hornet spend it faster. A Tesla Coil also drains the other bot's battery.",
+        "BAT is the chassis battery. It drains each exchange. PWR shows the effective power of a swing. STA is separate endurance that partly recovers between swings and can cost power later in a long fight. Cathy calls out those effects when the fight tape confirms them. When the battery runs low, the weapon weakens and the bot can lose pace late in a fight. Armor does not sag with it. Reactor holds the most. Sprinter and Hornet spend it faster. A Tesla Coil also drains the other bot's battery.",
       ),
       faq(
         "Which parts need green weeks?",

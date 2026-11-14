@@ -25,6 +25,12 @@ export function BoothSegment({ scene, id, label, automatic = false, onComplete }
     const controller = new AbortController();
     active.current = controller;
     setState("loading");
+    // Give a stalled walkout request a deadline, then let a playing message finish.
+    const loadingTimer = automatic && scene === "walkout" ? window.setTimeout(() => {
+      if (controller.signal.aborted) return;
+      controller.abort();
+      complete.current?.();
+    }, 45000) : undefined;
     try {
       armSound();
       const context = live();
@@ -42,6 +48,7 @@ export function BoothSegment({ scene, id, label, automatic = false, onComplete }
         throw Error();
       }
       await playBooth(context, result.clips, controller.signal, line => {
+        window.clearTimeout(loadingTimer);
         setState("playing");
         setCaption(line.speaker + " · " + line.text);
       });
@@ -54,10 +61,11 @@ export function BoothSegment({ scene, id, label, automatic = false, onComplete }
     } catch {
       if (!controller.signal.aborted) setState("unavailable");
     } finally {
+      window.clearTimeout(loadingTimer);
       if (active.current === controller) active.current = null;
       if (!controller.signal.aborted) complete.current?.();
     }
-  }, [scene, id]);
+  }, [automatic, scene, id]);
   useEffect(() => {
     stop();
     if (automatic && !muted) void start();

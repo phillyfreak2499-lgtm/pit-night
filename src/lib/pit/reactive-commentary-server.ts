@@ -53,10 +53,11 @@ export const getReactiveCommentary = createServerFn({ method: "POST" })
       try {
         const { ringsideVoice } = await import("./ringside-voice.server");
         const { analystReply } = await import("./booth");
-        const reply = analystReply(moment!);
+        const { swingMeterCall } = await import("./vitals");
+        const reply = analystReply(moment!, input.phase === "exchange" ? swingMeterCall(bout!.result!, input.index) : undefined);
         const [lead, analyst] = await Promise.all([
           ringsideVoice(sql, key, body),
-          reply ? ringsideVoice(sql, key + ":analysis-v2", reply, "Cathy", "ringside-analysis") : undefined,
+          reply ? ringsideVoice(sql, key + ":analysis:" + hashString(reply), reply, "Cathy", "ringside-analysis") : undefined,
         ]);
         return { status: "ready", body, ...lead,
           voicePending: !!(lead.voicePending || analyst?.voicePending),

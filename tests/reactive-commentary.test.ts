@@ -2,12 +2,38 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { impactLine, reactiveMoment, reactivePrompt, repeatsCall, shortReactiveLine } from "../src/lib/pit/reactive-commentary";
 import { analystReply } from "../src/lib/pit/booth";
+import { swingMeterCall } from "../src/lib/pit/vitals";
 import type { Exchange, FightResult, FighterSnap } from "../src/lib/pit/types";
 
 const fighters = [
   { id: "a", botName: "Iron Jaw" } as FighterSnap,
   { id: "b", botName: "Road Rage" } as FighterSnap,
 ];
+
+test("meter calls need recorded weapon output and the levels entering that particular swing", () => {
+  const result = fight(Array.from({length: 4}, (_, i) => exchange(i, "a", "b", 20, 100, 80)));
+  result.fighters = [{ ...fighters[0]!, stats: { power: 100, armor: 64, speed: 40, heat: 10 } }, fighters[1]!];
+  result.bell = { a: { battery: 100, batteryMax: 100, power: 100, stamina: 100, staminaMax: 100 } };
+  const ex = result.exchanges[3]!;
+  const state = { hp: 100, battery: 100, stamina: 50, heat: 0, burn: 0, stun: 1, slow: 1, phoenixUsed: false };
+  const trace = { before: state, after: state, damageDealt: 20, hitCount: 1, reflectedDamageTaken: 0, hazardDamage: 0, burnDamage: 0, healing: 0, revived: false };
+  ex.combat = { a: trace };
+  assert.equal(swingMeterCall(result, 3), undefined);
+  ex.vitals = { a: { battery: 95, stamina: 47, staminaLow: 40, power: 88 } };
+  assert.match(swingMeterCall(result, 3)!, /50 stamina.*Fatigue/);
+  const reg = result.exchanges[0]!;
+  reg.combat = ex.combat;
+  reg.vitals = ex.vitals;
+  assert.equal(swingMeterCall(result, 0), undefined, "same levels do not reduce power from stamina on the first swing");
+  trace.before.battery = 60;
+  reg.vitals.a!.power = 82;
+  assert.match(swingMeterCall(result, 0)!, /60 percent battery.*82 power/);
+  trace.before.battery = 85;
+  reg.vitals.a!.power = 93.25;
+  assert.match(swingMeterCall(result, 0)!, /93 power.*100 at the bell/);
+  trace.hitCount = 0;
+  assert.equal(swingMeterCall(result, 0), undefined, "no weapon hit to attribute");
+});
 
 function exchange(index: number, attackerId: string, defenderId: string, damage: number, attackerHp: number, defenderHp: number): Exchange {
   return { index, attackerId, defenderId, damage, attackerHp, defenderHp, call: "Impact!", tags: [] };
