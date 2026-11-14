@@ -1,7 +1,7 @@
 import { arenaBotScale } from "./arena-layout";
 import { botFrameOf as frameOf, type BotFrame as Frame } from "./bot-frame";
 import { sawPoseOf } from "./bot-weapons";
-import { drawPaintSkin } from "./paint-skins";
+import { drawPaintSkin, isPaintSkin } from "./paint-skins";
 import { bannerVerdict } from "../../../scripts/copy-guard.mjs";
 import { EYES, LEDS, PAINT, SMOKE, TRIM, WHEEL_COLORS, decalArt, styleOf } from "@/lib/pit/catalog";
 import { RAIN_CITY } from "@/lib/pit/rain-city";
@@ -1955,7 +1955,7 @@ export function drawSideBot(
       ctx.stroke();
     }
     ctx.restore();
-  } else if (look === "two-tone" || look === "camouflage" || look === "tie-dye" || look === "texas" || ["louisiana","cowboys","seahawks","raiders","chiefs","bumblebee","rain-city"].includes(look)) {
+  } else if (isPaintSkin(look)) {
     ctx.save();
     poly(ctx, f.hull, u2);
     ctx.clip();
@@ -5274,7 +5274,7 @@ export function drawTopBot(
   if (s.bot.look === "stripe") {
     ctx.fillStyle = "#f3efe6";
     ctx.fillRect(-len * 0.5, -wid * 0.05, len * 0.9, wid * 0.1);
-  } else if (s.bot.look === "two-tone" || s.bot.look === "camouflage" || s.bot.look === "tie-dye" || s.bot.look === "texas" || ["louisiana","cowboys","seahawks","raiders","chiefs","bumblebee","rain-city"].includes(s.bot.look)) {
+  } else if (isPaintSkin(s.bot.look)) {
     ctx.save();
     traceTopHull(ctx, s.bot.classId, style.body, len, wid);
     ctx.clip();

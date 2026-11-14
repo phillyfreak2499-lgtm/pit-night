@@ -9,7 +9,7 @@ export type PullResult = {
   doc: string | null;
   session: import("./types").Session;
 };
-const SCHEMA_TAG = "14-store-abilene-proposals-remove-removed-cleanup-v4-solid-gold";
+const SCHEMA_TAG = "14-store-abilene-proposals-remove-removed-cleanup-v4-solid-gold-college-chase";
 async function services() {
   const [db, store, auth, vanilla] = await Promise.all([
     import("@/lib/db"),
@@ -69,9 +69,9 @@ async function load(options?: { deadlines?: boolean }) {
     let doc = row.doc;
     if (normalizedDoc !== row.doc || row.schema_tag !== SCHEMA_TAG) {
       let backupId: string | null = null;
-      if (ownerGift.repairs || ownerGift.roses || ownerGift.gold || nov13Repairs) {
+      if (ownerGift.repairs || ownerGift.roses || ownerGift.gold || ownerGift.chase || nov13Repairs) {
         // Save and verify the exact pre-gift document before changing any bot.
-        const giftBackupId = `backup-owner-gifts-${nov13Repairs ? "2026-11-13" : ownerGift.gold ? "2026-11-09" : "2026-11-07"}-rev-${row.rev}`;
+        const giftBackupId = `backup-owner-gifts-${nov13Repairs ? "2026-11-13" : ownerGift.gold ? "2026-11-09" : ownerGift.chase ? "2026-11-14" : "2026-11-07"}-rev-${row.rev}`;
         await s.sql`insert into pit_season (id, rev, doc) values (${giftBackupId}, ${row.rev}, ${row.doc}) on conflict (id) do nothing`;
         const backup = (await s.sql<{ doc: string }>`select doc from pit_season where id = ${giftBackupId}`)[0];
         if (!backup || backup.doc !== row.doc)
@@ -95,7 +95,7 @@ async function load(options?: { deadlines?: boolean }) {
       if (!changed[0]) continue; // A concurrent command won. Read again, up to 8 tries.
       rev = Number(changed[0].rev);
       doc = normalizedDoc;
-      if (ownerGift.repairs || ownerGift.roses || ownerGift.gold || nov13Repairs) {
+      if (ownerGift.repairs || ownerGift.roses || ownerGift.gold || ownerGift.chase || nov13Repairs) {
         const saved = (await s.sql<{ doc: string }>`select doc from pit_season where id = 'main'`)[0];
         if (!saved) throw new Error("Owner gift verification failed: season row missing.");
         const verified = JSON.parse(saved.doc) as import("./types").PitData;
@@ -103,7 +103,8 @@ async function load(options?: { deadlines?: boolean }) {
           (!nov13Repairs || verified.ownerEvents?.includes(NOV13_REPAIR_GIFT)) &&
           (!ownerGift.repairs || verified.ownerEvents?.includes(s.store.WEEK2_REPAIR_GIFT)) &&
           (!ownerGift.roses || verified.ownerEvents?.includes(s.store.TYLER_ROSES_GIFT)) &&
-          (!ownerGift.gold || verified.ownerEvents?.includes(s.store.ALLIANCE_GOLD_GIFT));
+          (!ownerGift.gold || verified.ownerEvents?.includes(s.store.ALLIANCE_GOLD_GIFT)) &&
+          (!ownerGift.chase || verified.ownerEvents?.includes(s.store.COLLEGE_CHASE_GIFT));
         const repairsOK = !(ownerGift.repairs || nov13Repairs) || verified.bots.every((bot) =>
           Object.values(bot.wear).every((w) => w === "clean") &&
           Object.values(bot.partWear ?? {}).every((w) => w === "clean") &&
@@ -116,9 +117,11 @@ async function load(options?: { deadlines?: boolean }) {
           verified.stores.find((store) => store.id === "alliance")?.unlocks?.includes("wheel-solid-gold") &&
           verified.bots.find((bot) => bot.storeId === "alliance")?.style?.wheelColor === "solid-gold"
         );
-        if (!markerOK || !repairsOK || !rosesOK || !goldOK)
+        const chaseOK = !ownerGift.chase ||
+          verified.bots.find((bot) => bot.storeId === "college")?.look === "chase";
+        if (!markerOK || !repairsOK || !rosesOK || !goldOK || !chaseOK)
           throw new Error("Owner gift verification failed: check the league state before retrying.");
-        console.info(`[pit] owner gifts committed: repairs=${ownerGift.repairs}; nov13Repairs=${nov13Repairs}; roses=${ownerGift.roses}; allianceGold=${ownerGift.gold}; bots=${verified.bots.length}; week=${verified.week}`);
+        console.info(`[pit] owner gifts committed: repairs=${ownerGift.repairs}; nov13Repairs=${nov13Repairs}; roses=${ownerGift.roses}; allianceGold=${ownerGift.gold}; collegeChase=${ownerGift.chase}; bots=${verified.bots.length}; week=${verified.week}`);
       }
       if (isNewCleanup) {
         // Verify the actual production database after committing the changed revision.

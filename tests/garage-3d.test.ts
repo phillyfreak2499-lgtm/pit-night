@@ -103,7 +103,7 @@ test("Abilene swept wing, Shrek ears, Wally Eyes and new state skins render as c
   const eyes = createGarageCosmetics(look({ topper: "wally-eyes" }), dimensions);
   assertFiniteGeometry(eyes);
   assert.ok(eyes.getObjectByName("Wally Eyes binocular housing"));
-  for (const paintLook of ["louisiana", "cowboys", "seahawks", "raiders", "chiefs", "bumblebee"] as const) {
+  for (const paintLook of ["louisiana", "cowboys", "seahawks", "raiders", "chiefs", "bumblebee", "chase"] as const) {
     const decorated = createGarageCosmetics({ ...look({}), look: paintLook }, dimensions);
     assertFiniteGeometry(decorated);
     assert.ok(decorated.getObjectByName(paintLook + " roof skin"), paintLook);

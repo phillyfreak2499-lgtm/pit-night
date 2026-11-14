@@ -1,6 +1,26 @@
 import { RAIN_CITY } from "@/lib/pit/rain-city";
 import type { BotLook } from "@/lib/pit/types";
 
+/** Full-bleed hull graphics. Stripe, chevron, and rivets stay in the callers. */
+const PAINT_SKINS = new Set<BotLook>([
+  "two-tone",
+  "camouflage",
+  "tie-dye",
+  "texas",
+  "louisiana",
+  "cowboys",
+  "seahawks",
+  "raiders",
+  "chiefs",
+  "bumblebee",
+  "chase",
+  "rain-city",
+]);
+
+export function isPaintSkin(look: BotLook) {
+  return PAINT_SKINS.has(look);
+}
+
 /**
  * Shared procedural hull graphics for the side broadcast, overhead replay,
  * and 3D garage. Coordinates are relative to the painted surface.
@@ -16,7 +36,7 @@ export function drawPaintSkin(
   base: string,
   accent: string,
 ) {
-  if (!["two-tone", "camouflage", "tie-dye", "texas", "louisiana", "cowboys", "seahawks", "raiders", "chiefs", "bumblebee", "chase", "rain-city"].includes(look)) return;
+  if (!isPaintSkin(look)) return;
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(width, height);
@@ -292,37 +312,299 @@ export function drawPaintSkin(
     }
   }
 
-  if (look === "chase") {
-    // CHASE: original green futuristic armor panels, golden mirrored visor,
-    // broad angular chest plating; a homage to sci-fi armored heroes.
-    ctx.fillStyle="#384b2b";ctx.fillRect(0,0,1,1);
-    ctx.fillStyle="#1a2619";
-    for(const x of [0.03,0.36,0.69]) {
-      ctx.fillRect(x,0.06,0.28,0.08);
-      ctx.fillRect(x,0.86,0.28,0.09);
-    }
-    ctx.fillStyle="#647947";ctx.beginPath();
-    ctx.moveTo(0.1,0.22);ctx.lineTo(0.37,0.14);ctx.lineTo(0.63,0.14);
-    ctx.lineTo(0.9,0.22);ctx.lineTo(0.85,0.77);ctx.lineTo(0.5,0.91);
-    ctx.lineTo(0.15,0.77);ctx.closePath();ctx.fill();
-    ctx.strokeStyle="#1a271b";ctx.lineWidth=0.045;ctx.stroke();
-    ctx.fillStyle="#222d23";
-    ctx.fillRect(0.12,0.26,0.76,0.13);
-    ctx.fillStyle="#e5a83b";ctx.beginPath();
-    ctx.moveTo(0.15,0.31);ctx.lineTo(0.78,0.29);ctx.lineTo(0.85,0.42);
-    ctx.lineTo(0.73,0.52);ctx.lineTo(0.28,0.53);ctx.lineTo(0.13,0.44);ctx.closePath();ctx.fill();
-    ctx.fillStyle="#fff1b3";ctx.fillRect(0.22,0.35,0.42,0.025);
-    ctx.fillStyle="#36472a";
-    ctx.beginPath();ctx.moveTo(0.48,0.6);ctx.lineTo(0.77,0.56);
-    ctx.lineTo(0.81,0.79);ctx.lineTo(0.5,0.87);ctx.lineTo(0.19,0.79);
-    ctx.lineTo(0.23,0.56);ctx.closePath();ctx.fill();
-    ctx.strokeStyle="#92b16e";ctx.lineWidth=0.025;
-    ctx.beginPath();ctx.moveTo(0.26,0.66);ctx.lineTo(0.43,0.7);ctx.lineTo(0.5,0.77);
-    ctx.lineTo(0.57,0.7);ctx.lineTo(0.74,0.66);ctx.stroke();
-    ctx.fillStyle="#a7ca81";
-    ctx.font="bold 0.11px Arial, sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
-    ctx.fillText("CHASE",0.5,0.955,0.75);
-  }
+  if (look === "chase") drawChaseArmor(ctx);
 
   ctx.restore();
+}
+
+/**
+ * Olive plate armor with a dark undersuit in the seams and a gold wraparound visor.
+ * Original drawing: no borrowed marks, crests, or names. Static, so a baked garage
+ * texture matches the live broadcast.
+ */
+function drawChaseArmor(ctx: CanvasRenderingContext2D) {
+  const shade = (
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number,
+    stops: readonly (readonly [number, string])[],
+  ) => {
+    const grad = ctx.createLinearGradient(x0, y0, x1, y1);
+    for (const [t, color] of stops) grad.addColorStop(t, color);
+    return grad;
+  };
+  const olive = [
+    [0, "#b4c88a"],
+    [0.22, "#6f8648"],
+    [0.58, "#465c30"],
+    [1, "#24321a"],
+  ] as const;
+  const deep = [
+    [0, "#8ea264"],
+    [0.45, "#3a4e28"],
+    [1, "#1a2614"],
+  ] as const;
+  const plate = (trace: () => void, fill: CanvasGradient | string) => {
+    ctx.beginPath();
+    trace();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    ctx.lineJoin = "round";
+    ctx.lineWidth = 0.016;
+    ctx.strokeStyle = "rgba(232, 240, 206, 0.82)";
+    ctx.stroke();
+    ctx.lineWidth = 0.03;
+    ctx.strokeStyle = "rgba(8, 12, 8, 0.5)";
+    ctx.stroke();
+    ctx.restore();
+    ctx.lineWidth = 0.006;
+    ctx.strokeStyle = "#12180f";
+    ctx.stroke();
+  };
+
+  ctx.fillStyle = shade(0, 0, 0.15, 1, [
+    [0, "#1c2618"],
+    [0.5, "#0e140d"],
+    [1, "#070907"],
+  ]);
+  ctx.fillRect(0, 0, 1, 1);
+  ctx.fillStyle = "#121612";
+  ctx.fillRect(0.31, 0.18, 0.38, 0.7);
+  ctx.strokeStyle = "rgba(78, 86, 70, 0.7)";
+  ctx.lineWidth = 0.007;
+  for (let i = 0; i < 7; i++) {
+    const y = 0.22 + i * 0.085;
+    ctx.beginPath();
+    ctx.moveTo(0.34, y);
+    ctx.lineTo(0.66, y);
+    ctx.stroke();
+  }
+
+  plate(
+    () => {
+      ctx.moveTo(0.02, 0.3);
+      ctx.bezierCurveTo(-0.01, 0.08, 0.14, -0.01, 0.32, 0.08);
+      ctx.lineTo(0.33, 0.28);
+      ctx.bezierCurveTo(0.24, 0.5, 0.08, 0.52, 0, 0.38);
+      ctx.closePath();
+    },
+    shade(0, 0.02, 0.3, 0.5, olive),
+  );
+  plate(
+    () => {
+      ctx.moveTo(0.98, 0.3);
+      ctx.bezierCurveTo(1.01, 0.08, 0.86, -0.01, 0.68, 0.08);
+      ctx.lineTo(0.67, 0.28);
+      ctx.bezierCurveTo(0.76, 0.5, 0.92, 0.52, 1, 0.38);
+      ctx.closePath();
+    },
+    shade(1, 0.02, 0.7, 0.5, olive),
+  );
+  plate(
+    () => {
+      ctx.moveTo(0.26, 0.14);
+      ctx.quadraticCurveTo(0.5, 0.08, 0.74, 0.14);
+      ctx.lineTo(0.66, 0.32);
+      ctx.lineTo(0.34, 0.32);
+      ctx.closePath();
+    },
+    shade(0.26, 0.1, 0.74, 0.32, deep),
+  );
+  plate(
+    () => {
+      ctx.moveTo(0.33, 0.38);
+      ctx.bezierCurveTo(0.33, 0.06, 0.42, 0, 0.5, 0);
+      ctx.bezierCurveTo(0.58, 0, 0.67, 0.06, 0.67, 0.38);
+      ctx.quadraticCurveTo(0.5, 0.46, 0.33, 0.38);
+      ctx.closePath();
+    },
+    shade(0.34, 0, 0.7, 0.44, olive),
+  );
+  for (const side of [-1, 1]) {
+    plate(() => {
+      const x = 0.5 + side * 0.14;
+      ctx.moveTo(x, 0.34);
+      ctx.lineTo(x + side * 0.12, 0.4);
+      ctx.lineTo(x + side * 0.07, 0.54);
+      ctx.lineTo(x - side * 0.02, 0.48);
+      ctx.closePath();
+    }, shade(0.36, 0.34, 0.64, 0.54, deep));
+  }
+  plate(
+    () => {
+      ctx.moveTo(0.28, 0.2);
+      ctx.quadraticCurveTo(0.5, 0.12, 0.72, 0.2);
+      ctx.lineTo(0.66, 0.28);
+      ctx.quadraticCurveTo(0.5, 0.24, 0.34, 0.28);
+      ctx.closePath();
+    },
+    shade(0.28, 0.12, 0.72, 0.28, [
+      [0, "#d5e4b0"],
+      [1, "#3a4e26"],
+    ]),
+  );
+
+  const visor = () => {
+    ctx.beginPath();
+    ctx.moveTo(0.12, 0.3);
+    ctx.quadraticCurveTo(0.5, 0.18, 0.88, 0.3);
+    ctx.lineTo(0.8, 0.46);
+    ctx.quadraticCurveTo(0.5, 0.55, 0.2, 0.46);
+    ctx.closePath();
+  };
+  visor();
+  ctx.fillStyle = shade(0.12, 0.2, 0.88, 0.54, [
+    [0, "#6e2806"],
+    [0.16, "#e07010"],
+    [0.4, "#ffe08a"],
+    [0.58, "#f09020"],
+    [0.8, "#b84e08"],
+    [1, "#5c2206"],
+  ]);
+  ctx.fill();
+  ctx.save();
+  ctx.clip();
+  ctx.beginPath();
+  ctx.moveTo(0.2, 0.28);
+  ctx.lineTo(0.5, 0.23);
+  ctx.lineTo(0.42, 0.36);
+  ctx.lineTo(0.16, 0.38);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(255, 250, 226, 0.78)";
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(0.58, 0.34);
+  ctx.quadraticCurveTo(0.72, 0.31, 0.78, 0.36);
+  ctx.quadraticCurveTo(0.7, 0.4, 0.56, 0.4);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(255, 214, 130, 0.28)";
+  ctx.fill();
+  ctx.fillStyle = "rgba(48, 18, 4, 0.38)";
+  ctx.fillRect(0.14, 0.42, 0.72, 0.12);
+  ctx.restore();
+  visor();
+  ctx.lineWidth = 0.012;
+  ctx.strokeStyle = "#3a1c08";
+  ctx.stroke();
+  ctx.lineWidth = 0.004;
+  ctx.strokeStyle = "rgba(255, 236, 196, 0.9)";
+  ctx.stroke();
+
+  plate(
+    () => {
+      ctx.moveTo(0.2, 0.52);
+      ctx.lineTo(0.8, 0.52);
+      ctx.lineTo(0.7, 0.76);
+      ctx.lineTo(0.5, 0.82);
+      ctx.lineTo(0.3, 0.76);
+      ctx.closePath();
+    },
+    shade(0.2, 0.5, 0.82, 0.82, olive),
+  );
+  plate(
+    () => {
+      ctx.moveTo(0.4, 0.54);
+      ctx.lineTo(0.6, 0.54);
+      ctx.lineTo(0.56, 0.72);
+      ctx.lineTo(0.5, 0.76);
+      ctx.lineTo(0.44, 0.72);
+      ctx.closePath();
+    },
+    shade(0.4, 0.52, 0.62, 0.76, [
+      [0, "#e4f0c4"],
+      [0.4, "#8aa45e"],
+      [1, "#2c3c1e"],
+    ]),
+  );
+  ctx.beginPath();
+  ctx.moveTo(0.5, 0.56);
+  ctx.lineTo(0.5, 0.74);
+  ctx.strokeStyle = "rgba(10, 14, 8, 0.7)";
+  ctx.lineWidth = 0.007;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(0.28, 0.66);
+  ctx.lineTo(0.42, 0.7);
+  ctx.lineTo(0.5, 0.76);
+  ctx.lineTo(0.58, 0.7);
+  ctx.lineTo(0.72, 0.66);
+  ctx.strokeStyle = "rgba(214, 226, 176, 0.35)";
+  ctx.lineWidth = 0.006;
+  ctx.stroke();
+
+  for (const [y, width] of [
+    [0.8, 0.44],
+    [0.865, 0.36],
+  ] as const) {
+    plate(() => {
+      ctx.moveTo(0.5 - width / 2, y);
+      ctx.lineTo(0.5 + width / 2, y);
+      ctx.lineTo(0.5 + width / 2 - 0.03, y + 0.052);
+      ctx.lineTo(0.5 - width / 2 + 0.03, y + 0.052);
+      ctx.closePath();
+    }, shade(0.28, y, 0.72, y + 0.06, deep));
+  }
+
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "rgba(24, 18, 10, 0.75)";
+  ctx.lineWidth = 0.005;
+  ctx.beginPath();
+  ctx.moveTo(0.34, 0.62);
+  ctx.lineTo(0.47, 0.66);
+  ctx.moveTo(0.14, 0.24);
+  ctx.lineTo(0.22, 0.29);
+  ctx.moveTo(0.72, 0.68);
+  ctx.lineTo(0.81, 0.64);
+  ctx.moveTo(0.56, 0.12);
+  ctx.lineTo(0.63, 0.08);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(232, 238, 206, 0.45)";
+  ctx.lineWidth = 0.003;
+  ctx.beginPath();
+  ctx.moveTo(0.342, 0.612);
+  ctx.lineTo(0.47, 0.652);
+  ctx.moveTo(0.142, 0.232);
+  ctx.lineTo(0.22, 0.282);
+  ctx.stroke();
+  ctx.fillStyle = "rgba(214, 196, 148, 0.6)";
+  ctx.beginPath();
+  ctx.moveTo(0.1, 0.16);
+  ctx.lineTo(0.15, 0.14);
+  ctx.lineTo(0.12, 0.2);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.strokeStyle = "rgba(150, 226, 255, 0.34)";
+  ctx.lineWidth = 0.01;
+  ctx.beginPath();
+  ctx.roundRect(0.035, 0.02, 0.93, 0.9, 0.06);
+  ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle = shade(0, 0, 1, 1, [
+    [0, "rgba(170, 230, 255, 0.05)"],
+    [0.45, "rgba(255, 210, 120, 0)"],
+    [1, "rgba(120, 210, 255, 0.06)"],
+  ]);
+  ctx.fillRect(0, 0, 1, 1);
+
+  ctx.fillStyle = "rgba(8, 10, 8, 0.82)";
+  ctx.beginPath();
+  ctx.roundRect(0.2, 0.905, 0.6, 0.07, 0.016);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(198, 214, 150, 0.55)";
+  ctx.lineWidth = 0.005;
+  ctx.stroke();
+  ctx.font = "bold 0.072px Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineWidth = 0.008;
+  ctx.strokeStyle = "#10160e";
+  ctx.strokeText("CHASE", 0.5, 0.94, 0.52);
+  ctx.fillStyle = "#d7e8b6";
+  ctx.fillText("CHASE", 0.5, 0.94, 0.52);
 }

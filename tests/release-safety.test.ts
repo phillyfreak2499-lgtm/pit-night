@@ -106,7 +106,7 @@ async function checkLoad({ phase = "inspected", environment = "production", lose
   const seed = makeData();
   seed.week = 3;
   seed.phase = phase;
-  seed.ownerEvents = [storeModule.WEEK2_REPAIR_GIFT, storeModule.TYLER_ROSES_GIFT, storeModule.ALLIANCE_GOLD_GIFT];
+  seed.ownerEvents = [storeModule.WEEK2_REPAIR_GIFT, storeModule.TYLER_ROSES_GIFT, storeModule.ALLIANCE_GOLD_GIFT, storeModule.COLLEGE_CHASE_GIFT];
   seed.bots = seed.bots.map((b) => ({ ...b, voucher: 9, repairSpent: 7, wear: { ...b.wear, weapon: "disabled" }, partWear: { [b.equipped.weapon]: "disabled" } }));
   let row = { rev: 51, doc: JSON.stringify(storeModule.sharedDoc(seed)), schema_tag: JSON.parse(schemaLiteral) as string };
   const initial = row.doc;

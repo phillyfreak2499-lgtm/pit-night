@@ -3,7 +3,7 @@ import { LEDS, PAINT, SMOKE, TRIM, styleOf } from "@/lib/pit/catalog";
 import { RAIN_CITY } from "@/lib/pit/rain-city";
 import type { BotLookProps } from "../bot-portrait";
 import { stickerBadge } from "../cage-draw";
-import { drawPaintSkin } from "../paint-skins";
+import { drawPaintSkin, isPaintSkin } from "../paint-skins";
 import { botFrameOf } from "../bot-frame";
 import { measureTeamFlag, paintTeamFlagName } from "../team-flag";
 
@@ -225,7 +225,7 @@ export function createGarageCosmetics(
       );
     }
   }
-  if (look.look === "two-tone" || look.look === "camouflage" || look.look === "tie-dye" || look.look === "texas" || ["louisiana", "cowboys", "seahawks", "raiders", "chiefs", "bumblebee", "rain-city"].includes(look.look)) {
+  if (isPaintSkin(look.look)) {
     const paint = PAINT[look.paint] ?? PAINT.amber;
     const accent = TRIM[style.trim] ?? TRIM.white;
     const roofMap = canvasMap((ctx, w, h) => drawPaintSkin(ctx, look.look, 0, 0, w, h, paint, accent));
