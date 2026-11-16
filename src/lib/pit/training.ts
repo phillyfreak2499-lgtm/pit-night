@@ -1,7 +1,7 @@
 import { central } from "./time";
 import { productQuestion } from "./product-quiz";
 /**
- * Pit Week: four regular-season weeks plus finalist-only Championship Prep.
+ * Pit Week: four regular-season rounds plus two weeks of preparation for all fourteen stores.
  * Every job and Spark question is drawn from the COGS training library:
  * Why We Sell The Way We Do, A Remarkable Experience, Building Non-Tangible Value,
  * Interview for Reality, Building a Complete Solution, Peace of Mind 3,
@@ -10,7 +10,7 @@ import { productQuestion } from "./product-quiz";
  */
 
 export type JobKind = "culture" | "skill" | "care" | "crate";
-export type DayKey = "tue" | "wed" | "thu" | "fri" | "sat";
+export type DayKey = "tue" | "wed" | "thu" | "fri" | "sat" | "tue2" | "wed2" | "thu2" | "fri2";
 
 export type Job = {
   id: string;
@@ -47,8 +47,9 @@ export type TrainingWeek = {
   care: Job;
 };
 
-export const DAY_LABEL: Record<DayKey, string> = { tue: "Tuesday", wed: "Wednesday", thu: "Thursday", fri: "Friday", sat: "Saturday" };
-export const DAY_ORDER: DayKey[] = ["tue", "wed", "thu", "fri", "sat"];
+export const DAY_LABEL: Record<DayKey, string> = { tue: "Tuesday", wed: "Wednesday", thu: "Thursday", fri: "Friday", sat: "Saturday", tue2: "Tuesday", wed2: "Wednesday", thu2: "Thursday", fri2: "Friday" };
+export const DAY_ORDER: DayKey[] = ["tue", "wed", "thu", "fri", "sat", "tue2", "wed2", "thu2", "fri2"];
+const DAY_OFFSET: Record<DayKey, number> = { tue:0,wed:1,thu:2,fri:3,sat:4,tue2:7,wed2:8,thu2:9,fri2:10 };
 
 /** Coins are performance. Bolts are effort. Completing the Full Tune-Up earns the separate +4 fight bonus. */
 export const BOLTS = { job: 2, sparkCorrect: 1, pickCorrect: 2, crate: 5 } as const;
@@ -1050,9 +1051,9 @@ export const PROGRAM: TrainingWeek[] = [
           { id: "w5-tue-skill", kind: "skill", title: "Three clean hand-offs", do: "Complete three smooth hand-offs from Analysis into the test walk without breaking the Client's momentum.", proof: "What made the cleanest hand-off work." },
         ],
         spark: [
-          { q: "What makes Championship Prep count?", choices: ["Being a finalist", "The finalist store doing the work", "Other stores donating Bolts", "A free repair"], answer: 1, why: "The finalists earn their own preparation. Nothing is gifted." },
+          { q: "What makes Championship Prep count?", choices: ["Being a finalist", "Your own store doing the work", "Other stores donating Bolts", "A free repair"], answer: 1, why: "Every store earns its own preparation. Nothing is gifted." },
           { q: "What can another store add to a finalist's bot?", choices: ["Coins", "Repairs", "Nothing that changes combat", "A Super part"], answer: 2, why: "Rally support changes the show, never the fight." },
-          { q: "What happens to the build earned during the season?", choices: ["It resets", "It carries into Championship Week", "It becomes stock", "The other conference chooses it"], answer: 1, why: "The season-earned bot is the bot the finalist prepares." },
+          { q: "What happens to the build earned during the season?", choices: ["It resets", "It carries into Championship Week", "It becomes stock", "The other conference chooses it"], answer: 1, why: "The season-earned bot is the bot each store prepares." },
         ],
       },
       {
@@ -1076,7 +1077,7 @@ export const PROGRAM: TrainingWeek[] = [
         spark: [
           { q: "What should the recommendation connect back to?", choices: ["The store goal", "What the Client said they want to change", "The bot build", "The scoreboard"], answer: 1, why: "The Client's goal gives the Solution meaning." },
           { q: "Can a finalist spend coins it earned during Weeks 1–4?", choices: ["Yes", "No"], answer: 0, why: "Season-earned resources carry into Championship Week." },
-          { q: "Does Championship Week give free repairs?", choices: ["Yes", "No"], answer: 1, why: "Finalists must prepare with what they earned and the work they complete." },
+          { q: "Does Championship Week give free repairs?", choices: ["Yes", "No"], answer: 1, why: "All stores prepare with what they earned and the work they complete." },
         ],
       },
       {
@@ -1086,8 +1087,8 @@ export const PROGRAM: TrainingWeek[] = [
           { id: "w5-fri-skill", kind: "skill", title: "Finish with the ask", do: "On your next three qualified presentations, make the recommendation clearly and finish with a direct ask.", proof: "Which ask sounded most natural and why." },
         ],
         spark: [
-          { q: "Championship Saturday ends when…", choices: ["Round 3 ends", "A judge picks a winner", "One bot is thrown completely into the pit", "The crowd votes"], answer: 2, why: "No judges or round cap. The title fight continues until a complete pit elimination." },
-          { q: "Who can earn the Championship Tune-Up?", choices: ["Every store", "Only the two conference finalists", "Only the Desk", "Whichever side has more rally votes"], answer: 1, why: "Only finalist work can prepare a championship bot." },
+          { q: "Championship Saturday ends when…", choices: ["Round 3 ends", "A judge picks a winner", "A bot reaches zero health or is thrown into the pit", "The crowd votes"], answer: 2, why: "No judges or round cap. The title fight ends at zero health or a complete pit elimination." },
+          { q: "Who can earn the Championship Tune-Up?", choices: ["Every store", "Only the two conference finalists", "Only the Desk", "Whichever side has more rally votes"], answer: 0, why: "Every store prepares its own Rumble or championship bot." },
           { q: "What is the purpose of Rally?", choices: ["Transfer coins", "Increase Power", "Let the rest of the league choose a side and amplify the show", "Repair damage"], answer: 2, why: "Rally belongs to the atmosphere, not combat math." },
         ],
       },
@@ -1095,9 +1096,26 @@ export const PROGRAM: TrainingWeek[] = [
   },
 ];
 
+// Two preparation weeks for every November 28 entrant: Nov 17–21 and Nov 24–27.
+// Reuse the approved field-work curriculum; IDs stay distinct across both weeks.
+const eventPrep = PROGRAM.find(w => w.week === 5)!;
+eventPrep.start = "2026-11-17";
+eventPrep.theme = "Rumble & Championship Prep";
+eventPrep.tagline = "Fourteen stores. Two weeks to arrive ready for November 28.";
+eventPrep.days = [
+  ...PROGRAM.find(w => w.week === 4)!.days.map(d => ({...structuredClone(d),jobs:d.jobs.map(j=>({...j,id:j.id.replace("w4-","w5-prep-")})) as [Job,Job]})),
+  ...eventPrep.days.map(d => ({...d,day:(d.day+"2") as DayKey})),
+];
+for (const day of eventPrep.days) for (const q of day.spark) {
+  if(q.q==="Who can earn the Championship Tune-Up?"){q.choices=["Every store preparing its own bot","Only the two conference finalists","Only the Desk","Whichever side has more rally votes"];q.answer=0;q.why="All fourteen stores earn their own preparation for the Rumble or title fight.";}
+  if(q.q==="Championship Saturday ends when…"){q.choices=["Round 3 ends","A judge picks a winner","A bot reaches zero health or is thrown into the pit","The crowd votes"];q.answer=2;q.why="Zero health or a complete pit throw eliminates a bot. No judges or round cap.";}
+  if(q.q==="What makes Championship Prep count?"){q.choices=["Being a finalist","Your own store doing the work","Other stores donating Bolts","A free repair"];q.answer=1;q.why="Each store earns its own Rumble or championship preparation.";}
+}
+
 for (const week of PROGRAM) {
   for (const day of week.days) {
-    const product = productQuestion(week.week, day.day);
+    const second = day.day.endsWith("2");
+    const product = productQuestion(week.week+(second?1:0), day.day.replace("2","") as "tue"|"wed"|"thu"|"fri"|"sat");
     day.spark[2] = { q: product.q, choices: [...product.choices], answer: product.answer, why: product.why };
   }
 }
@@ -1109,7 +1127,7 @@ export function programWeek(week: number): TrainingWeek | undefined {
 /** Midnight Central on a day of a program week. */
 export function dayDate(week: TrainingWeek, day: DayKey): Date {
   const [y, m, d] = week.start.split("-").map(Number) as [number, number, number];
-  return central(y, m, d + DAY_ORDER.indexOf(day));
+  return central(y, m, d + DAY_OFFSET[day]);
 }
 
 /** A day opens at midnight Central on its date, or always when the desk opens practice mode. */

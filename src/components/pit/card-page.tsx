@@ -1,18 +1,23 @@
+import { pendingApprovedFinale, approvedFinaleTape } from "@/lib/pit/period12-tape";
 import { Link } from "@tanstack/react-router";
 import { CLASS_META } from "@/lib/pit/catalog";
 import { botFor } from "@/lib/pit/engine";
+import { buildTape } from "@/lib/pit/replay";
 import { upcomingMatchups } from "@/lib/pit/claude-copy";
 import { usePit, type PitState } from "@/lib/pit/store";
 import type { Bout, ClassId } from "@/lib/pit/types";
 import { BoutWatch, Panel, ResultLine, SectionLabel } from "./bits";
 import { MatchupPoster } from "./matchup-poster";
+import { SaturdayGate } from "./saturday-gate";
 import { BoothSegment } from "./booth-segment";
 
 export function CardPage() {
   const data = usePit();
   const week = data.week;
   const meta = data.weeks.find((w) => w.number === week);
-  const bouts = data.bouts.filter((b) => b.week === week);
+  const approvedHeld = pendingApprovedFinale(data);
+  const bouts = approvedHeld ? approvedFinaleTape() : data.bouts.filter((b) => b.week === week);
+  const held = week === 5 ? buildTape(data, 5).held : [];
   const groups = week === 2 ? groupByClass(data, bouts) : null;
 
   return (
@@ -20,10 +25,11 @@ export function CardPage() {
       <SectionLabel>Fight day card</SectionLabel>
       <h1 className="font-display text-5xl leading-none">{meta?.name ?? `Week ${week}`}</h1>
       <p className="mt-3 max-w-2xl text-muted">{meta?.blurb}</p>
-      <BoothSegment key={week} scene="card" label="Hear the card preview" />
+      {!approvedHeld ? <BoothSegment key={week} scene="card" label="Hear the card preview" /> : null}
       <Link to="/broadcast" className="mt-4 inline-flex min-h-11 items-center text-amber">
-        Watch the Monday broadcast
+        {week === 5 ? "Championship broadcast" : "Watch the Monday broadcast"}
       </Link>
+      {held.length ? <div className="mt-6"><SaturdayGate held={held} /></div> : null}
       {bouts.length === 0 ? (
         <p className="mt-6 border border-line bg-surface p-4">
           {week === 5

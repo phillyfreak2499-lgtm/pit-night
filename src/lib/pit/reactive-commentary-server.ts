@@ -21,6 +21,7 @@ export const getReactiveCommentary = createServerFn({ method: "POST" })
       { loadSeason },
       { reactiveMoment, reactivePrompt, shortReactiveLine, repeatsCall, impactLine },
       { hashString, previewSaturday },
+      { sealSaturday, saturdayFightId },
       { askClaude, FEATURE_MODEL },
       { getSql },
       store,
@@ -29,14 +30,16 @@ export const getReactiveCommentary = createServerFn({ method: "POST" })
       import("./authoritative"),
       import("./reactive-commentary"),
       import("./engine"),
+      import("./saturday-seal"),
       import("./claude.server"),
       import("@/lib/db"),
       import("./claude-store"),
       import("./claude-copy"),
     ]);
-    const { data } = await loadSeason();
+    const { data: saved } = await loadSeason();
+    const data = saturdayFightId(input.boutId) ? sealSaturday(saved) : saved;
     const archived = data.replays?.flatMap(replay => replay.bouts).find(b => b.id === input.boutId && b.result);
-    const house = input.preview && !data.bouts.some(b => b.week === data.week && b.result);
+    const house = input.preview && !saturdayFightId(input.boutId) && !data.bouts.some(b => b.week === data.week && b.result);
     const bout = house ? previewSaturday(data).find(b => b.id === input.boutId) : archived ?? data.bouts.find((b) => b.id === input.boutId);
     if (!bout?.result || bout.kind === "bye" || (!house &&
         !(data.week > bout.week || ["fought", "inspected", "complete"].includes(data.phase))))

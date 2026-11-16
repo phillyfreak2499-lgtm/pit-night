@@ -9,7 +9,8 @@ export const getBoothSegment = createServerFn({ method: "POST" })
       import("./authoritative"), import("./booth"), import("./ringside-voice.server"), import("node:crypto"),
     ]);
     const { data, sql } = await loadSeason();
-    const lines = boothScript(data, input.scene, input.id);
+    const { sealSaturday } = await import("./saturday-seal");
+    const lines = boothScript(sealSaturday(data), input.scene, input.id);
     const clips = await Promise.all(lines.map(async line => {
       const key = createHash("sha256").update(line.text).digest("hex");
       return { ...line, ...await ringsideVoice(sql, key, line.text, line.speaker, "league-booth") };

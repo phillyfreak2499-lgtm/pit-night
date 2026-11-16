@@ -1,4 +1,5 @@
 import { conferencePlace, hashString, previewSaturday, recordOf, regularSeasonRecordOf } from "./engine";
+import { saturdayFightId } from "./saturday-seal";
 import { upcomingMatchups } from "./claude-copy";
 import type { ReactiveMoment } from "./reactive-commentary";
 import type { Bout, PitData } from "./types";
@@ -76,8 +77,9 @@ export function boothScript(data: PitData, scene: BoothScene, id = ""): BoothLin
     const archived = data.replays?.flatMap(r => r.bouts).find(b => b.id === id);
     const posted = data.bouts.find(b => b.id === id && b.result && (b.week < data.week ||
       ["fought", "inspected", "complete"].includes(data.phase)));
+    if (saturdayFightId(id) && !archived?.result && !posted?.result) return [];
     const preview = !archived && !posted && !data.bouts.some(b => b.week === data.week && b.result);
-    const bout = archived ?? posted ?? (preview ? previewSaturday(data).find(b => b.id === id) : undefined);
+    const bout = archived ?? posted ?? (preview && !saturdayFightId(id) ? previewSaturday(data).find(b => b.id === id) : undefined);
     if (!bout?.result || bout.kind === "bye") return [];
     const fighters = bout.result.fighters;
     if (fighters.length < 2) return [];

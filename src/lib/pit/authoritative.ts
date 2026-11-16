@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { grantNov13Repairs, nov13RepairDue, nov13RepairDeploymentAllowed, NOV13_REPAIR_GIFT } from "./owner-repair-gift";
+import { reconcilePeriod12Finale, FINALE_EVENT, FINALE_POST_AFTER } from "./period12-finale";
 import { commandArgs, type Command } from "./commands";
 export type SyncMode = "live" | "preview" | "off";
 export type PullResult = {
@@ -9,7 +10,7 @@ export type PullResult = {
   doc: string | null;
   session: import("./types").Session;
 };
-const SCHEMA_TAG = "14-store-abilene-proposals-remove-removed-cleanup-v4-solid-gold-biting-maw";
+const SCHEMA_TAG = "14-store-period12-approved-finale-nov17-10ct-prep-v1";
 async function services() {
   const [db, store, auth, vanilla] = await Promise.all([
     import("@/lib/db"),
@@ -62,13 +63,21 @@ async function load(options?: { deadlines?: boolean }) {
     const repairNow = new Date();
     const nov13Repairs = nov13RepairDeploymentAllowed(process.env.VERCEL_ENV) && nov13RepairDue(oldGifts, repairNow);
     const gifted = nov13Repairs ? grantNov13Repairs(oldGifts, repairNow) : oldGifts;
-    const due = deadlines ? s.store.applyDueLock(gifted, new Date()) : null;
-    const effective = due ?? gifted;
+    const finalized = process.env.VERCEL_ENV === "production" ? reconcilePeriod12Finale(gifted, new Date()) : gifted;
+    const finaleApplied = finalized !== gifted;
+    const due = deadlines ? s.store.applyDueLock(finalized, new Date()) : null;
+    const effective = due ?? finalized;
     const normalizedDoc = JSON.stringify(s.store.sharedDoc(effective));
     let rev = Number(row.rev);
     let doc = row.doc;
     if (normalizedDoc !== row.doc || row.schema_tag !== SCHEMA_TAG) {
       let backupId: string | null = null;
+      if (finaleApplied) {
+        const id = `backup-period12-approved-finale-2026-11-17-rev-${row.rev}`;
+        await s.sql`insert into pit_season (id, rev, doc) values (${id}, ${row.rev}, ${row.doc}) on conflict (id) do nothing`;
+        const backup = (await s.sql<{doc:string}>`select doc from pit_season where id = ${id}`)[0];
+        if (!backup || backup.doc !== row.doc) throw new Error("Week 4 settlement halted: exact backup verification failed.");
+      }
       if (ownerGift.repairs || ownerGift.roses || ownerGift.gold || ownerGift.maw || nov13Repairs) {
         // Save and verify the exact pre-gift document before changing any bot.
         const giftBackupId = `backup-owner-gifts-${nov13Repairs ? "2026-11-13" : ownerGift.gold ? "2026-11-09" : ownerGift.maw ? "2026-11-14" : "2026-11-07"}-rev-${row.rev}`;
@@ -95,6 +104,14 @@ async function load(options?: { deadlines?: boolean }) {
       if (!changed[0]) continue; // A concurrent command won. Read again, up to 8 tries.
       rev = Number(changed[0].rev);
       doc = normalizedDoc;
+      if (finaleApplied) {
+        const saved = (await s.sql<{doc:string}>`select doc from pit_season where id = 'main'`)[0];
+        const verified = saved ? JSON.parse(saved.doc) as import("./types").PitData : null;
+        if (!verified?.ownerEvents?.includes(FINALE_EVENT) || verified.week !== 5 ||
+          JSON.stringify(s.store.sharedDoc(verified).bouts.filter(b=>b.week<=4)) !== JSON.stringify(s.store.sharedDoc(effective).bouts.filter(b=>b.week<=4)))
+          throw new Error("Week 4 settlement verification failed; inspect the season before retrying.");
+        console.info(`[pit] approved Week 4 posted after Nov 17 10 AM CT: revision=${rev}; finalistField=rockwall,abilene; backup verified`);
+      }
       if (ownerGift.repairs || ownerGift.roses || ownerGift.gold || ownerGift.maw || nov13Repairs) {
         const saved = (await s.sql<{ doc: string }>`select doc from pit_season where id = 'main'`)[0];
         if (!saved) throw new Error("Owner gift verification failed: season row missing.");
@@ -195,7 +212,9 @@ export const pullSeason = createServerFn({ method: "POST" })
     // Its persisted marker restores that path after a successful grant.
     // A closed week does not re-run the deadline normalizer on every poll.
     // An open week still loads once a scheduled lock can be due, so it freezes without a Desk button.
-    if (unchanged && !repairPending && (closed || !anyDeadlineDue(new Date()))) {
+    const finalePending = process.env.VERCEL_ENV === "production" && meta?.season_name === "Period 12" && Number(meta.week) === 4 && Date.now() > FINALE_POST_AFTER &&
+      !(meta.owner_events ? JSON.parse(meta.owner_events) as string[] : []).includes(FINALE_EVENT);
+    if (unchanged && !repairPending && !finalePending && (closed || !anyDeadlineDue(new Date()))) {
       // Verify expiry and credential generation on every pull, even unchanged ones.
       return { mode: quick.mode, rev: Number(meta.rev), doc: null, session: await quick.auth.session() };
     }

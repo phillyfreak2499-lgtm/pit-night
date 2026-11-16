@@ -57,7 +57,7 @@ export type DuelOpts = {
   overtime?: boolean;
   pace?: number;
   rounds?: number;
-  /** Only crossing the pit boundary eliminates a fighter. No round limit. */
+  /** Eliminate at zero health or a complete pit throw. No round limit. */
   pitOnly?: boolean;
   /** Free-for-all pit elimination, with exactly one surviving fighter. */
   lastBotStanding?: boolean;
@@ -1105,21 +1105,27 @@ function stepExchange(
   };
   const combat = startTrace(bots, state);
   const finishTrace = () => endTrace(bots, state, combat);
+  // Elimination rounds resolve one action at a time. A bot at zero cannot
+  // return a swing, heal, or take another turn. Alternate initiative so
+  // simultaneous lethal builds never require resurrecting a survivor.
+  const actionOrder = opts.pitOnly
+    ? [...bots].sort((left, right) => left.id.localeCompare(right.id))
+    : bots;
+  if (opts.pitOnly && i % 2) actionOrder.reverse();
   const tryRevive = (bot: FighterSnap) => {
+    if (opts.pitOnly) return;
     const before = hp[bot.id]!;
     hp[bot.id] = revive(bot, before, mem);
-    // A disabled chassis must still be physically pushed into the pit.
-    // Simultaneous lethal damage cannot decide a pit-only bout.
-    if (opts.pitOnly) hp[bot.id] = Math.max(1, hp[bot.id]!);
     if (hp[bot.id]! > before) combat[bot.id]!.revived = true;
   };
-  for (const bot of bots) {
+  for (const bot of actionOrder) {
     const pending = mem.burn[bot.id] ?? 0;
     if (pending > 0) {
       combat[bot.id]!.burnDamage = Math.min(hp[bot.id]!, pending);
       hp[bot.id] = Math.max(0, hp[bot.id]! - pending);
       mem.burn[bot.id] = Math.max(0, pending - 2);
     }
+    if (opts.pitOnly && hp[bot.id] === 0) break;
   }
   for (const bot of bots) tryRevive(bot);
   if (hp[a.id]! <= 0 || hp[b.id]! <= 0) {
@@ -1149,12 +1155,14 @@ function stepExchange(
   const hazB = hazardOf(kb, laneB, ka, bi);
   const preHazardA = hp[a.id]!;
   const preHazardB = hp[b.id]!;
-  if (kb.utility === "tremor" && ka.chassis !== "hover" && ka.drive !== "air")
-    hp[a.id] = Math.max(0, hp[a.id]! - 4);
-  if (ka.utility === "tremor" && kb.chassis !== "hover" && kb.drive !== "air")
-    hp[b.id] = Math.max(0, hp[b.id]! - 4);
-  hp[a.id] = Math.max(0, hp[a.id]! - hazA.damage);
-  hp[b.id] = Math.max(0, hp[b.id]! - hazB.damage);
+  for (const bot of actionOrder) {
+    const kit = bot.id === a.id ? ka : kb;
+    const foe = bot.id === a.id ? kb : ka;
+    const hazard = bot.id === a.id ? hazA : hazB;
+    const tremor = foe.utility === "tremor" && kit.chassis !== "hover" && kit.drive !== "air" ? 4 : 0;
+    hp[bot.id] = Math.max(0, hp[bot.id]! - tremor - hazard.damage);
+    if (opts.pitOnly && hp[bot.id] === 0) break;
+  }
   combat[a.id]!.hazardDamage = preHazardA - hp[a.id]!;
   combat[b.id]!.hazardDamage = preHazardB - hp[b.id]!;
   mem.slow[a.id] = hazA.slow;
@@ -1182,16 +1190,38 @@ function stepExchange(
   const blowA = oneWay(a, b, ai, mem, laneB, hot, bi);
   const blowB = oneWay(b, a, bi, mem, laneA, hot, ai);
   const ot = !opts.overtime || i < 3 ? 1 : i === 3 ? 1.1 : i === 4 ? 1.2 : 1.35;
-  const dmgA = Math.max(1, Math.round((blowA.damage + blowB.reflect) * pace * ot));
-  const dmgB = Math.max(1, Math.round((blowB.damage + blowA.reflect) * pace * ot));
+  let dmgA = Math.max(1, Math.round((blowA.damage + blowB.reflect) * pace * ot));
+  let dmgB = Math.max(1, Math.round((blowB.damage + blowA.reflect) * pace * ot));
+  let actedA = true, actedB = true;
+  let directA = blowB.reflect > 0 ? Math.min(dmgA, Math.round(blowA.damage * pace * ot)) : dmgA;
+  let directB = blowA.reflect > 0 ? Math.min(dmgB, Math.round(blowB.damage * pace * ot)) : dmgB;
+  if (opts.pitOnly) {
+    actedA = false; actedB = false;
+    dmgA = 0; dmgB = 0; directA = 0; directB = 0;
+    let leftA = hp[a.id]!, leftB = hp[b.id]!;
+    for (const attacker of actionOrder) {
+      if (leftA <= 0 || leftB <= 0) break;
+      const isA = attacker.id === a.id;
+      const blow = isA ? blowA : blowB;
+      const hit = Math.max(1, Math.round(blow.damage * pace * ot));
+      if (isA) { actedA = true; directA = hit; dmgA += hit; leftB = Math.max(0, leftB - hit); }
+      else { actedB = true; directB = hit; dmgB += hit; leftA = Math.max(0, leftA - hit); }
+      // Resolve a lethal hit immediately. A destroyed bot cannot return an
+      // attack or reflect damage after its elimination.
+      if (leftA <= 0 || leftB <= 0) break;
+      const reflected = Math.max(0, Math.round(blow.reflect * pace * ot));
+      if (isA) { dmgB += reflected; leftA = Math.max(0, leftA - reflected); }
+      else { dmgA += reflected; leftB = Math.max(0, leftB - reflected); }
+    }
+    if (!actedA) state.turns[a.id] = ai;
+    if (!actedB) state.turns[b.id] = bi;
+  }
   // Round the existing combined hit once, then attribute its components.
   // Reflected damage belongs to the attacker taking it, not their opponent's weapon.
-  const directA = blowB.reflect > 0 ? Math.min(dmgA, Math.round(blowA.damage * pace * ot)) : dmgA;
-  const directB = blowA.reflect > 0 ? Math.min(dmgB, Math.round(blowB.damage * pace * ot)) : dmgB;
   combat[a.id]!.damageDealt = directA;
   combat[b.id]!.damageDealt = directB;
-  combat[a.id]!.hitCount = blowA.hits;
-  combat[b.id]!.hitCount = blowB.hits;
+  combat[a.id]!.hitCount = actedA ? blowA.hits : 0;
+  combat[b.id]!.hitCount = actedB ? blowB.hits : 0;
   combat[a.id]!.reflectedDamageTaken = dmgB - directB;
   combat[b.id]!.reflectedDamageTaken = dmgA - directA;
   hp[b.id] = Math.max(0, hp[b.id]! - dmgA);
@@ -1204,29 +1234,34 @@ function stepExchange(
     combat[bot.id]!.healing = hp[bot.id]! - before;
   }
 
-  mem.burn[b.id] = (mem.burn[b.id] ?? 0) + blowA.burn;
-  mem.burn[a.id] = (mem.burn[a.id] ?? 0) + blowB.burn;
-  if (blowA.stun < 1) mem.stun[b.id] = blowA.stun;
-  else delete mem.stun[b.id];
-  if (blowB.stun < 1) mem.stun[a.id] = blowB.stun;
-  else delete mem.stun[a.id];
-  mem.heat[a.id] = (mem.heat[a.id] ?? 0) + blowA.heat - (blowB.tags.includes("leech") ? 4 : 0);
-  mem.heat[b.id] = (mem.heat[b.id] ?? 0) + blowB.heat - (blowA.tags.includes("leech") ? 4 : 0);
-  mem.battery[b.id] = Math.max(0, (mem.battery[b.id] ?? 0) - blowA.drain);
-  mem.battery[a.id] = Math.max(0, (mem.battery[a.id] ?? 0) - blowB.drain);
+  if (actedA) {
+    mem.burn[b.id] = (mem.burn[b.id] ?? 0) + blowA.burn;
+    if (blowA.stun < 1) mem.stun[b.id] = blowA.stun; else delete mem.stun[b.id];
+    mem.heat[a.id] = (mem.heat[a.id] ?? 0) + blowA.heat;
+    if (blowA.tags.includes("leech")) mem.heat[b.id] = (mem.heat[b.id] ?? 0) - 4;
+    mem.battery[b.id] = Math.max(0, (mem.battery[b.id] ?? 0) - blowA.drain);
+  }
+  if (actedB) {
+    mem.burn[a.id] = (mem.burn[a.id] ?? 0) + blowB.burn;
+    if (blowB.stun < 1) mem.stun[a.id] = blowB.stun; else delete mem.stun[a.id];
+    mem.heat[b.id] = (mem.heat[b.id] ?? 0) + blowB.heat;
+    if (blowB.tags.includes("leech")) mem.heat[a.id] = (mem.heat[a.id] ?? 0) - 4;
+    mem.battery[a.id] = Math.max(0, (mem.battery[a.id] ?? 0) - blowB.drain);
+  }
   for (const [bot, kit] of [
     [a, ka],
     [b, kb],
   ] as const) {
+    if (bot.id === a.id ? !actedA : !actedB) continue;
     mem.battery[bot.id] = Math.max(0, (mem.battery[bot.id] ?? 0) - drainAmt(kit));
   }
-  const staminaLow = applyStamina(bots, mem);
-  if (blowA.tags.includes("grapple") || blowB.tags.includes("grapple")) {
+  const staminaLow = applyStamina(bots.filter(bot => bot.id === a.id ? actedA : actedB), mem);
+  if ((actedA && blowA.tags.includes("grapple")) || (actedB && blowB.tags.includes("grapple"))) {
     mem.grapple[a.id] = true;
     mem.grapple[b.id] = true;
   }
-  if ((mem.spike[a.id] ?? 1) > 1 && blowA.tags.includes("phoenix-spike")) mem.spike[a.id] = 1;
-  if ((mem.spike[b.id] ?? 1) > 1 && blowB.tags.includes("phoenix-spike")) mem.spike[b.id] = 1;
+  if (actedA && (mem.spike[a.id] ?? 1) > 1 && blowA.tags.includes("phoenix-spike")) mem.spike[a.id] = 1;
+  if (actedB && (mem.spike[b.id] ?? 1) > 1 && blowB.tags.includes("phoenix-spike")) mem.spike[b.id] = 1;
 
   const featureA = dmgA >= dmgB;
   const attacker = featureA ? a : b;
@@ -1263,6 +1298,18 @@ function stepExchange(
 function stepPitExchange(a: FighterSnap, b: FighterSnap, state: BattleState, i: number, opts: DuelOpts) {
   stepExchange(a, b, state, i, { ...opts, pitOnly: true });
   const exchange = state.exchanges[state.exchanges.length - 1]!;
+  if (state.hp[a.id]! <= 0 || state.hp[b.id]! <= 0) {
+    const loser = state.hp[a.id]! <= 0 ? a : b;
+    const survivor = loser.id === a.id ? b : a;
+    exchange.attackerId = survivor.id;
+    exchange.defenderId = loser.id;
+    exchange.attackerHp = state.hp[survivor.id]!;
+    exchange.defenderHp = 0;
+    exchange.damage = exchange.combat![survivor.id]!.damageDealt;
+    exchange.tags.push("knockout");
+    exchange.call += " Zero health. The bot is eliminated.";
+    return;
+  }
   const pair = [a, b].sort((left, right) => left.id.localeCompare(right.id));
   if (i % 2) pair.reverse();
   for (const attacker of pair) {
@@ -1313,7 +1360,8 @@ export function fightDuel(a: FighterSnap, b: FighterSnap, opts: DuelOpts = {}): 
   if (opts.pitOnly) {
     for (let i = 0; hp[a.id]! > 0 && hp[b.id]! > 0; i++)
       stepPitExchange(a, b, state, i, opts);
-    return { exchanges, hp, finisher: null, method: "dump", koAt: state.koAt, bell };
+    const method = exchanges.at(-1)?.tags.includes("pit-elimination") ? "dump" : "ko";
+    return { exchanges, hp, finisher: null, method, koAt: state.koAt, bell };
   }
   const limit = Math.max(1, Math.min(12, opts.rounds ?? (opts.overtime ? 12 : 3)));
   for (let i = 0; i < limit && hp[a.id]! > 0 && hp[b.id]! > 0; i++)

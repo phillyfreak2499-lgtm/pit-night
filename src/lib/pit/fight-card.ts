@@ -1,5 +1,5 @@
 import { PARTS, SLOT_LABEL, tierWord } from "./catalog";
-import { recordOf } from "./engine";
+import { regularSeasonRecordOf } from "./engine";
 import type { Bout, FighterSnap, PitData, Slot } from "./types";
 
 /** How long the program stays up before the tape, when the broadcast is rolling. */
@@ -79,8 +79,8 @@ export function cornerStoreIds(fighter: FighterSnap, team: string[]): string[] {
  */
 export function recordEntering(data: PitData, storeId: string, boutId: string): WinLoss {
   const posted = data.bouts.some((bout) => bout.id === boutId && bout.result);
-  if (!posted) return recordOf(data, storeId);
-  return recordOf({ ...data, bouts: data.bouts.filter((bout) => bout.id !== boutId) }, storeId);
+  if (!posted) return regularSeasonRecordOf(data, storeId);
+  return regularSeasonRecordOf({ ...data, bouts: data.bouts.filter((bout) => bout.id !== boutId) }, storeId);
 }
 
 export function programRecords(data: PitData, bout: Bout): Record<string, WinLoss> {

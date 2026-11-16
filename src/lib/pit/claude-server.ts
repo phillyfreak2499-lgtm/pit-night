@@ -76,7 +76,9 @@ export const getClaudeCopy = createServerFn({ method: "POST" })
       import("./claude-copy"),
       import("./claude.server"),
     ]);
-    const { data } = await loadSeason();
+    const { data: saved } = await loadSeason();
+    const { sealSaturday } = await import("./saturday-seal");
+    const data = sealSaturday(saved);
     const subject =
       input.kind === "bout"
         ? copy.boutSubject(data, input.id)
@@ -113,7 +115,9 @@ export const getLiveCall = createServerFn({ method: "POST" })
       import("./claude.server"),
       import("@/lib/db"),
     ]);
-    const { data } = await loadSeason();
+    const { data: saved } = await loadSeason();
+    const { sealSaturday } = await import("./saturday-seal");
+    const data = sealSaturday(saved);
     const beats = copy.liveSubjects(data, input.id);
     if (!beats?.length) return { status: "unavailable" };
     const beat = beats[input.index];
@@ -281,7 +285,9 @@ export const getCoachTape = createServerFn({ method: "POST" })
     const [{ loadSeason }, { session, sameOrigin }, { coachStore, tapeNote }, { boutSubject }, { FEATURE_MODEL }] =
       await Promise.all([import("./authoritative"), import("./session.server"), import("./coach-tape"), import("./claude-copy"), import("./claude.server")]);
     sameOrigin();
-    const { data } = await loadSeason();
+    const { data: saved } = await loadSeason();
+    const { sealSaturday } = await import("./saturday-seal");
+    const data = sealSaturday(saved);
     const result = data.bouts.find(b => b.id === input.id)?.result;
     const storeId = result && coachStore(await session(data), result);
     const subject = storeId && boutSubject(data, input.id);

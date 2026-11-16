@@ -505,7 +505,7 @@ test("Bolts do not skip grade, class, championship, date, captain, or lock gates
   const weekBefore = snapshot(week5);
   week5.getState().buyPart(STORE, "drive-omni-sport", "bolts");
   assert.equal(snapshot(week5), weekBefore);
-  assert.match(week5.getState().flash, /Championship Week/);
+  assert.match(week5.getState().flash, /Nov 27/);
 
   const shut = setup(80);
   zeroJars(shut);

@@ -15,12 +15,16 @@ import type { Bout, PitData } from "@/lib/pit/types";
 import { ResultLine, SectionLabel } from "./bits";
 import { armBroadcastAudio, Broadcast } from "./broadcast";
 import { FightProgram } from "./fight-program";
+import { SaturdayGate } from "./saturday-gate";
+import { pendingApprovedFinale } from "@/lib/pit/period12-tape";
 
 type Segment = ChampionshipSegment<Bout>;
 
 export function ShowPage() {
   const data = usePit();
+  const approvedHeld = pendingApprovedFinale(data);
   const [weekPick, setWeekPick] = useState(() => openingWeek(data));
+  const [followCurrent, setFollowCurrent] = useState(true);
   const key = tapeSignature(data, weekPick);
   const tape = useMemo(() => buildTape(data, weekPick), [key]);
   const throughWeek = useMemo(
@@ -30,6 +34,9 @@ export function ShowPage() {
   const segments = useMemo(() => championshipProgramSegments(tape.bouts, weekPick), [tape, weekPick]);
   const [index, setIndex] = useState(0);
   const [rolling, setRolling] = useState(false);
+  useEffect(() => {
+    if (followCurrent && !rolling) setWeekPick(openingWeek(data));
+  }, [data.week, data.bouts, data.replays, followCurrent, rolling]);
   const [pregame, setPregame] = useState(false);
   const [speed, setSpeed] = useState(2);
   const [seek, setSeek] = useState(0);
@@ -102,6 +109,7 @@ export function ShowPage() {
     setRolling(first >= 0);
   };
   const start = () => {
+    setFollowCurrent(false);
     if (pregame) { setRolling(on => !on); return; }
     arm();
     if (segment.kind === "open" || segment.kind === "close") {
@@ -120,12 +128,14 @@ export function ShowPage() {
           <SectionLabel>{weekPick === 5 ? "Championship broadcast" : "Monday broadcast"}</SectionLabel>
           <h1 className="font-display text-5xl leading-none">{weekName(data, weekPick)}</h1>
           <p className="mt-2 max-w-xl text-sm text-muted">
-            {tape.replay
+            {tape.held.length && !tape.bouts.length
+              ? "Championship Saturday is sealed. The Desk PIN starts each fight at 9:30 AM CT on Nov 28. Nothing here names a winner before then."
+              : tape.replay
               ? "Replay. This is the card that posted. Watching it does not change coins, damage, records, or the week."
               : tape.live
                 ? "Posted card. This is the tape the stores get."
                 : tape.bouts.length
-                  ? "House tape. The gazette does not have this yet. A lock can still change it. The desk posts the card."
+                  ? approvedHeld && weekPick === 4 ? "Approved Week 4 finale from Nov 16. These fights count; conference standings post Tuesday, Nov 17, after 10 AM CT. Watching the tape does not change the results." : "House tape. The gazette does not have this yet. A lock can still change it. The desk posts the card."
                   : "That fight day was never posted."}
           </p>
         </div>
@@ -139,6 +149,8 @@ export function ShowPage() {
         </div>
       </div>
 
+      {tape.held.length ? <SaturdayGate held={tape.held} /> : null}
+
       {savedWeeks.length > 0 ? (
         <div className="flex gap-2 overflow-x-auto" data-testid="replay-archive" role="group" aria-label="Replay archive">
           {weekChoices.map((week) => (
@@ -147,7 +159,7 @@ export function ShowPage() {
               active={weekPick === week}
               testId={`replay-week-${week}`}
               label={weekLabel(data, week, savedWeeks)}
-              onClick={() => setWeekPick(week)}
+              onClick={() => { setFollowCurrent(false); setWeekPick(week); }}
             />
           ))}
         </div>
@@ -248,7 +260,7 @@ export function ShowPage() {
           bout={segment.bout}
           records={programRecords(throughWeek, segment.bout)}
           storeNames={storeNameMap(data)}
-          kicker={tape.replay ? "Replay. Record going in." : tape.live ? "Posted card. Record going in." : "House tape. Record going in. Not posted yet."}
+          kicker={approvedHeld && weekPick === 4 ? "Approved finale. Standings post Nov 17 after 10 AM CT." : tape.replay ? "Replay. Record going in." : tape.live ? "Posted card. Record going in." : "House tape. Record going in. Not posted yet."}
         />
       ) : null}
       {segment.kind === "fight" ? (
@@ -259,13 +271,13 @@ export function ShowPage() {
           speed={speed}
           seek={seek}
           chromeless
-          kicker={tape.replay ? "Replay" : tape.live ? "On air" : "House tape"}
+          kicker={approvedHeld && weekPick === 4 ? "Approved finale" : tape.replay ? "Replay" : tape.live ? "On air" : "House tape"}
           onComplete={onFightDone}
           onNotableBeat={onNotableBeat}
         />
       ) : null}
       {segment.kind === "sting" ? <Sting bout={segment.bout} next={nextFight(segments, index)} data={data} /> : null}
-      {segment.kind === "close" ? <SignOff bouts={tape.bouts} live={tape.live} replay={tape.replay} /> : null}
+      {segment.kind === "close" ? <SignOff bouts={tape.bouts} live={tape.live} replay={tape.replay} approved={approvedHeld && weekPick === 4} /> : null}
     </div>
   );
 }
@@ -289,7 +301,7 @@ function ColdOpen({ data, bouts, live, replay }: { data: PitData; bouts: Bout[];
     <section className="border border-line bg-deep">
       <div className="hazard h-2" />
       <div className="px-4 py-6 md:px-8 md:py-8">
-        <p className="font-display text-sm tracking-[0.28em] text-amber uppercase">{replay ? "Replay" : live ? "Posted" : "Not posted"}</p>
+        <p className="font-display text-sm tracking-[0.28em] text-amber uppercase">{pendingApprovedFinale(data) && bouts[0]?.week === 4 ? "Approved finale · standings pending" : replay ? "Replay" : live ? "Posted" : "Not posted"}</p>
         <h2 className="mt-2 font-display text-5xl leading-[0.85] md:text-6xl">
           THE WATERMAN
           <span className="block">BATTLE BOT</span>
@@ -299,7 +311,7 @@ function ColdOpen({ data, bouts, live, replay }: { data: PitData; bouts: Bout[];
           {bouts.length
             ? bouts.some((b) => b.kind === "bye")
               ? `${bouts.length} tapes. A bye counts as a win. The main event is last.`
-              : `${bouts.length} tapes. No bye. The main event is last.`
+              : bouts[0]?.week === 4 ? "Seven regular fights. Berth tiebreakers are separate from conference records." : `${bouts.length} tapes. No bye. The main event is last.`
             : "No tape on this week."}
         </p>
         <ol className="mt-6 flex flex-col gap-2">
@@ -332,7 +344,7 @@ function Sting({ bout, next, data }: { bout: Bout; next: Bout | null; data: PitD
   );
 }
 
-function SignOff({ bouts, live, replay }: { bouts: Bout[]; live: boolean; replay: boolean }) {
+function SignOff({ bouts, live, replay, approved }: { bouts: Bout[]; live: boolean; replay: boolean; approved: boolean }) {
   return (
     <section className="border border-line bg-deep">
       <div className="hazard h-2" />
@@ -340,7 +352,7 @@ function SignOff({ bouts, live, replay }: { bouts: Bout[]; live: boolean; replay
         <p className="font-display text-sm tracking-[0.28em] text-amber uppercase">Sign-off</p>
         <h2 className="mt-2 font-display text-5xl leading-none">Lights up.</h2>
         <p className="mt-3 max-w-xl text-muted">
-          {replay
+          {approved ? "The Nov 16 finale is approved. These results join conference standings Nov 17 after 10 AM CT. All fourteen stores prepare through Nov 27 for Nov 28." : replay
             ? "Replay. The card already posted. Nothing on the wall moves."
             : live
               ? "The card is on the wall. Damage waits on the desk."
@@ -374,13 +386,15 @@ function SignOff({ bouts, live, replay }: { bouts: Bout[]; live: boolean; replay
 
 export { buildTape };
 
-function openingWeek(data: PitData) {
+export function openingWeek(data: PitData) {
+  if (pendingApprovedFinale(data) || data.week === 5) return data.week;
   const saved = replayWeeks(data);
   if (saved.includes(data.week) || saved.length === 0) return data.week;
   return saved.at(-1)!;
 }
 
 function weekLabel(data: PitData, week: number, saved: number[]) {
+  if (week === 4 && pendingApprovedFinale(data)) return "Week 4 finale";
   if (saved.includes(week) && !isLiveCard(data, week)) return `Week ${week} replay`;
   return `Week ${week}`;
 }

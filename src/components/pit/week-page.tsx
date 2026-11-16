@@ -2,7 +2,8 @@ import { EffectLockerPreview } from "./effect-locker-preview";
 import { CosmeticTheme } from "./cosmetic-board";
 import { submitDailySpark } from "@/lib/pit/sync";
 import { Check, Clock, Flame, Lock, Package, Sparkles, Wrench } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { pendingApprovedFinale } from "@/lib/pit/period12-tape";
 import { buildCard, championshipFinalists } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
 import {
@@ -44,8 +45,11 @@ function useMe() {
 export function WeekPage() {
   const { data, me, role, storeId: myStore } = useMe();
   const boss = role === "commissioner";
-  const current = Math.min(5, Math.max(1, data.week));
+  const approvedHeld = pendingApprovedFinale(data);
+  const current = approvedHeld ? 5 : Math.min(5, Math.max(1, data.week));
   const [weekPick, setWeekPick] = useState(current);
+  const [followCurrent, setFollowCurrent] = useState(true);
+  useEffect(() => { if (followCurrent) setWeekPick(current); }, [current, followCurrent]);
   const [viewStore, setViewStore] = useState<string>(myStore ?? data.stores[0]?.id ?? "plano");
   const plan = programWeek(weekPick) ?? PROGRAM[0]!;
   const storeId = boss ? viewStore : (myStore ?? null);
@@ -53,7 +57,7 @@ export function WeekPage() {
   const captain = boss || (role === "captain" && myStore === storeId);
   const finalists = championshipFinalists(data);
   const championship = plan.week === 5;
-  const canPrep = !championship || boss || Boolean(storeId && finalists.includes(storeId));
+  const canPrep = true;
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6" data-testid="pit-week">
@@ -61,14 +65,15 @@ export function WeekPage() {
         <div className="hazard h-2" />
         <div className="flex flex-wrap items-end justify-between gap-4 px-4 py-5 md:px-6">
           <div className="max-w-2xl">
-            <SectionLabel>{championship ? "Championship Prep · Tuesday to Friday" : "Pit Week · Tuesday to Saturday"}</SectionLabel>
+            <SectionLabel>{championship ? "Finals Prep · Nov 17–21 and Nov 24–27" : "Pit Week · Tuesday to Saturday"}</SectionLabel>
             <h1 className="glow-text mt-1 font-display text-5xl leading-none">
-              Week {plan.week}: {plan.theme}
+              {championship ? plan.theme : `Week ${plan.week}: ${plan.theme}`}
             </h1>
             <p className="mt-2 text-lg text-fg">{plan.tagline}</p>
             <p className="mt-1 text-xs tracking-wide text-muted uppercase">From {plan.source}</p>
+            {approvedHeld ? <p className="mt-2 text-sm text-amber">Week 4 is complete. Preparation opens Tuesday, Nov 17, after 10 AM CT, when the approved results post.</p> : null}
             {plan.week === 5 ? (
-              <p className="mt-2 text-sm text-amber">Title builds lock automatically Friday, Nov 27, at 6:00 PM CT.</p>
+              <p className="mt-2 text-sm text-amber">All Rumble and title builds lock Friday, Nov 27, at 6:00 PM CT.</p>
             ) : plan.week === 1 ? (
               <p className="mt-2 text-sm text-amber">Builds lock automatically Saturday, Oct 31, at 6:00 PM CT.</p>
             ) : null}
@@ -79,21 +84,21 @@ export function WeekPage() {
                 key={w.week}
                 type="button"
                 className={`min-h-11 min-w-11 border font-display text-lg ${w.week === weekPick ? "border-amber bg-amber text-deep" : "border-line text-muted hover:text-fg"}`}
-                onClick={() => setWeekPick(w.week)}
+                onClick={() => { setFollowCurrent(false); setWeekPick(w.week); }}
                 aria-label={`Week ${w.week}`}
               >
-                {w.week}
+                {w.week === 5 ? "Finals prep" : w.week}
               </button>
             ))}
           </div>
         </div>
         <div className="grid gap-px border-t border-line bg-line text-sm sm:grid-cols-3">
-          <HowCell icon={<Check size={16} />} title="Do the jobs" body={`Two a day: one culture, one skill. Write one line of proof. The captain gives the thumbs-up. Wednesday hides a Mystery Crate worth +${BOLTS.crate}.`} />
+          <HowCell icon={<Check size={16} />} title="Do the jobs" body={championship ? "Two a day across November 17–21 and November 24–27: eighteen jobs total. Write one line of proof. The captain gives the thumbs-up." : `Two a day: one culture, one skill. Write one line of proof. The captain gives the thumbs-up. Wednesday hides a Mystery Crate worth +${BOLTS.crate}.`} />
           <HowCell icon={<Sparkles size={16} />} title="Daily Spark" body={`Three quick questions a day. +${BOLTS.sparkCorrect} bolt per right answer. ${STREAK_BADGE} perfect in a row earns a flame on your name.`} />
           <HowCell
             icon={<Flame size={16} />}
             title="Full Tune-Up"
-            body={championship ? `Finalist specialists finish all eight jobs and four Sparks, plus captain CARE: +${TUNE_UP_BONUS} Power, Speed, Armor, and Heat for Saturday.` : `Every specialist finishes everything by Saturday close and the captain does CARE: +${TUNE_UP_BONUS} Power, Speed, Armor, and Heat for Monday.`}
+            body={championship ? `Every store completes 18 jobs and 9 Sparks per eligible specialist, plus captain CARE: +${TUNE_UP_BONUS} Power, Speed, Armor, and Heat for Saturday.` : `Every specialist finishes everything by Saturday close and the captain does CARE: +${TUNE_UP_BONUS} Power, Speed, Armor, and Heat for Monday.`}
           />
         </div>
       </header>
@@ -209,7 +214,7 @@ function DayCard({ plan, day }: { plan: TrainingWeek; day: DayKey }) {
   const { data, me } = useMe();
   const now = useNow() ?? new Date();
   const d = plan.days.find((x) => x.day === day)!;
-  const open = dayOpen(plan, day, now, data.trainingOpenAll);
+  const open = !pendingApprovedFinale(data) && dayOpen(plan, day, now, data.trainingOpenAll);
   const date = dayDate(plan, day);
   const isToday = date.toDateString() === now.toDateString();
   const spark = me ? data.sparkLog.find((e) => e.id === `${plan.week}:${day}:${me.id}`) : undefined;
@@ -548,6 +553,7 @@ function PickEm({ data }: { data: PitData }) {
   const name = (id: string) => data.stores.find((s) => s.id === id)?.name ?? id;
   const myPick = (boutId: string) => (me ? data.picks.find((p) => p.id === `${boutId}:${me.id}`)?.pick : undefined);
   const open = data.phase === "open";
+  if (pendingApprovedFinale(data)) return <section className="border border-line bg-surface p-4"><SectionLabel>Week 4 picks closed</SectionLabel><p className="text-sm text-muted">The Nov 16 finale is approved. These fights count; standings post Nov 17 after 10 AM CT. Championship picks open with preparation.</p></section>;
   return (
     <section className="border border-line bg-surface">
       <div className="border-b border-line px-4 py-3">
@@ -648,14 +654,14 @@ function RallyPanel({ data }: { data: PitData }) {
 function LeagueBoard({ data, week }: { data: PitData; week: number }) {
   const finalists = championshipFinalists(data);
   const rows = data.stores
-    .filter((store) => week !== 5 || finalists.includes(store.id))
+    
     .map((s) => ({ store: s, prog: weekProgress(data, s.id, week), bolts: boltsOf(data, s.id).earned }))
     .sort((a, b) => b.prog.pct - a.prog.pct || b.bolts - a.bolts);
   return (
     <section className="border border-line bg-surface">
       <div className="border-b border-line px-4 py-3">
         <SectionLabel>League board · week {week}</SectionLabel>
-        <p className="text-sm text-muted">{week === 5 ? "Only the two finalists can earn Championship Prep. Rally never changes these numbers." : "Who is putting in the work. Tuned bays get the edge Monday."}</p>
+        <p className="text-sm text-muted">{week === 5 ? "All fourteen stores prepare their own bot for the Rumble or championship. Rally never changes combat." : "Who is putting in the work. Tuned bays get the edge Monday."}</p>
       </div>
       <ol className="grid gap-px bg-line sm:grid-cols-2 lg:grid-cols-3">
         {rows.map(({ store, prog, bolts }, i) => (

@@ -29,6 +29,7 @@ import {
   THANKSGIVING_SHOW_CLOSED_REASON,
 } from "./thanksgiving";
 import { buildScore, duelWear, fightDuel, fightGroup, preferFighter, type DuelOpts } from "./combat";
+import { browserBlocksSaturdaySeed, saturdayFightKind, sealedFightResult } from "./saturday-seal";
 import { centralDay } from "./time";
 export { halloweenStrikeAdjust } from "./combat";
 import { BOLTS, TUNE_UP_BONUS } from "./training";
@@ -1046,13 +1047,14 @@ export function simulateDuel(data: PitData, idA: string, idB: string, seed: stri
   };
 }
 
-/** Championship and berth duels end only when a bot is thrown completely into the pit. */
+/** Elimination duels end at zero health or a complete pit throw, with no decision. */
 export function simulateChampionshipDuel(
   data: PitData,
   idA: string,
   idB: string,
   seed: string,
 ): FightResult {
+  if (browserBlocksSaturdaySeed(seed)) return sealedFightResult();
   const a = snapshot(data, idA);
   const b = snapshot(data, idB);
   const fought = fightDuel(a, b, { hot: true, pitOnly: true });
@@ -1063,13 +1065,13 @@ export function simulateChampionshipDuel(
   return {
     winnerIds: [winner.id],
     loserIds: [loser.id],
-    method: "dump",
+    method: fought.method,
     blowout: exchanges.length <= 3 || hp[winner.id]! >= 60,
     exchanges,
     finisher: null,
     hp,
     fighters: [a, b],
-    wear: duelWear(winner.id, loser.id, "dump", exchanges.length <= 3),
+    wear: duelWear(winner.id, loser.id, fought.method, exchanges.length <= 3),
     seed,
     bell: fought.bell,
     pitTarget: pitTargetForWeek(data.week),
@@ -1189,6 +1191,7 @@ export function simulateTag(
 }
 
 export function simulateMelee(data: PitData, ids: string[], seed: string, lastBotStanding = false): FightResult {
+  if (browserBlocksSaturdaySeed(seed)) return sealedFightResult();
   const snaps = ids.map((id) => snapshot(data, id));
   const fought = fightGroup(snaps, null, { hot: data.week === 3, lastBotStanding });
   const hp = fought.hp;
@@ -1361,6 +1364,7 @@ function makeBout(
 }
 
 export function simulateBout(data: PitData, bout: Bout): FightResult {
+  if (typeof window !== "undefined" && saturdayFightKind(bout)) return sealedFightResult();
   const seed = `${data.seasonName}|w${data.week}|${bout.id}|${bout.storeIds.join(",")}|${loadoutSeed(data, bout.storeIds)}`;
   if (bout.kind === "bye") return simulateBye(data, bout.teamA[0]!, seed);
   if (bout.kind === "tag") return simulateTag(data, bout.teamA, bout.teamB, seed);
@@ -1767,7 +1771,9 @@ export function previewSaturday(data: PitData): Bout[] {
     locked: { ...(b.locked ?? b.draft) },
     equipped: { ...(b.locked ?? b.draft) },
   }));
-  return runSaturday({ ...data, phase: "locked", bots });
+  const card = runSaturday({ ...data, phase: "locked", bots });
+  if (typeof window === "undefined") return card;
+  return card.map((bout) => (saturdayFightKind(bout) ? { ...bout, result: null } : bout));
 }
 
 /** Build only after all four regular weeks have been posted. Safe to call repeatedly. */
@@ -2071,8 +2077,6 @@ export function classSwitchCheck(
     return { ok: false, reason: "Already this class.", cost: 0 };
   if (data.week === 1)
     return { ok: false, reason: "Week 1 class is frozen until after the first fight.", cost };
-  if (data.week === 5 && !championshipFinalists(data).includes(storeId))
-    return { ok: false, reason: "Championship Week builds belong to the conference champions.", cost };
   if (!shopOpen(data))
     return { ok: false, reason: "The shop must be open to change class.", cost };
   if (bot.locked)
@@ -2150,9 +2154,6 @@ export function buyCheck(
     // Thanksgiving has its own gate and its own reasons. It never inherits
     // the Halloween all-season availability: window first, then finalists.
     if (!thanksgivingOpen()) return { ok: false, reason: THANKSGIVING_CLOSED_REASON, cost };
-    if (data.week === 5 && !championshipFinalists(data).includes(storeId)) {
-      return { ok: false, reason: THANKSGIVING_FINALIST_REASON, cost };
-    }
   }
   if (part.window && !partInWindow(part)) {
     return {

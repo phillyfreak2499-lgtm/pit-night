@@ -25,13 +25,15 @@ export const writeGazette = createServerFn({ method: "POST" })
     first.auth.sameOrigin();
     if ((await first.auth.session(first.data)).role !== "commissioner")
       throw new Error("Only the Desk can write the Gazette.");
+    const { sealSaturday } = await import("./saturday-seal");
+    const visible = sealSaturday(first.data);
     const mode = input.mode;
-    if (mode === "recap" && !first.data.bouts.some((b) => b.week === first.data.week && b.result))
+    if (mode === "recap" && !visible.bouts.some((b) => b.week === visible.week && b.result))
       return { ok: false, reason: "nothing-to-recap" };
 
-    // Write once from the facts as saved right now.
+    // Write once from the facts the site is allowed to know right now.
     const today = gazette.centralISODate(new Date());
-    const brief = gazette.buildGazetteBrief(first.data, mode, today);
+    const brief = gazette.buildGazetteBrief(visible, mode, today);
     const { system, prompt, maxTokens } = gazette.gazetteRequest(brief, mode);
     const prose = (drafts: { headline: string; body: string }[]) => drafts.map((d) => `${d.headline} ${d.body}`).join(" ");
     let drafts: ReturnType<typeof gazette.parseGazetteEntries> = [];
