@@ -81,6 +81,8 @@ export type BotBody =
 
 /** Cosmetics only. None of it touches Power, Speed, Armor, or Heat. */
 export type BotStyle = {
+  /** Exclusive Rumble Games equipment; verified ownership is required for its Rumble-only bonus. */
+  showcasePrize?: import("./showcase-model").ShowcasePrizeId | "none";
   /** Visual shell only. Combat class remains classId. */
   body?: BotBody;
   finish: BotFinish;
@@ -247,6 +249,8 @@ export type CombatTrace = {
 };
 
 export type Exchange = {
+  /** Exact hit-resolution match time for recorded staggered Rumble tapes. */
+  at?: number;
   index: number;
   attackerId: string;
   defenderId: string;
@@ -337,6 +341,8 @@ export type FighterSnap = {
 };
 
 export type FightResult = {
+  /** Recorded arrivals; absent on legacy simultaneous-start tapes. */
+  rumbleEntries?: { fighterId: string; at: number }[];
   winnerIds: string[];
   loserIds: string[];
   method: Method;
@@ -488,6 +494,7 @@ export type Session = {
 };
 
 export type PitData = {
+  showcase?: import("./showcase-model").ShowcaseState;
   /** Server-only daily games and reward ledger; excluded from client snapshots. */
   halloweenArcade?: import("./halloween-arcade").HalloweenArcadeRecord[];
   version: number;
