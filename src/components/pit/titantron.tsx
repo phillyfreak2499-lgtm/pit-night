@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { botFor, buildCard, championshipFinalists, conferenceStandings, conferencePlace, fightStreak, randomHouseTape, regularSeasonRecordOf } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
 import { programWeek } from "@/lib/pit/training";
+import { pendingApprovedFinale } from "@/lib/pit/period12-tape";
 import { weekDeadline } from "@/lib/pit/time";
 import { tunedUp } from "@/lib/pit/week";
 import { ArenaHero } from "./arena-hero";
@@ -14,6 +15,7 @@ import { BoutWatch, ClassTag, formatRemain, nextLock, Panel, PERIOD_OPENS, Resul
 
 export function Titantron() {
   const data = usePit();
+  const approvedHeld = pendingApprovedFinale(data);
   const weekMeta = data.weeks.find((w) => w.number === data.week);
   const now = useNow();
   const beforeOpen = !now || now.getTime() < PERIOD_OPENS.getTime();
@@ -64,10 +66,10 @@ export function Titantron() {
             <p className="mt-2 text-sm text-muted">{weekMeta?.blurb}</p>
           </Panel>
           <Panel className="p-4">
-            <p className="text-xs tracking-widest text-muted uppercase">{beforeOpen ? "Opens Oct 25" : data.week === 5 ? "Friday Nov 27 lock" : data.week === 1 ? "Saturday Oct 31 lock" : "Saturday lock"}</p>
-            <p className="font-display text-4xl leading-none text-amber tabular-nums">{data.phase === "open" || beforeOpen ? remain : phaseWord(data.phase)}</p>
+            <p className="text-xs tracking-widest text-muted uppercase">{approvedHeld ? "Conference standings post" : beforeOpen ? "Opens Oct 25" : data.week === 5 ? "Friday Nov 27 lock" : data.week === 1 ? "Saturday Oct 31 lock" : "Saturday lock"}</p>
+            <p className="font-display text-4xl leading-none text-amber tabular-nums">{approvedHeld ? "Nov 17 · after 10 AM CT" : data.phase === "open" || beforeOpen ? remain : phaseWord(data.phase)}</p>
             <p className="mt-2 text-sm text-muted">
-              {beforeOpen
+              {approvedHeld ? "The Nov 16 Week 4 finale is complete. All stores prepare November 17–27 for the Rumble and championship November 28. No conference fight November 23." : beforeOpen
                 ? "October 25, 2026. Build now. The first bell has not rung."
                 : data.week === 5
                   ? "All fourteen stores prepare Nov 17–27. Every build locks Friday, Nov 27, at 6:00 PM CT. The Rumble and title fight begin Nov 28 at 9:30 AM CT with the Desk PIN."

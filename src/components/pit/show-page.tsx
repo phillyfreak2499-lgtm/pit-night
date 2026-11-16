@@ -272,7 +272,7 @@ export function ShowPage() {
         />
       ) : null}
       {segment.kind === "sting" ? <Sting bout={segment.bout} next={nextFight(segments, index)} data={data} /> : null}
-      {segment.kind === "close" ? <SignOff bouts={tape.bouts} live={tape.live} replay={tape.replay} /> : null}
+      {segment.kind === "close" ? <SignOff bouts={tape.bouts} live={tape.live} replay={tape.replay} approved={approvedHeld && weekPick === 4} /> : null}
     </div>
   );
 }
@@ -296,7 +296,7 @@ function ColdOpen({ data, bouts, live, replay }: { data: PitData; bouts: Bout[];
     <section className="border border-line bg-deep">
       <div className="hazard h-2" />
       <div className="px-4 py-6 md:px-8 md:py-8">
-        <p className="font-display text-sm tracking-[0.28em] text-amber uppercase">{replay ? "Replay" : live ? "Posted" : "Not posted"}</p>
+        <p className="font-display text-sm tracking-[0.28em] text-amber uppercase">{pendingApprovedFinale(data) && bouts[0]?.week === 4 ? "Approved finale · standings pending" : replay ? "Replay" : live ? "Posted" : "Not posted"}</p>
         <h2 className="mt-2 font-display text-5xl leading-[0.85] md:text-6xl">
           THE WATERMAN
           <span className="block">BATTLE BOT</span>
@@ -306,7 +306,7 @@ function ColdOpen({ data, bouts, live, replay }: { data: PitData; bouts: Bout[];
           {bouts.length
             ? bouts.some((b) => b.kind === "bye")
               ? `${bouts.length} tapes. A bye counts as a win. The main event is last.`
-              : `${bouts.length} tapes. No bye. The main event is last.`
+              : bouts[0]?.week === 4 ? "Seven regular fights. Berth tiebreakers are separate from conference records." : `${bouts.length} tapes. No bye. The main event is last.`
             : "No tape on this week."}
         </p>
         <ol className="mt-6 flex flex-col gap-2">
@@ -339,7 +339,7 @@ function Sting({ bout, next, data }: { bout: Bout; next: Bout | null; data: PitD
   );
 }
 
-function SignOff({ bouts, live, replay }: { bouts: Bout[]; live: boolean; replay: boolean }) {
+function SignOff({ bouts, live, replay, approved }: { bouts: Bout[]; live: boolean; replay: boolean; approved: boolean }) {
   return (
     <section className="border border-line bg-deep">
       <div className="hazard h-2" />
@@ -347,7 +347,7 @@ function SignOff({ bouts, live, replay }: { bouts: Bout[]; live: boolean; replay
         <p className="font-display text-sm tracking-[0.28em] text-amber uppercase">Sign-off</p>
         <h2 className="mt-2 font-display text-5xl leading-none">Lights up.</h2>
         <p className="mt-3 max-w-xl text-muted">
-          {replay
+          {approved ? "The Nov 16 finale is approved. These results join conference standings Nov 17 after 10 AM CT. All fourteen stores prepare through Nov 27 for Nov 28." : replay
             ? "Replay. The card already posted. Nothing on the wall moves."
             : live
               ? "The card is on the wall. Damage waits on the desk."
@@ -381,13 +381,15 @@ function SignOff({ bouts, live, replay }: { bouts: Bout[]; live: boolean; replay
 
 export { buildTape };
 
-function openingWeek(data: PitData) {
+export function openingWeek(data: PitData) {
+  if (pendingApprovedFinale(data) || data.week === 5) return data.week;
   const saved = replayWeeks(data);
   if (saved.includes(data.week) || saved.length === 0) return data.week;
   return saved.at(-1)!;
 }
 
 function weekLabel(data: PitData, week: number, saved: number[]) {
+  if (week === 4 && pendingApprovedFinale(data)) return "Week 4 finale";
   if (saved.includes(week) && !isLiveCard(data, week)) return `Week ${week} replay`;
   return `Week ${week}`;
 }

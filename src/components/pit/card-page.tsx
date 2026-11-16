@@ -1,3 +1,4 @@
+import { pendingApprovedFinale, approvedFinaleTape } from "@/lib/pit/period12-tape";
 import { Link } from "@tanstack/react-router";
 import { CLASS_META } from "@/lib/pit/catalog";
 import { botFor } from "@/lib/pit/engine";
@@ -14,7 +15,8 @@ export function CardPage() {
   const data = usePit();
   const week = data.week;
   const meta = data.weeks.find((w) => w.number === week);
-  const bouts = data.bouts.filter((b) => b.week === week);
+  const approvedHeld = pendingApprovedFinale(data);
+  const bouts = approvedHeld ? approvedFinaleTape() : data.bouts.filter((b) => b.week === week);
   const held = week === 5 ? buildTape(data, 5).held : [];
   const groups = week === 2 ? groupByClass(data, bouts) : null;
 
@@ -23,7 +25,7 @@ export function CardPage() {
       <SectionLabel>Fight day card</SectionLabel>
       <h1 className="font-display text-5xl leading-none">{meta?.name ?? `Week ${week}`}</h1>
       <p className="mt-3 max-w-2xl text-muted">{meta?.blurb}</p>
-      <BoothSegment key={week} scene="card" label="Hear the card preview" />
+      {!approvedHeld ? <BoothSegment key={week} scene="card" label="Hear the card preview" /> : null}
       <Link to="/broadcast" className="mt-4 inline-flex min-h-11 items-center text-amber">
         {week === 5 ? "Championship broadcast" : "Watch the Monday broadcast"}
       </Link>

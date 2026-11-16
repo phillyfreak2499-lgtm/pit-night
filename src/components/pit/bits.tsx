@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { CLASS_META, METRICS, SLOT_LABEL, tierWord } from "@/lib/pit/catalog";
-import { coinMath, gradesOf, methodLabel, recordOf } from "@/lib/pit/engine";
+import { coinMath, gradesOf, methodLabel, regularSeasonRecordOf } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
 import { nextLockAt } from "@/lib/pit/time";
 import type { Bout, Grade, StoreCard } from "@/lib/pit/types";
@@ -190,7 +190,7 @@ export function StoreLink({ id, children, className = "" }: { id: string; childr
 
 export function Record({ storeId }: { storeId: string }) {
   const data = usePit();
-  const rec = recordOf(data, storeId);
+  const rec = regularSeasonRecordOf(data, storeId);
   return (
     <span className="font-display text-lg tracking-wide">
       {rec.w}–{rec.l}

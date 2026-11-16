@@ -30,6 +30,7 @@ import { thanksgivingVisuals } from "@/lib/pit/thanksgiving";
 import { electionVisuals } from "@/lib/pit/election";
 import { veteransVisuals } from "@/lib/pit/veterans";
 import { recyclesVisuals } from "@/lib/pit/recycles";
+import { pendingApprovedFinale } from "@/lib/pit/period12-tape";
 import { weekDeadline } from "@/lib/pit/time";
 import { formatRemain, nextLock, PERIOD_OPENS, TextInput, useNow } from "./bits";
 import { Tutorial } from "./tutorial";
@@ -99,6 +100,7 @@ export function PitShell({ children }: { children: React.ReactNode }) {
   const election = Boolean(now && electionVisuals(now));
   const veterans = Boolean(now && veteransVisuals(now));
   const recycles = Boolean(now && recyclesVisuals(now));
+  const heldFinale = usePit(s => pendingApprovedFinale(s));
   const myStore = usePit((s) => (s.session.role === "captain" || s.session.role === "crew" ? s.session.storeId : null));
   const needsStarterBody = usePit((s) => s.week === 1 && Boolean(s.session.storeId) && ["crew", "captain"].includes(s.session.role) && !s.bots.find((bot) => bot.storeId === s.session.storeId)?.style?.body);
   return (
@@ -121,7 +123,7 @@ export function PitShell({ children }: { children: React.ReactNode }) {
           {thanksgiving ? <ThanksgivingBanner /> : null}
           {election ? <ElectionBanner /> : null}
           {veterans ? <VeteransBanner /> : null}
-            {recycles && usePit.getState().week < 5 ? <RecyclesBanner /> : null}
+            {recycles && !heldFinale && usePit.getState().week < 5 ? <RecyclesBanner /> : null}
             <FinaleScheduleNotice />
           <OozeCelebration />
           <header className="no-print sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-line bg-deep/95 px-4 py-3 backdrop-blur md:px-6">
@@ -408,6 +410,7 @@ function NavLink({
 }
 
 function PhaseBlock() {
+  const heldFinale = usePit(s => pendingApprovedFinale(s));
   const phase = usePit((s) => s.phase);
   const week = usePit((s) => s.week);
   const weeks = usePit((s) => s.weeks);
@@ -416,12 +419,13 @@ function PhaseBlock() {
     <div className="border border-line p-3">
       <p className="font-display text-xs tracking-[0.2em] text-muted uppercase">Week {week}</p>
       <p className="font-display text-xl leading-none">{meta?.name ?? "Season"}</p>
-      <p className="mt-2 text-xs tracking-widest text-amber uppercase">{phaseLabel(phase, week)}</p>
+      <p className="mt-2 text-xs tracking-widest text-amber uppercase">{heldFinale ? "Standings pending · Nov 17 after 10 AM" : phaseLabel(phase, week)}</p>
     </div>
   );
 }
 
 function ClockLine() {
+  const heldFinale = usePit(s => pendingApprovedFinale(s));
   const phase = usePit((s) => s.phase);
   const week = usePit((s) => s.week);
   const now = useNow();
@@ -430,6 +434,7 @@ function ClockLine() {
   const remain = now
     ? formatRemain((beforeOpen ? PERIOD_OPENS : nextLock(now, week)).getTime() - now.getTime())
     : "—";
+  if (heldFinale) return <p className="text-sm text-amber">Week 4 finale complete · standings post Nov 17 after 10 AM CT</p>;
   return (
     <p className="truncate text-sm text-muted">
       Week {week} · {phaseLabel(phase, week)}

@@ -88,7 +88,7 @@ export function WeekPage() {
           </div>
         </div>
         <div className="grid gap-px border-t border-line bg-line text-sm sm:grid-cols-3">
-          <HowCell icon={<Check size={16} />} title="Do the jobs" body={`Two a day: one culture, one skill. Write one line of proof. The captain gives the thumbs-up. Wednesday hides a Mystery Crate worth +${BOLTS.crate}.`} />
+          <HowCell icon={<Check size={16} />} title="Do the jobs" body={championship ? "Two a day across November 17–21 and November 24–27: eighteen jobs total. Write one line of proof. The captain gives the thumbs-up." : `Two a day: one culture, one skill. Write one line of proof. The captain gives the thumbs-up. Wednesday hides a Mystery Crate worth +${BOLTS.crate}.`} />
           <HowCell icon={<Sparkles size={16} />} title="Daily Spark" body={`Three quick questions a day. +${BOLTS.sparkCorrect} bolt per right answer. ${STREAK_BADGE} perfect in a row earns a flame on your name.`} />
           <HowCell
             icon={<Flame size={16} />}

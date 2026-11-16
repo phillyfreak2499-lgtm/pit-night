@@ -24,7 +24,7 @@ import { FightProgram } from "./fight-program";
 import { BoothSegment } from "./booth-segment";
 import { Pregame } from "./pregame";
 import { SaturdayGate } from "./saturday-gate";
-import { buildTape, matchup, methodWord } from "./show-page";
+import { buildTape, matchup, methodWord, openingWeek } from "./show-page";
 
 type Stage = "lobby" | "pregame" | "opening" | "intro" | "fight" | "result" | "ad" | "final";
 
@@ -35,7 +35,7 @@ const BYE_MS = 6000;
 export function WatchPage() {
   const data = usePit();
   const postedWeeks = useMemo(() => replayWeeks(data), [data.bouts, data.replays]);
-  const [week, setWeek] = useState(() => (postedWeeks.includes(data.week) || !postedWeeks.length ? data.week : postedWeeks.at(-1)!));
+  const [week, setWeek] = useState(() => openingWeek(data));
   // Freeze the tape when the party starts so a sync mid-show never reshuffles it.
   const liveTape = useMemo(() => buildTape(data, week), [data, week]);
   const [tape, setTape] = useState<{ live: boolean; replay: boolean; bouts: Bout[] } | null>(null);

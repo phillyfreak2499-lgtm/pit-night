@@ -9,7 +9,7 @@ import { SectionLabel } from "./bits";
 const STEPS = [
   {
     kicker: "Period 12",
-    title: "Fourteen stores. Two conferences. Four fight Mondays.",
+    title: "Fourteen stores. Two conferences. Four regular rounds.",
     body: "The full season runs October 25 through November 28. Every store has four regular-season fights: seven fights per card, no byes. Metro and Frontier each send one conference champion to Championship Saturday, November 28.",
   },
   {
