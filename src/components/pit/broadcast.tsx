@@ -1,9 +1,12 @@
 import { createFrameLoop } from "@/lib/pit/frame-loop";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useEventCommentary } from './use-event-commentary';
+import { rumbleSegments } from '@/lib/pit/event-commentary';
+import { usePit } from '@/lib/pit/store';
 import { PAINT } from "@/lib/pit/catalog";
 import { methodLabel } from "@/lib/pit/engine";
 import { reactiveMoment, type ReactiveCue } from "@/lib/pit/reactive-commentary";
-import { armSound, playBell, playClank, playCount, playDecision, playFinisher, playWeaponHit } from "@/lib/pit/sound";
+import { armSound, playBell, playClank, playCount, playDecision, playFinisher, playWeaponHit, soundMuted, subscribeSound } from "@/lib/pit/sound";
 import type { Bout, Exchange, FightResult } from "@/lib/pit/types";
 import { Fx, drawSide, drawTop, impactPoints, project, stepBots } from "./cage-draw";
 import { arenaForWeek, arenaTheme, hazardCallout, type ArenaId } from "./arena-scenes";
@@ -27,6 +30,8 @@ export function Broadcast({
   chromeless = false,
   kicker,
   noDamage = false,
+  commentaryPreview = false,
+  commentaryEnabled = true,
   arena: arenaProp,
   /** Watch party: the cage fills the viewport and the overhead cam is a corner inset. */
   stage = false,
@@ -43,6 +48,9 @@ export function Broadcast({
   kicker?: string;
   /** Scrimmage tape. The decision line must not invent a damage quote. */
   noDamage?: boolean;
+  /** PIN-authenticated rehearsal uses the prepared cache before the public show. */
+  commentaryPreview?: boolean;
+  commentaryEnabled?: boolean;
   /** Override the week's arena (the Playground picks its own). */
   arena?: ArenaId;
   stage?: boolean;
@@ -73,6 +81,13 @@ export function Broadcast({
   const [hp, setHp] = useState<Record<string, number>>({});
   const [meters, setMeters] = useState<Record<string, MeterRead | null>>({});
   const [clock, setClock] = useState("0:00");
+  const [recordedTime, setRecordedTime] = useState(0);
+  const [decisionShown, setDecisionShown] = useState(false);
+  const [muted, setMuted] = useState(soundMuted);
+  const revealed = usePit(s => Boolean(s.saturdayWatch?.rumbleRevealedAt));
+  useEffect(() => subscribeSound(() => setMuted(soundMuted())), []);
+  const commentarySegments = useMemo(() => result?.rumbleEntries ? rumbleSegments(result) : [], [result]);
+  const preparedLine = useEventCommentary({ event:'rumble', seed:result?.seed ?? '', segments:commentarySegments, time:recordedTime, playing:playing && commentaryEnabled && Boolean(result?.rumbleEntries), muted, preview:commentaryPreview, revealed:revealed && decisionShown });
   const [enteredIds, setEnteredIds] = useState<string[]>(() => result?.rumbleEntries?.filter(e => e.at === 0).map(e => e.fighterId) ?? []);
   const [round, setRound] = useState<string>("");
   const timeRef = useRef(0);
@@ -175,6 +190,10 @@ export function Broadcast({
         }
       }
       const drive = fightDrive(result, beat, local, time, { mainEvent });
+      if (result.rumbleEntries) {
+        setRecordedTime(Math.floor(time * 10) / 10);
+        setDecisionShown(beat.kind === 'decision');
+      }
       // Melee bouts get the count too.
       if (beat.kind === "countdown" && drive.countdown == null) drive.countdown = Math.max(0, 3 - Math.floor(local * 4));
       if (playing && drive.countdown != null && drive.countdown !== countSaid) {
@@ -413,7 +432,7 @@ export function Broadcast({
               </>
             )}
           </div>
-          <p className={`absolute inset-x-0 bottom-0 bg-deep/95 px-3 py-1.5 text-xs leading-relaxed md:py-3 md:text-base ${stage ? "pr-28 sm:pr-40" : ""}`}>{caption}</p>
+          <p className={`absolute inset-x-0 bottom-0 bg-deep/95 px-3 py-1.5 text-xs leading-relaxed md:py-3 md:text-base ${stage ? "pr-28 sm:pr-40" : ""}`}>{preparedLine || caption}</p>
         </div>
         <div hidden={Boolean(entranceId)} className={stage ? "pointer-events-none absolute right-2 bottom-14 z-20 w-24 sm:w-36 md:bottom-16 md:w-44" : "relative min-w-0 bg-deep lg:min-h-full"}>
           <canvas ref={topRef} aria-label="Overhead arena camera" className={stage ? "aspect-square w-full border border-white/25 bg-deep shadow-lg" : "aspect-square w-full bg-deep lg:absolute lg:inset-0 lg:h-full lg:w-full"} />

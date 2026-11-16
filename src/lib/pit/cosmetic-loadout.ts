@@ -3,6 +3,7 @@ import { styleOf } from "./catalog";
 import { cosmeticLoadoutSchema } from "./commands";
 import { cosmeticUnlocked, validBodyForClass, type CosmeticKind } from "./cosmetics";
 import { lockerItem } from "./week";
+import { showcasePrizeOwned } from './showcase-prizes';
 import type { CosmeticLoadout, PitData } from "./types";
 
 /** Single ownership gate for direct decoration and crew proposals. Never accepts combat fields. */
@@ -25,6 +26,7 @@ export function checkedCosmeticLoadout(
   };
   const loadout = parsed.data;
   const style = styleOf({ style: loadout.style, classId: bot.classId });
+  if (style.showcasePrize && style.showcasePrize !== 'none' && !showcasePrizeOwned(data,storeId,style.showcasePrize)) return null;
   if (
     !allowed("paint", loadout.paint) ||
     !allowed("look", loadout.look)

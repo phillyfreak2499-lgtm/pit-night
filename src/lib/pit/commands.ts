@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { championshipFinalists } from "./engine";
+import { SHOWCASE_EVENTS, SHOWCASE_LOCK_AT, showcaseField } from "./showcase-model";
 import { buildLockMessage, deadlineDue } from "./time";
 import { BOLT_EXCHANGE } from "./training";
 import type { PitData, Session } from "./types";
@@ -54,6 +54,7 @@ const style = z
     banner: z.string().max(12).optional(),
     walkout: z.enum(["", "walkout-pyro", "walkout-smoke", "walkout-sparks"]).optional(),
     victory: z.enum(["", "victory-confetti", "victory-fireworks"]).optional(),
+    showcasePrize: z.enum(['none','rocket-tail','battle-tank','tesla-rig']).optional(),
   })
   .strict();
 export const cosmeticLoadoutSchema = z.object({
@@ -154,11 +155,14 @@ export function captainBuildRejection(
 ): string | null {
   if (role === "commissioner") return null;
   if (!CAPTAIN_BUILD_COMMANDS.has(name)) return null;
-  if (!deadlineDue(week, now)) return null;
-  return buildLockMessage(week);
+  if (subject) {
+    const target = buildTarget(subject.data, name, subject.args);
+    if (target && showcaseBuildBlock(subject.data, target, now)) return showcaseBuildBlock(subject.data, target, now);
+  }
+  return deadlineDue(week, now) ? buildLockMessage(week) : null;
 }
 
-function finalistBuild(data: PitData, name: Command, args: readonly unknown[]) {
+function buildTarget(data: PitData, name: Command, args: readonly unknown[]) {
   const raw = args[0];
   const storeId =
     name === "acceptProposal"
@@ -166,7 +170,14 @@ function finalistBuild(data: PitData, name: Command, args: readonly unknown[]) {
       : typeof raw === "string" && data.stores.some((store) => store.id === raw)
         ? raw
         : undefined;
-  return storeId != null && championshipFinalists(data).includes(storeId);
+  return storeId;
+}
+export function showcaseBuildBlock(data: PitData, storeId: string, now: Date): string | null {
+  if (now.getTime() < SHOWCASE_LOCK_AT) return null;
+  const field = data.showcase?.lockedAt ? data.showcase.field : showcaseField(data);
+  if (field.length !== 12 || new Set(field).size !== 12 || !field.includes(storeId)) return null;
+  return SHOWCASE_EVENTS.every(event => data.showcase?.events[event.id]?.revealedAt != null)
+    ? null : "Showcase builds are frozen until all four events are revealed.";
 }
 const desk = new Set<Command>([
   "unlockStore",

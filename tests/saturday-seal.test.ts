@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import * as vanilla from "zustand/vanilla";
 import * as storeModule from "../src/lib/pit/store.ts";
+import { runServerCard } from "../src/lib/pit/run-card.server.ts";
 import { makeData } from "../src/lib/pit/seed.ts";
 import { recordOf, regularSeasonRecordOf, ROYAL_RUMBLE_TITLE, simulateChampionshipDuel } from "../src/lib/pit/engine.ts";
 import { buildTape } from "../src/lib/pit/replay.ts";
@@ -22,7 +23,7 @@ const beforeBell = new Date(SATURDAY_BELL.getTime() - 1);
 const atBell = new Date(SATURDAY_BELL.getTime());
 
 function playedSaturday(): PitData {
-  const store = vanilla.createStore(storeModule.pitCreator);
+  const store = vanilla.createStore(storeModule.createPitCreator(runServerCard));
   store.setState({ ...makeData(), session: deskSession });
   for (let week = 1; week <= 5; week++) {
     for (const row of store.getState().stores) store.getState().setOfficialNsnu(row.id, 1000 + row.seed * 53);

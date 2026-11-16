@@ -2,6 +2,8 @@ import test, { beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createStore } from "zustand/vanilla";
+import { createPitCreator } from "../src/lib/pit/store.ts";
+import { runServerCard } from "../src/lib/pit/run-card.server.ts";
 import { pitCreator, sharedDoc, clientDoc, applyLeague14, applyDueLock, pruneRemovePlaceholders, ownerGiftDue, grantOwnerGifts, WEEK2_REPAIR_GIFT, TYLER_ROSES_GIFT, ALLIANCE_GOLD_GIFT, COLLEGE_MAW_GIFT } from "../src/lib/pit/store.ts";
 import { makeData } from "../src/lib/pit/seed.ts";
 import { nsnuOf, rankedStores, simulateDuel, simulateChampionshipDuel, buildCard, conferenceStandings, championshipFinalists, coinMath, coinsByJar, type GradeSet } from "../src/lib/pit/engine.ts";
@@ -505,7 +507,7 @@ test("captain acceptance rechecks ownership instead of trusting an earlier propo
 });
 
 function state(role: Session["role"] = "captain", chooseBody = true) {
-  const store = createStore(pitCreator);
+  const store = createStore(createPitCreator(runServerCard));
   const crew = store
     .getState()
     .crew.find(

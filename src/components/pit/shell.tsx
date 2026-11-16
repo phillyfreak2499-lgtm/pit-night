@@ -42,6 +42,7 @@ const NAV = [
   { to: "/map", label: "Pit Map", icon: Warehouse },
   { to: "/week", label: "Pit Week", icon: ClipboardCheck },
   { to: "/broadcast", label: "Fight Day", icon: Swords },
+  { to: "/showcase", label: "Showcase", icon: Trophy },
   { to: "/preview", label: "Preview", icon: Play },
   { to: "/playground", label: "Playground", icon: FlaskConical },
   { to: "/damage", label: "Damage", icon: Wrench },

@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { stripTypeScriptTypes } from "node:module";
 import * as vanilla from "zustand/vanilla";
 import * as storeModule from "../src/lib/pit/store.ts";
+import { runServerCard } from "../src/lib/pit/run-card.server.ts";
 import { makeData } from "../src/lib/pit/seed.ts";
 import {
   buildConferenceTiebreakers, championshipFinalists, conferenceTopTie,
@@ -17,7 +18,7 @@ import type { Phase, PitData } from "../src/lib/pit/types.ts";
 const giftTime = new Date("2026-11-13T20:00:00Z");
 
 test("five-week release flow preserves vouchers, applies pending repair safely, and seals championship honors", () => {
-  const store = vanilla.createStore(storeModule.pitCreator);
+  const store = vanilla.createStore(storeModule.createPitCreator(runServerCard));
   store.setState({ ...makeData(), week: 1, phase: "open", session: { role: "commissioner", storeId: null, crewId: null } });
   for (let week = 1; week <= 5; week++) {
     store.setState({ storeCards: store.getState().storeCards.map((card) => ({ ...card, nsnuOfficial: true })) });

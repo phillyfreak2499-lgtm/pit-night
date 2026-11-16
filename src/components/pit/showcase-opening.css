@@ -1,0 +1,3 @@
+.showcase-parader { animation: showcase-parade-bob 1.8s ease-in-out infinite alternate; transform-box: fill-box; }
+@keyframes showcase-parade-bob { from { translate: 0 0; } to { translate: 0 -7px; } }
+@media (prefers-reduced-motion: reduce) { .showcase-parader { animation: none; } }
