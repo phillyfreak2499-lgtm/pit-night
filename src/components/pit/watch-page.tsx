@@ -36,11 +36,15 @@ export function WatchPage() {
   const data = usePit();
   const postedWeeks = useMemo(() => replayWeeks(data), [data.bouts, data.replays]);
   const [week, setWeek] = useState(() => openingWeek(data));
+  const [followCurrent, setFollowCurrent] = useState(true);
   // Freeze the tape when the party starts so a sync mid-show never reshuffles it.
   const liveTape = useMemo(() => buildTape(data, week), [data, week]);
   const [tape, setTape] = useState<{ live: boolean; replay: boolean; bouts: Bout[] } | null>(null);
   const bouts = (tape ?? liveTape).bouts;
   const [stage, setStage] = useState<Stage>("lobby");
+  useEffect(() => {
+    if (followCurrent && stage === "lobby") setWeek(openingWeek(data));
+  }, [data.week, data.bouts, data.replays, followCurrent, stage]);
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [full, setFull] = useState(false);
@@ -99,6 +103,7 @@ export function WatchPage() {
   }, [stage, next]);
 
   const start = (goFull: boolean) => {
+    setFollowCurrent(false);
     if (soundMuted()) setSoundMuted(false);
     setCommentaryEnabled(true);
     armBroadcastAudio();
@@ -185,7 +190,7 @@ export function WatchPage() {
         ) : null}
         <main className="relative flex min-h-0 flex-col overflow-y-auto p-3 md:p-5">
           {stage === "lobby" ? (
-            <Lobby data={data} week={week} weeks={postedWeeks} setWeek={setWeek} tape={liveTape} onStart={start} />
+            <Lobby data={data} week={week} weeks={postedWeeks} setWeek={(selected) => { setFollowCurrent(false); setWeek(selected); }} tape={liveTape} onStart={start} />
           ) : null}
           {stage === "opening" ? <TeamJanelleOpening data={data} playing={!paused} onComplete={next} /> : null}
           {stage === "pregame" && <Pregame week={week} title={weekName} bouts={bouts} playing={!paused} mic={commentaryEnabled && !muted} onComplete={next}/>}

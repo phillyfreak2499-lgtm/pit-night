@@ -24,6 +24,7 @@ export function ShowPage() {
   const data = usePit();
   const approvedHeld = pendingApprovedFinale(data);
   const [weekPick, setWeekPick] = useState(() => openingWeek(data));
+  const [followCurrent, setFollowCurrent] = useState(true);
   const key = tapeSignature(data, weekPick);
   const tape = useMemo(() => buildTape(data, weekPick), [key]);
   const throughWeek = useMemo(
@@ -33,6 +34,9 @@ export function ShowPage() {
   const segments = useMemo(() => championshipProgramSegments(tape.bouts, weekPick), [tape, weekPick]);
   const [index, setIndex] = useState(0);
   const [rolling, setRolling] = useState(false);
+  useEffect(() => {
+    if (followCurrent && !rolling) setWeekPick(openingWeek(data));
+  }, [data.week, data.bouts, data.replays, followCurrent, rolling]);
   const [pregame, setPregame] = useState(false);
   const [speed, setSpeed] = useState(2);
   const [seek, setSeek] = useState(0);
@@ -105,6 +109,7 @@ export function ShowPage() {
     setRolling(first >= 0);
   };
   const start = () => {
+    setFollowCurrent(false);
     if (pregame) { setRolling(on => !on); return; }
     arm();
     if (segment.kind === "open" || segment.kind === "close") {
@@ -154,7 +159,7 @@ export function ShowPage() {
               active={weekPick === week}
               testId={`replay-week-${week}`}
               label={weekLabel(data, week, savedWeeks)}
-              onClick={() => setWeekPick(week)}
+              onClick={() => { setFollowCurrent(false); setWeekPick(week); }}
             />
           ))}
         </div>
