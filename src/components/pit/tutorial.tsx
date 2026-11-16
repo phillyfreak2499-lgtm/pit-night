@@ -10,7 +10,7 @@ const STEPS = [
   {
     kicker: "Period 12",
     title: "Fourteen stores. Two conferences. Four fight Mondays.",
-    body: "Regular season runs October 25 through November 28. Every store fights all four Mondays: seven fights per card, no byes. Metro and Frontier each send one conference champion to Championship Saturday, November 28.",
+    body: "The full season runs October 25 through November 28. Every store has four regular-season fights: seven fights per card, no byes. Metro and Frontier each send one conference champion to Championship Saturday, November 28.",
   },
   {
     kicker: "Sign in",
@@ -25,7 +25,7 @@ const STEPS = [
   {
     kicker: "Full Tune-Up",
     title: "Everyone finishes, the bot gets +4.",
-    body: "If every specialist finishes all ten jobs and all five Sparks, and the captain finishes CARE, by Saturday close, your bot gets +4 Power, Speed, Armor, and Heat for Monday. One person short and nobody gets it, so pull each other along. Championship Prep has eight jobs and four Sparks (Tuesday–Friday), plus captain CARE, for finalists only. Other stores Rally. Captains plan vacation before Tuesday.",
+    body: "If every specialist finishes all ten jobs and all five Sparks, and the captain finishes CARE, by Saturday close, your bot gets +4 Power, Speed, Armor, and Heat for Monday. One person short and nobody gets it, so pull each other along. Rumble and Championship Prep runs November 17–21 and November 24–27 for all fourteen stores: eighteen jobs, nine Sparks and captain CARE. Captains plan vacation before Tuesday.",
   },
   {
     kicker: "The numbers",
@@ -45,7 +45,7 @@ const STEPS = [
   {
     kicker: "The trophy",
     title: "Win your conference. Then survive Championship Saturday.",
-    body: "After four Mondays, Metro and Frontier each crown one champion by win-loss record. Ties for first go straight to a fight: two bots duel, three or more battle together, automatically after the Week 4 card. In Week 5 only the two finalists can prepare their bots; everybody else can Rally behind either side. Saturday starts with a larger-arena Royal Rumble: all non-finalists battle together for third place. The Waterman Championship follows with no judges or round cap, ending only when a bot is completely thrown into the pit.",
+    body: "After four regular rounds, Metro and Frontier each crown one champion by win-loss record. Ties for first go straight to a fight: two bots duel, three or more battle together, automatically after the Week 4 card. All fourteen stores prepare their own bots November 17–27. The two conference winners enter the championship; the other twelve enter the Rumble. Rally is optional and cosmetic. Saturday starts with a larger-arena Royal Rumble: all non-finalists battle together for third place. The Waterman Championship follows with no judges or round cap, ending when a bot reaches zero health or is completely thrown into the pit.",
   },
 ];
 

@@ -10,7 +10,8 @@ import { hasChampionshipOpening } from "@/lib/pit/championship-opening";
 import { TeamJanelleOpening } from "./team-janelle-opening";
 import { commercialAfter } from "@/lib/pit/commercials";
 import { PROGRAM_HOLD_MS, programRecords, storeNameMap } from "@/lib/pit/fight-card";
-import { recordOf } from "@/lib/pit/engine";
+import { pendingApprovedFinale } from "@/lib/pit/period12-tape";
+import { regularSeasonRecordOf } from "@/lib/pit/engine";
 import { isLiveCard, replayWeeks } from "@/lib/pit/replay";
 import { paintHex, usePit } from "@/lib/pit/store";
 import { TUNE_UP_BONUS, crateFor } from "@/lib/pit/training";
@@ -277,7 +278,7 @@ function Lobby({
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col justify-center gap-6 py-6">
       <div>
-        <p className="font-display text-sm tracking-[0.3em] text-amber uppercase">{tape.held?.length && !tape.bouts.length ? "Sealed until the live watch" : tape.replay ? "Replay · read only" : tape.live ? "The card is posted" : "House tape · card not posted yet"}</p>
+        <p className="font-display text-sm tracking-[0.3em] text-amber uppercase">{tape.held?.length && !tape.bouts.length ? "Sealed until the live watch" : tape.replay ? "Replay · read only" : tape.live ? "The card is posted" : pendingApprovedFinale(data) && week === 4 ? "Approved finale · standings post Nov 17 after 10 AM CT" : "House tape · card not posted yet"}</p>
         <h1 className="mt-2 font-display text-6xl leading-[0.85] md:text-8xl">
           {week === 5 ? "Championship" : "Monday"}
           <span className="block text-amber">{week === 5 ? "Saturday" : "watch party"}</span>
@@ -288,7 +289,7 @@ function Lobby({
               ? "Replay of Championship Saturday. Same tape as the night it posted. Watching it does not change coins, damage, records, or the week."
               : "Replay of that Monday's card. Same walk-out, tape, and call. A house commercial runs between every fight. Watching it does not change coins, damage, records, or the week."
             : week === 5
-              ? "First, the nonfinalists meet in a last-bot-standing Royal Rumble for third place. Then the two conference champions fight for the title, with no round cap: it ends only when one bot is thrown into the pit. Rally support makes the room louder, never the bot stronger."
+              ? "First, the nonfinalists meet in a last-bot-standing Royal Rumble for third place. Then the two conference champions fight for the title, with no round cap: zero health or a pit dump eliminates a bot. All fourteen stores prepare their own bots November 17–27."
               : "Put this on the big screen. Every fight plays back to back with a walk-out, the tape, and the call. A house commercial runs between every fight. The live table updates after every fight."}
         </p>
       </div>
@@ -374,7 +375,7 @@ function Result({ data, bout, seen, next, commercialNext }: { data: PitData; bou
   const winner = bout.result?.winnerIds[0];
   const store = data.stores.find((s) => s.id === winner);
   const bot = winner ? data.bots.find((b) => b.storeId === winner) : undefined;
-  const rec = winner ? recordOf(seen, winner) : null;
+  const rec = winner ? regularSeasonRecordOf(seen, winner) : null;
   return (
     <div className="watch-in mx-auto flex w-full max-w-4xl flex-1 flex-col items-center justify-center gap-3 py-6 text-center">
       <p className="font-display text-sm tracking-[0.35em] text-amber uppercase">{bout.title}</p>
@@ -436,7 +437,7 @@ function Final({ data, seen, bouts, replay, onAgain }: { data: PitData; seen: Pi
 
 function Scoreboard({ data, highlight, compact = false }: { data: PitData; highlight: string[]; compact?: boolean }) {
   const rows = data.stores
-    .map((s) => ({ store: s, rec: recordOf(data, s.id) }))
+    .map((s) => ({ store: s, rec: regularSeasonRecordOf(data, s.id) }))
     .sort((a, b) => b.rec.w - a.rec.w || a.rec.l - b.rec.l || a.store.seed - b.store.seed);
   return (
     <div className={compact ? "" : "p-4"}>

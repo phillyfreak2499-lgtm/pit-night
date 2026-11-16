@@ -372,13 +372,13 @@ export const WEEK_META: WeekMeta[] = [
   {
     number: 4,
     name: "Conference Finale",
-    blurb: "Nov 15–21. Locks Saturday at close. Final regular-season card is the Week 4 Monday. One Metro and one Frontier champion advance.",
+    blurb: "Completed Nov 16. Approved standings post Tuesday, Nov 17, after 10 AM CT. Then all fourteen stores prepare for November 28.",
     tagsEnabled: false,
   },
   {
     number: 5,
-    name: "Championship Week",
-    blurb: "Nov 24–28. Finalists prepare Tuesday through Friday. Title builds lock automatically Friday, Nov 27, at 6:00 PM CT. Saturday Nov 28: Third Place Royal Rumble, then Waterman Championship. No judges; the title ends only in the pit.",
+    name: "Rumble & Championship Prep",
+    blurb: "Nov 17–27. All fourteen stores prepare: eighteen jobs, nine Sparks and captain CARE. Every build locks Friday, Nov 27 at 6 PM CT. Saturday Nov 28 at 9:30 AM CT: the Desk PIN starts the Third Place Royal Rumble, then the championship. Zero health or a pit throw eliminates a bot.",
     tagsEnabled: false,
   },
 ];
@@ -450,7 +450,7 @@ export function makeData(): PitData {
     honors: { pitBelt: null, thirdPlace: null, plate: null, bestBuild: null, bestBuildWhy: "", titleDrop: null },
     craft: [],
     session: { role: "public", storeId: null, crewId: null },
-    log: ["Period 12 opened. Fourteen bays. Two conferences. Four Monday cards, then Championship Saturday Nov 28."],
+    log: ["Period 12 opened. Fourteen bays. Two conferences. Four regular-season cards, then Championship Saturday Nov 28."],
     ownerEvents: [],
     tutorialSeen: false,
     intel: [],

@@ -1047,7 +1047,7 @@ export function simulateDuel(data: PitData, idA: string, idB: string, seed: stri
   };
 }
 
-/** Championship and berth duels end only when a bot is thrown completely into the pit. */
+/** Elimination duels end at zero health or a complete pit throw, with no decision. */
 export function simulateChampionshipDuel(
   data: PitData,
   idA: string,
@@ -1065,13 +1065,13 @@ export function simulateChampionshipDuel(
   return {
     winnerIds: [winner.id],
     loserIds: [loser.id],
-    method: "dump",
+    method: fought.method,
     blowout: exchanges.length <= 3 || hp[winner.id]! >= 60,
     exchanges,
     finisher: null,
     hp,
     fighters: [a, b],
-    wear: duelWear(winner.id, loser.id, "dump", exchanges.length <= 3),
+    wear: duelWear(winner.id, loser.id, fought.method, exchanges.length <= 3),
     seed,
     bell: fought.bell,
     pitTarget: pitTargetForWeek(data.week),
@@ -2077,8 +2077,6 @@ export function classSwitchCheck(
     return { ok: false, reason: "Already this class.", cost: 0 };
   if (data.week === 1)
     return { ok: false, reason: "Week 1 class is frozen until after the first fight.", cost };
-  if (data.week === 5 && !championshipFinalists(data).includes(storeId))
-    return { ok: false, reason: "Championship Week builds belong to the conference champions.", cost };
   if (!shopOpen(data))
     return { ok: false, reason: "The shop must be open to change class.", cost };
   if (bot.locked)
@@ -2156,9 +2154,6 @@ export function buyCheck(
     // Thanksgiving has its own gate and its own reasons. It never inherits
     // the Halloween all-season availability: window first, then finalists.
     if (!thanksgivingOpen()) return { ok: false, reason: THANKSGIVING_CLOSED_REASON, cost };
-    if (data.week === 5 && !championshipFinalists(data).includes(storeId)) {
-      return { ok: false, reason: THANKSGIVING_FINALIST_REASON, cost };
-    }
   }
   if (part.window && !partInWindow(part)) {
     return {

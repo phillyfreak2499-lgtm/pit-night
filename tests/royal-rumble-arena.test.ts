@@ -1,4 +1,5 @@
 import test from "node:test";
+import { approvedCard } from "../src/lib/pit/period12-approved-card.ts";
 import assert from "node:assert/strict";
 import { arenaBotScale, largeFieldSlot } from "../src/components/pit/arena-layout.ts";
 import { buildBeats, fightDrive, PIT } from "../src/components/pit/cage-motion.ts";
@@ -33,14 +34,15 @@ test("twelve-bot replay preserves entrants, wide framing, short beats and eleven
   const end = fightDrive(result, decision, 1, decision.t + decision.dur);
   assert.equal(end.bots.filter((b) => b.celebrate).length, 1);
   assert.equal(end.bots.filter((b) => b.hp > 0).length, 1);
-  assert.equal(end.bots.filter((b) => b.gone === 1).length, 11);
+  assert.equal(end.bots.filter((b) => b.dead && b.rev === 0).length, 11);
   assert.ok(beats.reduce((sum, b) => sum + b.dur, 0) < 900);
 });
 
 test("championship exchange, replay and decision keep the loser in the Grand pit", () => {
   const data = makeData();
   data.week = 5;
-  const result = simulateChampionshipDuel(data, data.stores[0]!.id, data.stores[1]!.id, "arena-final");
+  const result = structuredClone(approvedCard.at(-1)!.result!);
+  result.pitTarget = { x: 0.5, y: 0.64 };
   assert.deepEqual(result.pitTarget, { x: 0.5, y: 0.64 });
   const beats = buildBeats(result);
   assert.equal(beats.find((b) => b.kind === "replay")?.dur, 7.5);
@@ -56,7 +58,8 @@ test("championship exchange, replay and decision keep the loser in the Grand pit
 
 test("legacy tapes without recorded targets retain the original pit", () => {
   const data = makeData();
-  const result = simulateChampionshipDuel(data, data.stores[0]!.id, data.stores[1]!.id, "legacy-pit");
+  const result = structuredClone(approvedCard.at(-1)!.result!);
+  result.pitTarget = { x: 0.5, y: 0.64 };
   delete result.pitTarget;
   const beat = buildBeats(result).at(-1)!;
   const loser = fightDrive(result, beat, 1, beat.t + beat.dur).bots.find((b) => result.loserIds.includes(b.bot.id))!;

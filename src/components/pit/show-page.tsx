@@ -16,11 +16,13 @@ import { ResultLine, SectionLabel } from "./bits";
 import { armBroadcastAudio, Broadcast } from "./broadcast";
 import { FightProgram } from "./fight-program";
 import { SaturdayGate } from "./saturday-gate";
+import { pendingApprovedFinale } from "@/lib/pit/period12-tape";
 
 type Segment = ChampionshipSegment<Bout>;
 
 export function ShowPage() {
   const data = usePit();
+  const approvedHeld = pendingApprovedFinale(data);
   const [weekPick, setWeekPick] = useState(() => openingWeek(data));
   const key = tapeSignature(data, weekPick);
   const tape = useMemo(() => buildTape(data, weekPick), [key]);
@@ -128,7 +130,7 @@ export function ShowPage() {
               : tape.live
                 ? "Posted card. This is the tape the stores get."
                 : tape.bouts.length
-                  ? "House tape. The gazette does not have this yet. A lock can still change it. The desk posts the card."
+                  ? approvedHeld && weekPick === 4 ? "Approved Week 4 finale from Nov 16. These fights count; conference standings post Tuesday, Nov 17, after 10 AM CT. Watching the tape does not change the results." : "House tape. The gazette does not have this yet. A lock can still change it. The desk posts the card."
                   : "That fight day was never posted."}
           </p>
         </div>
@@ -253,7 +255,7 @@ export function ShowPage() {
           bout={segment.bout}
           records={programRecords(throughWeek, segment.bout)}
           storeNames={storeNameMap(data)}
-          kicker={tape.replay ? "Replay. Record going in." : tape.live ? "Posted card. Record going in." : "House tape. Record going in. Not posted yet."}
+          kicker={approvedHeld && weekPick === 4 ? "Approved finale. Standings post Nov 17 after 10 AM CT." : tape.replay ? "Replay. Record going in." : tape.live ? "Posted card. Record going in." : "House tape. Record going in. Not posted yet."}
         />
       ) : null}
       {segment.kind === "fight" ? (
@@ -264,7 +266,7 @@ export function ShowPage() {
           speed={speed}
           seek={seek}
           chromeless
-          kicker={tape.replay ? "Replay" : tape.live ? "On air" : "House tape"}
+          kicker={approvedHeld && weekPick === 4 ? "Approved finale" : tape.replay ? "Replay" : tape.live ? "On air" : "House tape"}
           onComplete={onFightDone}
           onNotableBeat={onNotableBeat}
         />

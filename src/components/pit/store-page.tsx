@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { CLASS_META, batteryOf, partById, SLOT_LABEL } from "@/lib/pit/catalog";
-import { canSeeLoadout, cardFor, loadSignature, printedStats, recordOf, weaponFamilyOf, weekQuality, gradesOf } from "@/lib/pit/engine";
+import { canSeeLoadout, cardFor, loadSignature, printedStats, regularSeasonRecordOf, weaponFamilyOf, weekQuality, gradesOf } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
 import { RAIN_CITY } from "@/lib/pit/rain-city";
 import type { Slot } from "@/lib/pit/types";
@@ -17,7 +17,7 @@ export function StorePage({ storeId }: { storeId: string }) {
   const store = data.stores.find((s) => s.id === storeId);
   const bot = data.bots.find((b) => b.storeId === storeId);
   if (!store || !bot) return <p>Unknown store.</p>;
-  const rec = recordOf(data, storeId);
+  const rec = regularSeasonRecordOf(data, storeId);
   const card = cardFor(data, storeId);
   const see = canSeeLoadout(data, storeId);
   const loadout = bot.locked ?? bot.draft;

@@ -107,6 +107,20 @@ test("weeks 1 through 4, including a conference tiebreaker, stay on the public t
   assert.equal(view.honors.bestBuild, season.honors.bestBuild);
 });
 
+test("sealed Saturday projections withhold opponents' actual computation inputs", () => {
+  const hidden=structuredClone(season);
+  hidden.bots=hidden.bots.map(bot=>({...bot,draft:{...bot.draft,brain:"brain-hunter-super"},locked:{...bot.locked!,brain:"brain-hunter-super"},equipped:{...bot.equipped,brain:"brain-hunter-super"}}));
+  for (const role of ["public","commissioner","captain"] as const) {
+    const own=role==="captain"?hidden.stores[0]!.id:null;
+    const view=storeModule.clientDoc(hidden,{role,storeId:own,crewId:null});
+    assert.equal(view.bouts.find(b=>b.id===title.id)?.result,null);
+    for(const bot of view.bots) {
+      if(bot.storeId===own)assert.equal(bot.draft.brain,"brain-hunter-super");
+      else {assert.notEqual(bot.draft.brain,"brain-hunter-super");assert.deepEqual(bot.owned,[]);}
+    }
+  }
+});
+
 test("results publish one fight at a time and only after the bell for the Desk", () => {
   assert.deepEqual(saturdayPlayDecision({ role: "public", fight: "rumble", now: atBell, data: season }), {
     ok: false,

@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { CLASS_META } from "@/lib/pit/catalog";
-import { botFor, recordOf } from "@/lib/pit/engine";
+import { botFor, regularSeasonRecordOf } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
 import { SectionLabel } from "./bits";
 import { BotPortrait, useBotLook } from "./bot-portrait";
@@ -21,7 +21,7 @@ export function PitMap() {
       <ul className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4">
         {data.stores.map((store) => {
           const bot = botFor(data, store.id);
-          const rec = recordOf(data, store.id);
+          const rec = regularSeasonRecordOf(data, store.id);
           const locked = Boolean(bot.locked);
           const hurt = Object.values(bot.wear).some((w) => w === "disabled" || w === "bent");
           return (

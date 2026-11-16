@@ -1,5 +1,4 @@
 import { central, centralDay } from "./time";
-import { dayDate, programWeek } from "./training";
 import { SHOW_PRICE } from "./halloween";
 import type { PartWindow } from "./catalog";
 
@@ -8,7 +7,7 @@ import type { PartWindow } from "./catalog";
  * Week. Thanksgiving keeps its OWN gate, window, and refusal reasons — it
  * does not inherit the Halloween all-season availability and never routes
  * through the Halloween premium helpers. Parts are buyable only during the
- * window and, in Week 5, only by the two championship finalists. The show
+ * window for all fourteen stores. The show
  * effect is league-wide during the window. Owned parts stay owned and
  * equippable under the normal rules after the window closes; nothing here
  * expires ownership.
@@ -17,10 +16,9 @@ import type { PartWindow } from "./catalog";
 /** Calendar peg window shared by the catalog families and roster ladders. */
 export const THANKSGIVING_WINDOW: PartWindow = { start: [11, 24], end: [11, 28] };
 
-const week = programWeek(5)!;
 
 /** Tuesday of Championship Week (Nov 24, 2026), midnight Central. */
-export const THANKSGIVING_WEEK_START = dayDate(week, "tue");
+export const THANKSGIVING_WEEK_START = central(2026, 11, 24);
 
 const titleTuesday = centralDay(THANKSGIVING_WEEK_START);
 
@@ -32,9 +30,9 @@ export const THANKSGIVING_OPEN = THANKSGIVING_WEEK_START;
 export const THANKSGIVING_CLOSE = central(titleTuesday.y, titleTuesday.m, titleTuesday.d + 5);
 
 export const THANKSGIVING_CLOSED_REASON =
-  "Thanksgiving iron goes on the peg Tuesday, November 24 at midnight Central, for the two title builds, through Championship Saturday, November 28.";
+  "Thanksgiving iron goes on the peg Tuesday, November 24 at midnight Central, for all fourteen stores, through Championship Saturday, November 28.";
 export const THANKSGIVING_FINALIST_REASON =
-  "Thanksgiving iron is for the two title builds. Rally behind a finalist instead.";
+  "All fourteen stores may prepare their own Rumble or title build.";
 export const THANKSGIVING_SHOW_CLOSED_REASON =
   "Falling Leaves goes on sale Tuesday, November 24 at midnight Central, through Championship Saturday, November 28.";
 

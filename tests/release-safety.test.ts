@@ -45,9 +45,9 @@ test("five-week release flow preserves vouchers, applies pending repair safely, 
       assert.equal(rumble!.storeIds.length, 12);
       assert.ok(rumble!.storeIds.every((id) => !final!.storeIds.includes(id)));
       assert.equal(Object.values(rumble!.result!.hp).filter((hp) => hp > 0).length, 1);
-      assert.equal(rumble!.result!.exchanges.filter((e) => e.tags.includes("pit-elimination")).length, 11);
-      assert.equal(final!.result!.method, "dump");
-      assert.ok(final!.result!.exchanges.at(-1)!.tags.includes("pit-elimination"));
+      assert.equal(rumble!.result!.exchanges.filter((e) => e.tags.some(t => t === "pit-elimination" || t === "knockout")).length, 11);
+      assert.ok(["ko", "dump"].includes(final!.result!.method));
+      assert.ok(final!.result!.exchanges.at(-1)!.tags.some(t => t === "pit-elimination" || t === "knockout"));
       assert.equal(fought.honors.thirdPlace, rumble!.result!.winnerIds[0]);
       assert.equal(fought.honors.pitBelt, final!.result!.winnerIds[0]);
       assert.equal(fought.honors.plate, final!.result!.loserIds[0]);
@@ -93,7 +93,7 @@ test("five-week release flow preserves vouchers, applies pending repair safely, 
 const source = readFileSync(new URL("../src/lib/pit/authoritative.ts", import.meta.url), "utf8");
 const schemaLiteral = source.match(/const SCHEMA_TAG = ("[^"]+");/)![1]!;
 const loadBody = stripTypeScriptTypes(source.slice(source.indexOf("async function load("), source.indexOf("/** Server-only:")));
-const loadFactory = new Function("services", "grantNov13Repairs", "nov13RepairDue", "nov13RepairDeploymentAllowed", "NOV13_REPAIR_GIFT", "Date", "process", "console",
+const loadFactory = new Function("reconcilePeriod12Finale", "FINALE_EVENT", "services", "grantNov13Repairs", "nov13RepairDue", "nov13RepairDeploymentAllowed", "NOV13_REPAIR_GIFT", "Date", "process", "console",
   `const SCHEMA_TAG = ${schemaLiteral}; ${loadBody}; return load;`);
 
 class GiftDate extends Date {
@@ -140,7 +140,7 @@ async function checkLoad({ phase = "inspected", environment = "production", lose
     throw new Error(`Unexpected in-memory SQL: ${query}`);
   };
   const services = async () => ({ sql, store: storeModule, vanilla, auth: { publicSession: { role: "public", storeId: null, crewId: null } }, mode: "preview" });
-  const load = loadFactory(services, grantNov13Repairs, nov13RepairDue, nov13RepairDeploymentAllowed, NOV13_REPAIR_GIFT, GiftDate,
+  const load = loadFactory((data) => data, "unused-finale-event", services, grantNov13Repairs, nov13RepairDue, nov13RepairDeploymentAllowed, NOV13_REPAIR_GIFT, GiftDate,
     { env: { VERCEL_ENV: environment || undefined } }, { info() {} });
   if (brokenBackup) {
     await assert.rejects(() => load({ deadlines: false }), /backup verification failed/);

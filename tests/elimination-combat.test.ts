@@ -37,6 +37,11 @@ function checkTape(fighters: FighterSnap[], exchanges: Exchange[], finalHp: Reco
       assert.ok(position <= 100);
       positions[id!] = position;
     }
+    if (exchange.tags.includes("knockout")) {
+      assert.equal(exchange.defenderHp, 0);
+      assert.ok(exchange.attackerHp > 0);
+      eliminations.push(exchange.defenderId);
+    }
     if (exchange.tags.includes("pit-elimination")) {
       assert.ok(exchange.tags.includes("dump"));
       assert.equal(exchange.defenderHp, 0);
@@ -58,7 +63,7 @@ test("pit championship has no round cutoff even at zero pace against healing anc
   for (const pace of [0, 1e-12]) {
     const result = fightDuel(a, b, { pitOnly: true, pace, rounds: 1 });
     assert.equal(result.exchanges.length, 100);
-    assert.equal(result.method, "dump");
+    assert.ok(["ko", "dump"].includes(result.method));
     assert.equal(result.finisher, null, "pit exit is not repeated as an extra finisher");
     assert.equal(result.koAt, 99);
     checkTape([a, b], result.exchanges, result.hp);
@@ -74,17 +79,17 @@ test("simultaneous lethal weapon damage cannot double-eliminate a pit championsh
   assert.equal(regular.hp.a, 0);
   assert.equal(regular.hp.b, 0);
   const result = fightDuel(a, b, { pitOnly: true });
-  assert.equal(result.method, "dump");
+  assert.ok(["ko", "dump"].includes(result.method));
   checkTape([a, b], result.exchanges, result.hp);
 });
 
-test("every class matchup can finish by pit elimination with a balanced build", () => {
+test("every class matchup can finish by knockout or pit elimination with a balanced build", () => {
   const classes: ClassId[] = ["striker", "tank", "specialist"];
   for (const classA of classes) for (const classB of classes) {
     const a = bot("a", { classId: classA });
     const b = bot("b", { classId: classB });
     const result = fightDuel(a, b, { pitOnly: true });
-    assert.equal(result.method, "dump");
+    assert.ok(["ko", "dump"].includes(result.method));
     checkTape([a, b], result.exchanges, result.hp);
   }
 });
@@ -118,7 +123,7 @@ test("pit control respects loadout differences and leaves normal modes opt-in", 
   assert.notDeepEqual(fightDuel(a, b, { pitOnly: true }).exchanges, fightDuel(control, b, { pitOnly: true }).exchanges);
   const regular = fightDuel(a, b, { pace: 0 });
   assert.equal(regular.exchanges.length, 3);
-  assert.ok(regular.exchanges.every((exchange) => !exchange.tags.includes("pit-elimination")));
+  assert.ok(regular.exchanges.every((exchange) => !exchange.tags.some(t => t === "pit-elimination" || t === "knockout")));
   const group = fightGroup([a, b], null, { pace: 0 });
   assert.equal(group.exchanges.length, 12);
   assert.ok(Object.values(group.hp).every((hp) => hp > 0));

@@ -48,14 +48,14 @@ test("Halloween dates follow Pit Week 1 and Championship Saturday", () => {
   const week1 = programWeek(1)!;
   const week5 = programWeek(5)!;
   assert.equal(week1.start, "2026-10-27");
-  assert.equal(week5.start, "2026-11-24");
+  assert.equal(week5.start, "2026-11-17");
   assert.match(WEEK_META[0]!.blurb, /Oct 25/);
   assert.match(WEEK_META[0]!.blurb, /31/);
-  assert.match(WEEK_META[3]!.blurb, /Week 4 Monday/);
+  assert.match(WEEK_META[3]!.blurb, /Nov 16/);
   assert.doesNotMatch(WEEK_META[3]!.blurb, /Nov 23/);
   const rules = readFileSync(new URL("../src/components/pit/rules-page.tsx", import.meta.url), "utf8");
-  assert.match(rules, /Week 4 Monday/);
-  assert.doesNotMatch(rules, /Nov 23|November 23/);
+  assert.match(rules, /Nov 16/);
+  assert.match(rules, /no additional conference round November 23/);
   assert.match(WEEK_META[4]!.blurb, /Nov 28/);
   assert.equal(HALLOWEEN_PIT_START.toISOString(), "2026-10-27T05:00:00.000Z");
   assert.equal(HALLOWEEN_PIT_SATURDAY.toISOString(), "2026-10-31T05:00:00.000Z");

@@ -34,7 +34,7 @@ export function nudgeFor(data: PitData, storeId: string, now: Date): Nudge | nul
   const today = pitWeekDay(data, now);
   if (!today) return null;
   const progress = weekProgress(data, storeId, data.week);
-  if (!progress.crew.length) return null; // Championship Week: finalists only.
+  if (!progress.crew.length) return null;
   const crew = countedCrew(data, storeId, data.week);
   const { day } = today;
 
@@ -58,7 +58,10 @@ export function nudgeFor(data: PitData, storeId: string, now: Date): Nudge | nul
   if (toApprove) lines.push(`${plural(toApprove, "job")} waiting for the captain's thumbs-up.`);
   if (careLeft) lines.push("The captain's CARE job for the week is still open.");
   if (coins) lines.push(`${plural(coins, "coin")} waiting in your Shop. Spend them before the bots lock.`);
-  if (day.day === "sat") lines.push(lock ? `Builds lock today: ${lock.label}. Lock in your parts.` : "Builds lock tonight at close. Lock in your parts.");
+  const currentDay = centralDay(now);
+  const lockDay = lock ? centralDay(lock.at) : null;
+  const locksToday = lockDay ? currentDay.y === lockDay.y && currentDay.m === lockDay.m && currentDay.d === lockDay.d : day.day === "sat";
+  if (locksToday) lines.push(lock ? `Builds lock today: ${lock.label}. Lock in your parts.` : "Builds lock tonight at close. Lock in your parts.");
   if (!lines.length) return null;
 
   const subject =

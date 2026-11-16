@@ -121,7 +121,8 @@ export function PitShell({ children }: { children: React.ReactNode }) {
           {thanksgiving ? <ThanksgivingBanner /> : null}
           {election ? <ElectionBanner /> : null}
           {veterans ? <VeteransBanner /> : null}
-          {recycles ? <RecyclesBanner /> : null}
+            {recycles && usePit.getState().week < 5 ? <RecyclesBanner /> : null}
+            <FinaleScheduleNotice />
           <OozeCelebration />
           <header className="no-print sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-line bg-deep/95 px-4 py-3 backdrop-blur md:px-6">
             <div className="md:hidden">
@@ -271,12 +272,23 @@ function RecyclesBanner() {
   );
 }
 
+function FinaleScheduleNotice() {
+  const week = usePit(s => s.week);
+  const season = usePit(s => s.seasonName);
+  if (season !== "Period 12" || week < 4) return null;
+  return <aside className="no-print border-b border-amber/50 bg-deep px-4 py-3 text-sm md:px-6" aria-label="Updated season schedule">
+    <p className="font-display text-lg text-amber">Week 4 finale completed Nov 16 · Championship Saturday Nov 28</p>
+    <p>{week === 4 ? "Conference standings will include the approved Week 4 fights Tuesday, Nov 17, after 10 AM CT. " : "All four regular-season rounds count. "}There is no additional conference round November 23.</p>
+    <p>All fourteen stores prepare November 17–21 and November 24–27. Every build locks Friday, Nov 27, at 6 PM CT. Saturday, Nov 28, at 9:30 AM CT: the Third Place Royal Rumble, then Rockwall vs Abilene for the championship. The Desk PIN opens each fight.</p>
+  </aside>;
+}
+
 function ThanksgivingBanner() {
   return (
     <div className="thanksgiving-banner no-print" data-testid="thanksgiving-banner" role="status">
       <p className="font-display text-xs tracking-[0.18em] text-amber uppercase">Championship Week</p>
       <p className="mt-1 text-sm leading-snug">
-        Championship Week — the table is set. Title fight Saturday. Thanksgiving iron is on the peg for the two title builds, and Falling Leaves is on sale for every store through Saturday.
+        Rumble and Championship Prep — November 17–27. All fourteen stores prepare their own bots. Builds lock November 27 at 6 PM CT; the Desk PIN starts the November 28 show at 9:30 AM CT. Thanksgiving iron and Falling Leaves are on sale November 24–28.
       </p>
     </div>
   );

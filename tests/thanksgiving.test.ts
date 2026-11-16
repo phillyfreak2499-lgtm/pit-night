@@ -46,7 +46,7 @@ const NUDGES: Record<(typeof THANKSGIVING_PART_IDS)[number], [number, number, nu
 
 test("Thanksgiving dates follow Championship Week (programWeek 5)", () => {
   const week5 = programWeek(5)!;
-  assert.equal(week5.start, "2026-11-24");
+  assert.equal(week5.start, "2026-11-17");
   assert.equal(THANKSGIVING_WEEK_START.toISOString(), "2026-11-24T06:00:00.000Z");
   assert.equal(THANKSGIVING_OPEN.toISOString(), THANKSGIVING_WEEK_START.toISOString());
   assert.equal(THANKSGIVING_VISUAL_START.toISOString(), "2026-11-23T06:00:00.000Z");
@@ -124,7 +124,7 @@ test("no Thanksgiving nudge strictly dominates a same-slot super, and names stay
   for (const effect of THANKSGIVING_SHOW_EFFECTS) assert.equal(banned.test(`${effect.name} ${effect.blurb}`), false);
 });
 
-test("buy gate: closed before Nov 24, finalist-only in Week 5, owned parts stay owned after close", (t) => {
+test("buy gate: closed before Nov 24, all fourteen in Week 5, owned parts stay owned after close", (t) => {
   t.mock.timers.enable({ apis: ["Date"], now: central(2026, 11, 23, 12).getTime() });
   const league = state();
   fund(league);
@@ -153,8 +153,8 @@ test("buy gate: closed before Nov 24, finalist-only in Week 5, owned parts stay 
   for (const id of THANKSGIVING_PART_IDS) {
     const part = partById(id)!;
     const refused = buyCheck(season, outsider, part);
-    assert.equal(refused.ok, false, `${outsider} ${id}`);
-    assert.equal(refused.reason, THANKSGIVING_FINALIST_REASON);
+    assert.equal(refused.ok, true, `${outsider} ${id}`);
+    assert.equal(refused.cost, 8);
     const open = buyCheck(season, finalist, part);
     assert.equal(open.ok, true, `${finalist} ${id}`);
     assert.equal(open.cost, 8);
@@ -165,8 +165,8 @@ test("buy gate: closed before Nov 24, finalist-only in Week 5, owned parts stay 
   league.setState({ session: { role: "captain", storeId: outsider, crewId: outsiderCaptain.id } satisfies Session });
   const outsiderCoins = JSON.stringify(botOf(league, outsider).coins);
   league.getState().buyPart(outsider, "weapon-carver-super");
-  assert.equal(JSON.stringify(botOf(league, outsider).coins), outsiderCoins);
-  assert.equal(botOf(league, outsider).owned.includes("weapon-carver-super"), false);
+  assert.notEqual(JSON.stringify(botOf(league, outsider).coins), outsiderCoins);
+  assert.equal(botOf(league, outsider).owned.includes("weapon-carver-super"), true);
 
   // The finalist buys at exactly 8 from the right jar.
   const finalistCaptain = season.crew.find((c) => c.storeId === finalist && c.role === "captain")!;
@@ -219,7 +219,7 @@ test("Falling Leaves sells league-wide in Week 5, finalist or not", (t) => {
   // guard still turns a non-finalist away, and a finalist buys as before.
   league.getState().buyShow(outsider, "fog");
   assert.deepEqual(botOf(league, outsider).shows, ["leaves"]);
-  assert.match(league.getState().flash, /conference champions/);
+  assert.match(league.getState().flash, /Needs 100 Bolts/);
 
   const finalist = championshipFinalists(season)[0]!;
   const finalistCaptain = season.crew.find((c) => c.storeId === finalist && c.role === "captain")!;
@@ -404,7 +404,7 @@ test("shop copy: no November 1–28 claim survives, and the leaves section carri
   assert.match(shop, /Tuesday November 24 through Saturday November 28/);
   assert.match(shop, /League-wide — finalist or not/);
   const rules = readFileSync(new URL("../src/components/pit/rules-page.tsx", import.meta.url), "utf8");
-  assert.doesNotMatch(rules, /Nov 23|November 23/);
+  assert.match(rules, /no additional conference round November 23/);
 });
 
 /* ------------------------------------------------------------ helpers */

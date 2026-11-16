@@ -70,7 +70,7 @@ export function Titantron() {
               {beforeOpen
                 ? "October 25, 2026. Build now. The first bell has not rung."
                 : data.week === 5
-                  ? "Only the two finalists prep this week. Title builds lock automatically Friday, Nov 27, at 6:00 PM CT, ahead of Saturday, Nov 28."
+                  ? "All fourteen stores prepare Nov 17–27. Every build locks Friday, Nov 27, at 6:00 PM CT. The Rumble and title fight begin Nov 28 at 9:30 AM CT with the Desk PIN."
                   : data.week === 1
                     ? `Builds lock automatically ${deadline?.label ?? "Saturday, Oct 31, 6:00 PM CT"}. That build fights Monday.`
                     : "Each store locks one build at Saturday close. That build fights Monday."}
@@ -102,7 +102,7 @@ export function Titantron() {
             <FighterCard storeId={featured?.teamB[0] ?? "allen"} facing={-1} />
           </div>
           <div className="px-4 py-3 text-sm text-muted">
-            {featured?.result ? <ResultLine bout={featured} /> : data.week === 5 ? "Championship Saturday, Nov 28. Title builds lock automatically Friday, Nov 27, at 6:00 PM CT. The fight runs until knockout." : data.week === 1 ? "Card posts Monday morning. Builds lock automatically Saturday, Oct 31, at 6:00 PM CT." : "Card posts Monday morning. Lock your build by Saturday close."}
+            {featured?.result ? <ResultLine bout={featured} /> : data.week === 5 ? "Championship Saturday, Nov 28. All Rumble and title builds lock automatically Friday, Nov 27, at 6:00 PM CT. Zero health or a complete pit throw ends the fight." : data.week === 1 ? "Card posts Monday morning. Builds lock automatically Saturday, Oct 31, at 6:00 PM CT." : data.week === 4 ? "The Nov 16 finale counts. Conference standings post Nov 17 after 10 AM CT. All fourteen stores then prepare through Nov 27 for Nov 28." : "Card posts Monday morning. Lock your build by Saturday close."}
           </div>
         </Panel>
         <Panel className="p-4">
@@ -236,16 +236,16 @@ function PitWeekCallout() {
   return (
     <Link to="/week" className="lift group grid gap-3 border border-amber/60 bg-surface p-4 md:grid-cols-[1fr_auto] md:items-center">
       <span>
-        <span className="block font-display text-xs tracking-[0.22em] text-amber uppercase">{plan.week === 5 ? "Championship Prep · finalists only" : "Pit Week · Tuesday to Saturday"}</span>
+        <span className="block font-display text-xs tracking-[0.22em] text-amber uppercase">{plan.week === 5 ? "Rumble & Championship Prep · Nov 17–27" : "Pit Week · Tuesday to Saturday"}</span>
         <span className="mt-1 block font-display text-3xl leading-none">
           Week {plan.week}: {plan.theme}
         </span>
         <span className="mt-1 block text-sm text-muted">
-          {plan.week === 5 ? "The two conference champions earn their own Saturday preparation Tuesday through Friday. Everybody else can Rally without changing the fight." : "Two jobs and a Daily Spark every day. Finish the whole week as a crew and your bot fights Monday with a Full Tune-Up: +4 to every stat."}
+          {plan.week === 5 ? "All fourteen stores earn their own Saturday preparation across Nov 17–21 and Nov 24–27. Eighteen jobs, nine Sparks and captain CARE earn a Full Tune-Up." : "Two jobs and a Daily Spark every day. Finish the whole week as a crew and your bot fights Monday with a Full Tune-Up: +4 to every stat."}
         </span>
       </span>
       <span className="flex items-center gap-3 font-display">
-        <span className="text-sm text-muted">{plan.week === 5 ? `${tuned} finalists tuned` : `${tuned} of ${data.stores.length} bays tuned`}</span>
+        <span className="text-sm text-muted">{plan.week === 5 ? `${tuned} of ${data.stores.length} bays tuned` : `${tuned} of ${data.stores.length} bays tuned`}</span>
         <span className="bg-amber px-4 py-2 text-sm tracking-wide text-deep uppercase">{plan.week === 5 ? "Open Championship Week" : "Open Pit Week"}</span>
       </span>
     </Link>

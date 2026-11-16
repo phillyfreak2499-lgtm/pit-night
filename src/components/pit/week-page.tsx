@@ -53,7 +53,7 @@ export function WeekPage() {
   const captain = boss || (role === "captain" && myStore === storeId);
   const finalists = championshipFinalists(data);
   const championship = plan.week === 5;
-  const canPrep = !championship || boss || Boolean(storeId && finalists.includes(storeId));
+  const canPrep = true;
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6" data-testid="pit-week">
@@ -61,14 +61,14 @@ export function WeekPage() {
         <div className="hazard h-2" />
         <div className="flex flex-wrap items-end justify-between gap-4 px-4 py-5 md:px-6">
           <div className="max-w-2xl">
-            <SectionLabel>{championship ? "Championship Prep · Tuesday to Friday" : "Pit Week · Tuesday to Saturday"}</SectionLabel>
+            <SectionLabel>{championship ? "Finals Prep · Nov 17–21 and Nov 24–27" : "Pit Week · Tuesday to Saturday"}</SectionLabel>
             <h1 className="glow-text mt-1 font-display text-5xl leading-none">
               Week {plan.week}: {plan.theme}
             </h1>
             <p className="mt-2 text-lg text-fg">{plan.tagline}</p>
             <p className="mt-1 text-xs tracking-wide text-muted uppercase">From {plan.source}</p>
             {plan.week === 5 ? (
-              <p className="mt-2 text-sm text-amber">Title builds lock automatically Friday, Nov 27, at 6:00 PM CT.</p>
+              <p className="mt-2 text-sm text-amber">All Rumble and title builds lock Friday, Nov 27, at 6:00 PM CT.</p>
             ) : plan.week === 1 ? (
               <p className="mt-2 text-sm text-amber">Builds lock automatically Saturday, Oct 31, at 6:00 PM CT.</p>
             ) : null}
@@ -93,7 +93,7 @@ export function WeekPage() {
           <HowCell
             icon={<Flame size={16} />}
             title="Full Tune-Up"
-            body={championship ? `Finalist specialists finish all eight jobs and four Sparks, plus captain CARE: +${TUNE_UP_BONUS} Power, Speed, Armor, and Heat for Saturday.` : `Every specialist finishes everything by Saturday close and the captain does CARE: +${TUNE_UP_BONUS} Power, Speed, Armor, and Heat for Monday.`}
+            body={championship ? `Every store completes 18 jobs and 9 Sparks per eligible specialist, plus captain CARE: +${TUNE_UP_BONUS} Power, Speed, Armor, and Heat for Saturday.` : `Every specialist finishes everything by Saturday close and the captain does CARE: +${TUNE_UP_BONUS} Power, Speed, Armor, and Heat for Monday.`}
           />
         </div>
       </header>
@@ -648,14 +648,14 @@ function RallyPanel({ data }: { data: PitData }) {
 function LeagueBoard({ data, week }: { data: PitData; week: number }) {
   const finalists = championshipFinalists(data);
   const rows = data.stores
-    .filter((store) => week !== 5 || finalists.includes(store.id))
+    
     .map((s) => ({ store: s, prog: weekProgress(data, s.id, week), bolts: boltsOf(data, s.id).earned }))
     .sort((a, b) => b.prog.pct - a.prog.pct || b.bolts - a.bolts);
   return (
     <section className="border border-line bg-surface">
       <div className="border-b border-line px-4 py-3">
         <SectionLabel>League board · week {week}</SectionLabel>
-        <p className="text-sm text-muted">{week === 5 ? "Only the two finalists can earn Championship Prep. Rally never changes these numbers." : "Who is putting in the work. Tuned bays get the edge Monday."}</p>
+        <p className="text-sm text-muted">{week === 5 ? "All fourteen stores prepare their own bot for the Rumble or championship. Rally never changes combat." : "Who is putting in the work. Tuned bays get the edge Monday."}</p>
       </div>
       <ol className="grid gap-px bg-line sm:grid-cols-2 lg:grid-cols-3">
         {rows.map(({ store, prog, bolts }, i) => (

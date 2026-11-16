@@ -99,7 +99,7 @@ export const commandArgs = {
   rejectJob: z.tuple([id]),
   submitSpark: z.tuple([
     week,
-    z.enum(["tue", "wed", "thu", "fri", "sat"]),
+    z.enum(["tue", "wed", "thu", "fri", "sat", "tue2", "wed2", "thu2", "fri2"]),
     z.array(z.number().int().min(0).max(8)).length(3),
   ]),
   postShout: z.tuple([text, text]),
@@ -155,9 +155,6 @@ export function captainBuildRejection(
   if (role === "commissioner") return null;
   if (!CAPTAIN_BUILD_COMMANDS.has(name)) return null;
   if (!deadlineDue(week, now)) return null;
-  if (week === 5 && subject && !finalistBuild(subject.data, name, subject.args)) {
-    return "Championship Week bot work belongs to the two conference champions. Rally behind a finalist instead.";
-  }
   return buildLockMessage(week);
 }
 

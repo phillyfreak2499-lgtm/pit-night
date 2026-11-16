@@ -37,7 +37,6 @@ export function weekProgress(data: PitData, storeId: string, week: number): Week
   const plan = programWeek(week);
   const empty: WeekProgress = { week, crew: [], careDone: false, carePending: false, tuned: false, done: 0, total: 0, pct: 0 };
   if (!plan) return empty;
-  if (week === 5 && !championshipFinalists(data).includes(storeId)) return empty;
   const jobs = allJobs(plan);
   const sparkDays = plan.days.map((d) => d.day);
   const crew = countedCrew(data, storeId, week).map((c): CrewProgress => {

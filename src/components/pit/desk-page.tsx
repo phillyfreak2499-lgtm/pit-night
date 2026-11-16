@@ -106,7 +106,7 @@ function DeskLive() {
       </div>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <Btn testId="lock-friday" onClick={() => lockFriday()}>
-          {data.week === 5 ? "Lock finalists (Fri Nov 27)" : data.week === 1 ? "Lock the bots (auto Sat Oct 31)" : "Lock the bots (Sat close)"}
+          {data.week === 5 ? "Lock all builds (Fri Nov 27)" : data.week === 1 ? "Lock the bots (auto Sat Oct 31)" : "Lock the bots (Sat close)"}
         </Btn>
         <Btn testId="run-saturday" tone="spark" onClick={() => runSaturday()}>
           {data.week === 5 ? "Run Championship (Sat)" : "Run the card (Monday)"}
@@ -121,7 +121,7 @@ function DeskLive() {
       {deadline ? (
         <p className="text-sm text-muted">
           {data.week === 5
-            ? `Title builds lock automatically ${deadline.label}, before the Saturday, Nov 28 championship. This button still locks early. If that automatic lock has already landed, pressing it again changes nothing. Run the championship, drop damage, and advance still follow.`
+            ? `All Rumble and title builds lock automatically ${deadline.label}, before the Saturday, Nov 28 championship. This button still locks early. If that automatic lock has already landed, pressing it again changes nothing. Run the championship, drop damage, and advance still follow.`
             : `Week 1 builds lock automatically ${deadline.label}, even if this button has not been pressed. It still locks early, and pressing it again after the automatic lock changes nothing. Enter Sunday's numbers, run the card, drop damage, and advance still follow.`}
         </p>
       ) : null}
@@ -387,11 +387,11 @@ function ChampionshipDesk() {
         {names.length === 2 ? names.join(" vs ") : "Conference champions pending"}
       </h2>
       <p className="mt-2 max-w-3xl text-sm text-muted">
-        There is no fifth Sunday sales scorecard. The finalists carry their Week 4 sales card,
-        season-earned parts, coins and damage into Championship Week. Only those two stores can
-        prepare their bots. Rally support changes presentation only.
+        There is no fifth Sunday sales scorecard. Every store carries its Week 4 sales card,
+        season-earned parts, coins and damage into Championship Week. All fourteen stores can
+        prepare their own bots November 17–27. Rally support changes presentation only.
       </p>
-      <p className="mt-2 text-sm text-amber">Saturday starts with the third-place Royal Rumble, then the title fight. No judges or round cap: the title ends only with a complete pit elimination.</p>
+      <p className="mt-2 text-sm text-amber">Saturday starts with the third-place Royal Rumble, then the title fight. No judges or round cap: zero health or a complete pit throw ends an elimination fight.</p>
       <div className="mt-4">
         <SaturdayGate held={buildTape(data, 5).held} />
       </div>

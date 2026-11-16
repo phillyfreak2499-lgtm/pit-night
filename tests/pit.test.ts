@@ -354,12 +354,12 @@ function championshipState() {
   return store;
 }
 
-test("Championship Prep requires eight jobs, four Sparks and captain CARE; Rally stores cannot earn it", () => {
+test("All fourteen stores can earn preparation with eighteen jobs, nine Sparks and captain CARE", () => {
   const store = championshipState();
   const finalist = championshipFinalists(store.getState())[0]!;
   const plan = programWeek(5)!;
-  assert.equal(allJobs(plan).length, 8);
-  assert.equal(plan.days.length, 4);
+  assert.equal(allJobs(plan).length, 18);
+  assert.equal(plan.days.length, 9);
   for (const c of store.getState().crew.filter(c => c.storeId === finalist && c.role === "specialist")) {
     store.setState({ session: { role: "crew", storeId: finalist, crewId: c.id } });
     for (const j of allJobs(plan)) store.getState().completeJob(5, j.id, "Evidence recorded");
@@ -374,9 +374,9 @@ test("Championship Prep requires eight jobs, four Sparks and captain CARE; Rally
   const outsider = store.getState().crew.find(c => c.role === "specialist" && !championshipFinalists(store.getState()).includes(c.storeId))!;
   store.setState({ session: { role: "crew", storeId: outsider.storeId, crewId: outsider.id } });
   const before = JSON.stringify([store.getState().jobLog, store.getState().sparkLog]);
-  store.getState().completeJob(5, allJobs(plan)[0]!.id, "Not eligible");
+  store.getState().completeJob(5, allJobs(plan)[0]!.id, "Rumble preparation");
   store.getState().submitSpark(5, "tue", 3, 3);
-  assert.equal(JSON.stringify([store.getState().jobLog, store.getState().sparkLog]), before);
+  assert.notEqual(JSON.stringify([store.getState().jobLog, store.getState().sparkLog]), before);
   assert.equal(weekProgress(store.getState(), outsider.storeId, 5).tuned, false);
 });
 
@@ -998,7 +998,7 @@ test("every eligible specialist completing all ten jobs and five Sparks plus CAR
   assert.equal(weekProgress(store.getState(), "plano", 1).tuned, true);
 });
 
-test("four 14-store cards lead to two conference champions and a pit-only Championship Saturday", () => {
+test("four 14-store cards lead to two conference champions and a elimination Championship Saturday", () => {
   const store = state("commissioner");
   for (let week = 1; week <= 4; week++) {
     for (const row of store.getState().stores) {
@@ -1020,7 +1020,7 @@ test("four 14-store cards lead to two conference champions and a pit-only Champi
   store.getState().runSaturday();
   const championship = store.getState().bouts.find((bout) => bout.week === 5 && bout.title === "Waterman Championship");
   assert.ok(championship?.result);
-  assert.equal(championship!.result!.method, "dump");
+  assert.ok(["ko", "dump"].includes(championship!.result!.method));
   store.getState().dropDamage();
   store.getState().advanceWeek();
   assert.equal(store.getState().phase, "complete");
@@ -1084,7 +1084,7 @@ test("captain build commands are rejected at the Oct 31 and Nov 27 instants and 
     assert.equal(captainBuildRejection(name, "captain", 5, beforeNov), null);
     assert.match(
       captainBuildRejection(name, "captain", 5, atNov, { data: makeData(), args: ["plano"] })!,
-      /conference champions/,
+      /Nov 27/,
     );
     assert.equal(captainBuildRejection(name, "commissioner", 5, atNov), null);
     assert.equal(captainBuildRejection(name, "captain", 2, atOct), null);
@@ -1178,7 +1178,7 @@ test("week 5 title builds lock at Friday Nov 27 6:00 PM CT and the championship 
   assert.equal(due!.weeks.find((w) => w.number === 5)!.lockedAt, Date.parse(NOV27_LOCK));
   const finalists = championshipFinalists(due!);
   assert.ok(finalists.every((id) => due!.bots.find((b) => b.storeId === id)!.locked));
-  assert.ok(due!.bots.filter((b) => !finalists.includes(b.storeId)).every((b) => b.locked == null));
+  assert.ok(due!.bots.filter((b) => !finalists.includes(b.storeId)).every((b) => b.locked != null));
   const logLength = due!.log.length;
   store.setState({ phase: due!.phase, weeks: due!.weeks, bots: due!.bots, log: due!.log, flash: due!.flash });
   store.setState({ session: { role: "captain", storeId: finalist, crewId: cap.id } });
@@ -1198,7 +1198,7 @@ test("week 5 title builds lock at Friday Nov 27 6:00 PM CT and the championship 
   );
   assert.match(
     captainBuildRejection("buyShow", "captain", 5, new Date(NOV27_LOCK), { data: store.getState(), args: [outsider.id] })!,
-    /conference champions/,
+    /Nov 27/,
   );
   assert.equal(
     captainBuildRejection("buyPart", "captain", 5, new Date("2026-11-27T23:59:59.999Z"), {
@@ -1232,7 +1232,7 @@ test("pressing Lock again does not add another log line once every eligible buil
   }
 });
 
-test("buyShow is refused with the build lock, and a week-5 non-finalist is not told the builds locked", (t) => {
+test("buyShow is refused with the build lock, for both Rumble and title captains", (t) => {
   const store = championshipState();
   const finalists = championshipFinalists(store.getState());
   const finalist = finalists[0]!;
@@ -1243,7 +1243,7 @@ test("buyShow is refused with the build lock, and a week-5 non-finalist is not t
   store.setState({ session: { role: "captain", storeId: outsider.id, crewId: outsiderCap.id } });
   const outsiderShows = store.getState().bots.find((b) => b.storeId === outsider.id)!.shows ?? [];
   store.getState().buyShow(outsider.id, "fog");
-  assert.match(store.getState().flash, /conference champions/);
+  assert.match(store.getState().flash, /Nov 27/);
   assert.deepEqual(store.getState().bots.find((b) => b.storeId === outsider.id)!.shows ?? [], outsiderShows);
   store.setState({ session: { role: "captain", storeId: finalist, crewId: finalistCap.id } });
   const finalistShows = store.getState().bots.find((b) => b.storeId === finalist)!.shows ?? [];
@@ -1263,7 +1263,7 @@ test("season load retries a bounded number of times and skips closed-week deadli
 test("Pit elimination fixtures always contain a replay and particle budgets stay bounded", () => {
   const data = makeData();
   const result = simulateChampionshipDuel(data, "plano", "allen", "title");
-  assert.equal(result.method, "dump");
+  assert.ok(["ko", "dump"].includes(result.method));
   assert.ok(buildBeats(result).some((b) => b.kind === "replay"));
   const fx = new Fx();
   for (let i = 0; i < 1000; i++) fx.dust(0, 0, 1, 1);

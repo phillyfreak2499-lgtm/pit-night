@@ -1,4 +1,5 @@
 import test from "node:test";
+import { approvedCard } from "../src/lib/pit/period12-approved-card.ts";
 import assert from "node:assert/strict";
 import { makeData } from "../src/lib/pit/seed.ts";
 import { simulateChampionshipDuel } from "../src/lib/pit/engine.ts";
@@ -12,10 +13,11 @@ import { resizeBroadcastCanvas } from "../src/components/pit/broadcast-canvas.ts
 function resultForTest() {
   const data = makeData();
   data.week = 5;
-  return simulateChampionshipDuel(data, data.stores[0]!.id, data.stores[1]!.id, "title-show");
+  return structuredClone(approvedCard.at(-1)!.result!);
 }
 function recorder(text: string[] = [], moves: number[][] = []) {
   return new Proxy({
+    getTransform: () => ({ a: 1 }),
     createLinearGradient: () => ({ addColorStop() {} }),
     createRadialGradient: () => ({ addColorStop() {} }),
     measureText: (text: string) => ({ width: text.length * 6 }),

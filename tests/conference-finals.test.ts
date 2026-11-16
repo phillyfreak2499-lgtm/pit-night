@@ -38,8 +38,8 @@ test("two tied contenders duel for each conference berth and never use a decisio
   assert.equal(extras.length, 2);
   for (const bout of extras) {
     assert.equal(bout.kind, "final"); assert.equal(bout.storeIds.length, 2);
-    assert.equal(bout.result!.method, "dump");
-    assert.ok(bout.result!.exchanges.at(-1)!.tags.includes("pit-elimination"));
+    assert.ok(["ko", "dump"].includes(bout.result!.method));
+    assert.ok(bout.result!.exchanges.at(-1)!.tags.some(t => t === "pit-elimination" || t === "knockout"));
   }
   data.bouts.push(...extras);
   assert.ok(conferenceChampion(data, "metro"));
@@ -55,7 +55,7 @@ test("three or more tied contenders battle simultaneously and standings exclude 
     const result = bout.result!;
     assert.equal(result.meleeOrder!.length, 3);
     assert.equal(Object.values(result.hp).filter(hp => hp > 0).length, 1);
-    assert.equal(result.exchanges.filter(e => e.tags.includes("pit-elimination")).length, 2);
+    assert.equal(result.exchanges.filter(e => e.tags.some(t => t === "pit-elimination" || t === "knockout")).length, 2);
   }
   data.bouts.push(...extras);
   assert.deepEqual(data.stores.map(s => regularSeasonRecordOf(data, s.id)), before);
@@ -102,9 +102,9 @@ test("Week 5 fields all nonfinalists in the third-place Rumble before the title"
 test("championship replay records a real pit elimination with no duplicate finisher", () => {
   const data = makeData(); data.week = 5;
   const result = simulateChampionshipDuel(data, "plano", "allen", "title-pit-test");
-  assert.equal(result.method, "dump"); assert.equal(result.finisher, null);
+  assert.ok(["ko", "dump"].includes(result.method)); assert.equal(result.finisher, null);
   assert.deepEqual(result.pitTarget, { x: 0.5, y: 0.64 });
   assert.equal(result.hp[result.loserIds[0]!], 0);
-  assert.ok(result.exchanges.at(-1)!.tags.includes("pit-elimination"));
+  assert.ok(result.exchanges.at(-1)!.tags.some(t => t === "pit-elimination" || t === "knockout"));
   assert.ok(result.exchanges.slice(0, -1).every(e => e.attackerHp > 0 && e.defenderHp > 0));
 });

@@ -16,23 +16,21 @@ import { dayDate, programWeek } from "./training";
  */
 
 const pitWeek = programWeek(1)!;
-const titleWeek = programWeek(5)!;
 
 export const HALLOWEEN_PIT_START = dayDate(pitWeek, "tue");
 export const HALLOWEEN_PIT_SATURDAY = dayDate(pitWeek, "sat");
 
 const pitTuesday = centralDay(HALLOWEEN_PIT_START);
 const pitSaturday = centralDay(HALLOWEEN_PIT_SATURDAY);
-const titleTuesday = centralDay(dayDate(titleWeek, "tue"));
 
 /** Monday Oct 26, 00:00 CT. Decorations may show while the floor is setting up. */
 export const HALLOWEEN_VISUAL_START = central(pitTuesday.y, pitTuesday.m, pitTuesday.d - 1);
 /** Sunday Nov 1, 00:00 CT. End of Saturday Oct 31. Kept as a season marker; no longer a sales gate. */
 export const HALLOWEEN_VISUAL_END = central(pitSaturday.y, pitSaturday.m, pitSaturday.d + 1);
 /** Saturday Nov 28, 00:00 CT. Championship Saturday. */
-export const CHAMPIONSHIP_SATURDAY = central(titleTuesday.y, titleTuesday.m, titleTuesday.d + 4);
+export const CHAMPIONSHIP_SATURDAY = central(2026, 11, 28);
 /** Sunday Nov 29, 00:00 CT. Kept as a season marker; no longer a sales gate. */
-export const PREMIUM_CLOSE = central(titleTuesday.y, titleTuesday.m, titleTuesday.d + 5);
+export const PREMIUM_CLOSE = central(2026, 11, 29);
 
 export const PREMIUM_OPEN = HALLOWEEN_VISUAL_END;
 

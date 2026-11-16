@@ -1,4 +1,5 @@
 import { buildCard, previewSaturday } from "./engine";
+import { approvedFinaleTape, pendingApprovedFinale } from "./period12-tape";
 import { saturdayFightKind } from "./saturday-seal";
 import type { Bout, PitData, WeekReplay } from "./types";
 
@@ -92,7 +93,7 @@ export function buildTape(data: PitData, week: number): Tape {
   const posted = replayWeek(data, week);
   if (posted.length) return { live: true, replay: !isLiveCard(data, week), bouts: posted, held: [] };
   if (week !== data.week) return { live: false, replay: false, bouts: [], held: [] };
-  return { live: false, replay: false, bouts: previewSaturday(data), held: [] };
+  return { live: false, replay: false, bouts: week===4&&pendingApprovedFinale(data)?approvedFinaleTape():previewSaturday(data), held: [] };
 }
 
 /** Stable identity of a card: seed, winner, method, and every exchange. */

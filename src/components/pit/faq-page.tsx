@@ -28,7 +28,7 @@ export const GROUPS: Group[] = [
       faq("Why does the music change or get quieter?", "Four upbeat guitar and drum tracks rotate by week and fight order. A replay gets the same track as the original slot. The crowd cheers on standout hits. Both the music and the crowd drop under the booth and rise after the last speaker finishes."),
       faq("I see captions but hear nothing. What should I check?", "Press Play or Start, check the mic and speaker controls, then check the browser tab, device volume and selected output. A fresh recording can take a few seconds. Fight commentary can use the device voice when a recording is unavailable. On other pages, you can read the caption and tap the audio button to retry. If a button says Booth audio muted, unmute the arena first."),
       faq("Where else can I hear the announcers?", "On the home page, tap Tune in to the booth. On the fight card, tap Hear the card preview. On a store page, use Introduce next to the bot. In the Gazette, choose Hear the lead headline. These clips play on request and have a Stop audio button."),
-      faq("Is the house tape official, and does watching change my record?", "House tape is a preview of the open week and can change before the card posts. A posted card and its archived replay use recorded fight events. Playback speed, commentary, music and rewatching have no effect on damage, coins, Bolts or standings."),
+      faq("Is the house tape official, and does watching change my record?", "The Nov 16 Week 4 finale is approved and counts. Its standings post Nov 17 after 10 AM CT. Other house tapes preview an open week and can change before posting. A posted card and its archived replay use recorded fight events. Playback speed, commentary, music and rewatching have no effect on damage, coins, Bolts or standings."),
     ],
   },
   {
@@ -36,7 +36,7 @@ export const GROUPS: Group[] = [
     items: [
       faq(
         "What is the Waterman Battle Bot League?",
-        "Fourteen Good Feet stores play a four-week regular season in Metro and Frontier conferences. Every store fights all four Mondays. After Week 4, the #1 store in each conference advances to Championship Saturday on November 28. That title fight continues until knockout.",
+        "Fourteen Good Feet stores play a four-round regular season in Metro and Frontier conferences. Every store has four regular-season fights. After Week 4, the #1 store in each conference advances to Championship Saturday on November 28. That title fight continues until knockout.",
       ),
       faq(
         "How do I sign in?",
@@ -151,7 +151,7 @@ export const GROUPS: Group[] = [
     items: [
       faq(
         "When do the bots lock?",
-        "Week 1 locks automatically Saturday, Oct 31, at 6:00 PM Central. The Desk can lock earlier. Weeks 2 through 4 lock when the Desk presses lock at Saturday close (6 pm Central). Championship Week locks automatically Friday, Nov 27, at 6:00 PM Central, ahead of the Saturday, Nov 28 championship. The Desk can lock the two title builds earlier. Captains cannot change builds after either automatic deadline.",
+        "Week 1 locks automatically Saturday, Oct 31, at 6:00 PM Central. The Desk can lock earlier. Weeks 2 through 4 lock when the Desk presses lock at Saturday close (6 pm Central). Championship Week locks automatically Friday, Nov 27, at 6:00 PM Central, ahead of the Saturday, Nov 28 championship. All fourteen Rumble and title builds use that deadline. The Desk can lock them earlier. Captains cannot change builds after either automatic deadline.",
       ),
       faq(
         "How does a fight work?",
@@ -175,7 +175,7 @@ export const GROUPS: Group[] = [
       ),
       faq(
         "Are there byes?",
-        "No. Fourteen stores means seven fights every regular-season Monday, so every store fights all four weeks.",
+        "No. Fourteen stores means seven fights on every regular card, so every store has four regular fights.",
       ),
       faq(
         "Where can we watch?",
@@ -191,8 +191,8 @@ export const GROUPS: Group[] = [
     title: "Championship Week",
     items: [
       faq(
-        "Who can work on a bot in Week 5?",
-        "Only the Metro Champion and Frontier Champion. They keep the parts, coins, upgrades, damage and bot identity they earned through the season. There are no free repairs or donated upgrades. Their own Tuesday-through-Friday Championship Prep and season-earned resources are the only ways to get ready.",
+        "Who can prepare for the Rumble and championship?",
+        "All fourteen stores prepare November 17–21 and November 24–27. The two conference winners prepare for the title; the other twelve prepare for the Third Place Royal Rumble. Each store keeps its earned parts, coins and damage and can earn its own repairs, upgrades and Full Tune-Up. All builds lock Friday, November 27 at 6 PM Central.",
       ),
       faq(
         "What is Rally?",
@@ -200,7 +200,7 @@ export const GROUPS: Group[] = [
       ),
       faq(
         "How does the Championship fight end?",
-        "There are no judges and no decision. The championship continues for as many rounds as needed until a bot is completely thrown into the pit. Before it, all non-finalists battle simultaneously in the larger-arena Royal Rumble for third place.",
+        "There are no judges and no decision. The championship ends when a bot reaches zero health or is completely thrown into the pit. Zero health is final in both duels and melees. Before it, all non-finalists battle simultaneously in the larger-arena Royal Rumble for third place.",
       ),
     ],
   },

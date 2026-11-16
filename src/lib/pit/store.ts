@@ -55,6 +55,7 @@ import { showEffect } from "./halloween";
 import { thanksgivingShowEffect } from "./thanksgiving";
 import { buildLockMessage, deadlineDue, weekDeadline } from "./time";
 import { captureSaturdayBaseline, initialSaturdayWatch, sealSaturday } from "./saturday-seal";
+import { pendingApprovedFinale, FINALE_POST_AFTER, FINALE_HOLD_LABEL } from "./period12-tape";
 import type { BotDecal, CosmeticLoadout, StickerSlot } from "./types";
 import type { Bot, BotLook, BotStyle, Bout, Condition, FightResult, GarageLook, GazetteEntry, Grade, Kickoff, Loadout, PitData, Session, ShowEffectId, Slot, StatKey, StoreCard } from "./types";
 import { dailyGazetteId, type GazetteDraft } from "./gazette-ai";
@@ -186,13 +187,13 @@ function isCaptainOf(data: PitData, storeId: string) {
 }
 
 function championshipPrepAllowed(data: PitData, storeId: string) {
-  return data.week !== 5 || championshipFinalists(data).includes(storeId);
+  return data.stores.some(store=>store.id===storeId);
 }
 
 function championshipPrepGuard(data: PitData, storeId: string): string | null {
   return championshipPrepAllowed(data, storeId)
     ? null
-    : "Championship Week bot work belongs to the two conference champions. Rally behind a finalist instead.";
+    : "Choose a store preparing for the November 28 Rumble or championship.";
 }
 
 function starterBodyGuard(data: PitData, storeId: string): string | null {
@@ -209,9 +210,7 @@ function captainBuildBlock(data: PitData): string | null {
 }
 
 function buildsFrozen(data: PitData): boolean {
-  const finalists = data.week === 5 ? championshipFinalists(data) : null;
   return data.bots.every((bot) => {
-    if (finalists && !finalists.includes(bot.storeId)) return true;
     return bot.locked != null;
   });
 }
@@ -223,12 +222,10 @@ function lockPatch(data: PitData, at: number) {
     phase: "locked" as const,
     weeks: data.weeks.map((w) => (w.number === data.week ? { ...w, lockedAt: w.lockedAt ?? at } : w)),
     bots: data.bots.map((b) =>
-      championship && !finalists.includes(b.storeId)
-        ? { ...b, locked: null }
-        : { ...b, locked: { ...(b.locked ?? b.draft) }, equipped: { ...(b.locked ?? b.draft) } },
+      ({ ...b, locked: { ...(b.locked ?? b.draft) }, equipped: { ...(b.locked ?? b.draft) } }),
     ),
     flash: championship
-      ? "Championship builds frozen. Saturday ends only with a complete pit elimination."
+      ? "All Rumble and championship builds frozen. Zero health or a pit throw eliminates a bot."
       : `Locked. ${data.stores.length} builds frozen for Monday. Click in Sunday's colors, then run the card.`,
     log: [`Week ${data.week} locked.`, ...data.log.slice(0, 23)],
   };
@@ -439,7 +436,8 @@ export function clientDoc(state: PitData, session: Session): SharedDoc {
   out.intel = desk ? out.intel : out.intel.filter(i => i.from === session.storeId);
   out.proposals = desk ? out.proposals : out.proposals.filter(p => p.storeId === session.storeId);
   out.cosmeticProposals = (out.cosmeticProposals ?? []).filter(p => desk || (session.role !== "public" && p.storeId === session.storeId));
-  if (desk || ["fought", "inspected", "complete"].includes(state.phase)) return out;
+  const sealedSaturday = state.week === 5 && !state.saturdayWatch?.championshipRevealedAt;
+  if (!sealedSaturday && (desk || ["fought", "inspected", "complete"].includes(state.phase))) return out;
   out.bots = out.bots.map(bot => {
     if (session.role !== "public" && session.storeId === bot.storeId) return bot;
     const stock = { chassis: stockPart("chassis", bot.classId).id, armor: stockPart("armor", bot.classId).id, drive: stockPart("drive", bot.classId).id, weapon: stockPart("weapon", bot.classId).id, utility: null, brain: stockPart("brain", bot.classId).id };
@@ -1919,6 +1917,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "Run the card from the desk." });
           return;
         }
+        if(pendingApprovedFinale(data)&&Date.now()<=FINALE_POST_AFTER){set({flash:`Week 4 standings stay unchanged until ${FINALE_HOLD_LABEL}.`});return;}
         if (data.phase === "fought" || data.phase === "inspected" || data.phase === "complete") {
           set({ flash: "This card already ran." });
           return;
@@ -1934,9 +1933,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           return;
         }
         const lockedBots = data.bots.map((b) =>
-          data.week === 5 && !finalists.includes(b.storeId)
-            ? { ...b, locked: null }
-            : { ...b, locked: { ...(b.locked ?? b.draft) }, equipped: { ...(b.locked ?? b.draft) } },
+          ({ ...b, locked: { ...(b.locked ?? b.draft) }, equipped: { ...(b.locked ?? b.draft) } }),
         );
         const staged: PitData = { ...data, phase: "locked", bots: lockedBots };
         const bouts = playCard(staged);
@@ -2120,7 +2117,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           // Advance pays coins and moves the week. It does not drop the fight.
           bouts: data.bouts,
           replays: sealReplay(data),
-          flash: next === 5 ? "Championship Week is open. Only the two conference champions can work on their bots; everyone else enters the third-place Royal Rumble and can Rally. The regular season stays on Fight Day as a replay." : `Week ${next} is open. ${data.week === 1 ? "Coins are in the jars and the shop is open." : "Cards are house projections until the desk clicks in Sunday's colors."} Week ${data.week} stays on Fight Day as a replay.`,
+          flash: next === 5 ? "Rumble and Championship Prep is open November 17–27 for all fourteen stores. Every store prepares its own bot; the regular season stays on Fight Day as a replay." : `Week ${next} is open. ${data.week === 1 ? "Coins are in the jars and the shop is open." : "Cards are house projections until the desk clicks in Sunday's colors."} Week ${data.week} stays on Fight Day as a replay.`,
           log: [...lines, ...data.log].slice(0, 24),
         });
       },
