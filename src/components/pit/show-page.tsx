@@ -15,6 +15,7 @@ import type { Bout, PitData } from "@/lib/pit/types";
 import { ResultLine, SectionLabel } from "./bits";
 import { armBroadcastAudio, Broadcast } from "./broadcast";
 import { FightProgram } from "./fight-program";
+import { SaturdayGate } from "./saturday-gate";
 
 type Segment = ChampionshipSegment<Bout>;
 
@@ -120,7 +121,9 @@ export function ShowPage() {
           <SectionLabel>{weekPick === 5 ? "Championship broadcast" : "Monday broadcast"}</SectionLabel>
           <h1 className="font-display text-5xl leading-none">{weekName(data, weekPick)}</h1>
           <p className="mt-2 max-w-xl text-sm text-muted">
-            {tape.replay
+            {tape.held.length && !tape.bouts.length
+              ? "Championship Saturday is sealed. The Desk PIN starts each fight at 9:30 AM CT on Nov 28. Nothing here names a winner before then."
+              : tape.replay
               ? "Replay. This is the card that posted. Watching it does not change coins, damage, records, or the week."
               : tape.live
                 ? "Posted card. This is the tape the stores get."
@@ -138,6 +141,8 @@ export function ShowPage() {
           </Link>
         </div>
       </div>
+
+      {tape.held.length ? <SaturdayGate held={tape.held} /> : null}
 
       {savedWeeks.length > 0 ? (
         <div className="flex gap-2 overflow-x-auto" data-testid="replay-archive" role="group" aria-label="Replay archive">

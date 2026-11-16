@@ -1,11 +1,13 @@
 import { Link } from "@tanstack/react-router";
 import { CLASS_META } from "@/lib/pit/catalog";
 import { botFor } from "@/lib/pit/engine";
+import { buildTape } from "@/lib/pit/replay";
 import { upcomingMatchups } from "@/lib/pit/claude-copy";
 import { usePit, type PitState } from "@/lib/pit/store";
 import type { Bout, ClassId } from "@/lib/pit/types";
 import { BoutWatch, Panel, ResultLine, SectionLabel } from "./bits";
 import { MatchupPoster } from "./matchup-poster";
+import { SaturdayGate } from "./saturday-gate";
 import { BoothSegment } from "./booth-segment";
 
 export function CardPage() {
@@ -13,6 +15,7 @@ export function CardPage() {
   const week = data.week;
   const meta = data.weeks.find((w) => w.number === week);
   const bouts = data.bouts.filter((b) => b.week === week);
+  const held = week === 5 ? buildTape(data, 5).held : [];
   const groups = week === 2 ? groupByClass(data, bouts) : null;
 
   return (
@@ -22,8 +25,9 @@ export function CardPage() {
       <p className="mt-3 max-w-2xl text-muted">{meta?.blurb}</p>
       <BoothSegment key={week} scene="card" label="Hear the card preview" />
       <Link to="/broadcast" className="mt-4 inline-flex min-h-11 items-center text-amber">
-        Watch the Monday broadcast
+        {week === 5 ? "Championship broadcast" : "Watch the Monday broadcast"}
       </Link>
+      {held.length ? <div className="mt-6"><SaturdayGate held={held} /></div> : null}
       {bouts.length === 0 ? (
         <p className="mt-6 border border-line bg-surface p-4">
           {week === 5

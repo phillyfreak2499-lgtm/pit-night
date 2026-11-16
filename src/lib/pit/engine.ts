@@ -29,6 +29,7 @@ import {
   THANKSGIVING_SHOW_CLOSED_REASON,
 } from "./thanksgiving";
 import { buildScore, duelWear, fightDuel, fightGroup, preferFighter, type DuelOpts } from "./combat";
+import { browserBlocksSaturdaySeed, saturdayFightKind, sealedFightResult } from "./saturday-seal";
 import { centralDay } from "./time";
 export { halloweenStrikeAdjust } from "./combat";
 import { BOLTS, TUNE_UP_BONUS } from "./training";
@@ -1053,6 +1054,7 @@ export function simulateChampionshipDuel(
   idB: string,
   seed: string,
 ): FightResult {
+  if (browserBlocksSaturdaySeed(seed)) return sealedFightResult();
   const a = snapshot(data, idA);
   const b = snapshot(data, idB);
   const fought = fightDuel(a, b, { hot: true, pitOnly: true });
@@ -1189,6 +1191,7 @@ export function simulateTag(
 }
 
 export function simulateMelee(data: PitData, ids: string[], seed: string, lastBotStanding = false): FightResult {
+  if (browserBlocksSaturdaySeed(seed)) return sealedFightResult();
   const snaps = ids.map((id) => snapshot(data, id));
   const fought = fightGroup(snaps, null, { hot: data.week === 3, lastBotStanding });
   const hp = fought.hp;
@@ -1361,6 +1364,7 @@ function makeBout(
 }
 
 export function simulateBout(data: PitData, bout: Bout): FightResult {
+  if (typeof window !== "undefined" && saturdayFightKind(bout)) return sealedFightResult();
   const seed = `${data.seasonName}|w${data.week}|${bout.id}|${bout.storeIds.join(",")}|${loadoutSeed(data, bout.storeIds)}`;
   if (bout.kind === "bye") return simulateBye(data, bout.teamA[0]!, seed);
   if (bout.kind === "tag") return simulateTag(data, bout.teamA, bout.teamB, seed);
@@ -1767,7 +1771,9 @@ export function previewSaturday(data: PitData): Bout[] {
     locked: { ...(b.locked ?? b.draft) },
     equipped: { ...(b.locked ?? b.draft) },
   }));
-  return runSaturday({ ...data, phase: "locked", bots });
+  const card = runSaturday({ ...data, phase: "locked", bots });
+  if (typeof window === "undefined") return card;
+  return card.map((bout) => (saturdayFightKind(bout) ? { ...bout, result: null } : bout));
 }
 
 /** Build only after all four regular weeks have been posted. Safe to call repeatedly. */

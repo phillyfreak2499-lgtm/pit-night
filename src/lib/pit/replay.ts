@@ -1,4 +1,5 @@
-import { previewSaturday } from "./engine";
+import { buildCard, previewSaturday } from "./engine";
+import { saturdayFightKind } from "./saturday-seal";
 import type { Bout, PitData, WeekReplay } from "./types";
 
 /** Posted bouts for one week, in card order. Empty when that week never ran. */
@@ -61,16 +62,37 @@ export function replayWeek(data: Pick<PitData, "bouts" | "replays">, week: numbe
   return structuredClone(source).sort((a, b) => a.slot - b.slot);
 }
 
+export type Tape = { live: boolean; replay: boolean; bouts: Bout[]; held: Bout[] };
+
+/** Championship Saturday matchups with any still-sealed fight kept out of the playable tape. */
+function weekFiveCard(data: PitData): Bout[] {
+  const live = data.bouts.filter((bout) => bout.week === 5).sort((a, b) => a.slot - b.slot);
+  if (live.length) return live;
+  const archived = data.replays?.find((row) => row.week === 5)?.bouts;
+  if (archived?.length) return [...archived].sort((a, b) => a.slot - b.slot);
+  if (data.week < 5) return [];
+  return buildCard({ ...data, week: 5 }).map((bout) => ({ ...bout, result: null }));
+}
+
 /**
  * The tape Fight Day and the watch party play.
  * A posted week comes from the archive. The open week, before the desk runs it,
  * is a house preview and is not stored.
+ * Championship Saturday is never preview-simulated. Sealed fights sit on `held`.
  */
-export function buildTape(data: PitData, week: number): { live: boolean; replay: boolean; bouts: Bout[] } {
+export function buildTape(data: PitData, week: number): Tape {
+  if (week === 5) {
+    const card = weekFiveCard(data);
+    const held = card.filter((bout) => saturdayFightKind(bout) && !bout.result);
+    const ready = card.filter((bout) => bout.result);
+    if (card.length)
+      return { live: ready.length > 0, replay: ready.length > 0 && !isLiveCard(data, week), bouts: ready, held };
+    return { live: false, replay: false, bouts: [], held: [] };
+  }
   const posted = replayWeek(data, week);
-  if (posted.length) return { live: true, replay: !isLiveCard(data, week), bouts: posted };
-  if (week !== data.week) return { live: false, replay: false, bouts: [] };
-  return { live: false, replay: false, bouts: previewSaturday(data) };
+  if (posted.length) return { live: true, replay: !isLiveCard(data, week), bouts: posted, held: [] };
+  if (week !== data.week) return { live: false, replay: false, bouts: [], held: [] };
+  return { live: false, replay: false, bouts: previewSaturday(data), held: [] };
 }
 
 /** Stable identity of a card: seed, winner, method, and every exchange. */

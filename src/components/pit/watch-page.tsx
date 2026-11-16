@@ -22,6 +22,7 @@ import { Commercial } from "./commercial";
 import { FightProgram } from "./fight-program";
 import { BoothSegment } from "./booth-segment";
 import { Pregame } from "./pregame";
+import { SaturdayGate } from "./saturday-gate";
 import { buildTape, matchup, methodWord } from "./show-page";
 
 type Stage = "lobby" | "pregame" | "opening" | "intro" | "fight" | "result" | "ad" | "final";
@@ -267,7 +268,7 @@ function Lobby({
   week: number;
   weeks: number[];
   setWeek: (w: number) => void;
-  tape: { live: boolean; replay: boolean; bouts: Bout[] };
+  tape: { live: boolean; replay: boolean; bouts: Bout[]; held?: Bout[] };
   onStart: (full: boolean) => void;
 }) {
   const final = tape.bouts.find((bout) => bout.kind === "final");
@@ -276,7 +277,7 @@ function Lobby({
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col justify-center gap-6 py-6">
       <div>
-        <p className="font-display text-sm tracking-[0.3em] text-amber uppercase">{tape.replay ? "Replay · read only" : tape.live ? "The card is posted" : "House tape · card not posted yet"}</p>
+        <p className="font-display text-sm tracking-[0.3em] text-amber uppercase">{tape.held?.length && !tape.bouts.length ? "Sealed until the live watch" : tape.replay ? "Replay · read only" : tape.live ? "The card is posted" : "House tape · card not posted yet"}</p>
         <h1 className="mt-2 font-display text-6xl leading-[0.85] md:text-8xl">
           {week === 5 ? "Championship" : "Monday"}
           <span className="block text-amber">{week === 5 ? "Saturday" : "watch party"}</span>
@@ -321,6 +322,7 @@ function Lobby({
           <Flame size={18} aria-hidden /> Tuned up for this card (+{TUNE_UP_BONUS}): {tuned.map((s) => s.name).join(", ")}
         </p>
       ) : null}
+      {tape.held?.length ? <SaturdayGate held={tape.held} /> : null}
       {week === 5 && final ? (
         <div className="grid gap-2 sm:grid-cols-2">
           {final.storeIds.map((id) => {

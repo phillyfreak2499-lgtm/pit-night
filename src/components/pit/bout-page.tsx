@@ -7,10 +7,23 @@ import { Broadcast } from "./broadcast";
 import { ClaudeCopy, LiveCall } from "./claude-copy";
 import { FightProgram } from "./fight-program";
 import { coachStore } from "@/lib/pit/coach-tape";
+import { buildTape } from "@/lib/pit/replay";
+import { saturdayFightId } from "@/lib/pit/saturday-seal";
+import { SaturdayGate } from "./saturday-gate";
 
 export function BoutPage({ boutId }: { boutId: string }) {
   const data = usePit();
-  const bout = data.bouts.find((b) => b.id === boutId);
+  const bout = data.bouts.find((b) => b.id === boutId) ?? data.replays?.flatMap((row) => row.bouts).find((b) => b.id === boutId);
+  if (saturdayFightId(boutId)) {
+    const held = buildTape(data, 5).held.filter((row) => row.id === boutId);
+    if (held.length) {
+      return (
+        <div className="mx-auto max-w-5xl">
+          <SaturdayGate held={held} />
+        </div>
+      );
+    }
+  }
   if (!bout || !bout.result) {
     return (
       <div>

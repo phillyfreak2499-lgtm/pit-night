@@ -54,6 +54,7 @@ import { authorize } from "./commands";
 import { showEffect } from "./halloween";
 import { thanksgivingShowEffect } from "./thanksgiving";
 import { buildLockMessage, deadlineDue, weekDeadline } from "./time";
+import { captureSaturdayBaseline, initialSaturdayWatch, sealSaturday } from "./saturday-seal";
 import type { BotDecal, CosmeticLoadout, StickerSlot } from "./types";
 import type { Bot, BotLook, BotStyle, Bout, Condition, FightResult, GarageLook, GazetteEntry, Grade, Kickoff, Loadout, PitData, Session, ShowEffectId, Slot, StatKey, StoreCard } from "./types";
 import { dailyGazetteId, type GazetteDraft } from "./gazette-ai";
@@ -403,7 +404,7 @@ export const TUTORIAL_REV = 3;
 /** Everything the league shares. Session and tutorial stay on the device. */
 export const SHARED_KEYS = [
   "version", "seasonName", "tagline", "week", "phase", "stores", "crew", "bots", "weeks", "storeCards", "bouts", "replays",
-  "gazette", "quotes", "proposals", "mvps", "honors", "craft", "log", "intel", "jobLog", "rallies", "sparkLog", "shouts", "picks",
+  "gazette", "quotes", "proposals", "mvps", "honors", "saturdayWatch", "saturdayBaseline", "craft", "log", "intel", "jobLog", "rallies", "sparkLog", "shouts", "picks",
   "trainingOpenAll", "kickoff", "cosmeticProposals", "halloweenArcade", "ownerEvents",
 ] as const satisfies readonly (keyof PitData)[];
 
@@ -427,7 +428,10 @@ export function sharedDoc(state: PitData): SharedDoc {
 
 /** Private drafts and scouting notes are projected for the verified viewer only. */
 export function clientDoc(state: PitData, session: Session): SharedDoc {
-  const out = sharedDoc(state);
+  const sealed = sealSaturday(state);
+  const out = sharedDoc(sealed);
+  // The pre-Saturday snapshot is how the seal restores wear. It never leaves the server.
+  delete out.saturdayBaseline;
   // Game solutions and attempt ledgers never travel in the shared client snapshot,
   // including Desk and post-fight projections. The game API returns a safe view.
   out.halloweenArcade = [];
@@ -1970,6 +1974,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           return bot.owned.includes(honors.titleDrop) ? bot : { ...bot, owned: [...bot.owned, honors.titleDrop] };
         });
         const postedBouts = [...data.bouts.filter((b) => b.week !== data.week), ...bouts];
+        const saturday = data.week === 5;
         set({
           phase: "fought",
           bots,
@@ -1978,8 +1983,21 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           gazette,
           craft,
           honors,
-          flash: data.week === 5 ? "Championship Saturday is in the books." : data.week === 4 ? "Regular season complete. Conference champions are set for Saturday." : "Monday card is live. Watch it before you drop damage.",
-          log: [`Week ${data.week} fought.`, ...data.log.slice(0, 23)],
+          ...(saturday
+            ? {
+                saturdayBaseline: data.saturdayBaseline ?? captureSaturdayBaseline(data),
+                saturdayWatch: data.saturdayWatch ?? initialSaturdayWatch(),
+              }
+            : {}),
+          flash: saturday
+            ? "Championship Saturday is computed and sealed. Results stay off the site until the live watch."
+            : data.week === 4
+              ? "Regular season complete. Conference champions are set for Saturday."
+              : "Monday card is live. Watch it before you drop damage.",
+          log: [
+            saturday ? "Championship Saturday computed. Sealed until the live watch." : `Week ${data.week} fought.`,
+            ...data.log.slice(0, 23),
+          ],
         });
       },
       dropDamage: () => {
@@ -2034,12 +2052,20 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           return;
         }
         if (data.week === 5) {
+          const posted = Boolean(data.saturdayWatch?.rumbleRevealedAt && data.saturdayWatch?.championshipRevealedAt);
           set({
             phase: "complete",
             bouts: data.bouts,
             replays: sealReplay(data),
-            flash: "Season closed. The Waterman Champion is on the wall. Every card stays on Fight Day as a replay.",
-            log: ["Championship Saturday complete.", ...data.log].slice(0, 24),
+            flash: posted
+              ? "Season closed. The Waterman Champion is on the wall. Every card stays on Fight Day as a replay."
+              : "Season closed on the desk. Championship Saturday stays sealed until the live watch.",
+            log: [
+              posted
+                ? "Championship Saturday complete."
+                : "Championship Saturday closed. Results stay sealed until the live watch.",
+              ...data.log,
+            ].slice(0, 24),
           });
           return;
         }
@@ -2411,11 +2437,12 @@ export const usePit = create<PitState>()(persist(pitCreator, {
         if (!saved) return current;
         if (typeof saved.version !== "number" || saved.version < 5) return current;
         const fixed = applyLeague14(applyMondays(applyHulen(saved as PitData)));
+        const sealed = sealSaturday({ ...current, ...sharedDoc(fixed), tutorialSeen: fixed.tutorialSeen ?? false });
         return {
           ...current,
-          ...sharedDoc(fixed),
+          ...sharedDoc(sealed),
           tutorialSeen: fixed.tutorialSeen ?? false,
-          stores: sharedDoc(fixed).stores,
+          stores: sharedDoc(sealed).stores,
           session: { role: "public", storeId: null, crewId: null },
           version: VERSION,
           jobLog: fixed.jobLog ?? [],

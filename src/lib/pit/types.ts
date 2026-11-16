@@ -437,6 +437,39 @@ export type Honors = {
   titleDrop: string | null;
 };
 
+/** Which Championship Saturday fight a Desk action is about. */
+export type SaturdayFightName = "rumble" | "championship";
+
+/**
+ * When the Desk started and published each Championship Saturday fight.
+ * Timestamps are public. They do not name a winner.
+ * Null means that fight is still sealed.
+ */
+export type SaturdayWatch = {
+  rumbleStartedAt: number | null;
+  rumbleRevealedAt: number | null;
+  championshipStartedAt: number | null;
+  championshipRevealedAt: number | null;
+};
+
+/** One bot's public face before Saturday damage and title iron land. */
+export type SaturdayBotFace = {
+  storeId: string;
+  wear: Record<Slot, Condition>;
+  partWear: Record<string, Condition>;
+  owned: string[];
+  style?: BotStyle;
+};
+
+/**
+ * Server-only snapshot taken when the Desk runs Championship Saturday,
+ * before damage and the title part are applied. Never sent to a browser.
+ */
+export type SaturdayBaseline = {
+  bots: SaturdayBotFace[];
+  quotes: Record<string, Quote[]>;
+};
+
 export type Intel = {
   week: number;
   from: string;
@@ -479,6 +512,13 @@ export type PitData = {
   cosmeticProposals: CosmeticProposal[];
   mvps: Mvp[];
   honors: Honors;
+  /**
+   * Championship Saturday reveal clock. Absent until the Desk runs that card.
+   * Safe to send: it stores times, not winners.
+   */
+  saturdayWatch?: SaturdayWatch;
+  /** Stripped from every client response. See SaturdayBaseline. */
+  saturdayBaseline?: SaturdayBaseline;
   craft: { week: number; storeId: string; score: number }[];
   session: Session;
   log: string[];

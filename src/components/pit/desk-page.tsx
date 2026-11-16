@@ -5,6 +5,7 @@ import { Btn, Field, SectionLabel, TextInput } from "./bits";
 import { ScoreInputs } from "./score-card";
 import { GradeGrid } from "./grade-grid";
 import { buildCard, championshipFinalists, gradeMetric, cardValue, coinMath, gradesOf, kickoffRank } from "@/lib/pit/engine";
+import { buildTape } from "@/lib/pit/replay";
 import { METRICS, SLOT_LABEL } from "@/lib/pit/catalog";
 import type { Grade, Slot, StatKey } from "@/lib/pit/types";
 import { centralISODate, dailyGazetteId } from "@/lib/pit/gazette-ai";
@@ -13,6 +14,7 @@ import { takeLeagueSeason, useSyncStatus } from "@/lib/pit/sync";
 import { DeskCodes } from "./desk-codes";
 import { ClaudeCheck } from "./claude-copy";
 import { RemindersPanel } from "./reminders-panel";
+import { SaturdayGate } from "./saturday-gate";
 
 export function DeskPage() {
   const data = usePit();
@@ -390,6 +392,12 @@ function ChampionshipDesk() {
         prepare their bots. Rally support changes presentation only.
       </p>
       <p className="mt-2 text-sm text-amber">Saturday starts with the third-place Royal Rumble, then the title fight. No judges or round cap: the title ends only with a complete pit elimination.</p>
+      <div className="mt-4">
+        <SaturdayGate held={buildTape(data, 5).held} />
+      </div>
+      <p className="mt-3 max-w-3xl text-sm text-muted">
+        Run the card whenever the builds are ready. That computes the fights and keeps them sealed. At 9:30 AM CT on Saturday, Nov 28, open the broadcast or the watch party and start the Rumble with the Desk PIN. The result posts when that fight ends. The title stays sealed until you start it next. Showing the sealed result stays on this desk and does not put it on the site.
+      </p>
     </section>
   );
 }
