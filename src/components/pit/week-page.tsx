@@ -2,7 +2,8 @@ import { EffectLockerPreview } from "./effect-locker-preview";
 import { CosmeticTheme } from "./cosmetic-board";
 import { submitDailySpark } from "@/lib/pit/sync";
 import { Check, Clock, Flame, Lock, Package, Sparkles, Wrench } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { pendingApprovedFinale } from "@/lib/pit/period12-tape";
 import { buildCard, championshipFinalists } from "@/lib/pit/engine";
 import { paintHex, usePit } from "@/lib/pit/store";
 import {
@@ -44,8 +45,11 @@ function useMe() {
 export function WeekPage() {
   const { data, me, role, storeId: myStore } = useMe();
   const boss = role === "commissioner";
-  const current = Math.min(5, Math.max(1, data.week));
+  const approvedHeld = pendingApprovedFinale(data);
+  const current = approvedHeld ? 5 : Math.min(5, Math.max(1, data.week));
   const [weekPick, setWeekPick] = useState(current);
+  const [followCurrent, setFollowCurrent] = useState(true);
+  useEffect(() => { if (followCurrent) setWeekPick(current); }, [current, followCurrent]);
   const [viewStore, setViewStore] = useState<string>(myStore ?? data.stores[0]?.id ?? "plano");
   const plan = programWeek(weekPick) ?? PROGRAM[0]!;
   const storeId = boss ? viewStore : (myStore ?? null);
@@ -63,10 +67,11 @@ export function WeekPage() {
           <div className="max-w-2xl">
             <SectionLabel>{championship ? "Finals Prep · Nov 17–21 and Nov 24–27" : "Pit Week · Tuesday to Saturday"}</SectionLabel>
             <h1 className="glow-text mt-1 font-display text-5xl leading-none">
-              Week {plan.week}: {plan.theme}
+              {championship ? plan.theme : `Week ${plan.week}: ${plan.theme}`}
             </h1>
             <p className="mt-2 text-lg text-fg">{plan.tagline}</p>
             <p className="mt-1 text-xs tracking-wide text-muted uppercase">From {plan.source}</p>
+            {approvedHeld ? <p className="mt-2 text-sm text-amber">Week 4 is complete. Preparation opens Tuesday, Nov 17, after 10 AM CT, when the approved results post.</p> : null}
             {plan.week === 5 ? (
               <p className="mt-2 text-sm text-amber">All Rumble and title builds lock Friday, Nov 27, at 6:00 PM CT.</p>
             ) : plan.week === 1 ? (
@@ -79,10 +84,10 @@ export function WeekPage() {
                 key={w.week}
                 type="button"
                 className={`min-h-11 min-w-11 border font-display text-lg ${w.week === weekPick ? "border-amber bg-amber text-deep" : "border-line text-muted hover:text-fg"}`}
-                onClick={() => setWeekPick(w.week)}
+                onClick={() => { setFollowCurrent(false); setWeekPick(w.week); }}
                 aria-label={`Week ${w.week}`}
               >
-                {w.week}
+                {w.week === 5 ? "Finals prep" : w.week}
               </button>
             ))}
           </div>
@@ -209,7 +214,7 @@ function DayCard({ plan, day }: { plan: TrainingWeek; day: DayKey }) {
   const { data, me } = useMe();
   const now = useNow() ?? new Date();
   const d = plan.days.find((x) => x.day === day)!;
-  const open = dayOpen(plan, day, now, data.trainingOpenAll);
+  const open = !pendingApprovedFinale(data) && dayOpen(plan, day, now, data.trainingOpenAll);
   const date = dayDate(plan, day);
   const isToday = date.toDateString() === now.toDateString();
   const spark = me ? data.sparkLog.find((e) => e.id === `${plan.week}:${day}:${me.id}`) : undefined;
@@ -548,6 +553,7 @@ function PickEm({ data }: { data: PitData }) {
   const name = (id: string) => data.stores.find((s) => s.id === id)?.name ?? id;
   const myPick = (boutId: string) => (me ? data.picks.find((p) => p.id === `${boutId}:${me.id}`)?.pick : undefined);
   const open = data.phase === "open";
+  if (pendingApprovedFinale(data)) return <section className="border border-line bg-surface p-4"><SectionLabel>Week 4 picks closed</SectionLabel><p className="text-sm text-muted">The Nov 16 finale is approved. These fights count; standings post Nov 17 after 10 AM CT. Championship picks open with preparation.</p></section>;
   return (
     <section className="border border-line bg-surface">
       <div className="border-b border-line px-4 py-3">

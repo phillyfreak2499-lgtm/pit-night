@@ -174,6 +174,7 @@ function actor(data: PitData) {
 
 /** Why a Pit Week action is closed right now, or null when it is open. */
 function trainingClosed(data: PitData, week: number, day?: DayKey): string | null {
+  if (pendingApprovedFinale(data)) return "Week 4 is complete. Rumble and Championship Prep opens Tuesday, Nov 17, after 10 AM CT.";
   if (week < data.week) return `Week ${week} training is closed.`;
   if (week > data.week) return `Week ${week} opens after the desk advances the league.`;
   if (data.phase !== "open") return "Saturday lock passed. This week's training is closed.";
@@ -1590,6 +1591,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
       },
       makePick: (boutId, pick) => {
         const data = get();
+        if (pendingApprovedFinale(data)) { set({flash:"Week 4 picks are closed. The Nov 16 finale is approved."}); return; }
         const who = actor(data);
         if (!who) {
           set({ flash: "Sign in on the Clipboard to make picks." });

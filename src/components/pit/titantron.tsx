@@ -232,7 +232,7 @@ function phaseWord(phase: string) {
 
 function PitWeekCallout() {
   const data = usePit();
-  const plan = programWeek(Math.min(5, Math.max(1, data.week)));
+  const plan = programWeek(pendingApprovedFinale(data) ? 5 : Math.min(5, Math.max(1, data.week)));
   if (!plan) return null;
   const tuned = data.stores.filter((s) => tunedUp(data, s.id, plan.week)).length;
   return (

@@ -11,6 +11,19 @@ import { weekProgress } from "../src/lib/pit/week.ts";
 import type { Bout, PitData } from "../src/lib/pit/types.ts";
 import { backfillReplays } from "../src/lib/pit/replay.ts";
 import { nudgeFor } from "../src/lib/pit/nudge.ts";
+
+test("an approved finale cannot accept late picks or obsolete Week 4 training", () => {
+  const data=beforeFinale();
+  const crew=data.crew.find(c=>c.role==="specialist")!;
+  const store=createStore(pitCreator);
+  store.setState({...sharedDoc(data),trainingOpenAll:true,session:{role:"crew",storeId:crew.storeId,crewId:crew.id}});
+  const original=JSON.stringify([store.getState().picks,store.getState().jobLog]);
+  store.getState().makePick(approvedCard[0]!.id,"college");
+  assert.match(store.getState().flash,/picks are closed/);
+  store.getState().completeJob(4,allJobs(programWeek(4)!)[0]!.id,"Late work");
+  assert.match(store.getState().flash,/Prep opens Tuesday, Nov 17, after 10 AM/);
+  assert.equal(JSON.stringify([store.getState().picks,store.getState().jobLog]),original);
+});
 import { readFileSync } from "node:fs";
 import { stripTypeScriptTypes } from "node:module";
 import * as storeModule from "../src/lib/pit/store.ts";
