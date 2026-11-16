@@ -971,7 +971,7 @@ type BattleState = {
   pitPosition: Record<string, number>;
 };
 
-function battleState(bots: FighterSnap[]): BattleState {
+export function battleState(bots: FighterSnap[]): BattleState {
   return {
     hp: Object.fromEntries(bots.map((bot) => [bot.id, 100])),
     mem: {
@@ -1036,7 +1036,7 @@ function endTrace(bots: FighterSnap[], state: BattleState, combat: Record<string
   return combat;
 }
 
-function bellFor(bots: FighterSnap[]): Record<string, BellVitals> {
+export function bellFor(bots: FighterSnap[]): Record<string, BellVitals> {
   return Object.fromEntries(
     bots.map((bot) => {
       const max = kitOf(bot).batteryMax;
@@ -1295,7 +1295,7 @@ function stepExchange(
  * Every engagement therefore progresses even at zero pace or with repair kits.
  * Initiative alternates by exchange, never by HP, rating or a judge's score.
  */
-function stepPitExchange(a: FighterSnap, b: FighterSnap, state: BattleState, i: number, opts: DuelOpts) {
+export function stepPitExchange(a: FighterSnap, b: FighterSnap, state: BattleState, i: number, opts: DuelOpts) {
   stepExchange(a, b, state, i, { ...opts, pitOnly: true });
   const exchange = state.exchanges[state.exchanges.length - 1]!;
   if (state.hp[a.id]! <= 0 || state.hp[b.id]! <= 0) {

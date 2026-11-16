@@ -73,6 +73,7 @@ export function Broadcast({
   const [hp, setHp] = useState<Record<string, number>>({});
   const [meters, setMeters] = useState<Record<string, MeterRead | null>>({});
   const [clock, setClock] = useState("0:00");
+  const [enteredIds, setEnteredIds] = useState<string[]>(() => result?.rumbleEntries?.filter(e => e.at === 0).map(e => e.fighterId) ?? []);
   const [round, setRound] = useState<string>("");
   const timeRef = useRef(0);
   const cueRef = useRef("");
@@ -273,6 +274,10 @@ export function Broadcast({
       if (finishPhase) paintChampionshipFinish(ctx, canvas.width, canvas.height, result, drive, finishPhase, playing ? dt : 0, titleFx, reduced, fx.cam);
       setCaption(titleEntrance ? `Championship finalist: ${heroSide.botName} from ${heroSide.storeName}. The spotlight is yours.` : captionFor(result, bout, beat, noDamage));
       // The bars follow the bots on screen; the replay shows where the fight ended.
+      if (result.rumbleEntries) {
+        const ids = drive.bots.map(b => b.bot.id);
+        setEnteredIds(previous => previous.length === ids.length && previous.every((id, i) => id === ids[i]) ? previous : ids);
+      }
       const bars = hpFor(result, beat, local);
       if (beat.kind === "replay") for (const f of result.fighters) bars[f.id] = result.hp[f.id] ?? bars[f.id] ?? 100;
       else for (const b of drive.bots) bars[b.bot.id] = Math.round(b.hp);
@@ -333,7 +338,8 @@ export function Broadcast({
   if (!result) return null;
   const group = result.fighters.length > 2;
   const largeField = result.fighters.length > 4;
-  const survivors = result.fighters.filter((f) => (hp[f.id] ?? 100) > 0).length;
+  const visibleFighters = result.rumbleEntries ? result.fighters.filter(f => enteredIds.includes(f.id)) : result.fighters;
+  const survivors = visibleFighters.filter((f) => (hp[f.id] ?? 100) > 0).length;
   const left = group ? undefined : result.fighters[0];
   const right = group ? undefined : result.fighters[1];
   const beats = broadcastBeats(bout, result);
@@ -376,7 +382,7 @@ export function Broadcast({
       )}
       {group && !stage ? (
         <div className={`grid grid-cols-2 gap-3 border-b border-line p-3 ${largeField ? "sm:grid-cols-3 lg:grid-cols-4" : ""}`} aria-label="All fighters' health">
-          {result.fighters.map((fighter) => (
+          {visibleFighters.map((fighter) => (
             <div key={fighter.id} data-testid={`group-health-${fighter.id}`}>
               {healthFor(fighter, "left")}
             </div>
@@ -390,7 +396,7 @@ export function Broadcast({
             {group && stage ? (
               <div className={`grid max-h-[30vh] gap-2 overflow-y-auto ${largeField ? "grid-cols-3 lg:grid-cols-4" : "grid-cols-2"}`} aria-label="All fighters' health">
                 {largeField ? <p className="col-span-full font-display text-[11px] text-amber">{survivors} / {result.fighters.length} STILL STANDING</p> : null}
-                {result.fighters.map((fighter) => (
+                {visibleFighters.map((fighter) => (
                   <div key={fighter.id} data-testid={`group-health-${fighter.id}`}>
                     {healthFor(fighter, "left")}
                   </div>
@@ -549,6 +555,7 @@ function meterPhase(beat: Beat, local: number): MeterPhase {
 }
 
 function captionFor(result: FightResult, bout: Bout, beat: Beat, noDamage: boolean) {
+  if (beat.kind === "rumble") return "The Rumble is underway.";
   if (beat.kind === "bumper" && bout.kind === "bye") return "Bye. It counts as a win. The bot does not take damage.";
   if (beat.kind === "bumper") return noDamage ? "Bay scrimmage. The house drill. Nothing posts." : `${bout.title}. Fourteen stores. This cage holds ${bout.kind === "melee" ? "the tie" : result.fighters.length > 2 ? `${result.fighters.length} bots` : "two"}.`;
   if (beat.kind === "intro") {
