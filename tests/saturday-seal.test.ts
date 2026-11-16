@@ -178,6 +178,10 @@ test("the lock screen asks non-desk viewers for the PIN and gives them no scrubb
   assert.match(source, /Desk eyes only/);
   assert.equal(source.includes('type="range"'), false);
   assert.match(source, /tape\?\.result && desk/);
+  const startBody = source.slice(source.indexOf("const start = async"), source.indexOf("const post = async"));
+  const armAt = startBody.indexOf("armBroadcastAudio()");
+  const fetchAt = startBody.indexOf("await openSaturdayTape");
+  assert.ok(armAt >= 0 && fetchAt > armAt);
 });
 
 test("the browser cannot compute a Saturday tape even if it calls the fight math", () => {

@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { usePit } from "@/lib/pit/store";
+import { setSoundMuted, soundMuted } from "@/lib/pit/sound";
 import { openSaturdayTape, peekSaturday, publishSaturday, type SaturdayPeek } from "@/lib/pit/saturday-server";
 import { SATURDAY_BELL_LABEL, saturdayFightKind, saturdayLockControls } from "@/lib/pit/saturday-seal";
 import { takeLeagueSeason } from "@/lib/pit/sync";
 import type { Bout, SaturdayFightName } from "@/lib/pit/types";
-import { Broadcast } from "./broadcast";
+import { armBroadcastAudio, Broadcast } from "./broadcast";
 import { Btn, SectionLabel, TextInput } from "./bits";
 
 function fightCopy(fight: SaturdayFightName) {
@@ -49,6 +50,9 @@ export function SaturdayGate({ held }: { held: Bout[] }) {
   const controls = saturdayLockControls(data.session.role);
 
   const start = async (fight: SaturdayFightName) => {
+    // Browsers only unlock the arena inside the click. This has to run before the tape request.
+    if (soundMuted()) setSoundMuted(false);
+    armBroadcastAudio();
     setError("");
     setBusy(true);
     try {
@@ -99,8 +103,8 @@ export function SaturdayGate({ held }: { held: Bout[] }) {
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
           <p className="font-display text-sm tracking-[0.18em] text-amber uppercase">Desk live watch · {fightCopy(kind).title}</p>
           <div className="flex flex-wrap gap-2">
-            <Btn tone="line" onClick={() => setPlaying((on) => !on)}>{playing ? "Pause" : "Play"}</Btn>
-            <Btn tone="line" onClick={() => { setPlaying(true); setSeek((n) => n + 1); }}>Skip to the decision</Btn>
+            <Btn tone="line" onClick={() => { armBroadcastAudio(); setPlaying((on) => !on); }}>{playing ? "Pause" : "Play"}</Btn>
+            <Btn tone="line" onClick={() => { armBroadcastAudio(); setPlaying(true); setSeek((n) => n + 1); }}>Skip to the decision</Btn>
           </div>
         </div>
         <Broadcast bout={tape} playing={playing} speed={2} seek={seek} chromeless kicker="Live from the Desk" onComplete={() => void post(kind)} />
