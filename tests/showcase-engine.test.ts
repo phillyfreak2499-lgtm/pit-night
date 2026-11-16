@@ -53,3 +53,10 @@ test('changed class composition stays within the tape budget',()=>{
  const tape=simulateShowcaseEvent(tanks,'tank-pull',[],'larger-field');
  assert.equal(tape.runs.length,12); assert.ok(tape.duration<=120);
 });
+
+test('seeded draw ranks the selected crew first and retains lower ties',()=>{
+ const equal=fighters.map(f=>({...f,stats:{speed:40,power:40,armor:40,heat:40}}));
+ const teams=buildShowcaseTeams(equal,'draw1'); const tape=simulateShowcaseEvent(equal,'team-gauntlet',teams,'draw1');
+ assert.equal(tape.tieBreak?.contenders.length,3);
+ for(const run of tape.runs) assert.equal(run.rank,tape.winnerIds.includes(run.storeId)?1:2);
+});

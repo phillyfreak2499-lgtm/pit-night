@@ -8,7 +8,7 @@ import { captainBuildRejection, commandArgs } from '../src/lib/pit/commands.ts';
 import { clientDoc, pitCreator, sharedDoc, showcaseFreezeDue } from '../src/lib/pit/store.ts';
 import { styleOf } from '../src/lib/pit/catalog.ts';
 import { SHOWCASE_EVENTS, SHOWCASE_LOCK_AT, SHOWCASE_WATCH_AT, showcaseField } from '../src/lib/pit/showcase-model.ts';
-import { freezeShowcase, prepareShowcase, saveShowcaseCard, startShowcaseEvent, revealShowcaseEvent } from '../src/lib/pit/showcase-state.server.ts';
+import { freezeShowcase, prepareShowcase, saveShowcaseCard, startShowcaseEvent, revealShowcaseEvent, previewShowcase, sealShowcase } from '../src/lib/pit/showcase-state.server.ts';
 import { runServerCard } from '../src/lib/pit/run-card.server.ts';
 import type { Bout, PitData } from '../src/lib/pit/types.ts';
 
@@ -68,13 +68,14 @@ test('client projection seals prepared private data for every role without mutat
 });
 test('awards are required for direct and proposed cosmetics, and can be equipped or removed',()=>{
  let d=prepared(); const event=d.showcase!.events['striker-race']!.tape!, id=event.winnerIds[0]!;
- const state=createStore(pitCreator); state.setState({...d,session:{role:'captain',storeId:id,crewId:null}});
+ const captain=d.crew.find(c=>c.storeId===id && c.role==='captain')!;
+ const state=createStore(pitCreator); state.setState({...d,session:{role:'captain',storeId:id,crewId:captain.id}});
  state.getState().setStyle(id,{showcasePrize:'rocket-tail'}); assert.notEqual(state.getState().bots.find(b=>b.storeId===id)!.style?.showcasePrize,'rocket-tail');
  const bot=d.bots.find(b=>b.storeId===id)!, store=d.stores.find(s=>s.id===id)!;
  const loadout={paint:store.paint,look:bot.look,number:bot.number,style:{...styleOf(bot),showcasePrize:'rocket-tail' as const}};
- const crew=d.crew.find(c=>c.storeId===id)!; state.setState({session:{role:'crew',storeId:id,crewId:crew.id}});
+ const crew=d.crew.find(c=>c.storeId===id && c.role==='specialist')!; state.setState({session:{role:'crew',storeId:id,crewId:crew.id}});
  state.getState().proposeCosmetic(id,loadout); assert.equal(state.getState().cosmeticProposals.length,0);
- state.setState({session:{role:'captain',storeId:id,crewId:null}});
+ state.setState({session:{role:'captain',storeId:id,crewId:captain.id}});
  state.setState({cosmeticProposals:[{id:'forged',storeId:id,crewId:'x',crewName:'x',loadout,voters:[],at:0,status:'open'}]});
  state.getState().acceptCosmetic('forged'); assert.equal(state.getState().cosmeticProposals[0]!.status,'open');
  assert.equal(Object.hasOwn(commandArgs,'buyShowcasePrize'),false);
@@ -96,4 +97,55 @@ test('earned equipped prize changes only the Rumble fighter snapshot',()=>{
  assert.equal(fighter(earned).stats.speed,fighter(base).stats.speed+2); assert.deepEqual(snapshot(d,id).stats,before.stats);
  assert.deepEqual(earned.find(b=>b.title==='Waterman Championship')!.result,base.find(b=>b.title==='Waterman Championship')!.result);
  bot.style.showcasePrize='none'; assert.deepEqual(fighter(runServerCard(d)).stats,fighter(base).stats);
+});
+
+test('frozen identities and seed survive later paint and name changes; rehearsal uses current identity',()=>{
+ let frozen=freezeShowcase(fixture(),SHOWCASE_LOCK_AT);
+ for(const c of frozen.showcase!.cards!) frozen=saveShowcaseCard(frozen,{...c,nsnuOfficial:true},SHOWCASE_LOCK_AT);
+ const changed=structuredClone(frozen), id=changed.showcase!.field[0]!;
+ const store=changed.stores.find(s=>s.id===id)!; store.paint='mud'; store.name='Changed name';
+ const baseline=prepareShowcase(frozen,SHOWCASE_LOCK_AT+1), after=prepareShowcase(changed,SHOWCASE_LOCK_AT+1);
+ assert.deepEqual(after.showcase!.events,baseline.showcase!.events);
+ assert.equal(after.showcase!.events['team-gauntlet']!.tape!.fighters.find(f=>f.id===id)!.paint,frozen.stores.find(s=>s.id===id)!.paint);
+ assert.equal(previewShowcase(changed,'team-gauntlet','rehearsal').fighters.find(f=>f.id===id)!.paint,'mud');
+ assert.equal(sealShowcase(after).showcase!.frozenStores,undefined);
+ assert.ok(sharedDoc(after).showcase!.frozenStores);
+ for(const role of ['public','crew','captain','commissioner'] as const) assert.equal(clientDoc(after,{role,storeId:id,crewId:null}).showcase!.frozenStores,undefined);
+});
+
+test('prize changes stop at Friday lock while ordinary edits and Desk override remain available',t=>{
+ const lock=Date.parse('2026-11-28T00:00:00Z'); t.mock.timers.enable({apis:['Date'],now:lock-1});
+ const d=prepared(), id=d.showcase!.field[0]!, store=d.stores.find(s=>s.id===id)!, bot=d.bots.find(b=>b.storeId===id)!;
+ store.unlocks=[...(store.unlocks??[]),'showcase-prize:rocket-tail'];
+ const captain=d.crew.find(c=>c.storeId===id && c.role==='captain')!;
+ const state=createStore(pitCreator); state.setState({...d,session:{role:'captain',storeId:id,crewId:captain.id}});
+ state.getState().setStyle(id,{showcasePrize:'rocket-tail'}); assert.equal(state.getState().bots.find(b=>b.storeId===id)!.style?.showcasePrize,'rocket-tail');
+ state.getState().setStyle(id,{showcasePrize:'none'}); assert.equal(state.getState().bots.find(b=>b.storeId===id)!.style?.showcasePrize,'none');
+ const loadout={paint:'amber',look:'plain' as const,number:bot.number,style:{...styleOf({classId:bot.classId}),showcasePrize:'rocket-tail' as const}};
+ const proposal={id:'valid',storeId:id,crewId:'x',crewName:'x',loadout,voters:[],at:0,status:'open' as const};
+ const specialist=d.crew.find(c=>c.storeId===id && c.role==='specialist')!;
+ state.setState({session:{role:'crew',storeId:id,crewId:specialist.id},cosmeticProposals:[]});
+ state.getState().proposeCosmetic(id,loadout); assert.equal(state.getState().cosmeticProposals.length,1);
+ state.setState({session:{role:'captain',storeId:id,crewId:captain.id}});
+ state.setState({cosmeticProposals:[proposal]}); state.getState().acceptCosmetic('valid'); assert.equal(state.getState().cosmeticProposals[0]!.status,'accepted',state.getState().flash);
+ state.getState().setStyle(id,{showcasePrize:'none'}); state.setState({cosmeticProposals:[proposal]});
+ t.mock.timers.setTime(lock);
+ state.getState().setStyle(id,{showcasePrize:'rocket-tail'}); assert.equal(state.getState().bots.find(b=>b.storeId===id)!.style?.showcasePrize,'none');
+ state.getState().acceptCosmetic('valid'); assert.equal(state.getState().cosmeticProposals[0]!.status,'open');
+ const crew=d.crew.find(c=>c.storeId===id && c.role==='specialist')!; state.setState({session:{role:'crew',storeId:id,crewId:crew.id},cosmeticProposals:[]});
+ state.getState().proposeCosmetic(id,loadout); assert.equal(state.getState().cosmeticProposals.length,0);
+ state.setState({session:{role:'captain',storeId:id,crewId:captain.id}}); state.getState().setStyle(id,{flag:true}); assert.equal(state.getState().bots.find(b=>b.storeId===id)!.style?.flag,true);
+ state.getState().setPaint(id,'amber'); assert.equal(state.getState().stores.find(s=>s.id===id)!.paint,'amber');
+ state.setState({session:{role:'commissioner',storeId:null,crewId:null}}); state.getState().setStyle(id,{showcasePrize:'rocket-tail'}); assert.equal(state.getState().bots.find(b=>b.storeId===id)!.style?.showcasePrize,'rocket-tail');
+ state.setState({session:{role:'captain',storeId:id,crewId:captain.id},phase:'locked'}); t.mock.timers.setTime(lock-1);
+ state.getState().setStyle(id,{showcasePrize:'none'}); assert.equal(state.getState().bots.find(b=>b.storeId===id)!.style?.showcasePrize,'rocket-tail');
+ state.setState({cosmeticProposals:[proposal]}); state.getState().acceptCosmetic('valid'); assert.equal(state.getState().cosmeticProposals[0]!.status,'accepted');
+});
+
+test('readSeasonFrom reads the actual row without any write',async()=>{
+ const {readSeasonFrom}=await import('../src/lib/pit/authoritative.ts'); const store=await import('../src/lib/pit/store.ts'); const vanilla=await import('zustand/vanilla');
+ const data=fixture(), doc=JSON.stringify(sharedDoc(data)); const calls:string[]=[];
+ const sql=async (strings:TemplateStringsArray)=>{const query=strings.join('?'); calls.push(query); if(!/^select /i.test(query.trim())) throw new Error('unexpected write'); return [{rev:7,doc,schema_tag:'old'}];};
+ const result=await readSeasonFrom({sql,store,vanilla,auth:{publicSession:{role:'public',storeId:null,crewId:null}},mode:'preview'} as never);
+ assert.equal(result.row.rev,7); assert.equal(result.data.week,5); assert.equal(calls.length,1); assert.match(calls[0]!,/^select /i); assert.equal(result.data.showcase,undefined);
 });

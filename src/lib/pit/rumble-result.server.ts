@@ -35,8 +35,10 @@ export function adaptRumbleResult(
   const pairMatches = last && ((last.attackerId === winner && last.defenderId === loser) || (last.attackerId === loser && last.defenderId === winner));
   // Direct damage must independently account for the knockout after prior environmental damage.
   const remaining = victim ? victim.before.hp - victim.burnDamage - victim.hazardDamage : 0;
+  const weaponLethal = last?.lethal ? last.lethal.cause === 'weapon' && last.lethal.by === winner && last.lethal.against === loser
+    : remaining > 0 && !!strike && strike.hitCount > 0 && strike.damageDealt >= remaining;
   const finisher = pairMatches && strike && victim && victim.after.hp === 0 && !victim.revived &&
-    !last.tags.includes('pit-elimination') && remaining > 0 && strike.hitCount > 0 && strike.damageDealt >= remaining
+    !last.tags.includes('pit-elimination') && weaponLethal
     ? { by: winner, against: loser, damage: strike.damageDealt, call: last.call, combat: last.combat }
     : null;
   const wear: FightResult['wear'] = {};

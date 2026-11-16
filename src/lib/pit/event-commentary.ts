@@ -84,15 +84,24 @@ export async function readPrepared(deps: {readText:()=>Promise<CacheRow>; readAu
   const audio = await deps.readAudio();
   return {status:'ready' as const, body:row.body, ...(audio?.status === 'ready' && audio.body ? {audio:audio.body} : {})};
 }
-export async function warmPrepared(deps: {read:()=>Promise<CacheRow>; reserve:()=>Promise<'claimed'|'existing'|'capped'>; generate:()=>Promise<string>; finish:(result:{body:string}|{error:string})=>Promise<void>; voice:(body:string)=>Promise<{audio?:string;voicePending?:boolean}>}) {
+export async function warmPrepared(deps: {read:()=>Promise<CacheRow>; reserve:()=>Promise<'claimed'|'existing'|'capped'>; claim:()=>Promise<boolean>; generate:()=>Promise<string>; finish:(result:{body:string}|{error:string})=>Promise<void>; voice:(body:string)=>Promise<{audio?:string;voicePending?:boolean}>}) {
   let row = await deps.read();
+  let claimed = false;
   if (!row) {
     const slot = await deps.reserve();
     if (slot === 'capped') return {status:'capped' as const,audioReady:false};
-    if (slot === 'claimed') {
-      try { const body = (await deps.generate()).trim().replace(/\s+/g,' ').slice(0,240); if (!body) throw new Error('empty'); await deps.finish({body}); row = {status:'ready',body}; }
-      catch { await deps.finish({error:'Commentary unavailable.'}); return {status:'unavailable' as const,audioReady:false}; }
-    } else row = await deps.read();
+    claimed = slot === 'claimed';
+    if (!claimed) row = await deps.read();
+  }
+  // Existing rows retain their original daily reservation. claimCopy atomically
+  // permits only stale pending or eligible failed rows, with bounded retries.
+  if (!claimed && (row?.status === 'pending' || row?.status === 'failed')) {
+    claimed = await deps.claim();
+    if (!claimed) row = await deps.read();
+  }
+  if (claimed) {
+    try { const body = (await deps.generate()).trim().replace(/\s+/g,' ').slice(0,240); if (!body) throw new Error('empty'); await deps.finish({body}); row = {status:'ready',body}; }
+    catch { await deps.finish({error:'Commentary unavailable.'}); return {status:'unavailable' as const,audioReady:false}; }
   }
   if (row?.status !== 'ready' || !row.body) return {status:row?.status === 'pending' ? 'pending' as const : 'unavailable' as const,audioReady:false};
   const audio = await deps.voice(row.body);

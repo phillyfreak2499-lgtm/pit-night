@@ -4,9 +4,9 @@ import type { PitData, StoreCard } from './types';
 import type { ShowcaseEventId } from './showcase-model';
 
 const event = z.enum(['striker-race', 'tank-pull', 'specialist-rescue', 'team-gauntlet']);
-async function owner() {
-  const { loadSeason } = await import('./authoritative');
-  const s = await loadSeason();
+async function owner(readOnly = false) {
+  const { loadSeason, readSeason } = await import('./authoritative');
+  const s = await (readOnly ? readSeason() : loadSeason());
   s.auth.sameOrigin();
   if ((await s.auth.session(s.data)).role !== 'commissioner') throw new Error('The Desk PIN is required.');
   return s;
@@ -23,7 +23,7 @@ async function change<T>(update: (data: PitData, now: number) => { data: PitData
   throw new Error('The league is busy. Try again.');
 }
 export const getShowcasePreparation = createServerFn({method:'POST'}).handler(async () => {
-  const s = await owner();
+  const s = await owner(true);
   return { cards:s.data.showcase?.cards ?? [], lockedAt:s.data.showcase?.lockedAt ?? null, preparedAt:s.data.showcase?.preparedAt ?? null };
 });
 export const lockShowcaseBuilds = createServerFn({method:'POST'}).handler(async () => {
@@ -58,7 +58,7 @@ export const saveShowcaseEntryOrder = createServerFn({method:'POST'}).validator(
   return change((data,now)=>({data:setShowcaseEntryOrder(data,input.order,now),response:{ok:true as const}}));
 });
 export const previewShowcaseEvent = createServerFn({method:'POST'}).validator(z.object({event,source:z.enum(['rehearsal','prepared'])}).strict()).handler(async ({data:input})=>{
-  const s=await owner();
+  const s=await owner(true);
   const {previewShowcase}=await import('./showcase-state.server.ts');
   let data: PitData=s.data;
   if(input.source==='rehearsal') {

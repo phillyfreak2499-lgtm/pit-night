@@ -98,7 +98,10 @@ export function simulateShowcaseEvent(fighters:FighterSnap[],eventId:ShowcaseEve
    if(tied.length>1){const contenders=tied.map(s=>s.team.id).sort();const id=contenders[hash(seed+':gauntlet-draw')%contenders.length]!;winner=tied.find(s=>s.team.id===id)!;tieBreak={kind:'draw',contenders,winnerId:id};}
    winnerIds=winner.team.storeIds.slice();
   }
-  summaries.forEach((s,i)=>s.runs.forEach(r=>{r.rank=i+1;runs.push(r);}));
+  let previousRank=1;
+  const winner=winnerIds.length ? summaries.find(s=>s.team.storeIds.every(id=>winnerIds.includes(id))) : undefined;
+  const ordered=winner ? [winner,...summaries.filter(s=>s!==winner)] : summaries;
+  ordered.forEach((s,i)=>{ const prior=ordered[i-1]; const tied=i>1 && prior && s.finish===prior.finish && s.progress===prior.progress; const rank=tied?previousRank:i+1; previousRank=rank; s.runs.forEach(r=>{r.rank=rank;runs.push(r);}); });
  }
  if(eventId!=='team-gauntlet') runs.forEach((r,i)=>{ const previous=runs[i-1]; const tied=previous && (eventId==='specialist-rescue' ? previous.frames.at(-1)!.cargo===r.frames.at(-1)!.cargo && previous.finishAt===r.finishAt && previous.frames.at(-1)!.progress===r.frames.at(-1)!.progress : previous.score===r.score); r.rank=tied?previous!.rank:i+1; });
  duration=Math.max(0,...runs.map(r=>r.frames.at(-1)?.at??0));

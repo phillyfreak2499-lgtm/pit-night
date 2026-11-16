@@ -87,7 +87,7 @@ export function Broadcast({
   const revealed = usePit(s => Boolean(s.saturdayWatch?.rumbleRevealedAt));
   useEffect(() => subscribeSound(() => setMuted(soundMuted())), []);
   const commentarySegments = useMemo(() => result?.rumbleEntries ? rumbleSegments(result) : [], [result]);
-  const preparedLine = useEventCommentary({ event:'rumble', seed:result?.seed ?? '', segments:commentarySegments, time:recordedTime, playing:playing && commentaryEnabled && Boolean(result?.rumbleEntries), muted, preview:commentaryPreview, revealed:revealed && decisionShown });
+  const preparedLine = useEventCommentary({ event:'rumble', seed:result?.seed ?? '', segments:commentarySegments, time:recordedTime, playing:playing && commentaryEnabled && Boolean(result?.rumbleEntries), muted, preview:commentaryPreview, revealed:revealed && decisionShown, closingReady:revealed && decisionShown });
   const [enteredIds, setEnteredIds] = useState<string[]>(() => result?.rumbleEntries?.filter(e => e.at === 0).map(e => e.fighterId) ?? []);
   const [round, setRound] = useState<string>("");
   const timeRef = useRef(0);

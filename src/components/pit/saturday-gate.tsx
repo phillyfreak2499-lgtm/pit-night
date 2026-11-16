@@ -7,6 +7,7 @@ import { takeLeagueSeason } from "@/lib/pit/sync";
 import type { Bout, SaturdayFightName } from "@/lib/pit/types";
 import { armBroadcastAudio, Broadcast } from "./broadcast";
 import { Btn, SectionLabel, TextInput } from "./bits";
+import { TeamJanelleOpening } from "./team-janelle-opening";
 
 function fightCopy(fight: SaturdayFightName) {
   if (fight === "rumble") {
@@ -44,6 +45,8 @@ export function SaturdayGate({ held }: { held: Bout[] }) {
   const [playing, setPlaying] = useState(true);
   const [seek, setSeek] = useState(0);
   const [peek, setPeek] = useState<SaturdayPeek | null>(null);
+  const [opening, setOpening] = useState(false);
+  const [finished, setFinished] = useState(false);
   const [armed, setArmed] = useState<SaturdayFightName | null>(null);
 
   if (!fights.length) return null;
@@ -61,6 +64,8 @@ export function SaturdayGate({ held }: { held: Bout[] }) {
       setSeek(0);
       setPlaying(true);
       setTape(res.bout);
+      setFinished(false);
+      setOpening(fight === "rumble");
     } catch (err) {
       setError(err instanceof Error ? err.message : "The Desk could not start that fight.");
     } finally {
@@ -74,7 +79,7 @@ export function SaturdayGate({ held }: { held: Bout[] }) {
     try {
       await publishSaturday({ data: { fight } });
       await takeLeagueSeason();
-      setTape(null);
+      setFinished(true);
       setArmed(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "The result stayed sealed.");
@@ -104,12 +109,13 @@ export function SaturdayGate({ held }: { held: Bout[] }) {
           <p className="font-display text-sm tracking-[0.18em] text-amber uppercase">Desk live watch · {fightCopy(kind).title}</p>
           <div className="flex flex-wrap gap-2">
             <Btn tone="line" onClick={() => { armBroadcastAudio(); setPlaying((on) => !on); }}>{playing ? "Pause" : "Play"}</Btn>
-            <Btn tone="line" onClick={() => { armBroadcastAudio(); setPlaying(true); setSeek((n) => n + 1); }}>Skip to the decision</Btn>
+            {!opening && !finished && <Btn tone="line" onClick={() => { armBroadcastAudio(); setPlaying(true); setSeek((n) => n + 1); }}>Skip to the decision</Btn>}
+            {finished && <Btn onClick={() => { setTape(null); setFinished(false); }}>Next fight</Btn>}
           </div>
         </div>
-        <Broadcast bout={tape} playing={playing} speed={2} seek={seek} chromeless kicker="Live from the Desk" onComplete={() => void post(kind)} />
+        {opening ? <TeamJanelleOpening data={data} playing={playing} onComplete={() => setOpening(false)} /> : <Broadcast bout={tape} playing={playing} speed={2} seek={seek} chromeless kicker="Live from the Desk" onComplete={() => void post(kind)} />}
         <p className="px-4 py-3 text-sm text-muted">The result posts for every store when this fight ends. Leaving early keeps it sealed.</p>
-        {error ? <p className="px-4 pb-3 text-sm text-bad">{error}</p> : null}
+        {error ? <div className="px-4 pb-3 text-sm text-bad">{error} <Btn disabled={busy} tone="line" onClick={() => void post(kind)}>Retry posting</Btn></div> : null}
       </section>
     );
   }

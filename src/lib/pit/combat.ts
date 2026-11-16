@@ -1195,6 +1195,7 @@ function stepExchange(
   let actedA = true, actedB = true;
   let directA = blowB.reflect > 0 ? Math.min(dmgA, Math.round(blowA.damage * pace * ot)) : dmgA;
   let directB = blowA.reflect > 0 ? Math.min(dmgB, Math.round(blowB.damage * pace * ot)) : dmgB;
+  let lethal: Exchange['lethal'];
   if (opts.pitOnly) {
     actedA = false; actedB = false;
     dmgA = 0; dmgB = 0; directA = 0; directB = 0;
@@ -1206,12 +1207,14 @@ function stepExchange(
       const hit = Math.max(1, Math.round(blow.damage * pace * ot));
       if (isA) { actedA = true; directA = hit; dmgA += hit; leftB = Math.max(0, leftB - hit); }
       else { actedB = true; directB = hit; dmgB += hit; leftA = Math.max(0, leftA - hit); }
+      if (leftA <= 0 || leftB <= 0) lethal = { by: attacker.id, against: isA ? b.id : a.id, cause: 'weapon' };
       // Resolve a lethal hit immediately. A destroyed bot cannot return an
       // attack or reflect damage after its elimination.
       if (leftA <= 0 || leftB <= 0) break;
       const reflected = Math.max(0, Math.round(blow.reflect * pace * ot));
       if (isA) { dmgB += reflected; leftA = Math.max(0, leftA - reflected); }
       else { dmgA += reflected; leftB = Math.max(0, leftB - reflected); }
+      if (leftA <= 0 || leftB <= 0) lethal = { by: isA ? b.id : a.id, against: attacker.id, cause: 'reflection' };
     }
     if (!actedA) state.turns[a.id] = ai;
     if (!actedB) state.turns[b.id] = bi;
@@ -1285,6 +1288,7 @@ function stepExchange(
     tags,
     combat: finishTrace(),
     vitals: stampVitals(bots, state, powerAt, staminaLow),
+    ...(lethal ? { lethal } : {}),
   });
   if (hp[a.id] === 0 || hp[b.id] === 0) {
     state.koAt = i;

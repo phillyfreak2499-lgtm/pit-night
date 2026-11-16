@@ -5,6 +5,14 @@ import { cosmeticUnlocked, validBodyForClass, type CosmeticKind } from "./cosmet
 import { lockerItem } from "./week";
 import { showcasePrizeOwned } from './showcase-prizes';
 import type { CosmeticLoadout, PitData } from "./types";
+import { deadlineDue } from './time';
+
+/** Only the combat prize is locked; ordinary appearance remains editable. */
+export function prizeChangeBlocked(data: PitData, storeId: string, prize: string | undefined, now = new Date()): boolean {
+  if (data.session.role === 'commissioner' || data.week !== 5) return false;
+  const current = data.bots.find(b => b.storeId === storeId)?.style?.showcasePrize ?? 'none';
+  return (prize ?? 'none') !== current && (deadlineDue(5, now) || data.phase !== 'open');
+}
 
 /** Single ownership gate for direct decoration and crew proposals. Never accepts combat fields. */
 export function checkedCosmeticLoadout(
@@ -26,6 +34,7 @@ export function checkedCosmeticLoadout(
   };
   const loadout = parsed.data;
   const style = styleOf({ style: loadout.style, classId: bot.classId });
+  if (prizeChangeBlocked(data, storeId, style.showcasePrize)) return null;
   if (style.showcasePrize && style.showcasePrize !== 'none' && !showcasePrizeOwned(data,storeId,style.showcasePrize)) return null;
   if (
     !allowed("paint", loadout.paint) ||

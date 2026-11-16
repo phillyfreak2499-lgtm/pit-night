@@ -175,6 +175,20 @@ async function load(options?: { deadlines?: boolean }) {
 export async function loadSeason() {
   return load();
 }
+/** Select-only loader for previews and cached presentation reads. */
+export async function readSeason() {
+  const s = await services();
+  return readSeasonFrom(s);
+}
+export async function readSeasonFrom(s: Awaited<ReturnType<typeof services>>) {
+  const row = (await s.sql<{rev:number; doc:string; schema_tag:string}>`select rev, doc, schema_tag from pit_season where id = 'main'`)[0];
+  if (!row) throw new Error('The league season has not been initialized.');
+  const seed = s.vanilla.createStore(s.store.pitCreator).getState();
+  const parsed = JSON.parse(row.doc) as import('./types').PitData;
+  const normalized = s.store.applyLeague14(s.store.applyMondays(s.store.applyHulen(parsed)));
+  const data = {...seed,...s.store.sharedDoc(normalized),tutorialSeen:false,session:s.auth.publicSession};
+  return {...s,row,data};
+}
 /**
  * Server failures reach the browser as a plain message, and results as plain data.
  * An error the framework cannot package showed up only as "Seroval Error (step: 1)",

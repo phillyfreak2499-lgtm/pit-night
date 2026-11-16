@@ -3,7 +3,7 @@ import { central } from './time';
 import { buildShowcaseTeams, simulateShowcaseEvent } from './showcase-engine.server.ts';
 import { SHOWCASE_EVENTS, SHOWCASE_LOCK_AT, SHOWCASE_WATCH_AT, showcaseField } from './showcase-model';
 import type { ShowcaseEventId, ShowcaseState, ShowcaseTape } from './showcase-model';
-import type { Bot, PitData, StoreCard } from './types';
+import type { Bot, PitData, Store, StoreCard } from './types';
 
 const clone = <T>(value: T): T => structuredClone(value);
 const orderLock = central(2026, 11, 27, 18).getTime();
@@ -35,11 +35,16 @@ function initialCards(data: PitData, field: string[]): StoreCard[] {
     return { ...clone(card), id: `showcase-${id}`, week: 4, nsnuOfficial: false };
   });
 }
-function fightersFor(data: PitData, field: string[], bots: Bot[], cards: StoreCard[]) {
+type FrozenStore = Pick<Store,'id'|'name'|'teamName'|'paint'>;
+function identities(data: PitData, field: string[]): FrozenStore[] {
+  return field.map(id => { const store=data.stores.find(s=>s.id===id); if (!store) throw new Error(`Missing store for ${id}`); return {id:store.id,name:store.name,teamName:store.teamName,paint:store.paint}; });
+}
+function fightersFor(data: PitData, field: string[], bots: Bot[], cards: StoreCard[], stores: FrozenStore[]) {
   const isolated = clone(data);
   isolated.week = 4;
   isolated.phase = 'locked';
   isolated.bots = isolated.bots.map(bot => clone(bots.find(b => b.storeId === bot.storeId) ?? bot));
+  isolated.stores = isolated.stores.map(store => ({...store,...stores.find(s=>s.id===store.id)}));
   isolated.storeCards = isolated.storeCards.filter(c => c.week !== 4 || !field.includes(c.storeId));
   isolated.storeCards.push(...cards.map(c => ({ ...clone(c), week: 4 })));
   // The exhibition is a separate weekend, so old Week 4 tune-ups do not carry over.
@@ -51,8 +56,8 @@ function stable(value: unknown): string {
   if (value && typeof value === 'object') return `{${Object.entries(value).sort(([a],[b]) => a.localeCompare(b)).map(([k,v]) => `${JSON.stringify(k)}:${stable(v)}`).join(',')}}`;
   return JSON.stringify(value) ?? 'null';
 }
-function seedFor(bots: Bot[], cards: StoreCard[]): string {
-  const input = stable({ bots, cards }); let h = 2166136261;
+function seedFor(bots: Bot[], cards: StoreCard[], stores: FrozenStore[]): string {
+  const input = stable({ bots, cards, stores }); let h = 2166136261;
   for (const c of input) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); }
   return `showcase:${(h >>> 0).toString(16)}`;
 }
@@ -68,10 +73,11 @@ export function freezeShowcase(data: PitData, now: number): PitData {
   const field = fieldOf(data);
   const bots = field.map(id => { const bot=data.bots.find(b=>b.storeId===id); if (!bot) throw new Error(`Missing bot for ${id}`); return frozenBot(bot); });
   const cards = initialCards(data, field);
-  const seed = seedFor(bots, cards);
-  const teams = buildShowcaseTeams(fightersFor(data, field, bots, cards), seed);
+  const stores = identities(data, field);
+  const seed = seedFor(bots, cards, stores);
+  const teams = buildShowcaseTeams(fightersFor(data, field, bots, cards, stores), seed);
   const result = clone(data);
-  result.showcase = { field, teams, createdAt: now, lockedAt: SHOWCASE_LOCK_AT, frozenBots: bots, cards, events: {} };
+  result.showcase = { field, teams, createdAt: now, lockedAt: SHOWCASE_LOCK_AT, frozenBots: bots, frozenStores: stores, cards, events: {} };
   return result;
 }
 export function saveShowcaseCard(data: PitData, card: StoreCard, _now: number): PitData {
@@ -92,7 +98,8 @@ export function prepareShowcase(data: PitData, now: number): PitData {
   if (started(s)) throw new Error('Cannot prepare after an event starts');
   if (!s.cards || s.cards.length!==12 || new Set(s.cards.map(c=>c.storeId)).size!==12 || s.field.some(id=>!s.cards!.some(c=>c.storeId===id && c.nsnuOfficial))) throw new Error('All twelve showcase cards must be official');
   if (s.preparedAt != null && SHOWCASE_EVENTS.every(e=>s.events[e.id]?.tape)) return clone(data);
-  const fighters=fightersFor(data,s.field,s.frozenBots!,s.cards), seed=seedFor(s.frozenBots!,s.cards);
+  if (!s.frozenStores || s.frozenStores.length!==12 || s.field.some(id=>!s.frozenStores!.some(store=>store.id===id))) throw new Error('Frozen showcase identities are missing');
+  const fighters=fightersFor(data,s.field,s.frozenBots!,s.cards,s.frozenStores), seed=seedFor(s.frozenBots!,s.cards,s.frozenStores);
   const teams=buildShowcaseTeams(fighters,seed), result=clone(data), out=result.showcase!;
   out.teams=teams; out.preparedAt=now;
   out.events=Object.fromEntries(SHOWCASE_EVENTS.map(e=>[e.id,{startedAt:null,revealedAt:null,tape:simulateShowcaseEvent(fighters,e.id,teams,`${seed}:${e.id}`)}]));
@@ -132,7 +139,7 @@ export function setShowcaseEntryOrder(data: PitData, order: string[], now: numbe
 }
 export function sealShowcase(data: PitData): PitData {
   const result=clone(data), s=result.showcase; if (!s) return result;
-  delete s.frozenBots; delete s.cards;
+  delete s.frozenBots; delete s.frozenStores; delete s.cards;
   for (const event of SHOWCASE_EVENTS) { const e=s.events[event.id]; if (e && e.revealedAt == null) e.tape=null; }
   if (s.events['team-gauntlet']?.revealedAt == null) delete s.entryOrder;
   return result;
@@ -143,7 +150,7 @@ export function previewShowcase(data: PitData, event: ShowcaseEventId, source: '
   if (source!=='rehearsal') throw new Error('Unknown showcase preview source');
   const field=fieldOf(data), bots=field.map(id=>{ const bot=data.bots.find(b=>b.storeId===id); if (!bot) throw new Error(`Missing bot for ${id}`); return frozenBot(bot); });
   const initial=initialCards(data,field), cards=field.map(id=>clone(data.showcase?.cards?.find(c=>c.storeId===id) ?? initial.find(c=>c.storeId===id)!));
-  const fighters=fightersFor(data,field,bots,cards), seed=seedFor(bots,cards), teams=buildShowcaseTeams(fighters,seed);
+  const stores=identities(data,field), fighters=fightersFor(data,field,bots,cards,stores), seed=seedFor(bots,cards,stores), teams=buildShowcaseTeams(fighters,seed);
   return simulateShowcaseEvent(fighters,event,teams,`${seed}:${event}`);
 }
 export function showcaseBuildLocked(data: PitData, storeId: string, now: number): boolean {

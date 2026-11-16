@@ -11,6 +11,7 @@ import { cosmeticUnlocked, earnedRewardIds, THANKSGIVING_REWARD_IDS } from "../s
 import { authorize, commandArgs } from "../src/lib/pit/commands.ts";
 import { buyCheck, championshipFinalists, showCheck, simulateDuel } from "../src/lib/pit/engine.ts";
 import { central } from "../src/lib/pit/time.ts";
+import { SHOWCASE_EVENTS, showcaseField } from '../src/lib/pit/showcase-model.ts';
 import { SHOW_PRICE } from "../src/lib/pit/halloween.ts";
 import {
   THANKSGIVING_CLOSE,
@@ -145,6 +146,7 @@ test("buy gate: closed before Nov 24, all fourteen in Week 5, owned parts stay o
 
   // Week 5, inside the window: plano is a finalist, allen is not.
   const season = week5Season(league);
+  league.setState({showcase:{field:showcaseField(season),teams:[],createdAt:1,lockedAt:1,events:Object.fromEntries(SHOWCASE_EVENTS.map(e=>[e.id,{startedAt:1,revealedAt:2,tape:null}]))}});
   assert.deepEqual(championshipFinalists(season), expectFinalists(season));
   const finalist = championshipFinalists(season).includes("plano") ? "plano" : championshipFinalists(season)[0]!;
   const outsider = season.stores.find((s) => !championshipFinalists(season).includes(s.id))!.id;
@@ -193,6 +195,7 @@ test("Falling Leaves sells league-wide in Week 5, finalist or not", (t) => {
   const league = state();
   fund(league);
   const season = week5Season(league);
+  league.setState({showcase:{field:showcaseField(season),teams:[],createdAt:1,lockedAt:1,events:Object.fromEntries(SHOWCASE_EVENTS.map(e=>[e.id,{startedAt:1,revealedAt:2,tape:null}]))}});
   const outsider = season.stores.find((s) => !championshipFinalists(season).includes(s.id))!.id;
   creditShowBolts(league, outsider, 50);
   creditShowBolts(league, championshipFinalists(season)[0]!, 50);

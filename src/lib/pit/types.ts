@@ -249,6 +249,8 @@ export type CombatTrace = {
 };
 
 export type Exchange = {
+  /** Actual lethal blow, recorded as damage is applied in sequential pit combat. */
+  lethal?: { by: string; against: string; cause: 'weapon' | 'reflection' };
   /** Exact hit-resolution match time for recorded staggered Rumble tapes. */
   at?: number;
   index: number;

@@ -23,6 +23,7 @@ import { DECALS, styleOf, partById, GRADE_COINS, METRICS } from "../src/lib/pit/
 import { createFrameLoop } from "../src/lib/pit/frame-loop.ts";
 import { leagueArgs, sameSession, singleFlight } from "../src/lib/pit/sync-policy.ts";
 import { memoSnapshot, snapshotStorage } from "../src/lib/pit/snapshot-storage.ts";
+import { SHOWCASE_EVENTS, showcaseField } from '../src/lib/pit/showcase-model.ts';
 test("one-time placeholder cleanup removes only exact specialist names and preserves history", () => {
   const seed = makeData();
   const specialist = seed.crew.find((member) => member.role === "specialist")!;
@@ -1159,6 +1160,7 @@ test("Oct 31 automatic lock freezes captains and still lets the Desk run, damage
 
 test("week 5 title builds lock at Friday Nov 27 6:00 PM CT and the championship still runs", (t) => {
   const store = championshipState();
+  store.setState({showcase:{field:showcaseField(store.getState()),teams:[],createdAt:1,lockedAt:1,events:Object.fromEntries(SHOWCASE_EVENTS.map(e=>[e.id,{startedAt:1,revealedAt:2,tape:null}]))}});
   const finalist = championshipFinalists(store.getState())[0]!;
   const cap = store.getState().crew.find((c) => c.storeId === finalist && c.role === "captain")!;
   store.setState({ session: { role: "captain", storeId: finalist, crewId: cap.id } });
@@ -1236,6 +1238,7 @@ test("pressing Lock again does not add another log line once every eligible buil
 
 test("buyShow is refused with the build lock, for both Rumble and title captains", (t) => {
   const store = championshipState();
+  store.setState({showcase:{field:showcaseField(store.getState()),teams:[],createdAt:1,lockedAt:1,events:Object.fromEntries(SHOWCASE_EVENTS.map(e=>[e.id,{startedAt:1,revealedAt:2,tape:null}]))}});
   const finalists = championshipFinalists(store.getState());
   const finalist = finalists[0]!;
   const outsider = store.getState().stores.find((row) => !finalists.includes(row.id))!;

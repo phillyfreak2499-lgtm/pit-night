@@ -63,3 +63,15 @@ test('rejects inconsistent IDs and clocks', () => {
   assert.throws(() => adaptRumbleResult(resolution, context));
 });
 
+
+test('ordered real combat credits direct lethal damage but not lethal reflection',async()=>{
+ const {makeData}=await import('../src/lib/pit/seed.ts'); const {snapshot}=await import('../src/lib/pit/engine.ts'); const {fightStaggeredRumble}=await import('../src/lib/pit/rumble.server.ts');
+ const data=makeData(); const field=data.stores.slice(0,12).map(s=>({...snapshot(data,s.id),armorFamily:'spike',utilityFamily:'mirror'}));
+ for(const [seed,cause] of [['review-35','weapon'],['reflect-5','reflection']] as const){
+  const resolution=fightStaggeredRumble(field,seed), last=resolution.exchanges.at(-1)!;
+  assert.equal(last.lethal?.cause,cause);
+  const result=adaptRumbleResult(resolution,{fighters:field,seed,pitTarget:{x:.5,y:.64}});
+  if(cause==='weapon') {const victim=last.combat![resolution.order[1]!]!, strike=last.combat![resolution.order[0]!]!; assert.equal(victim.before.hp,10); assert.equal(victim.reflectedDamageTaken,2); assert.equal(strike.damageDealt,8); assert.equal(result.finisher?.by,resolution.order[0]); assert.equal(result.finisher?.against,resolution.order[1]);}
+  else assert.equal(result.finisher,null);
+ }
+});

@@ -13,6 +13,7 @@ type CacheInput = {event:z.infer<typeof event>; seed:string; index:number};
 type CacheDeps = {
   read:(kind:string,key:string)=>Promise<CacheRow>;
   reserve:(key:string)=>Promise<'claimed'|'existing'|'capped'>;
+  claim:(key:string)=>Promise<boolean>;
   generate:()=>Promise<string>;
   finish:(key:string,result:{body:string}|{error:string})=>Promise<void>;
   voice:(key:string,body:string)=>Promise<{audio?:string;voicePending?:boolean}>;
@@ -26,7 +27,7 @@ async function cacheIdentity({event,seed,index}:CacheInput) {
 }
 export async function prepareEventCache(input:CacheInput,deps:CacheDeps) {
   const {key}=await cacheIdentity(input);
-  return warmPrepared({read:()=>deps.read(KIND,key),reserve:()=>deps.reserve(key),generate:deps.generate,finish:value=>deps.finish(key,value),voice:body=>deps.voice(key,body)});
+  return warmPrepared({read:()=>deps.read(KIND,key),reserve:()=>deps.reserve(key),claim:()=>deps.claim(key),generate:deps.generate,finish:value=>deps.finish(key,value),voice:body=>deps.voice(key,body)});
 }
 export async function readEventCache(input:CacheInput,read:CacheDeps['read']) {
   const {key,audioKey}=await cacheIdentity(input);
@@ -43,8 +44,8 @@ function resolve(data:PitData, id:z.infer<typeof event>) {
   return {seed:state.tape.seed,segments:showcaseSegments(state.tape),startedAt:state.startedAt,revealedAt:state.revealedAt,gateAt:SHOWCASE_WATCH_AT};
 }
 export const prepareEventCommentary = createServerFn({method:'POST'}).validator(z.object(base).strict()).handler(async ({data:input}) => {
-  const [{loadSeason},{getSql},store,{askClaude,FEATURE_MODEL},{ringsideVoice}] = await Promise.all([import('./authoritative'),import('@/lib/db'),import('./claude-store'),import('./claude.server'),import('./ringside-voice.server')]);
-  const season = await loadSeason(); season.auth.sameOrigin();
+  const [{readSeason},{getSql},store,{askClaude,FEATURE_MODEL},{ringsideVoice}] = await Promise.all([import('./authoritative'),import('@/lib/db'),import('./claude-store'),import('./claude.server'),import('./ringside-voice.server')]);
+  const season = await readSeason(); season.auth.sameOrigin();
   if ((await season.auth.session(season.data)).role !== 'commissioner') throw new Error('Only the Desk can prepare commentary.');
   const tape = resolve(season.data,input.event), segment = tape?.segments[input.index];
   if (!tape || !segment) return {status:'unavailable' as const,audioReady:false,index:input.index,total:tape?.segments.length ?? 0};
@@ -53,6 +54,7 @@ export const prepareEventCommentary = createServerFn({method:'POST'}).validator(
   const result=await prepareEventCache({event:input.event,seed:tape.seed,index:input.index},{
     read:(kind,key)=>store.readCopy(sql,kind,key),
     reserve:(key)=>store.reserveCopy(sql,KIND,key,FEATURE_MODEL.live,80,day),
+    claim:(key)=>store.claimCopy(sql,KIND,key,FEATURE_MODEL.live),
     generate:async()=> { const text = (await askClaude({feature:'live',system:'You are a live sports announcer. Write one short, energetic sentence using only the supplied facts. Do not predict, invent outcomes, or mention private mechanics. No stage directions.',prompt:segment.facts,maxTokens:100})).text; if (segment.phase !== 'closing' && /\b(wins?|won|winner|champion|victory|final result)\b/i.test(text)) throw new Error('Premature result'); return text; },
     finish:(key,value)=>store.finishCopy(sql,KIND,key,value),
     voice:(key,body)=>ringsideVoice(sql,key,body),
@@ -60,11 +62,12 @@ export const prepareEventCommentary = createServerFn({method:'POST'}).validator(
   return {...result,index:input.index,total:tape.segments.length};
 });
 export const getEventCommentary = createServerFn({method:'POST'}).validator(eventCommentaryRequestSchema).handler(async ({data:input}) => {
-  const [{loadSeason},{getSql},store]=await Promise.all([import('./authoritative'),import('@/lib/db'),import('./claude-store')]);
-  const season=await loadSeason(), tape=resolve(season.data,input.event), segment=tape?.segments[input.index];
+  const [{readSeason},{getSql},store]=await Promise.all([import('./authoritative'),import('@/lib/db'),import('./claude-store')]);
+  const season=await readSeason(), tape=resolve(season.data,input.event), segment=tape?.segments[input.index];
   if (!tape || !segment || tape.seed !== input.seed) return {status:'unavailable' as const};
   const commissioner = input.preview ? (await season.auth.session(season.data)).role === 'commissioner' : false;
   if (!mayReadSegment({segment,preview:!!input.preview,commissioner,startedAt:tape.startedAt,revealedAt:tape.revealedAt,gateAt:tape.gateAt,now:Date.now()})) return {status:'unavailable' as const};
   const sql=await getSql();
   return readEventCache({event:input.event,seed:tape.seed,index:input.index},(kind,key)=>store.readCopy(sql,kind,key));
 });
+

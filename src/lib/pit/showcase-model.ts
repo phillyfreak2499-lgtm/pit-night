@@ -1,6 +1,6 @@
 import { championshipFinalists, regularSeasonComplete } from "./engine";
 import { central } from "./time";
-import type { Bot, ClassId, FighterSnap, PitData, StoreCard } from "./types";
+import type { Bot, ClassId, FighterSnap, PitData, Store, StoreCard } from "./types";
 
 export type ShowcaseEventId = "striker-race" | "tank-pull" | "specialist-rescue" | "team-gauntlet";
 export type ShowcasePrizeId = "rocket-tail" | "battle-tank" | "tesla-rig";
@@ -24,7 +24,7 @@ export type ShowcaseObstacle = { id: string; kind: "gate"|"barrier"|"core"|"reac
 export type ShowcaseCourse = { objects: ShowcaseObstacle[]; stages: string[] };
 export type ShowcaseTape = { eventId: ShowcaseEventId; title:string; seed:string; duration:number; fighters:FighterSnap[]; runs:ShowcaseRun[]; winnerIds:string[]; teams?:ShowcaseTeam[]; prize?:ShowcasePrizeId; course:ShowcaseCourse; tieBreak?:{kind:"draw";contenders:string[];winnerId:string} };
 export type ShowcaseEventState = { startedAt:number|null; revealedAt:number|null; tape:ShowcaseTape|null };
-export type ShowcaseState = { field:string[]; teams:ShowcaseTeam[]; createdAt:number; lockedAt?:number; frozenBots?:Bot[]; cards?:StoreCard[]; preparedAt?:number; events:Partial<Record<ShowcaseEventId,ShowcaseEventState>>; entryOrder?:string[] };
+export type ShowcaseState = { field:string[]; teams:ShowcaseTeam[]; createdAt:number; lockedAt?:number; frozenBots?:Bot[]; frozenStores?:Pick<Store,'id'|'name'|'teamName'|'paint'>[]; cards?:StoreCard[]; preparedAt?:number; events:Partial<Record<ShowcaseEventId,ShowcaseEventState>>; entryOrder?:string[] };
 
 export function showcaseField(data: PitData): string[] {
   if (!regularSeasonComplete(data)) return [];
