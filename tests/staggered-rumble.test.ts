@@ -73,3 +73,66 @@ test('a strong first entrant can win and recorded health changes at the hit', ()
   assert.equal(state(ex.at!-0.001).bots.find(b=>b.bot.id===ex.defenderId)!.hp,ex.combat![ex.defenderId]!.before.hp);
   assert.equal(state(ex.at!+0.001).bots.find(b=>b.bot.id===ex.defenderId)!.hp,ex.combat![ex.defenderId]!.after.hp);
 });
+
+test('exact recorded hit time updates health even when normalized time rounds down', () => {
+  const r = fightStaggeredRumble(bots, 'playback', bots.map(b=>b.id));
+  const result = { ...r, fighters:bots, rumbleEntries:r.entries, method:'melee', winnerIds:[r.order[0]!], seed:'playback' } as any;
+  const ex = r.exchanges.find(e => e.at === 58)!;
+  assert.ok(ex);
+  const beat = { t:0, dur:162.5, kind:'rumble' } as const;
+  const state = fightDrive(result, beat, 58 / beat.dur, 58);
+  for (const [id, trace] of Object.entries(ex.combat!)) assert.equal(state.bots.find(b=>b.bot.id===id)!.hp, trace.after.hp);
+});
+
+test('non-attack elimination does not animate a weapon strike', () => {
+  const field=bots.map(b=>({...b, weaponFamily:'flame'}));
+  const r=fightStaggeredRumble(field,'audit-0',field.map(b=>b.id));
+  const index=r.exchanges.findIndex(e=>Object.values(e.combat!).every(t=>t.hitCount===0));
+  assert.ok(index>=0, 'fixture contains a non-attack elimination');
+  const ex=r.exchanges[index]!;
+  const result={...r,fighters:field,rumbleEntries:r.entries,method:'melee',winnerIds:[r.order[0]!],seed:'audit-0'} as any;
+  const beat=buildBeats(result)[0]!;
+  const drive=fightDrive(result,beat,ex.at!/beat.dur,ex.at!);
+  assert.equal(drive.hitKey,null);
+  assert.equal(drive.impact,null);
+});
+
+test('lethal attacks cannot add statuses to the destroyed target', () => {
+  const field=bots.map(b=>({...b, weaponFamily:'flame'}));
+  let checked=0;
+  for(let i=0;i<20;i++) {
+    const r=fightStaggeredRumble(field,`audit-${i}`,field.map(b=>b.id));
+    for(const ex of r.exchanges) for (const [id,trace] of Object.entries(ex.combat!)) {
+      const other=Object.entries(ex.combat!).find(([key])=>key!==id)![1];
+      if(trace.after.hp===0 && other.hitCount>0) {
+        checked++;
+        assert.ok(trace.after.burn<=trace.before.burn, `dead ${id} gained burn at ${ex.at}`);
+      }
+    }
+  }
+  assert.ok(checked>0);
+});
+
+test('lethal tesla strike does not stun, drain or leech a destroyed target', async () => {
+  const {fightDuel}=await import('../src/lib/pit/combat.ts');
+  const a={...structuredClone(frontierFighters[0]!),id:'a',weaponFamily:'tesla',utilityFamily:'leech',stats:{power:10000,speed:20,armor:20,heat:20}};
+  const b={...structuredClone(frontierFighters[1]!),id:'b',chassisFamily:'shrike',armorFamily:'plate',stats:{power:1,speed:1,armor:1,heat:1}};
+  const ex=fightDuel(a,b,{pitOnly:true,pace:10}).exchanges[0]!;
+  const trace=ex.combat!.b!;
+  assert.equal(trace.after.hp,0);
+  assert.equal(trace.hitCount,0);
+  assert.equal(trace.after.stun,trace.before.stun);
+  assert.equal(trace.after.battery,trace.before.battery);
+  assert.equal(trace.after.heat,trace.before.heat);
+});
+
+test('recorded entry numbers remain stable as later bots arrive', () => {
+  const order=bots.map(b=>b.id).reverse();
+  const r=fightStaggeredRumble(bots,'bib',order);
+  const result={...r,fighters:bots,rumbleEntries:r.entries,method:'melee',winnerIds:[r.order[0]!],seed:'bib'} as any;
+  const beat=buildBeats(result)[0]!;
+  for (const at of [0,3,15,30]) {
+    const drive=fightDrive(result,beat,at/beat.dur,at);
+    for(const bot of drive.bots) assert.equal(bot.entryNumber,order.indexOf(bot.bot.id)+1);
+  }
+});

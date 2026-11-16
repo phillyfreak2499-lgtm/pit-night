@@ -353,7 +353,7 @@ export function Broadcast({
   const healthFor = (fighter: (typeof result.fighters)[number], align: "left" | "right") => largeField ? (
     <div className="min-w-0" aria-label={`${fighter.botName}: ${(hp[fighter.id] ?? 100) <= 0 ? "eliminated" : `${Math.round(hp[fighter.id] ?? 100)} health`}`}>
       <p className={`truncate font-display text-[11px] ${(hp[fighter.id] ?? 100) <= 0 ? "text-muted" : "text-fg"}`}>
-        <span className="text-amber">#{result.fighters.indexOf(fighter) + 1}</span> {fighter.botName}
+        <span className="text-amber">#{result.rumbleEntries ? result.rumbleEntries.findIndex(e => e.fighterId === fighter.id) + 1 : result.fighters.indexOf(fighter) + 1}</span> {fighter.botName}
       </p>
       <div className="flex items-center gap-1">
         <div className="h-1 flex-1 bg-white/10"><div className="h-full bg-amber" style={{ width: `${Math.max(0, hp[fighter.id] ?? 100)}%` }} /></div>

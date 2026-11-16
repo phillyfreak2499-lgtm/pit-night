@@ -1235,18 +1235,22 @@ function stepExchange(
   }
 
   if (actedA) {
-    mem.burn[b.id] = (mem.burn[b.id] ?? 0) + blowA.burn;
-    if (blowA.stun < 1) mem.stun[b.id] = blowA.stun; else delete mem.stun[b.id];
     mem.heat[a.id] = (mem.heat[a.id] ?? 0) + blowA.heat;
-    if (blowA.tags.includes("leech")) mem.heat[b.id] = (mem.heat[b.id] ?? 0) - 4;
-    mem.battery[b.id] = Math.max(0, (mem.battery[b.id] ?? 0) - blowA.drain);
+    if (!opts.pitOnly || hp[b.id]! > 0) {
+      mem.burn[b.id] = (mem.burn[b.id] ?? 0) + blowA.burn;
+      if (blowA.stun < 1) mem.stun[b.id] = blowA.stun; else delete mem.stun[b.id];
+      if (blowA.tags.includes("leech")) mem.heat[b.id] = (mem.heat[b.id] ?? 0) - 4;
+      mem.battery[b.id] = Math.max(0, (mem.battery[b.id] ?? 0) - blowA.drain);
+    }
   }
   if (actedB) {
-    mem.burn[a.id] = (mem.burn[a.id] ?? 0) + blowB.burn;
-    if (blowB.stun < 1) mem.stun[a.id] = blowB.stun; else delete mem.stun[a.id];
     mem.heat[b.id] = (mem.heat[b.id] ?? 0) + blowB.heat;
-    if (blowB.tags.includes("leech")) mem.heat[a.id] = (mem.heat[a.id] ?? 0) - 4;
-    mem.battery[a.id] = Math.max(0, (mem.battery[a.id] ?? 0) - blowB.drain);
+    if (!opts.pitOnly || hp[a.id]! > 0) {
+      mem.burn[a.id] = (mem.burn[a.id] ?? 0) + blowB.burn;
+      if (blowB.stun < 1) mem.stun[a.id] = blowB.stun; else delete mem.stun[a.id];
+      if (blowB.tags.includes("leech")) mem.heat[a.id] = (mem.heat[a.id] ?? 0) - 4;
+      mem.battery[a.id] = Math.max(0, (mem.battery[a.id] ?? 0) - blowB.drain);
+    }
   }
   for (const [bot, kit] of [
     [a, ka],

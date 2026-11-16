@@ -23,6 +23,8 @@ export type Spot = { x: number; y: number };
 
 export type BotState = {
   bot: FighterSnap;
+  /** One-based recorded Rumble entry slot. */
+  entryNumber?: number;
   spot: Spot;
   /** Top-down heading, radians. 0 points right, PI/2 points at the camera. */
   heading: number;
@@ -1229,7 +1231,7 @@ export function fightDrive(result: FightResult, beat: Beat, local: number, time:
 }
 
 function meleeDrive(result: FightResult, beat: Beat, local: number, time: number): Drive {
-  const clock = beat.kind === "rumble" ? clamp(local, 0, 1) * beat.dur : beat.kind === "decision" ? Infinity : 0;
+  const clock = beat.kind === "rumble" ? clamp(time - beat.t, 0, beat.dur) : beat.kind === "decision" ? Infinity : 0;
   const bots = result.fighters.filter((f) => f.id !== "house" && (!result.rumbleEntries || result.rumbleEntries.some(e => e.fighterId === f.id && e.at <= clock)));
   const count = Math.max(1, bots.length);
   const hpNow = result.rumbleEntries ? recordedRumbleHp(result, clock) : meleeHp(result, beat, local);
@@ -1276,7 +1278,7 @@ function meleeDrive(result: FightResult, beat: Beat, local: number, time: number
     states.forEach(s => { const entered = result.rumbleEntries!.find(e => e.fighterId === s.bot.id)!.at; s.rise = ease(clamp((clock - entered) / 0.8, 0, 1)); });
     const index = result.exchanges.findIndex(ex => ex.at !== undefined && clock >= ex.at - 0.42 && clock < ex.at + 0.58);
     const ex = result.exchanges[index];
-    if (ex) {
+    if (ex && (!ex.combat || Object.values(ex.combat).some(trace => trace.hitCount > 0))) {
       const ai = bots.findIndex(bot => bot.id === ex.attackerId), di = bots.findIndex(bot => bot.id === ex.defenderId);
       if (ai >= 0 && di >= 0) {
         const u = clamp(clock - (ex.at! - 0.42), 0, 1);
@@ -1356,7 +1358,10 @@ function meleeDrive(result: FightResult, beat: Beat, local: number, time: number
     });
   }
 
-  states.forEach((s) => (s.roll = s.spot.x * 34 + s.spot.y * 21));
+  states.forEach((s) => {
+    s.roll = s.spot.x * 34 + s.spot.y * 21;
+    if (result.rumbleEntries) s.entryNumber = result.rumbleEntries.findIndex(e => e.fighterId === s.bot.id) + 1;
+  });
   return { bots: states, impact, power, hitKey, hitAt: beat.kind === "rumble" && hitKey ? (result.exchanges[Number(hitKey.split("-")[1])]!.at! / beat.dur) : HIT_AT, weapon, victim, focus: large ? center : focus, tight: large ? 0 : tight, countdown: beat.kind === "countdown" ? Math.max(0, 3 - Math.floor(local * 4)) : undefined };
 }
 

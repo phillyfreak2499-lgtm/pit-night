@@ -4687,7 +4687,7 @@ export function drawSide(
     }
     drawSideBot(ctx, s, p.x, p.y, p.size, time, spin, facingOf(s.heading));
     if (drive.bots.length > 4 && s.gone < 1) {
-      const number = drive.bots.findIndex((b) => b.bot.id === s.bot.id) + 1;
+      const number = s.entryNumber ?? drive.bots.findIndex((b) => b.bot.id === s.bot.id) + 1;
       ctx.save();
       ctx.font = `bold ${Math.max(10, w * 0.012)}px sans-serif`;
       ctx.textAlign = "center";
