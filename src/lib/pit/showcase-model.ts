@@ -40,6 +40,7 @@ export function showcaseDemo(eventId: ShowcaseEventId): ShowcaseTape {
   const all:FighterSnap[]=classes.map((classId,i)=>({id:`house-${i+1}`,name:`House ${i+1}`,storeName:`House ${i+1}`,botName:["COMET","DASH","BLAZE","BULLDOZER","IRONCLAD","MULE","CIRCUIT","NOVA","SPARK","ORBIT","PULSE","VECTOR"][i]!,classId,paint:["amber","red","blue","mint"][i%4]!,stats:{power:30+i%4,speed:30+(i*3)%7,armor:30+(i*5)%6,heat:30+i%5},rating:120,fit:1,weekQ:0.5,weaponFamily:classId==="tank"?"hammer":classId==="specialist"?"claw":"saw",weaponName:"House tool",driveName:"House drive",armorName:"House plate",utilityName:null,chassisName:"House shell",look:"stripe",number:String(i+1)}));
   const fighters=meta.classId?all.filter(f=>f.classId===meta.classId):all;
   const teams:ShowcaseTeam[]=[0,1,2].map(i=>({id:`house-crew-${i+1}`,name:`House crew ${i+1}`,storeIds:[all[i]!.id,all[i+3]!.id,all[6+i*2]!.id,all[7+i*2]!.id]}));
+  for(const team of teams) team.roles=Object.fromEntries(team.storeIds.map((id,i)=>[id,(['scout','puller','carrier','operator'] as const)[i]!]));
   const duration=eventId==="tank-pull"?45:60;
   const stages=eventId==="striker-race"?["Lap 1","Lap 2","Final lap","Finished"]:eventId==="tank-pull"?["Ready","Pulling","Stalled","Full pull"]:eventId==="specialist-rescue"?["Collect","Return","Gate","Finished"]:["Scout","Clear","Recover","Exit"];
   const runs:ShowcaseRun[]=fighters.map((f,i)=>{
@@ -47,8 +48,9 @@ export function showcaseDemo(eventId: ShowcaseEventId): ShowcaseTape {
     const finish=duration-8+i*2;
     for(let at=0;at<=duration;at++){
       const p=Math.min(1,at/finish);let x=.12+p*.76,y=.3+(i%3)*.2;
-      if(eventId==="striker-race"){x=.5+Math.cos(p*Math.PI*6-Math.PI/2)*(.33+i*.012);y=.5+Math.sin(p*Math.PI*6-Math.PI/2)*(.27+i*.012);}
-      if(eventId==="specialist-rescue"){const leg=(p*6)%2;x=.15+(leg<=1?leg:2-leg)*.7;y=.22+(Math.floor(p*3)%3)*.25;}
+      if(eventId==="striker-race"){x=.5+Math.cos(p*Math.PI*6-Math.PI/2)*(.33+i*.012);y=.5+Math.sin(p*Math.PI*6-Math.PI/2)*(.22+(fighters.length===1?0:i/(fighters.length-1))*.18);}
+      if(eventId==="specialist-rescue"){const leg=(p*6)%2;x=.15+(leg<=1?leg:2-leg)*.7;y=.18+(fighters.length===1?0:i/(fighters.length-1))*.64;}
+      if(eventId==="team-gauntlet"){const crew=teams.findIndex(t=>t.storeIds.includes(f.id));const member=teams[crew]!.storeIds.indexOf(f.id);y=.18+crew*.32+(member-1.5)*.08;}
       frames.push({at,x,y,hp:100,progress:p,cargo:eventId==="specialist-rescue"?Math.min(3,Math.floor(p*3)):0,carrying:eventId==="specialist-rescue"&&p<1&&((p*6)%2)>=1,stage:Math.min(3,Math.floor(p*4))});
     }
     return {storeId:f.id,teamId:eventId==="team-gauntlet"?teams.find(t=>t.storeIds.includes(f.id))!.id:undefined,rank:i+1,score:eventId==="tank-pull"?95-i*7:finish,distance:100,finishAt:finish,frames};
