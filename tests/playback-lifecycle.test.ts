@@ -1,6 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { acceptShowcaseTape, keepDirectSaturdayGate, showcaseFinishVisible, updateShowcaseClock } from "../src/components/pit/playback-lifecycle.ts";
+import {showcaseFrameUpdate} from '../src/components/pit/playback-lifecycle.ts';
+
+test('deferred Showcase frame updaters retain their elapsed time and requested speed',()=>{
+ for(const speed of [1,2]){
+  let last=0;const queued:((time:number)=>number)[]=[];
+  const tick=(now:number)=>{if(last)queued.push(showcaseFrameUpdate(last,now,speed,110));last=now;};
+  tick(1000);tick(1500);tick(2000);
+  assert.equal(queued.reduce((time,update)=>update(time),0),speed);
+  assert.equal(queued.reduce((time,update)=>update(time),109.5),110);
+  assert.equal(updateShowcaseClock(4,1,2,queued[0]!),4,'generation guard still rejects stale queued frames');
+ }
+});
 
 test("finish visibility and closing eligibility follow the current frame, including a stopped seek", () => {
   const duration = 30;

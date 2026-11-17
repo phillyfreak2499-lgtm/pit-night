@@ -195,6 +195,10 @@ export const GROUPS: Group[] = [
         "All fourteen stores prepare November 17–21 and November 24–27. The two conference winners prepare for the title; the other twelve prepare for the Third Place Royal Rumble. Each store keeps its earned parts, coins and damage and can earn its own repairs, upgrades and Full Tune-Up. The twelve nonfinalists also compete in the Tuesday, November 24 Showcase, using builds frozen Saturday, November 21 at 6 PM Central. Rumble preparation resumes after the Showcase results post. Rumble and championship builds lock Friday, November 27 at 6 PM Central for the Saturday, November 28 show at 9:30 AM Central.",
       ),
       faq(
+        "How does Team Gauntlet work?",
+        "Three crews of four run a cooperative course at one shared pace, with role stats determining relative task speeds. The Scout reveals the route, the Puller moves the barrier, the Carrier returns three cores one at a time, then the Operator powers the exit so the whole crew can finish. Each job follows the previous checkpoint. Fastest completed crew wins; if nobody finishes by 120 seconds, furthest checkpoint progress wins. Exact ties use the recorded seeded draw. The winning four receive Rumble entry slots 9–12 and agree their relative order through the Desk. House demos award nothing.",
+      ),
+      faq(
         "What is Rally?",
         "Anyone signed in from a non-finalist store can Rally behind either conference champion. Rally adds crowd support, banners and championship presentation only. It can never change Power, Speed, Armor, Heat, HP, damage, repairs, coins, parts or fight odds.",
       ),
