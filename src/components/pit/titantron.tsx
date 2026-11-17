@@ -66,13 +66,13 @@ export function Titantron() {
             <p className="mt-2 text-sm text-muted">{weekMeta?.blurb}</p>
           </Panel>
           <Panel className="p-4">
-            <p className="text-xs tracking-widest text-muted uppercase">{approvedHeld ? "Conference standings post" : beforeOpen ? "Opens Oct 25" : data.week === 5 ? "Friday Nov 27 lock" : data.week === 1 ? "Saturday Oct 31 lock" : "Saturday lock"}</p>
+            <p className="text-xs tracking-widest text-muted uppercase">{approvedHeld ? "Conference standings post" : beforeOpen ? "Opens Oct 25" : data.week === 5 ? "Rumble/title lock · Nov 27" : data.week === 1 ? "Saturday Oct 31 lock" : "Saturday lock"}</p>
             <p className="font-display text-4xl leading-none text-amber tabular-nums">{approvedHeld ? "Nov 17 · after 10 AM CT" : data.phase === "open" || beforeOpen ? remain : phaseWord(data.phase)}</p>
             <p className="mt-2 text-sm text-muted">
               {approvedHeld ? "The Nov 16 Week 4 finale is complete. All stores prepare November 17–27 for the Rumble and championship November 28. No conference fight November 23." : beforeOpen
                 ? "October 25, 2026. Build now. The first bell has not rung."
                 : data.week === 5
-                  ? "All fourteen stores prepare Nov 17–27. Every build locks Friday, Nov 27, at 6:00 PM CT. The Rumble and title fight begin Nov 28 at 9:30 AM CT with the Desk PIN."
+                  ? "Twelve nonfinalists: Showcase builds lock Saturday, Nov 21 at 6 PM CT; the Showcase is Tuesday, Nov 24. Rumble and championship builds lock Friday, Nov 27 at 6 PM CT. The Desk PIN starts the Saturday, Nov 28 show at 9:30 AM CT."
                   : data.week === 1
                     ? `Builds lock automatically ${deadline?.label ?? "Saturday, Oct 31, 6:00 PM CT"}. That build fights Monday.`
                     : "Each store locks one build at Saturday close. That build fights Monday."}

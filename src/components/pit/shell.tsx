@@ -282,7 +282,7 @@ function FinaleScheduleNotice() {
   return <aside className="no-print border-b border-amber/50 bg-deep px-4 py-3 text-sm md:px-6" aria-label="Updated season schedule">
     <p className="font-display text-lg text-amber">Week 4 finale completed Nov 16 · Championship Saturday Nov 28</p>
     <p>{week === 4 ? "Conference standings will include the approved Week 4 fights Tuesday, Nov 17, after 10 AM CT. " : "All four regular-season rounds count. "}There is no additional conference round November 23.</p>
-    <p>All fourteen stores prepare November 17–21 and November 24–27. Every build locks Friday, Nov 27, at 6 PM CT. Saturday, Nov 28, at 9:30 AM CT: the Third Place Royal Rumble, then Rockwall vs Abilene for the championship. The Desk PIN opens each fight.</p>
+    <p>All fourteen stores prepare November 17–21 and November 24–27. The twelve nonfinalists lock Showcase builds Saturday, Nov 21, at 6 PM CT for the Tuesday, Nov 24 Showcase. Rumble and championship builds lock Friday, Nov 27, at 6 PM CT. Saturday, Nov 28, at 9:30 AM CT: the Third Place Royal Rumble, then Rockwall vs Abilene for the championship. The Desk PIN opens each fight.</p>
   </aside>;
 }
 
@@ -291,7 +291,7 @@ function ThanksgivingBanner() {
     <div className="thanksgiving-banner no-print" data-testid="thanksgiving-banner" role="status">
       <p className="font-display text-xs tracking-[0.18em] text-amber uppercase">Championship Week</p>
       <p className="mt-1 text-sm leading-snug">
-        Rumble and Championship Prep — November 17–27. All fourteen stores prepare their own bots. Builds lock November 27 at 6 PM CT; the Desk PIN starts the November 28 show at 9:30 AM CT. Thanksgiving iron and Falling Leaves are on sale November 24–28.
+        Showcase builds lock Saturday, Nov 21 at 6 PM CT for the twelve nonfinalists; watch Tuesday, Nov 24. Rumble and championship builds lock Friday, Nov 27 at 6 PM CT; the Desk PIN starts the Saturday, Nov 28 show at 9:30 AM CT. Thanksgiving iron and Falling Leaves are on sale November 24–28.
       </p>
     </div>
   );

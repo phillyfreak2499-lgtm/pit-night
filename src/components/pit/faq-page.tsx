@@ -151,7 +151,7 @@ export const GROUPS: Group[] = [
     items: [
       faq(
         "When do the bots lock?",
-        "Week 1 locks automatically Saturday, Oct 31, at 6:00 PM Central. The Desk can lock earlier. Weeks 2 through 4 lock when the Desk presses lock at Saturday close (6 pm Central). Championship Week locks automatically Friday, Nov 27, at 6:00 PM Central, ahead of the Saturday, Nov 28 championship. All fourteen Rumble and title builds use that deadline. The Desk can lock them earlier. Captains cannot change builds after either automatic deadline.",
+        "Week 1 locks automatically Saturday, Oct 31, at 6:00 PM Central. The Desk can lock earlier. Weeks 2 through 4 lock when the Desk presses lock at Saturday close (6 pm Central). The twelve nonfinalists lock Showcase builds Saturday, Nov 21 at 6 PM Central for the Tuesday, Nov 24 Showcase. After all Showcase results post, Rumble build preparation resumes until Friday, Nov 27 at 6 PM Central. Rumble and championship builds lock automatically at that Friday deadline; the Desk can lock them earlier. The Saturday, Nov 28 show begins at 9:30 AM Central. Captains cannot change a build while its lock is in effect.",
       ),
       faq(
         "How does a fight work?",
@@ -192,7 +192,7 @@ export const GROUPS: Group[] = [
     items: [
       faq(
         "Who can prepare for the Rumble and championship?",
-        "All fourteen stores prepare November 17–21 and November 24–27. The two conference winners prepare for the title; the other twelve prepare for the Third Place Royal Rumble. Each store keeps its earned parts, coins and damage and can earn its own repairs, upgrades and Full Tune-Up. All builds lock Friday, November 27 at 6 PM Central.",
+        "All fourteen stores prepare November 17–21 and November 24–27. The two conference winners prepare for the title; the other twelve prepare for the Third Place Royal Rumble. Each store keeps its earned parts, coins and damage and can earn its own repairs, upgrades and Full Tune-Up. The twelve nonfinalists also compete in the Tuesday, November 24 Showcase, using builds frozen Saturday, November 21 at 6 PM Central. Rumble preparation resumes after the Showcase results post. Rumble and championship builds lock Friday, November 27 at 6 PM Central for the Saturday, November 28 show at 9:30 AM Central.",
       ),
       faq(
         "What is Rally?",
