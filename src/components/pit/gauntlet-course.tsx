@@ -1,5 +1,5 @@
 import {BotPortrait} from './bot-portrait';
-import {gauntletAt,gauntletTask,type GauntletCrewView} from '@/lib/pit/showcase-gauntlet';
+import {gauntletAt,gauntletTask,gauntletBarrierSize,type GauntletCrewView} from '@/lib/pit/showcase-gauntlet';
 import type {ShowcaseTape} from '@/lib/pit/showcase-model';
 
 const COLORS=['#7ce8db','#f4d99b','#bbacff'];
@@ -33,7 +33,8 @@ export function GauntletCourse({tape,time,reduced}:{tape:ShowcaseTape;time:numbe
     {stations.map(({x,label,id})=><g key={id}><text x={x*1000} y="-15" textAnchor="middle" fill="#d8e9e6" fontSize="17" fontWeight="700">{label}</text><path d={`M${x*1000} 0V560`} stroke="#ccfff3" strokeOpacity=".12" strokeDasharray="5 7"/></g>)}
     {view.crews.map((crew,i)=>{
       const color=COLORS[i%3]!,lane=crew.members.length?crew.members.reduce((sum,m)=>sum+m.frame.y,0)/crew.members.length:.18+i*.32,cy=lane*560;
-      const objects=tape.course.objects.filter(o=>o.teamId===crew.team.id),core=objects.find(o=>o.kind==='core'),gate=objects.find(o=>o.kind==='gate'),scout=objects.find(o=>o.id.endsWith(':scout')),depot=objects.find(o=>o.id.endsWith(':depot')),finish=objects.find(o=>o.id.endsWith(':finish'));
+      const objects=tape.course.objects.filter(o=>o.teamId===crew.team.id),core=objects.find(o=>o.kind==='core'),gate=objects.find(o=>o.kind==='gate'),scout=objects.find(o=>o.id.endsWith(':scout')),depot=objects.find(o=>o.id.endsWith(':depot')),finish=objects.find(o=>o.id.endsWith(':finish')),control=objects.find(o=>o.id.endsWith(':control'));
+      const barrier=gauntletBarrierSize(crew.frame),scoutY=(scout?.y??lane)*560,controlX=control?control.x*1000:(gate?.x??0)*1000-35,controlY=control?control.y*560:cy,controlW=control?control.w*1000:18,controlH=control?control.h*560:74;
       const carrier=crew.members.find(m=>crew.team.roles?.[m.fighter.id]==='carrier');
       const carrying=carrier?.frame.carrying?1:0;
       return <g key={crew.team.id} data-gauntlet-crew={crew.team.id}>
@@ -41,15 +42,15 @@ export function GauntletCourse({tape,time,reduced}:{tape:ShowcaseTape;time:numbe
         <text x="20" y={cy-65} fill={color} fontSize="19" fontWeight="800">{crew.team.name}</text>
         {!crew.legacy&&finish&&<path d={`M${finish.x*1000} ${cy-80}v160`} stroke="#f4edd1" strokeWidth="8" strokeDasharray="9 9"/>}
         {!crew.legacy&&<>
-          <circle cx={(scout?.x??0)*1000} cy={cy} r="17" fill={crew.frame.scoutProgress===1?color:'#17353b'} stroke={color} strokeWidth="3"/>
-          <path d={`M${(scout?.x??0)*1000-10} ${cy}l7 7 13-15`} stroke="#0b2427" strokeWidth="4" fill="none" opacity={crew.frame.scoutProgress===1?1:.2}/>
-          <path d={`M160 ${cy}H${(scout?.x??0)*1000+20}`} stroke={color} strokeWidth="5" strokeDasharray="6 5" opacity={crew.frame.scoutProgress}/>
-          <g transform={`translate(${crew.frame.barrierX!*1000} ${crew.frame.barrierY!*560})`} data-gauntlet-barrier={crew.team.id}><rect x="-15" y="-30" width="30" height="60" rx="3" fill="#b79d76" stroke="#fff0c8" strokeWidth="3"/><path d="M-10-23L10-3M-10-3L10 17" stroke="#494332" strokeWidth="5"/></g>
+          <circle cx={(scout?.x??0)*1000} cy={scoutY} r="17" fill={crew.frame.scoutProgress===1?color:'#17353b'} stroke={color} strokeWidth="3"/>
+          <path d={`M${(scout?.x??0)*1000-10} ${scoutY}l7 7 13-15`} stroke="#0b2427" strokeWidth="4" fill="none" opacity={crew.frame.scoutProgress===1?1:.2}/>
+          <path d={`M160 ${scoutY}H${(scout?.x??0)*1000+20}`} stroke={color} strokeWidth="5" strokeDasharray="6 5" opacity={crew.frame.scoutProgress}/>
+          <g transform={`translate(${crew.frame.barrierX!*1000} ${crew.frame.barrierY!*560})`} data-gauntlet-barrier={crew.team.id}><rect x={-barrier.width/2} y={-barrier.height/2} width={barrier.width} height={barrier.height} rx="3" fill="#b79d76" stroke="#fff0c8" strokeWidth={barrier.stroke}/><path d={`M${-barrier.width*.3} ${-barrier.height*.3}L${barrier.width*.3} ${barrier.height*.1}M${-barrier.width*.3} ${barrier.height*.1}L${barrier.width*.2} ${barrier.height*.35}`} stroke="#494332" strokeWidth="4"/></g>
           {crew.frame.stage===1&&(()=>{const puller=crew.members.find(m=>crew.team.roles?.[m.fighter.id]==='puller');return puller?<path d={`M${puller.frame.x*1000} ${puller.frame.y*560}L${crew.frame.barrierX!*1000} ${crew.frame.barrierY!*560}`} stroke="#e5d5b5" strokeWidth="3"/>:null;})()}
-          <rect x={(depot?.x??0)*1000-16} y={cy-17} width="34" height="34" rx="5" fill="#294f52" stroke={color} strokeWidth="2"/>
-          {Array.from({length:crew.frame.coresDelivered},(_,n)=><circle key={'delivered'+n} cx={(depot?.x??0)*1000-9+n*9} cy={cy} r="5" fill="#baffea" stroke="#fff"/>)}
-          {core&&Array.from({length:Math.max(0,3-crew.frame.coresDelivered-carrying)},(_,n)=><circle key={'waiting'+n} cx={core.x*1000+(n-1)*12} cy={cy} r="7" fill="#baffea" stroke="#fff"/>)}
-          {gate&&<g data-gauntlet-gate={crew.team.id} data-open={crew.frame.gateOpen?'true':'false'}><rect x={gate.x*1000-10} y={cy-79} width="20" height="158" rx="4" fill={crew.frame.gateOpen?color:'#ecab61'} opacity={crew.frame.gateOpen?.18:.9}/><rect x={gate.x*1000-44} y={cy-37} width="18" height="74" fill="#0c1a21" stroke={color}/><rect x={gate.x*1000-41} y={cy+34-(crew.frame.gatePower??0)*68} width="12" height={(crew.frame.gatePower??0)*68} fill={color}/><text x={gate.x*1000} y={cy-83} textAnchor="middle" fill={color} fontSize="12">{crew.frame.gateOpen?'OPEN':'POWER'}</text></g>}
+          <rect x={(depot?.x??0)*1000-16} y={(depot?.y??lane)*560-17} width="34" height="34" rx="5" fill="#294f52" stroke={color} strokeWidth="2"/>
+          {Array.from({length:crew.frame.coresDelivered},(_,n)=><circle key={'delivered'+n} cx={(depot?.x??0)*1000-9+n*9} cy={(depot?.y??lane)*560} r="5" fill="#baffea" stroke="#fff"/>)}
+          {core&&Array.from({length:Math.max(0,3-crew.frame.coresDelivered-carrying)},(_,n)=><circle key={'waiting'+n} cx={core.x*1000+(n-1)*12} cy={core.y*560} r="7" fill="#baffea" stroke="#fff"/>)}
+          {gate&&<g data-gauntlet-gate={crew.team.id} data-open={crew.frame.gateOpen?'true':'false'}><rect x={gate.x*1000-10} y={cy-79} width="20" height="158" rx="4" fill={crew.frame.gateOpen?color:'#ecab61'} opacity={crew.frame.gateOpen?.18:.9}/><rect x={controlX-controlW/2} y={controlY-controlH/2} width={controlW} height={controlH} fill="#0c1a21" stroke={color}/><rect x={controlX-controlW/2+3} y={controlY+controlH/2-3-(crew.frame.gatePower??0)*(controlH-6)} width={controlW-6} height={(crew.frame.gatePower??0)*(controlH-6)} fill={color}/><text x={gate.x*1000} y={cy-83} textAnchor="middle" fill={color} fontSize="12">{crew.frame.gateOpen?'OPEN':'POWER'}</text></g>}
         </>}
         {crew.legacy&&<text x="500" y={cy-61} textAnchor="middle" fill={color} fontSize="14">Recorded positions · course actions not captured on this tape</text>}
         {crew.members.map(member=><RecordedBot key={member.fighter.id} member={member} crew={crew} tape={tape} color={color}/>)}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {buildGauntletTape,gauntletAt,gauntletTask} from '../src/lib/pit/showcase-gauntlet.ts';
+import {buildGauntletTape,gauntletAt,gauntletTask,gauntletBarrierSize} from '../src/lib/pit/showcase-gauntlet.ts';
 import {buildShowcaseTeams,simulateShowcaseEvent} from '../src/lib/pit/showcase-engine.server.ts';
 import {showcaseDemo} from '../src/lib/pit/showcase-model.ts';
 import {showcaseSegments,mayReadSegment} from '../src/lib/pit/event-commentary.ts';
@@ -128,4 +128,62 @@ test('Gauntlet checkpoint facts describe crews and do not expose the winning cre
  }
  const closing=segments.at(-1)!;assert.match(closing.facts,/slots 9–12/);
  assert.equal(mayReadSegment({segment:closing,preview:true,commissioner:true,startedAt:1,revealedAt:null,gateAt:0,now:1e9}),false);
+});
+
+function permutations<T>(values:T[]):T[][] {return values.length?values.flatMap((value,i)=>permutations(values.filter((_,j)=>j!==i)).map(rest=>[value,...rest])):[[]];}
+function roleGeometryFixtures(){
+ const fighters=field(),original=buildShowcaseTeams(fighters,'geometry');
+ const orders=permutations(['scout','puller','carrier','operator'] as const).map((roles,i)=>{
+  const teams=original.map(team=>({...team,roles:Object.fromEntries(team.storeIds.map((id,j)=>[id,roles[j]!]))}));
+  return buildGauntletTape(fighters,teams,'geometry-'+i);
+ });
+ const data=makeData(),stock=data.stores.filter(s=>!['rockwall','abilene'].includes(s.id)).map(s=>snapshot(data,s.id));
+ return [...orders,showcaseDemo('team-gauntlet'),buildGauntletTape(stock,buildShowcaseTeams(stock,'review-course'),'review-course')];
+}
+function overlapInterval(a:number,b:number,limit:number):[number,number]|null {
+ if(a===b)return Math.abs(a)<limit?[0,1]:null;
+ const t1=(-limit-a)/(b-a),t2=(limit-a)/(b-a),lo=Math.max(0,Math.min(t1,t2)),hi=Math.min(1,Math.max(t1,t2));
+ return lo<hi?[lo,hi]:null;
+}
+
+test('all role orders clear every body across the entire interpolated barrier tow, shift, return and convoy',()=>{
+ for(const tape of roleGeometryFixtures()){
+  const times=[...new Set([...tape.runs.flatMap(r=>r.frames.map(f=>f.at)),...tape.gauntlet!.crews.flatMap(c=>c.frames.map(f=>f.at))])].sort((a,b)=>a-b);
+  for(let i=1;i<times.length;i++){
+   const a=gauntletAt(tape,times[i-1]!),b=gauntletAt(tape,times[i]!);
+   for(let ci=0;ci<a.crews.length;ci++){
+    const start=a.crews[ci]!,end=b.crews[ci]!,size=gauntletBarrierSize(start.frame),width=size.width,height=size.height;
+    for(const crew of a.crews)for(const member of crew.members){
+     const next=b.crews.flatMap(c=>c.members).find(m=>m.fighter.id===member.fighter.id)!;
+     const x=overlapInterval((member.frame.x-start.frame.barrierX!)*1000,(next.frame.x-end.frame.barrierX!)*1000,34+width/2+size.stroke/2);
+     const y=overlapInterval((member.frame.y-start.frame.barrierY!)*560,(next.frame.y-end.frame.barrierY!)*560,21+height/2+size.stroke/2);
+     assert.ok(!x||!y||Math.max(x[0],y[0])>=Math.min(x[1],y[1]),`${tape.seed}: ${member.fighter.id} crosses ${start.team.id} barrier during ${times[i-1]}–${times[i]}`);
+    }
+   }
+  }
+ }
+});
+
+test('all four role rows meet their recorded core, depot, scout and control objects in two dimensions',()=>{
+ for(const tape of roleGeometryFixtures())for(const team of tape.teams!){
+  const objects=tape.course.objects.filter(o=>o.teamId===team.id),core=objects.find(o=>o.kind==='core')!,depot=objects.find(o=>o.kind==='reactor')!;
+  const run=tape.runs.find(r=>team.roles![r.storeId]==='carrier')!;
+  for(let i=1;i<run.frames.length;i++){
+   const a=run.frames[i-1]!,b=run.frames[i]!;
+   if(!a.carrying&&b.carrying){assert.ok(Math.hypot((b.x-core.x)*1000,(b.y-core.y)*560)<1e-8,'pickup is at the recorded core');}
+   if(b.cargo>a.cargo){assert.ok(Math.hypot((b.x-depot.x)*1000,(b.y-depot.y)*560)<1e-8,'delivery is at the recorded depot');}
+  }
+  const scout=tape.runs.find(r=>team.roles![r.storeId]==='scout')!,operator=tape.runs.find(r=>team.roles![r.storeId]==='operator')!;
+  assert.equal(objects.find(o=>o.id.endsWith(':scout'))!.y,scout.frames[0]!.y);
+  assert.equal(objects.find(o=>o.id.endsWith(':control'))!.y,operator.frames[0]!.y);
+ }
+});
+
+test('recorded new barrier dimensions match drawing bounds while old tapes retain the 30x60 fallback',()=>{
+ const tape=showcaseDemo('team-gauntlet'),state=tape.gauntlet!.crews[0]!.frames[0]!;
+ assert.deepEqual(gauntletBarrierSize(state),{width:30,height:28,stroke:3});
+ const obstacle=tape.course.objects.find(o=>o.teamId===tape.gauntlet!.crews[0]!.teamId&&o.kind==='barrier')!;
+ assert.equal(obstacle.w*1000,30);assert.equal(obstacle.h*560,28);
+ const old={...state};delete old.barrierWidth;delete old.barrierHeight;
+ assert.deepEqual(gauntletBarrierSize(old),{width:30,height:60,stroke:3});
 });

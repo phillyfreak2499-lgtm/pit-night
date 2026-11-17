@@ -23,7 +23,12 @@ export function buildGauntletTape(fighters:FighterSnap[],teams:ShowcaseTeam[],ba
   for(let ti=0;ti<teams.length;ti++){
     const team=teams[ti]!,members=team.storeIds.map(id=>fighters.find(f=>f.id===id)).filter((f):f is FighterSnap=>!!f);if(members.length!==4)continue;
     const assigned=team.roles??{},byRole=GAUNTLET_ROLES.map((r,i)=>members.find(f=>assigned[f.id]===r)??members[i]!);
-    const lane=.18+ti*.32,pullSide=members.indexOf(byRole[1]!)<2?.10:-.10,frames:GauntletCrewFrame[]=[],teamRuns=members.map(f=>({storeId:f.id,teamId:team.id,rank:0,score:0,distance:0,finishAt:null,frames:[]} as ShowcaseRun));
+    const lane=.18+ti*.32,pullSide=members.indexOf(byRole[1]!)<2?.10:-.10;
+    const row=(fighter:FighterSnap)=>lane+(members.indexOf(fighter)-1.5)*.08;
+    const pullRow=row(byRole[1]!),parkRow=lane+pullSide;
+    const barrierAt=(w:number)=>({barrierX:.4-.18*clamp(w/.5),barrierY:pullRow+(parkRow-pullRow)*clamp((w-.5)/.15),barrierWidth:30,barrierHeight:28});
+    const pullPhaseX=(w:number,role:number)=>role===1?(w<=.5?.30-.18*clamp(w/.5):w<=.65?.12:.12+.34*clamp((w-.65)/.35)):.30+.16*clamp((w-.65)/.35);
+    const frames:GauntletCrewFrame[]=[],teamRuns=members.map(f=>({storeId:f.id,teamId:team.id,rank:0,score:0,distance:0,finishAt:null,frames:[]} as ShowcaseRun));
     let phase=0,work=0,finish:number|null=null;
     for(let at=0;at<=120;at++){
       // Original role-stat weights and checkpoint resets; one field-wide pace multiplies every crew.
@@ -31,22 +36,36 @@ export function buildGauntletTape(fighters:FighterSnap[],teams:ShowcaseTeam[],ba
         work+=Math.max(.006,.010+rate*.00048)*pace;if(work>=1){phase++;work=0;if(phase===4)finish=at;}}
       const progress=finish!==null?1:(phase+work)/4,stage=Math.min(3,phase),delivered=phase>=3?3:phase===2?Math.floor(work*3):0;
       const gateOpen=finish!==null||(phase===3&&work>=.5);
-      const barrierWork=phase>1?1:phase===1?clamp(work/.6):0;
+      const barrier=barrierAt(phase>1?1:phase===1?work:0);
       frames.push({at,stage,phaseWork:work,progress,activeRole:finish!==null||gateOpen?null:GAUNTLET_ROLES[stage]!,checkpoints:finish!==null?4:phase,coresDelivered:delivered,finished:finish!==null,
-        scoutProgress:phase>0?1:clamp(work/.6),barrierX:.4-.18*barrierWork,barrierY:lane+pullSide*barrierWork,
+        scoutProgress:phase>0?1:clamp(work/.6),...barrier,
         gatePower:phase>3?1:phase===3?clamp((work-.25)/.25):0,gateOpen});
       for(let j=0;j<members.length;j++){
         const member=members[j]!,role=GAUNTLET_ROLES.indexOf((assigned[member.id]??GAUNTLET_ROLES[j]) as GauntletRole);
         let x=.16,carrying=false;
         if(finish!==null)x=.88;
         else if(phase===0)x=.16+.14*clamp(role===0?work/.6:(work-.6)/.4);
-        else if(phase===1)x=role===1?(work<=.6?.30-.18*clamp(work/.6):.12+.34*clamp((work-.6)/.4)):.30+.16*clamp((work-.6)/.4);
+        else if(phase===1)x=pullPhaseX(work,role);
         else if(phase===2){x=.46;if(role===2){const cycle=(work*3)%1;x+=.20*(cycle<.5?cycle*2:2-cycle*2);carrying=cycle>=.5;}}
         else {const convoy=clamp((work-.5)/.5);x=role===3?.46+.26*clamp(work/.25)+.16*convoy:.46+.42*convoy;}
         teamRuns[j]!.frames.push({at,x,y:lane+(j-1.5)*.08,hp:100,progress,cargo:delivered,stage,carrying});
       }
       if(finish!==null)break;
     }
+    // Record the tow/shift/return corners explicitly so interpolation cannot cut across them.
+    const phaseFrames=frames.slice();
+    for(let i=1;i<phaseFrames.length;i++){
+      const a=phaseFrames[i-1]!,b=phaseFrames[i]!;if(a.stage!==1||b.stage!==1)continue;
+      for(const work of [.5,.65])if(a.phaseWork<work&&b.phaseWork>work){
+        const fraction=(work-a.phaseWork)/(b.phaseWork-a.phaseWork),at=a.at+(b.at-a.at)*fraction;
+        frames.push({...a,at,phaseWork:work,progress:a.progress+(b.progress-a.progress)*fraction,...barrierAt(work)});
+        for(let j=0;j<members.length;j++){
+          const run=teamRuns[j]!,member=members[j]!,role=GAUNTLET_ROLES.indexOf((assigned[member.id]??GAUNTLET_ROLES[j]) as GauntletRole),pose=poseAt(run.frames,at,false)!;
+          run.frames.push({...pose,at,x:pullPhaseX(work,role)});run.frames.sort((a,b)=>a.at-b.at);
+        }
+      }
+    }
+    frames.sort((a,b)=>a.at-b.at);
     // Path turns occur at the recorded delivery ticks, with explicit pickup poses
     // between ticks so interpolation cannot skip the depot or a recovered core.
     const carrierId=byRole[2]!.id,carrier=teamRuns.find(r=>r.storeId===carrierId)!;
@@ -68,8 +87,10 @@ export function buildGauntletTape(fighters:FighterSnap[],teams:ShowcaseTeam[],ba
         else {const prior=lastAt(carrier.frames,at)!;carrier.frames.push({...prior,at,x:.66,carrying:true,cargo:i});carrier.frames.sort((a,b)=>a.at-b.at);}}
     }
     crews.push({teamId:team.id,pace,frames});
-    for(const [id,kind,x,label] of [['scout','checkpoint',.28,'1 SCOUT'],['barrier','barrier',.4,'2 PULL'],['depot','reactor',.46,'CORE HOME'],['core','core',.66,'3 CORES'],['gate','gate',.76,'4 EXIT'],['finish','checkpoint',.85,'FINISH']] as const)
-      objects.push({id:`${team.id}:${id}`,teamId:team.id,kind,x,y:lane,w:.025,h:.12,label});
+    for(const [id,kind,x,label] of [['scout','checkpoint',.28,'1 SCOUT'],['barrier','barrier',.4,'2 PULL'],['depot','reactor',.46,'CORE HOME'],['core','core',.66,'3 CORES'],['gate','gate',.76,'4 EXIT'],['control','checkpoint',.76,undefined],['finish','checkpoint',.85,'FINISH']] as const)
+      objects.push({id:`${team.id}:${id}`,teamId:team.id,kind,x,
+        y:id==='core'||id==='depot'?row(byRole[2]!):id==='scout'?row(byRole[0]!):id==='barrier'?pullRow:id==='control'?row(byRole[3]!):lane,
+        w:id==='barrier'?.03:id==='control'?.018:.025,h:id==='barrier'?28/560:id==='control'?34/560:.12,label});
     const progress=frames.at(-1)!.progress;
     for(const run of teamRuns){run.finishAt=finish;run.score=finish??120+(1-progress)*100;run.distance=progress*100;}
     summaries.push({team,finish,progress,runs:teamRuns});
@@ -113,3 +134,6 @@ export function gauntletTask(crew:GauntletCrewView):string {
   if(f.finished)return 'Crew finished';
   return f.stage===0?'Scout revealing route':f.stage===1?'Puller clearing barrier':f.stage===2?`Carrier returning core ${Math.min(3,f.coresDelivered+1)} of 3`:f.gateOpen?'Whole crew crossing finish':'Operator powering exit';
 }
+
+/** Recorded SVG drawing units; old metadata keeps its original30x60 barrier. */
+export function gauntletBarrierSize(frame:GauntletCrewFrame){return {width:frame.barrierWidth??30,height:frame.barrierHeight??60,stroke:3};}
