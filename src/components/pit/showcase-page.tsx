@@ -9,7 +9,7 @@ import { ShowcaseTeamJanelleOpening } from "./showcase-team-janelle-opening";
 import { prepareEventCommentary } from "@/lib/pit/event-commentary-server";
 import { SHOWCASE_EVENTS } from "@/lib/pit/showcase-model";
 import { celebrationCast } from "@/lib/pit/celebration-cast";
-import { showcaseFinishVisible } from "./playback-lifecycle";
+import { acceptShowcaseTape, showcaseFinishVisible, updateShowcaseClock } from "./playback-lifecycle";
 
 const EVENTS: {id: ShowcaseEventId; title: string; eyebrow: string; detail: string; prize: string}[] = [
   {id:"striker-race", title:"Striker Stakes", eyebrow:"01 / RACE", detail:"Three laps on the oval. Strikers race for the finish.", prize:"Rocket Tail · +2 Speed when equipped for the Rumble"},
@@ -32,9 +32,14 @@ function CommentaryWarmup() {
 export function ShowcasePage({ admin = false }: {admin?: boolean}) {
   const data = usePit(); const desk = data.session.role === "commissioner";
   const request = useRef(0);
+  const activeGeneration = useRef(0);
+  const [generation, setGeneration] = useState(0);
   const [opening, setOpening] = useState(false); const [openingSeen, setOpeningSeen] = useState(false);
   const [event,setEvent] = useState<ShowcaseEventId>("striker-race");
   const [tape,setTape] = useState<ShowcaseTape | null>(null); const [mode,setMode] = useState(""); const [time,setTime] = useState(0); const [busy,setBusy] = useState(false); const [error,setError] = useState(""); const [order,setOrder] = useState<string[]>([]);
+  const setPlayerTime: React.Dispatch<React.SetStateAction<number>> = update => {
+    setTime(current => updateShowcaseClock(current, generation, activeGeneration.current, update));
+  };
   const done = Boolean(tape && showcaseFinishVisible(time, tape.duration));
   const selected = EVENTS.find(e => e.id === event)!;
   const posted = data.showcase?.events?.[event]?.tape ?? null;
@@ -49,10 +54,12 @@ export function ShowcasePage({ admin = false }: {admin?: boolean}) {
       else if (source === "posted") { if (!posted) throw new Error("This event has not been posted yet."); next = posted; }
       else if (source === "live") next = (await openShowcaseEvent({data:{event:requestedEvent}})).tape;
       else next = (await previewShowcaseEvent({data:{event:requestedEvent,source}})).tape;
-      if (token !== request.current) return;
+      const accepted = acceptShowcaseTape(request.current, token, next);
+      if (!accepted) return;
+      activeGeneration.current = accepted.generation;
       const saved = data.showcase?.entryOrder?.slice(-4);
       const validSaved = saved?.length === 4 && new Set(saved).size === 4 && saved.every(id => next.winnerIds.includes(id));
-      setTape(next); setMode(source); setOrder(validSaved ? saved : next.winnerIds); if (!admin && ((source === "live" && !openingSeen) || source === "demo")) { setOpening(true); if (source === "live") setOpeningSeen(true); }
+      setTape(accepted.tape); setTime(accepted.time); setGeneration(accepted.generation); setMode(source); setOrder(validSaved ? saved : next.winnerIds); if (!admin && ((source === "live" && !openingSeen) || source === "demo")) { setOpening(true); if (source === "live") setOpeningSeen(true); }
     } catch (e) { if (token === request.current) setError(e instanceof Error ? e.message : "The tape could not be opened."); } finally {if (token === request.current) setBusy(false);}
   };
   const post = async () => {if (!tape || mode !== "live") return; const event = tape.eventId; setBusy(true); setError(""); try {await publishShowcaseEvent({data:{event}}); await takeLeagueSeason(); setMode("posted");} catch(e) {setError(e instanceof Error ? e.message : "The result could not be posted.");} finally {setBusy(false);}};
@@ -65,6 +72,6 @@ export function ShowcasePage({ admin = false }: {admin?: boolean}) {
     {!admin && <p className="text-sm text-muted">House demos use fictional competitors. They do not post results or award prizes.</p>}
     {error && <p role="alert" className="border border-red-500 p-3 text-sm text-red-300">{error}</p>}
     {tape && opening && <ShowcaseTeamJanelleOpening cast={mode === "demo" ? showcaseDemo("team-gauntlet").fighters : celebrationCast(data).filter(f => data.showcase?.field.includes(f.id))} onComplete={() => setOpening(false)} />}
-    {tape && !opening && <><ShowcaseArena key={`${tape.eventId}-${tape.seed}`} tape={tape} time={time} setTime={setTime} preview={admin} revealed={Boolean(data.showcase?.events[tape.eventId]?.revealedAt)} label={mode === "demo" ? "HOUSE DEMO · NO AWARDS" : admin ? `DESK REVIEW · ${mode.toUpperCase()}` : mode === "posted" ? "POSTED REPLAY" : "DESK BROADCAST"}/>{done && <section className="border border-amber bg-[#2b271d] p-5"><p className="text-xs tracking-widest text-amber">OFFICIAL TAPE / FINISH</p><h3 className="mt-2 font-display text-3xl">{winners.map(f => f.botName).join(" · ") || "Event complete"}</h3><p className="mt-2 text-sm text-muted">{mode === "demo" ? "Fictional house result — no awards." : admin ? "Review only — no results or awards posted." : EVENTS.find(e => e.id === tape.eventId)?.prize}</p>{desk && mode === "live" && <button disabled={busy} className="mt-4 min-h-11 bg-amber px-4 font-display text-black" onClick={() => void post()}>POST EVENT RESULT</button>}</section>}{desk && !admin && tape.eventId === "team-gauntlet" && done && mode !== "demo" && order.length === 4 && <section className="border border-line p-5"><h3 className="font-display text-2xl">Winning crew entry order</h3><p className="mt-2 text-sm text-muted">Set the four captains’ agreed order for the final four slots.</p><ol className="mt-3 space-y-2">{order.map((id,i) => <li className="flex items-center gap-3" key={id}><span className="w-6">{i+1}.</span><span className="flex-1">{tape.fighters.find(f => f.id === id)?.botName ?? id}</span><button aria-label={`Move ${id} earlier`} disabled={i===0} onClick={() => setOrder(a => {const b=[...a]; [b[i-1],b[i]]=[b[i],b[i-1]]; return b;})} className="min-h-11 border border-line px-3">↑</button><button aria-label={`Move ${id} later`} disabled={i===3} onClick={() => setOrder(a => {const b=[...a]; [b[i+1],b[i]]=[b[i],b[i+1]]; return b;})} className="min-h-11 border border-line px-3">↓</button></li>)}</ol><button disabled={busy} className="mt-4 min-h-11 border border-amber px-4 text-amber" onClick={() => void saveOrder()}>Save agreed order</button></section>}</>}
+    {tape && !opening && <><ShowcaseArena key={`${tape.eventId}-${tape.seed}-${generation}`} tape={tape} time={time} setTime={setPlayerTime} preview={admin} revealed={Boolean(data.showcase?.events[tape.eventId]?.revealedAt)} label={mode === "demo" ? "HOUSE DEMO · NO AWARDS" : admin ? `DESK REVIEW · ${mode.toUpperCase()}` : mode === "posted" ? "POSTED REPLAY" : "DESK BROADCAST"}/>{done && <section className="border border-amber bg-[#2b271d] p-5"><p className="text-xs tracking-widest text-amber">OFFICIAL TAPE / FINISH</p><h3 className="mt-2 font-display text-3xl">{winners.map(f => f.botName).join(" · ") || "Event complete"}</h3><p className="mt-2 text-sm text-muted">{mode === "demo" ? "Fictional house result — no awards." : admin ? "Review only — no results or awards posted." : EVENTS.find(e => e.id === tape.eventId)?.prize}</p>{desk && mode === "live" && <button disabled={busy} className="mt-4 min-h-11 bg-amber px-4 font-display text-black" onClick={() => void post()}>POST EVENT RESULT</button>}</section>}{desk && !admin && tape.eventId === "team-gauntlet" && done && mode !== "demo" && order.length === 4 && <section className="border border-line p-5"><h3 className="font-display text-2xl">Winning crew entry order</h3><p className="mt-2 text-sm text-muted">Set the four captains’ agreed order for the final four slots.</p><ol className="mt-3 space-y-2">{order.map((id,i) => <li className="flex items-center gap-3" key={id}><span className="w-6">{i+1}.</span><span className="flex-1">{tape.fighters.find(f => f.id === id)?.botName ?? id}</span><button aria-label={`Move ${id} earlier`} disabled={i===0} onClick={() => setOrder(a => {const b=[...a]; [b[i-1],b[i]]=[b[i],b[i-1]]; return b;})} className="min-h-11 border border-line px-3">↑</button><button aria-label={`Move ${id} later`} disabled={i===3} onClick={() => setOrder(a => {const b=[...a]; [b[i+1],b[i]]=[b[i],b[i+1]]; return b;})} className="min-h-11 border border-line px-3">↓</button></li>)}</ol><button disabled={busy} className="mt-4 min-h-11 border border-amber px-4 text-amber" onClick={() => void saveOrder()}>Save agreed order</button></section>}</>}
   </main>;
 }
