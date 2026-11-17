@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { makeData } from "../src/lib/pit/seed.ts";
-import { simulateTag } from "../src/lib/pit/engine.ts";
+import { simulateTag, simulateMelee } from "../src/lib/pit/engine.ts";
 import { buildBeats, fightDrive } from "../src/components/pit/cage-motion.ts";
 import type { FightResult, Loadout } from "../src/lib/pit/types.ts";
 
@@ -93,5 +93,28 @@ test("group replay preserves both participants' HP after each exchange", () => {
     expected[exchange.defenderId] = exchange.defenderHp;
     const drive = fightDrive(result, beat, 1, beat.t + beat.dur);
     assert.deepEqual(Object.fromEntries(drive.bots.map((bot) => [bot.bot.id, bot.hp])), expected);
+  }
+});
+
+test("real one-based tag and melee exchanges preserve defender HP until contact", () => {
+  const data=makeData();data.phase="locked";
+  const ids=["waco","arlington","plano","allen"];
+  const fixtures=[
+    simulateTag(data,ids.slice(0,2),ids.slice(2),"review-group"),
+    simulateMelee(data,ids,"review-melee"),
+  ];
+  for(const result of fixtures) {
+    assert.equal(result.exchanges[0]!.index,1);
+    const expected=Object.fromEntries(result.fighters.map(f=>[f.id,100]));
+    for(const beat of buildBeats(result)) {
+      if(beat.kind!=="exchange")continue;
+      const ex=result.exchanges[beat.index]!;
+      const sample=(local:number)=>fightDrive(result,beat,local,beat.t+beat.dur*local).bots.find(b=>b.bot.id===ex.defenderId)!.hp;
+      const contact=fightDrive(result,beat,0,beat.t).hitAt;
+      assert.equal(sample(0),expected[ex.defenderId],`exchange ${beat.index} starts from its prior state`);
+      assert.equal(sample(contact-.001),expected[ex.defenderId],"no health loss before the strike");
+      assert.equal(sample(.72),ex.defenderHp,"the visible strike commits its recorded after-health");
+      expected[ex.attackerId]=ex.attackerHp;expected[ex.defenderId]=ex.defenderHp;
+    }
   }
 });

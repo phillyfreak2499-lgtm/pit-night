@@ -1398,7 +1398,7 @@ function recordedRumbleHp(result: FightResult, clock: number) {
 }
 
 function meleeBefore(result: FightResult, ex: Exchange) {
-  return hpBefore(result, ex.defenderId, ex.index);
+  return beforeHp(result, ex);
 }
 
 function meleeHp(result: FightResult, beat: Beat, local: number) {
