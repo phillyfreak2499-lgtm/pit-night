@@ -157,3 +157,30 @@ test('readSeasonFrom produces cloneable data for a real rehearsal without writes
  assert.ok(rehearsal.fighters.every(f=>f.classId==='striker'));
  assert.equal(calls.length,1); assert.match(calls[0]!,/^select /i); assert.equal(result.data.showcase,undefined);
 });
+
+test('normal load freezes and persists the twelve-store showcase at lock',async t=>{
+ t.mock.timers.enable({apis:['Date'],now:SHOWCASE_LOCK_AT});
+ const {loadSeasonFrom}=await import('../src/lib/pit/authoritative.ts');
+ const store=await import('../src/lib/pit/store.ts'); const vanilla=await import('zustand/vanilla');
+ let doc=JSON.stringify(sharedDoc(fixture())); let rev=7; let writes=0;
+ const backups=new Map<string,string>();
+ const sql=async (strings:TemplateStringsArray,...values:unknown[])=>{
+  const q=strings.join('?').replace(/\s+/g,' ').trim().toLowerCase();
+  if(q.startsWith('insert into pit_season')) { if(q.includes("values ('main'")) return []; backups.set(String(values[0]),String(values[2])); return []; }
+  if(q.startsWith('select doc') && q.includes('where id = ?')) return [{doc:backups.get(String(values[0]))}];
+  if(q.startsWith('select')) return [{rev,doc,schema_tag:'14-store-period12-approved-finale-nov17-10ct-prep-v1'}];
+  if(q.startsWith('update pit_season')) { doc=String(values[0]); rev++; writes++; return [{rev}]; }
+  throw new Error(`Unexpected query: ${q}`);
+ };
+ const result=await loadSeasonFrom({sql,store,vanilla,auth:{publicSession:{role:'public',storeId:null,crewId:null}},mode:'preview'} as never);
+ const persisted=JSON.parse(doc) as PitData;
+ assert.ok(writes>0); assert.equal(persisted.showcase?.field.length,12);
+ assert.equal(persisted.showcase?.frozenStores?.length,12);
+ for(const frozen of persisted.showcase!.frozenStores!) {
+  const original=fixture().stores.find(s=>s.id===frozen.id)!;
+  assert.equal(frozen.name,original.name); assert.equal(frozen.teamName,original.teamName); assert.equal(frozen.paint,original.paint);
+ }
+ assert.deepEqual(persisted.showcase?.field,result.data.showcase?.field);
+ assert.equal(Object.values(result.data).some(v=>typeof v==='function'),false);
+ assert.doesNotThrow(()=>structuredClone(result.data));
+});

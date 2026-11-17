@@ -32,8 +32,11 @@ async function services() {
   return { sql, store, auth, vanilla, mode };
 }
 async function load(options?: { deadlines?: boolean }) {
-  const deadlines = options?.deadlines !== false;
   const s = await services();
+  return loadSeasonFrom(s, options);
+}
+export async function loadSeasonFrom(s: Awaited<ReturnType<typeof services>>, options?: { deadlines?: boolean }) {
+  const deadlines = options?.deadlines !== false;
   const seed = s.vanilla.createStore(s.store.pitCreator).getState();
   await s.sql`insert into pit_season (id, rev, doc) values ('main', 1, ${JSON.stringify(s.store.sharedDoc(seed))}) on conflict (id) do nothing`;
   for (let attempt = 0; attempt < 8; attempt++) {
@@ -45,7 +48,7 @@ async function load(options?: { deadlines?: boolean }) {
     // This is intentionally additive: existing stores, work logs, builds, and results survive.
     const parsed = JSON.parse(row.doc) as import("./types").PitData;
     const normalized = s.store.applyLeague14(s.store.applyMondays(s.store.applyHulen(parsed)));
-    const merged = { ...seed, ...s.store.sharedDoc(normalized) };
+    const merged = { ...s.store.sharedDoc(seed), ...s.store.sharedDoc(normalized), tutorialSeen: false, session: s.auth.publicSession };
     // Run the owner-authorized roster cleanup once against the authoritative
     // season row; not against cached browser roster snapshots.
     const isNewCleanup = row.schema_tag !== SCHEMA_TAG;

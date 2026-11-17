@@ -54,7 +54,7 @@ export const prepareEventCommentary = createServerFn({method:'POST'}).validator(
   const result=await prepareEventCache({event:input.event,seed:tape.seed,index:input.index},{
     read:(kind,key)=>store.readCopy(sql,kind,key),
     reserve:(key)=>store.reserveCopy(sql,KIND,key,FEATURE_MODEL.live,80,day),
-    claim:(key)=>store.claimCopy(sql,KIND,key,FEATURE_MODEL.live),
+    claim:(key)=>store.retryCopy(sql,KIND,key,FEATURE_MODEL.live),
     generate:async()=> { const text = (await askClaude({feature:'live',system:'You are a live sports announcer. Write one short, energetic sentence using only the supplied facts. Do not predict, invent outcomes, or mention private mechanics. No stage directions.',prompt:segment.facts,maxTokens:100})).text; if (segment.phase !== 'closing' && /\b(wins?|won|winner|champion|victory|final result)\b/i.test(text)) throw new Error('Premature result'); return text; },
     finish:(key,value)=>store.finishCopy(sql,KIND,key,value),
     voice:(key,body)=>ringsideVoice(sql,key,body),

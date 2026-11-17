@@ -93,7 +93,7 @@ export async function warmPrepared(deps: {read:()=>Promise<CacheRow>; reserve:()
     claimed = slot === 'claimed';
     if (!claimed) row = await deps.read();
   }
-  // Existing rows retain their original daily reservation. claimCopy atomically
+  // Existing rows retain their original daily reservation. The update-only claim atomically
   // permits only stale pending or eligible failed rows, with bounded retries.
   if (!claimed && (row?.status === 'pending' || row?.status === 'failed')) {
     claimed = await deps.claim();

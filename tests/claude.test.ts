@@ -218,6 +218,50 @@ test("parallel live claims refuse the 65th beat and never store more than the da
   assert.equal(claimed + raced.filter((result) => result === "capped").length, raced.length);
 });
 
+test("commentary retry never recreates a capped provisional row and honors retry policy", async (t) => {
+  const { retryCopy } = await import('../src/lib/pit/claude-store.ts');
+  const { warmPrepared } = await import('../src/lib/pit/event-commentary.ts');
+  const pg = new PGlite();
+  t.after(()=>pg.close());
+  const dir = new URL('../migrations/', import.meta.url);
+  for (const name of readdirSync(dir).filter(f=>f.endsWith('.sql')).sort()) await pg.exec(readFileSync(new URL(name,dir),'utf8'));
+  const sql = (async <T>(strings:TemplateStringsArray,...values:unknown[]) => {
+    let text=strings[0]!; values.forEach((_,i)=>text+=`$${i+1}${strings[i+1]}`);
+    return (await pg.query<T>(text,values)).rows;
+  }) as unknown as Sql;
+  const kind='event-commentary', model='test-model', day=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Chicago'}).format(new Date());
+  let release!:()=>void, observed!:()=>void;
+  const gate=new Promise<void>(resolve=>release=resolve), sawPending=new Promise<void>(resolve=>observed=resolve);
+  let generated=0, retryPromise:ReturnType<typeof warmPrepared>|undefined;
+  const interleaved=(async <T>(strings:TemplateStringsArray,...values:unknown[])=>{
+    if(strings.join('?').includes('select count(*)')) {
+      retryPromise=warmPrepared({read:()=>readCopy(sql,kind,'race'),reserve:async()=>{throw new Error('unexpected reservation');},claim:async()=>{observed(); await gate; return retryCopy(sql,kind,'race',model);},generate:async()=>{generated++;return 'line';},finish:async()=>{},voice:async()=>({})});
+      await sawPending;
+    }
+    return sql<T>(strings,...values);
+  }) as Sql;
+  assert.equal(await reserveCopy(interleaved,kind,'race',model,0,day),'capped');
+  release(); assert.equal((await retryPromise!).status,'unavailable');
+  assert.equal(generated,0); assert.equal(await readCopy(sql,kind,'race'),undefined);
+  assert.equal(await claimCopy(sql,kind,'retry',model),true);
+  assert.equal(await retryCopy(sql,kind,'retry',model),false);
+  await pg.query("update pit_claude_text set claimed_at=now()-interval '4 minutes' where key='retry'");
+  assert.equal(await retryCopy(sql,kind,'retry',model),true);
+  await finishCopy(sql,kind,'retry',{error:'failed'});
+  assert.equal(await retryCopy(sql,kind,'retry',model),false);
+  await pg.query("update pit_claude_text set claimed_at=now()-interval '11 minutes' where key='retry'");
+  assert.equal(await retryCopy(sql,kind,'retry',model),true);
+  await finishCopy(sql,kind,'retry',{error:'failed again'});
+  await pg.query("update pit_claude_text set claimed_at=now()-interval '11 minutes', attempts=5 where key='retry'");
+  assert.equal(await retryCopy(sql,kind,'retry',model),false);
+  await pg.query("update pit_claude_text set attempts=4 where key='retry'");
+  assert.equal(await retryCopy(sql,kind,'retry',model),true);
+  await finishCopy(sql,kind,'retry',{body:'ready'});
+  await pg.query("update pit_claude_text set claimed_at=now()-interval '1 day' where key='retry'");
+  assert.equal(await retryCopy(sql,kind,'retry',model),false);
+  assert.deepEqual(await readCopy(sql,kind,'retry'),{status:'ready',body:'ready'});
+});
+
 test("live calls follow the resolved tape and hide the ending until the decision", () => {
   const d = league(true);
   const bout = d.bouts.find((b) => b.week === 1 && b.kind === "bout")!;
