@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { adaptRumbleResult } from '../src/lib/pit/rumble-result.server.ts';
+import {buildBeats,fightDrive} from '../src/components/pit/cage-motion.ts';
 import type { FighterSnap, CombatTrace } from '../src/lib/pit/types';
 
 const ids = Array.from({ length: 12 }, (_, i) => `f${i}`);
@@ -72,6 +73,17 @@ test('ordered real combat credits direct lethal damage but not lethal reflection
   assert.equal(last.lethal?.cause,cause);
   const result=adaptRumbleResult(resolution,{fighters:field,seed,pitTarget:{x:.5,y:.64}});
   if(cause==='weapon') {const victim=last.combat![resolution.order[1]!]!, strike=last.combat![resolution.order[0]!]!; assert.equal(victim.before.hp,10); assert.equal(victim.reflectedDamageTaken,2); assert.equal(strike.damageDealt,8); assert.equal(result.finisher?.by,resolution.order[0]); assert.equal(result.finisher?.against,resolution.order[1]);}
-  else assert.equal(result.finisher,null);
+  else {
+   assert.equal(result.finisher,null);
+   const survivor=resolution.order[0]!,doomed=resolution.order[1]!;
+   assert.equal(last.combat![survivor]!.hitCount,0);
+   assert.equal(last.combat![doomed]!.hitCount,1);
+   const beat=buildBeats(result)[0]!;
+   const drive=fightDrive(result,beat,last.at!/beat.dur,last.at!);
+   assert.equal(drive.victim,survivor,'show the recorded attack on the reflector');
+   assert.equal(drive.attacker,doomed,'the zero-hit survivor never swings');
+   assert.equal(drive.weapon,field.find(f=>f.id===doomed)!.weaponFamily);
+   assert.equal(drive.bots.find(b=>b.bot.id===doomed)!.hp,0);
+  }
  }
 });

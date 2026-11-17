@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { eventKey, mayReadSegment, readPrepared, rumbleSegments, showcaseSegments, warmPrepared, type CacheRow } from './event-commentary';
+import { eventKey, mayReadSegment, readPrepared, rumbleSegments, showcaseSegments, warmPrepared, type CacheRow, type EventSegment } from './event-commentary';
+import { unsupportedNumbers } from './claude-copy';
 import { SHOWCASE_WATCH_AT } from './showcase-model';
 import { SATURDAY_BELL, saturdayBout } from './saturday-seal';
 import type { PitData } from './types';
@@ -25,9 +26,21 @@ async function cacheIdentity({event,seed,index}:CacheInput) {
   // Jim voice/model identity used by the existing ringsideVoice adapter.
   return {key,audioKey:`DduhIyyKkOosbP8VefhP:eleven_v4:${key}`};
 }
-export async function prepareEventCache(input:CacheInput,deps:CacheDeps) {
+function validatePreparedText(text:string,segment:EventSegment) {
+  if (segment.phase !== 'closing' && /\b(wins?|won|winner|champion|victory|final result)\b/i.test(text)) throw new Error('Premature result');
+  if (unsupportedNumbers(text,segment.facts).length) throw new Error('Unsupported commentary number');
+  return text;
+}
+export async function prepareEventCache(input:CacheInput & {segment:EventSegment},deps:CacheDeps) {
   const {key}=await cacheIdentity(input);
-  return warmPrepared({read:()=>deps.read(KIND,key),reserve:()=>deps.reserve(key),claim:()=>deps.claim(key),generate:deps.generate,finish:value=>deps.finish(key,value),voice:body=>deps.voice(key,body)});
+  return warmPrepared({read:async()=>{
+    const row=await deps.read(KIND,key);
+    // Old ready text must pass the same check before a voice request can reuse it.
+    if (row?.status==='ready' && row.body) {
+      try {validatePreparedText(row.body,input.segment);} catch {return {status:'failed',body:null};}
+    }
+    return row;
+  },reserve:()=>deps.reserve(key),claim:()=>deps.claim(key),generate:async()=>validatePreparedText(await deps.generate(),input.segment),finish:value=>deps.finish(key,value),voice:body=>deps.voice(key,body)});
 }
 export async function readEventCache(input:CacheInput,read:CacheDeps['read']) {
   const {key,audioKey}=await cacheIdentity(input);
@@ -51,11 +64,11 @@ export const prepareEventCommentary = createServerFn({method:'POST'}).validator(
   if (!tape || !segment) return {status:'unavailable' as const,audioReady:false,index:input.index,total:tape?.segments.length ?? 0};
   const sql=await getSql();
   const day=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Chicago'}).format(new Date());
-  const result=await prepareEventCache({event:input.event,seed:tape.seed,index:input.index},{
+  const result=await prepareEventCache({event:input.event,seed:tape.seed,index:input.index,segment},{
     read:(kind,key)=>store.readCopy(sql,kind,key),
     reserve:(key)=>store.reserveCopy(sql,KIND,key,FEATURE_MODEL.live,80,day),
     claim:(key)=>store.retryCopy(sql,KIND,key,FEATURE_MODEL.live),
-    generate:async()=> { const text = (await askClaude({feature:'live',system:'You are a live sports announcer. Write one short, energetic sentence using only the supplied facts. Do not predict, invent outcomes, or mention private mechanics. No stage directions.',prompt:segment.facts,maxTokens:100})).text; if (segment.phase !== 'closing' && /\b(wins?|won|winner|champion|victory|final result)\b/i.test(text)) throw new Error('Premature result'); return text; },
+    generate:async()=> (await askClaude({feature:'live',system:'You are a live sports announcer. Write one short, energetic sentence using only the supplied facts. Do not predict, invent outcomes, or mention private mechanics. No stage directions.',prompt:segment.facts,maxTokens:100})).text,
     finish:(key,value)=>store.finishCopy(sql,KIND,key,value),
     voice:(key,body)=>ringsideVoice(sql,key,body),
   });

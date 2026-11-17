@@ -17,7 +17,7 @@ test('showcase facts report recorded current checkpoints without final fields',(
 import {prepareEventCache, readEventCache} from '../src/lib/pit/event-commentary-server.ts';
 test('prepared long-seed closing text and audio are found by playback using the same cache identity',async()=>{
   const seed='season|w5|w5-melee-1|'+ 'loadout:weapon-drive-armor-utility|'.repeat(100);
-  const input={event:'rumble' as const,seed,index:42};
+  const input={event:'rumble' as const,seed,index:42,segment:{id:'closing',index:42,at:100,phase:'closing' as const,facts:'A final result.'}};
   const rows=new Map<string,{status:string;body:string|null}>();
   const read=async(kind:string,key:string)=>rows.get(`${kind}:${key}`);
   let calls=0;
@@ -47,4 +47,40 @@ test('new capped text never generates and ready text is never reclaimed',async()
   assert.equal((await warmPrepared({...base,read:async()=>undefined,reserve:async()=> 'capped'})).status,'capped');
   assert.equal((await warmPrepared({...base,read:async()=>({status:'ready',body:'old line'}),reserve:async()=> 'claimed'})).status,'ready');
   assert.equal(claimed,0);assert.equal(generated,0);
+});
+
+test('prepared provider numbers are validated before ready cache or voice',async()=>{
+ const segment={id:'hit',index:0,at:7,phase:'exchange' as const,facts:'At 7 seconds: Alpha lands 1 weapon hit, dealing 8 direct damage.'};
+ for(const proposed of ['Alpha lands a massive 999 damage hit!','At 999 seconds Alpha lands a hit.','Alpha reaches 999 points.','Alpha wins with 8 damage.','Alpha lands an 8 damage hit.']) {
+  let row: {status:string;body:string|null}|undefined; const spoken:string[]=[];
+  const prepared=await prepareEventCache({event:'rumble',seed:'validation',index:0,segment},{
+   read:async()=>row,reserve:async()=> 'claimed',claim:async()=>false,generate:async()=>proposed,
+   finish:async(_key,value)=>{row='body' in value?{status:'ready',body:value.body}:{status:'failed',body:null};},
+   voice:async(_key,body)=>{spoken.push(body);return {audio:'fixture'};},
+  });
+  const valid=proposed==='Alpha lands an 8 damage hit.';
+  assert.equal(prepared.status,valid?'ready':'unavailable');
+  assert.equal(row?.status,valid?'ready':'failed');
+  assert.deepEqual(spoken,valid?[proposed]:[]);
+ }
+});
+
+test('owner 2x due cues can use preview while ordinary viewers stay on server time',()=>{
+ const segment={id:'cue',index:0,at:74,phase:'exchange' as const,facts:'At 74 seconds action continues.'};
+ const clock={segment,preview:true,commissioner:true,startedAt:100000,revealedAt:null,gateAt:0,now:170347};
+ assert.equal(mayReadSegment(clock),true);
+ assert.equal(mayReadSegment({...clock,commissioner:false}),false);
+ assert.equal(mayReadSegment({...clock,preview:false}),false);
+ assert.equal(mayReadSegment({...clock,segment:{...segment,phase:'closing'}}),false);
+ assert.equal(eventCommentaryRequestSchema.safeParse({event:'rumble',index:0,seed:'tape',playbackTime:74}).success,false);
+});
+
+test('preparation does not voice an old cached numerical invention',async()=>{
+ let voiced=0,generated=0;
+ const response=await prepareEventCache({event:'rumble',seed:'old-copy',index:0,segment:{id:'hit',index:0,at:7,phase:'exchange',facts:'At 7 seconds Alpha deals 8 damage.'}},{
+  read:async()=>({status:'ready',body:'Alpha deals 999 damage.'}),reserve:async()=> 'existing',claim:async()=>false,
+  generate:async()=>{generated++;return 'Alpha deals 8 damage.';},finish:async()=>{},voice:async()=>{voiced++;return {audio:'fixture'};},
+ });
+ assert.deepEqual(response,{status:'unavailable',audioReady:false});
+ assert.equal(voiced,0); assert.equal(generated,0);
 });

@@ -42,7 +42,7 @@ export function simulateShowcaseEvent(fighters:FighterSnap[],eventId:ShowcaseEve
  if(eventId==='striker-race'){
   stages=['Lap 1','Lap 2','Final lap','Finished'];
   runs=field.map((f,i)=>{ const frames:ShowcaseFrame[]=[]; const speed=Math.max(8, f.stats.speed); const finish= Math.ceil(1500/(20+speed*.65));
-   for(let at=0;at<=finish;at++){const p=Math.min(1,at/finish),angle=p*Math.PI*6-Math.PI/2;frames.push(frame(at,.5+Math.cos(angle)*(.32+i*.008),.5+Math.sin(angle)*(.25+i*.008),p,0,p===1?3:Math.floor(p*3)));}
+   for(let at=0;at<=finish;at++){const p=Math.min(1,at/finish),angle=p*Math.PI*6-Math.PI/2;frames.push(frame(at,.5+Math.cos(angle)*(.32+i*.008),.5+Math.sin(angle)*(.22+(field.length===1?0:i/(field.length-1))*.18),p,0,p===1?3:Math.floor(p*3)));}
    return blank(f,frames,finish,1500,finish);
   });
   runs.sort((a,b)=>a.score-b.score); if(runs.length) winnerIds=runs.filter(r=>r.score===runs[0]!.score).map(r=>r.storeId);
@@ -78,15 +78,15 @@ export function simulateShowcaseEvent(fighters:FighterSnap[],eventId:ShowcaseEve
   for(let ti=0;ti<teams.length;ti++){
    const team=teams[ti]!;const members=team.storeIds.map(id=>field.find(f=>f.id===id)).filter((f):f is FighterSnap=>!!f); if(members.length!==4) continue;
    const assigned=team.roles??{};const byRole=roles.map((r,i)=>members.find(f=>assigned[f.id]===r)??members[i]!);
-   const lane=.2+ti*.3; const gateWindows:{from:number;to:number}[]=[]; const teamRuns=members.map(f=>blank(f,[],0,0,null,team.id)); let phase=0,work=0,finish:number|null=null;
+   const lane=.18+ti*.32; const gateWindows:{from:number;to:number}[]=[]; const teamRuns=members.map(f=>blank(f,[],0,0,null,team.id)); let phase=0,work=0,finish:number|null=null;
    for(let at=0;at<=120;at++){
     // Each phase cannot start until the previous role completes its task. Exit is a shared convoy.
     if(finish===null){const active=byRole[Math.min(phase,3)]!;let rate=phase===3?(members.reduce((sum,f)=>sum+f.stats.speed,0)/4+roleValue(active,'operator')/3)/2:roleValue(active,roles[phase]!)/3;
      work+=Math.max(.006,(.010+rate*.00048));if(work>=1){if(phase===1)gateWindows.push({from:at,to:121});phase++;work=0;if(phase===4)finish=at;}}
     const p=finish!==null?1:(phase+work)/4;
     for(let j=0;j<members.length;j++){const member=members[j]!,role=roles.indexOf((assigned[member.id]??roles[j]) as Role); const local=finish!==null?1:role<phase?1:role===phase?work:0;
-     const x=phase===3?.68+.2*work:role<phase?.2+Math.min(phase,3)*.16:role===phase?.2+phase*.16+.16*local:.2+Math.max(0,phase-1)*.16;
-     teamRuns[j]!.frames.push(frame(at,x,lane+(j-1.5)*.025,p,phase>=3?3:phase===2?Math.floor(work*3):0,Math.min(3,phase),phase===2&&role===2));
+     const x=finish!==null?.88:phase===3?.68+.2*work:role<phase?.2+Math.min(phase,3)*.16:role===phase?.2+phase*.16+.16*local:.2+Math.max(0,phase-1)*.16;
+     teamRuns[j]!.frames.push(frame(at,x,lane+(j-1.5)*.08,p,phase>=3?3:phase===2?Math.floor(work*3):0,Math.min(3,phase),phase===2&&role===2));
     } if(finish!==null)break;
    }
    objects.push({id:`gate-${team.id}`,kind:'gate',teamId:team.id,x:.53,y:lane,w:.025,h:.12,openWindows:gateWindows});

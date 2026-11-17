@@ -60,3 +60,32 @@ test('seeded draw ranks the selected crew first and retains lower ties',()=>{
  assert.equal(tape.tieBreak?.contenders.length,3);
  for(const run of tape.runs) assert.equal(run.rank,tape.winnerIds.includes(run.storeId)?1:2);
 });
+
+test('completed Gauntlet members finish at the exit without a backward final step',()=>{
+ const equal=fighters.map(f=>({...f,stats:{speed:55,power:55,armor:55,heat:55}}));
+ const tape=simulateShowcaseEvent(equal,'team-gauntlet',buildShowcaseTeams(equal,'exit'),'exit');
+ for(const run of tape.runs){
+  assert.equal(run.finishAt,111);
+  const before=run.frames.at(-2)!,last=run.frames.at(-1)!;
+  assert.equal(last.x,.88); assert.ok(last.x>=before.x); assert.equal(last.progress,1);
+  assert.equal(run.score,111);
+ }
+});
+
+test('Gauntlet recorded lanes and race starting lanes leave room for distinct portraits',()=>{
+ const teams=buildShowcaseTeams(fighters,'spacing');
+ const tape=simulateShowcaseEvent(fighters,'team-gauntlet',teams,'spacing');
+ const allLanes=tape.runs.map(r=>r.frames[0]!.y).sort((a,b)=>a-b);
+ for(let i=1;i<allLanes.length;i++) assert.ok((allLanes[i]!-allLanes[i-1]!)*560>=42,'separate neighboring crews too');
+ for(const team of teams) {
+  const runs=tape.runs.filter(r=>r.teamId===team.id);
+  for(let at=0;at<=tape.duration;at++) for(let i=1;i<runs.length;i++) {
+   const a=runs[i-1]!.frames[Math.min(at,runs[i-1]!.frames.length-1)]!;
+   const b=runs[i]!.frames[Math.min(at,runs[i]!.frames.length-1)]!;
+   assert.ok(Math.abs(b.y-a.y)*560>=42,'crew portraits need vertical separation at every phase');
+  }
+ }
+ const race=simulateShowcaseEvent(fighters,'striker-race',teams,'spacing');
+ const starts=race.runs.map(r=>r.frames[0]!.y).sort();
+ for(let i=1;i<starts.length;i++) assert.ok((starts[i]!-starts[i-1]!)*560>=42);
+});

@@ -1271,6 +1271,7 @@ function meleeDrive(result: FightResult, beat: Beat, local: number, time: number
   let hitKey: string | null = null;
   let weapon = "ram";
   let victim: string | null = null;
+  let attacker: string | null = null;
   let focus = center;
   let tight = 0.1;
 
@@ -1278,19 +1279,29 @@ function meleeDrive(result: FightResult, beat: Beat, local: number, time: number
     states.forEach(s => { const entered = result.rumbleEntries!.find(e => e.fighterId === s.bot.id)!.at; s.rise = ease(clamp((clock - entered) / 0.8, 0, 1)); });
     const index = result.exchanges.findIndex(ex => ex.at !== undefined && clock >= ex.at - 0.42 && clock < ex.at + 0.58);
     const ex = result.exchanges[index];
-    if (ex && (!ex.combat || Object.values(ex.combat).some(trace => trace.hitCount > 0))) {
-      const ai = bots.findIndex(bot => bot.id === ex.attackerId), di = bots.findIndex(bot => bot.id === ex.defenderId);
+    if (ex) {
+      // Knockout display IDs name survivor/victim. The actual striker can be the
+      // eliminated bot, especially when its attack was reflected back at it.
+      const lethalStriker = ex.lethal?.cause === 'reflection' ? ex.lethal.against : ex.lethal?.by;
+      const candidates = [lethalStriker, ex.attackerId, ex.defenderId];
+      const striker = ex.combat ? candidates.find(id => id && (ex.combat![id]?.hitCount ?? 0) > 0) : ex.attackerId;
+      const target = striker === ex.attackerId ? ex.defenderId : ex.attackerId;
+      const ai = bots.findIndex(bot => bot.id === striker), di = bots.findIndex(bot => bot.id === target);
       if (ai >= 0 && di >= 0) {
         const u = clamp(clock - (ex.at! - 0.42), 0, 1);
-        const before = ex.combat?.[ex.defenderId]?.before.hp ?? ex.defenderHp + ex.damage;
-        const out = strike(bots[ai]!, bots[di]!, slot(ai), slot(di), slot(ai), slot(di), u, time, ex.damage,
-          hpNow[ex.attackerId] ?? 100, before, ex.defenderHp, false, 1, arenaBotScale(count));
-        out.atk.hp = hpNow[ex.attackerId] ?? 100; out.def.hp = hpNow[ex.defenderId] ?? 100;
+        const targetTrace = ex.combat?.[target];
+        const after = target === ex.attackerId ? ex.attackerHp : ex.defenderHp;
+        const damage = ex.combat?.[striker!]?.damageDealt ?? ex.damage;
+        const before = targetTrace?.before.hp ?? after + damage;
+        const out = strike(bots[ai]!, bots[di]!, slot(ai), slot(di), slot(ai), slot(di), u, time, damage,
+          hpNow[striker!] ?? 100, before, after, false, 1, arenaBotScale(count));
+        out.atk.hp = hpNow[striker!] ?? 100; out.def.hp = hpNow[target] ?? 100;
         out.atk.dead = out.atk.hp <= 0; out.def.dead = out.def.hp <= 0;
         if (out.atk.dead) out.atk.rev = 0; if (out.def.dead) out.def.rev = 0;
-        pitFall(out, ex, u, result); states[ai] = out.atk; states[di] = out.def;
+        if (target === ex.defenderId) pitFall(out, ex, u, result);
+        states[ai] = out.atk; states[di] = out.def;
         impact = out.impact; power = out.power; hitKey = `rumble-${index}`;
-        weapon = bots[ai]!.weaponFamily; victim = ex.defenderId; focus = out.focus; tight = out.tight * 0.6;
+        weapon = bots[ai]!.weaponFamily; victim = target; attacker = striker!; focus = out.focus; tight = out.tight * 0.6;
       }
     }
   }
@@ -1362,7 +1373,7 @@ function meleeDrive(result: FightResult, beat: Beat, local: number, time: number
     s.roll = s.spot.x * 34 + s.spot.y * 21;
     if (result.rumbleEntries) s.entryNumber = result.rumbleEntries.findIndex(e => e.fighterId === s.bot.id) + 1;
   });
-  return { bots: states, impact, power, hitKey, hitAt: beat.kind === "rumble" && hitKey ? (result.exchanges[Number(hitKey.split("-")[1])]!.at! / beat.dur) : HIT_AT, weapon, victim, focus: large ? center : focus, tight: large ? 0 : tight, countdown: beat.kind === "countdown" ? Math.max(0, 3 - Math.floor(local * 4)) : undefined };
+  return { bots: states, impact, power, hitKey, hitAt: beat.kind === "rumble" && hitKey ? (result.exchanges[Number(hitKey.split("-")[1])]!.at! / beat.dur) : HIT_AT, weapon, victim, attacker, focus: large ? center : focus, tight: large ? 0 : tight, countdown: beat.kind === "countdown" ? Math.max(0, 3 - Math.floor(local * 4)) : undefined };
 }
 
 function recordedRumbleHp(result: FightResult, clock: number) {

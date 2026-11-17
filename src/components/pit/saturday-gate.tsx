@@ -113,7 +113,7 @@ export function SaturdayGate({ held, onPlayerStarted, onNextFight }: { held: Bou
             {finished && <Btn onClick={() => { setTape(null); setFinished(false); onNextFight?.(); }}>Next fight</Btn>}
           </div>
         </div>
-        {opening ? <TeamJanelleOpening data={data} playing={playing} onComplete={() => setOpening(false)} /> : <Broadcast bout={tape} playing={playing} speed={2} seek={seek} chromeless kicker="Live from the Desk" onComplete={() => void post(kind)} />}
+        {opening ? <TeamJanelleOpening data={data} playing={playing} onComplete={() => setOpening(false)} /> : <Broadcast bout={tape} playing={playing} speed={2} seek={seek} commentaryPreview={desk} chromeless kicker="Live from the Desk" onComplete={() => void post(kind)} />}
         <p className="px-4 py-3 text-sm text-muted">The result posts for every store when this fight ends. Leaving early keeps it sealed.</p>
         {error ? <div className="px-4 pb-3 text-sm text-bad">{error} <Btn disabled={busy} tone="line" onClick={() => void post(kind)}>Retry posting</Btn></div> : null}
       </section>
