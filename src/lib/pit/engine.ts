@@ -913,7 +913,7 @@ export function spyRead(data: PitData, targetId: string, tier: Tier): SpyRead | 
   };
 }
 
-function snapshot(data: PitData, storeId: string): FighterSnap {
+export function snapshot(data: PitData, storeId: string): FighterSnap {
   const store = storeFor(data, storeId);
   const bot = botFor(data, storeId);
   const card = cardFor(data, storeId);
@@ -1299,7 +1299,7 @@ function conferenceSchedule(data: PitData, week: number): [string, string][] | n
 
 export const ROYAL_RUMBLE_TITLE = "Third Place Royal Rumble";
 
-function pitTargetForWeek(week: number) {
+export function pitTargetForWeek(week: number) {
   return week === 5 ? { x: 0.5, y: 0.64 } : week === 4 ? { x: 0.5, y: 0.56 } :
     week === 3 ? { x: 0.5, y: 0.62 } : week === 2 ? { x: 0.6, y: 0.42 } : { x: 0.5, y: 0.1 };
 }
@@ -1365,15 +1365,20 @@ function makeBout(
 
 export function simulateBout(data: PitData, bout: Bout): FightResult {
   if (typeof window !== "undefined" && saturdayFightKind(bout)) return sealedFightResult();
-  const seed = `${data.seasonName}|w${data.week}|${bout.id}|${bout.storeIds.join(",")}|${loadoutSeed(data, bout.storeIds)}`;
+  if (bout.week === 5 && bout.title === ROYAL_RUMBLE_TITLE) throw new Error("The Royal Rumble requires its server resolver.");
+  const seed = boutSeed(data, bout);
   if (bout.kind === "bye") return simulateBye(data, bout.teamA[0]!, seed);
   if (bout.kind === "tag") return simulateTag(data, bout.teamA, bout.teamB, seed);
   const berth = bout.week === 4 && ["metro", "frontier"].some((c) => bout.title === conferenceTieTitle(c as Conference));
-  if (bout.kind === "melee") return simulateMelee(data, bout.teamA, seed, berth || (bout.week === 5 && bout.title === ROYAL_RUMBLE_TITLE));
+  if (bout.kind === "melee") return simulateMelee(data, bout.teamA, seed, berth);
   if (berth && bout.kind === "final") return simulateChampionshipDuel(data, bout.teamA[0]!, bout.teamB[0]!, seed);
   if (data.week === 5 && bout.kind === "final" && bout.title === "Waterman Championship")
     return simulateChampionshipDuel(data, bout.teamA[0]!, bout.teamB[0]!, seed);
   return simulateDuel(data, bout.teamA[0]!, bout.teamB[0]!, seed);
+}
+
+export function boutSeed(data: PitData, bout: Bout): string {
+  return `${data.seasonName}|w${data.week}|${bout.id}|${bout.storeIds.join(",")}|${loadoutSeed(data, bout.storeIds)}`;
 }
 
 function loadoutSeed(data: PitData, ids: string[]): string {
@@ -1766,6 +1771,7 @@ export function playgroundTape(builds: [PlaygroundBuild, PlaygroundBuild], round
 
 /** Same math as Run Saturday, on copied locks. Does not post the card. */
 export function previewSaturday(data: PitData): Bout[] {
+  if (data.week === 5) return buildCard(data);
   const bots = data.bots.map((b) => ({
     ...b,
     locked: { ...(b.locked ?? b.draft) },
@@ -1795,8 +1801,8 @@ export function buildConferenceTiebreakers(data: PitData): Bout[] {
   return extras;
 }
 
-export function runSaturday(data: PitData): Bout[] {
-  const played = buildCard(data).map((bout) => ({ ...bout, result: simulateBout(data, bout) }));
+export function runSaturday(data: PitData, resolveBout: typeof simulateBout = simulateBout): Bout[] {
+  const played = buildCard(data).map((bout) => ({ ...bout, result: resolveBout(data, bout) }));
   if (data.week !== 4) return played;
   const staged = { ...data, bouts: [...data.bouts.filter((bout) => bout.week !== 4), ...played] };
   return [...played, ...buildConferenceTiebreakers(staged)];

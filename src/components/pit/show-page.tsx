@@ -274,6 +274,7 @@ export function ShowPage() {
           kicker={approvedHeld && weekPick === 4 ? "Approved finale" : tape.replay ? "Replay" : tape.live ? "On air" : "House tape"}
           onComplete={onFightDone}
           onNotableBeat={onNotableBeat}
+          commentaryEnabled={mic}
         />
       ) : null}
       {segment.kind === "sting" ? <Sting bout={segment.bout} next={nextFight(segments, index)} data={data} /> : null}

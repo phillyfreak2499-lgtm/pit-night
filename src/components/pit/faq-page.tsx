@@ -200,7 +200,7 @@ export const GROUPS: Group[] = [
       ),
       faq(
         "How does the Championship fight end?",
-        "There are no judges and no decision. The championship ends when a bot reaches zero health or is completely thrown into the pit. Zero health is final in both duels and melees. Before it, all non-finalists battle simultaneously in the larger-arena Royal Rumble for third place.",
+        "There are no judges and no decision. The championship ends when a bot reaches zero health or is completely thrown into the pit. Zero health is final in both duels and melees. Before it, the twelve nonfinalists enter the Royal Rumble for third place: two at the bell, then one every three seconds, with all twelve in by thirty seconds.",
       ),
     ],
   },

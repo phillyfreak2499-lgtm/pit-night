@@ -1674,6 +1674,30 @@ export function createGarageBot(look: BotLookProps): THREE.Group {
       dark,
     );
   }
+  // Showcase awards are visual overlays: all installed parts remain intact.
+  if (style.showcasePrize === "battle-tank") {
+    const armor = metal("#536a50", 0.7, 0.55), track = metal("#202a25", 0.9, 0.3);
+    for (const side of [-1, 1]) {
+      box("Battle Tank thick track", [0.27, 0.28, d * 1.08], [side * (w / 2 + 0.08), 0.16, 0], track);
+      for (let i = -3; i <= 3; i++) box("Battle Tank tread cleat", [0.29, 0.035, 0.07], [side * (w / 2 + 0.08), 0.31, i * d / 8], steel);
+    }
+    box("Battle Tank armored hull", [w * 0.83, 0.25, d * 0.78], [0, roofY + 0.02, 0], armor);
+    cylinder("Battle Tank turret", w * 0.22, 0.23, [0, roofY + 0.25, 0], armor);
+    cylinder("Battle Tank long cannon", 0.065, d * 0.75, [0, roofY + 0.25, d * 0.43], dark, "z");
+  } else if (style.showcasePrize === "rocket-tail") {
+    for (const side of [-1, 1]) {
+      cylinder("Rocket Tail booster", 0.12, 0.42, [side * w * 0.3, roofY * 0.75, rear - 0.17], steel, "z");
+      cylinder("Rocket Tail nozzle", 0.15, 0.07, [side * w * 0.3, roofY * 0.75, rear - 0.4], dark, "z");
+    }
+  } else if (style.showcasePrize === "tesla-rig") {
+    const glow = new THREE.MeshStandardMaterial({ color: "#54dcf4", emissive: "#20bfe5", emissiveIntensity: 1.4 });
+    sphere("Tesla Rig glowing reactor", [0.2, 0.2, 0.2], [0, roofY + 0.25, 0], glow);
+    for (const side of [-1, 1]) {
+      cylinder("Tesla Rig coil", 0.09, 0.35, [side * w * 0.3, roofY + 0.2, 0], steel);
+      sphere("Tesla Rig coil light", [0.1, 0.1, 0.1], [side * w * 0.3, roofY + 0.42, 0], glow);
+      beam("Tesla Rig electrical arc", [0, roofY + 0.27, 0], [side * w * 0.3, roofY + 0.42, 0], 0.018, glow);
+    }
+  }
   bot.add(createGarageCosmetics(look, { roofY, width: w, depth: d, sidePanelX, frontLabelY }));
   bot.updateMatrixWorld(true);
   return bot;

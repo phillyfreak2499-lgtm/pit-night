@@ -21,6 +21,8 @@ import { Route as MapRouteImport } from './routes/map'
 import { Route as PlaygroundRouteImport } from './routes/playground'
 import { Route as PreviewRouteImport } from './routes/preview'
 import { Route as RulesRouteImport } from './routes/rules'
+import { Route as ShowcaseRouteImport } from './routes/showcase'
+import { Route as ShowcaseAdminRouteImport } from './routes/showcase-admin'
 import { Route as WatchRouteImport } from './routes/watch'
 import { Route as WeekRouteImport } from './routes/week'
 import { Route as BoutBoutIdRouteImport } from './routes/bout.$boutId'
@@ -90,6 +92,16 @@ const RulesRoute = RulesRouteImport.update({
   path: '/rules',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShowcaseRoute = ShowcaseRouteImport.update({
+  id: '/showcase',
+  path: '/showcase',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShowcaseAdminRoute = ShowcaseAdminRouteImport.update({
+  id: '/showcase-admin',
+  path: '/showcase-admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WatchRoute = WatchRouteImport.update({
   id: '/watch',
   path: '/watch',
@@ -144,6 +156,8 @@ export interface FileRoutesByFullPath {
   '/playground': typeof PlaygroundRoute
   '/preview': typeof PreviewRoute
   '/rules': typeof RulesRoute
+  '/showcase': typeof ShowcaseRoute
+  '/showcase-admin': typeof ShowcaseAdminRoute
   '/watch': typeof WatchRoute
   '/week': typeof WeekRoute
   '/bout/$boutId': typeof BoutBoutIdRoute
@@ -166,6 +180,8 @@ export interface FileRoutesByTo {
   '/playground': typeof PlaygroundRoute
   '/preview': typeof PreviewRoute
   '/rules': typeof RulesRoute
+  '/showcase': typeof ShowcaseRoute
+  '/showcase-admin': typeof ShowcaseAdminRoute
   '/watch': typeof WatchRoute
   '/week': typeof WeekRoute
   '/bout/$boutId': typeof BoutBoutIdRoute
@@ -189,6 +205,8 @@ export interface FileRoutesById {
   '/playground': typeof PlaygroundRoute
   '/preview': typeof PreviewRoute
   '/rules': typeof RulesRoute
+  '/showcase': typeof ShowcaseRoute
+  '/showcase-admin': typeof ShowcaseAdminRoute
   '/watch': typeof WatchRoute
   '/week': typeof WeekRoute
   '/bout/$boutId': typeof BoutBoutIdRoute
@@ -213,6 +231,8 @@ export interface FileRouteTypes {
     | '/playground'
     | '/preview'
     | '/rules'
+    | '/showcase'
+    | '/showcase-admin'
     | '/watch'
     | '/week'
     | '/bout/$boutId'
@@ -235,6 +255,8 @@ export interface FileRouteTypes {
     | '/playground'
     | '/preview'
     | '/rules'
+    | '/showcase'
+    | '/showcase-admin'
     | '/watch'
     | '/week'
     | '/bout/$boutId'
@@ -257,6 +279,8 @@ export interface FileRouteTypes {
     | '/playground'
     | '/preview'
     | '/rules'
+    | '/showcase'
+    | '/showcase-admin'
     | '/watch'
     | '/week'
     | '/bout/$boutId'
@@ -280,6 +304,8 @@ export interface RootRouteChildren {
   PlaygroundRoute: typeof PlaygroundRoute
   PreviewRoute: typeof PreviewRoute
   RulesRoute: typeof RulesRoute
+  ShowcaseRoute: typeof ShowcaseRoute
+  ShowcaseAdminRoute: typeof ShowcaseAdminRoute
   WatchRoute: typeof WatchRoute
   WeekRoute: typeof WeekRoute
   BoutBoutIdRoute: typeof BoutBoutIdRoute
@@ -376,6 +402,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RulesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/showcase': {
+      id: '/showcase'
+      path: '/showcase'
+      fullPath: '/showcase'
+      preLoaderRoute: typeof ShowcaseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/showcase-admin': {
+      id: '/showcase-admin'
+      path: '/showcase-admin'
+      fullPath: '/showcase-admin'
+      preLoaderRoute: typeof ShowcaseAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/watch': {
       id: '/watch'
       path: '/watch'
@@ -448,6 +488,8 @@ const rootRouteChildren: RootRouteChildren = {
   PlaygroundRoute: PlaygroundRoute,
   PreviewRoute: PreviewRoute,
   RulesRoute: RulesRoute,
+  ShowcaseRoute: ShowcaseRoute,
+  ShowcaseAdminRoute: ShowcaseAdminRoute,
   WatchRoute: WatchRoute,
   WeekRoute: WeekRoute,
   BoutBoutIdRoute: BoutBoutIdRoute,

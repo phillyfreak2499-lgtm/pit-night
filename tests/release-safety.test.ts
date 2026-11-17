@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { stripTypeScriptTypes } from "node:module";
 import * as vanilla from "zustand/vanilla";
 import * as storeModule from "../src/lib/pit/store.ts";
+import { runServerCard } from "../src/lib/pit/run-card.server.ts";
 import { makeData } from "../src/lib/pit/seed.ts";
 import {
   buildConferenceTiebreakers, championshipFinalists, conferenceTopTie,
@@ -17,7 +18,7 @@ import type { Phase, PitData } from "../src/lib/pit/types.ts";
 const giftTime = new Date("2026-11-13T20:00:00Z");
 
 test("five-week release flow preserves vouchers, applies pending repair safely, and seals championship honors", () => {
-  const store = vanilla.createStore(storeModule.pitCreator);
+  const store = vanilla.createStore(storeModule.createPitCreator(runServerCard));
   store.setState({ ...makeData(), week: 1, phase: "open", session: { role: "commissioner", storeId: null, crewId: null } });
   for (let week = 1; week <= 5; week++) {
     store.setState({ storeCards: store.getState().storeCards.map((card) => ({ ...card, nsnuOfficial: true })) });
@@ -92,7 +93,7 @@ test("five-week release flow preserves vouchers, applies pending repair safely, 
 // The SQL adapter is entirely in memory: this test never imports the real database.
 const source = readFileSync(new URL("../src/lib/pit/authoritative.ts", import.meta.url), "utf8");
 const schemaLiteral = source.match(/const SCHEMA_TAG = ("[^"]+");/)![1]!;
-const loadBody = stripTypeScriptTypes(source.slice(source.indexOf("async function load("), source.indexOf("/** Server-only:")));
+const loadBody = stripTypeScriptTypes(source.slice(source.indexOf("async function load("), source.indexOf("/** Server-only:")).replace("export async function loadSeasonFrom", "async function loadSeasonFrom"));
 const loadFactory = new Function("reconcilePeriod12Finale", "FINALE_EVENT", "services", "grantNov13Repairs", "nov13RepairDue", "nov13RepairDeploymentAllowed", "NOV13_REPAIR_GIFT", "Date", "process", "console",
   `const SCHEMA_TAG = ${schemaLiteral}; ${loadBody}; return load;`);
 

@@ -15,6 +15,8 @@ import { DeskCodes } from "./desk-codes";
 import { ClaudeCheck } from "./claude-copy";
 import { RemindersPanel } from "./reminders-panel";
 import { SaturdayGate } from "./saturday-gate";
+import { Link } from '@tanstack/react-router';
+import { PreparedCommentaryButton } from './prepared-commentary-button';
 
 export function DeskPage() {
   const data = usePit();
@@ -100,6 +102,7 @@ function DeskLive() {
       <div>
         <SectionLabel>House desk</SectionLabel>
         <h1 className="font-display text-5xl leading-none">Run the season</h1>
+        <div className="mt-4 flex flex-wrap items-center gap-3"><Link className="border border-amber px-4 py-3 text-sm text-amber" to="/showcase-admin">Showcase rehearsal · PIN only</Link><Link className="border border-line px-4 py-3 text-sm" to="/showcase">Showcase metrics and tapes</Link><PreparedCommentaryButton event="rumble" label="Prepare Rumble commentary"/></div>
         <p className="mt-2 text-muted">
           Week {data.week} · {meta?.name} · {data.phase}
         </p>

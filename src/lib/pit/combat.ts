@@ -971,7 +971,7 @@ type BattleState = {
   pitPosition: Record<string, number>;
 };
 
-function battleState(bots: FighterSnap[]): BattleState {
+export function battleState(bots: FighterSnap[]): BattleState {
   return {
     hp: Object.fromEntries(bots.map((bot) => [bot.id, 100])),
     mem: {
@@ -1036,7 +1036,7 @@ function endTrace(bots: FighterSnap[], state: BattleState, combat: Record<string
   return combat;
 }
 
-function bellFor(bots: FighterSnap[]): Record<string, BellVitals> {
+export function bellFor(bots: FighterSnap[]): Record<string, BellVitals> {
   return Object.fromEntries(
     bots.map((bot) => {
       const max = kitOf(bot).batteryMax;
@@ -1195,6 +1195,7 @@ function stepExchange(
   let actedA = true, actedB = true;
   let directA = blowB.reflect > 0 ? Math.min(dmgA, Math.round(blowA.damage * pace * ot)) : dmgA;
   let directB = blowA.reflect > 0 ? Math.min(dmgB, Math.round(blowB.damage * pace * ot)) : dmgB;
+  let lethal: Exchange['lethal'];
   if (opts.pitOnly) {
     actedA = false; actedB = false;
     dmgA = 0; dmgB = 0; directA = 0; directB = 0;
@@ -1206,12 +1207,14 @@ function stepExchange(
       const hit = Math.max(1, Math.round(blow.damage * pace * ot));
       if (isA) { actedA = true; directA = hit; dmgA += hit; leftB = Math.max(0, leftB - hit); }
       else { actedB = true; directB = hit; dmgB += hit; leftA = Math.max(0, leftA - hit); }
+      if (leftA <= 0 || leftB <= 0) lethal = { by: attacker.id, against: isA ? b.id : a.id, cause: 'weapon' };
       // Resolve a lethal hit immediately. A destroyed bot cannot return an
       // attack or reflect damage after its elimination.
       if (leftA <= 0 || leftB <= 0) break;
       const reflected = Math.max(0, Math.round(blow.reflect * pace * ot));
       if (isA) { dmgB += reflected; leftA = Math.max(0, leftA - reflected); }
       else { dmgA += reflected; leftB = Math.max(0, leftB - reflected); }
+      if (leftA <= 0 || leftB <= 0) lethal = { by: isA ? b.id : a.id, against: attacker.id, cause: 'reflection' };
     }
     if (!actedA) state.turns[a.id] = ai;
     if (!actedB) state.turns[b.id] = bi;
@@ -1235,18 +1238,22 @@ function stepExchange(
   }
 
   if (actedA) {
-    mem.burn[b.id] = (mem.burn[b.id] ?? 0) + blowA.burn;
-    if (blowA.stun < 1) mem.stun[b.id] = blowA.stun; else delete mem.stun[b.id];
     mem.heat[a.id] = (mem.heat[a.id] ?? 0) + blowA.heat;
-    if (blowA.tags.includes("leech")) mem.heat[b.id] = (mem.heat[b.id] ?? 0) - 4;
-    mem.battery[b.id] = Math.max(0, (mem.battery[b.id] ?? 0) - blowA.drain);
+    if (!opts.pitOnly || hp[b.id]! > 0) {
+      mem.burn[b.id] = (mem.burn[b.id] ?? 0) + blowA.burn;
+      if (blowA.stun < 1) mem.stun[b.id] = blowA.stun; else delete mem.stun[b.id];
+      if (blowA.tags.includes("leech")) mem.heat[b.id] = (mem.heat[b.id] ?? 0) - 4;
+      mem.battery[b.id] = Math.max(0, (mem.battery[b.id] ?? 0) - blowA.drain);
+    }
   }
   if (actedB) {
-    mem.burn[a.id] = (mem.burn[a.id] ?? 0) + blowB.burn;
-    if (blowB.stun < 1) mem.stun[a.id] = blowB.stun; else delete mem.stun[a.id];
     mem.heat[b.id] = (mem.heat[b.id] ?? 0) + blowB.heat;
-    if (blowB.tags.includes("leech")) mem.heat[a.id] = (mem.heat[a.id] ?? 0) - 4;
-    mem.battery[a.id] = Math.max(0, (mem.battery[a.id] ?? 0) - blowB.drain);
+    if (!opts.pitOnly || hp[a.id]! > 0) {
+      mem.burn[a.id] = (mem.burn[a.id] ?? 0) + blowB.burn;
+      if (blowB.stun < 1) mem.stun[a.id] = blowB.stun; else delete mem.stun[a.id];
+      if (blowB.tags.includes("leech")) mem.heat[a.id] = (mem.heat[a.id] ?? 0) - 4;
+      mem.battery[a.id] = Math.max(0, (mem.battery[a.id] ?? 0) - blowB.drain);
+    }
   }
   for (const [bot, kit] of [
     [a, ka],
@@ -1281,6 +1288,7 @@ function stepExchange(
     tags,
     combat: finishTrace(),
     vitals: stampVitals(bots, state, powerAt, staminaLow),
+    ...(lethal ? { lethal } : {}),
   });
   if (hp[a.id] === 0 || hp[b.id] === 0) {
     state.koAt = i;
@@ -1295,7 +1303,7 @@ function stepExchange(
  * Every engagement therefore progresses even at zero pace or with repair kits.
  * Initiative alternates by exchange, never by HP, rating or a judge's score.
  */
-function stepPitExchange(a: FighterSnap, b: FighterSnap, state: BattleState, i: number, opts: DuelOpts) {
+export function stepPitExchange(a: FighterSnap, b: FighterSnap, state: BattleState, i: number, opts: DuelOpts) {
   stepExchange(a, b, state, i, { ...opts, pitOnly: true });
   const exchange = state.exchanges[state.exchanges.length - 1]!;
   if (state.hp[a.id]! <= 0 || state.hp[b.id]! <= 0) {

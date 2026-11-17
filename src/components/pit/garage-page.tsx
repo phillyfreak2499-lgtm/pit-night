@@ -1,3 +1,4 @@
+import { SHOWCASE_PRIZES, showcasePrizeOwned } from "@/lib/pit/showcase-prizes";
 import { Modal } from "./modal";
 import { boltsOf } from "@/lib/pit/week";
 import { boltsForCoins } from "@/lib/pit/training";
@@ -723,7 +724,7 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
         <div>
           <SectionLabel>Bot Locker · {proposalMode ? "draft a crew proposal" : "earn the look"}</SectionLabel>
-          <p className="text-sm text-muted">Jobs, Sparks, Mystery Crates, picks and wins unlock more looks. Cosmetics never change Power, Speed, Armor, Heat, HP or fight odds.</p>
+          <p className="text-sm text-muted">Jobs, Sparks, Mystery Crates, picks and wins unlock more looks. Ordinary cosmetics do not change fight stats. Showcase prizes grant their listed bonus only in the Rumble while equipped.</p>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted">{earnedCount}/{progress.length} achievement unlocks</span>
@@ -732,6 +733,17 @@ function DecoratePanel({ storeId, proposalMode }: { storeId: string; proposalMod
         </div>
       </div>
 
+      <div className="border-b border-line p-4" data-testid="showcase-prizes">
+        <SectionLabel>Rumble Games awards</SectionLabel>
+        <p className="mt-1 text-sm text-muted">Earned by event winners. Equip one for its flat +2 bonus in the Rumble only; removing it removes the bonus. {proposalMode ? "Awards are equipped directly by the captain, not through look proposals." : ""}</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Chip active={!style.showcasePrize || style.showcasePrize === "none"} disabled={proposalMode} title={proposalMode ? "Awards are equipped directly by the captain." : "Remove the equipped award."} onClick={() => setStyle(storeId, { showcasePrize: "none" })}>Remove award</Chip>
+          {SHOWCASE_PRIZES.map((prize) => {
+            const owned = showcasePrizeOwned(data, storeId, prize.id);
+            return <Chip key={prize.id} active={style.showcasePrize === prize.id} disabled={!owned || proposalMode} title={proposalMode ? "Awards are equipped directly by the captain." : owned ? `${prize.label}: +2 ${prize.stat} in the Rumble while equipped` : `Win ${prize.eventLabel} to unlock this award.`} onClick={() => setStyle(storeId, { showcasePrize: prize.id })}>{prize.label} · +2 {prize.stat} · {owned ? "Unlocked" : "Locked"}</Chip>;
+          })}
+        </div>
+      </div>
       <LockerIdentity key={storeId} storeId={storeId} />
       {nextRewards.length ? (
         <div className="border-b border-line bg-deep/60 p-4">

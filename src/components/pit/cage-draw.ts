@@ -1,3 +1,4 @@
+import { drawShowcasePrize } from "./showcase-prize-draw";
 import { arenaBotScale } from "./arena-layout";
 import { botFrameOf as frameOf, type BotFrame as Frame } from "./bot-frame";
 import { sawPoseOf } from "./bot-weapons";
@@ -1578,6 +1579,7 @@ export function drawSideBot(
   time: number,
   spin: number,
   facing: number,
+  reduced = false,
 ) {
   const style = styleOf(s.bot, s.bot.classId);
   const baseFrame = frameOf(s.bot.classId, style.body);
@@ -2134,6 +2136,7 @@ export function drawSideBot(
   weaponFront(ctx, s, f, u2, spin, dark);
   drawFangSkin(ctx, style.weaponSkin, f.front * u2, (f.deck + 0.12) * u2, u2 * 0.24);
 
+  drawShowcasePrize(ctx, style.showcasePrize, "side", u2, u2, reduced ? 0 : time, s.charging && !s.dead);
   if (s.flame > 0) drawFlame(ctx, f.front * u2, top + f.height * u2 * 0.3, u2, s.flame, time);
 
   ctx.restore();
@@ -4679,13 +4682,13 @@ export function drawSide(
       ctx.rect(p.x - p.size * 2, 0, p.size * 4, p.y + p.size * 0.04);
       ctx.clip();
       ctx.translate(0, (1 - rise) * p.size * 0.95);
-      drawSideBot(ctx, s, p.x, p.y, p.size, time, spin, facingOf(s.heading));
+      drawSideBot(ctx, s, p.x, p.y, p.size, time, spin, facingOf(s.heading), opts.reduced);
       ctx.restore();
       continue;
     }
-    drawSideBot(ctx, s, p.x, p.y, p.size, time, spin, facingOf(s.heading));
+    drawSideBot(ctx, s, p.x, p.y, p.size, time, spin, facingOf(s.heading), opts.reduced);
     if (drive.bots.length > 4 && s.gone < 1) {
-      const number = drive.bots.findIndex((b) => b.bot.id === s.bot.id) + 1;
+      const number = s.entryNumber ?? drive.bots.findIndex((b) => b.bot.id === s.bot.id) + 1;
       ctx.save();
       ctx.font = `bold ${Math.max(10, w * 0.012)}px sans-serif`;
       ctx.textAlign = "center";
@@ -5260,7 +5263,7 @@ export function drawTop(
         }
       }
     }
-    drawTopBot(ctx, s, p, g.s * arenaBotScale(drive.bots.length), fx.spin.get(s.bot.id) ?? 0, time);
+    drawTopBot(ctx, s, p, g.s * arenaBotScale(drive.bots.length), fx.spin.get(s.bot.id) ?? 0, time, reduced);
   }
   drawParticles(ctx, fx.top);
   ctx.restore();
@@ -5317,6 +5320,7 @@ export function drawTopBot(
   cage: number,
   spin: number,
   time: number,
+  reduced = false,
 ) {
   const paint = paintOf(s.bot.paint);
   const style = styleOf(s.bot, s.bot.classId);
@@ -5519,6 +5523,7 @@ export function drawTopBot(
     ctx.fillText(s.bot.number, 0, len * 0.08);
     ctx.restore();
   }
+  drawShowcasePrize(ctx, style.showcasePrize, "top", len, wid, reduced ? 0 : time, s.charging && !s.dead);
   drawTopperPlan(ctx, style.topper, len, wid, time, EYES[style.eye] ?? "#50ff8c");
   drawFangSkin(ctx, style.weaponSkin, len * 0.45, -wid * 0.3, wid * 0.45);
   if (style.banner) drawBannerPlate(ctx, style.banner, -len * 0.05, wid * 0.78, len * 1.4, false);

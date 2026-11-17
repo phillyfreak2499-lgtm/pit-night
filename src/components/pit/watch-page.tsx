@@ -215,6 +215,7 @@ export function WatchPage() {
           <Broadcast
             key={bout.id}
             bout={bout}
+            commentaryEnabled={commentaryEnabled}
             playing={!paused}
             speed={1.5}
             chromeless

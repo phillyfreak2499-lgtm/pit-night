@@ -7,6 +7,7 @@ import { takeLeagueSeason } from "@/lib/pit/sync";
 import type { Bout, SaturdayFightName } from "@/lib/pit/types";
 import { armBroadcastAudio, Broadcast } from "./broadcast";
 import { Btn, SectionLabel, TextInput } from "./bits";
+import { TeamJanelleOpening } from "./team-janelle-opening";
 
 function fightCopy(fight: SaturdayFightName) {
   if (fight === "rumble") {
@@ -31,7 +32,7 @@ function fightCopy(fight: SaturdayFightName) {
  * commissioner sign-in. Starting a fight fetches that one tape for this screen
  * only; the rest of the site updates when the fight ends or the Desk posts it.
  */
-export function SaturdayGate({ held }: { held: Bout[] }) {
+export function SaturdayGate({ held, onPlayerStarted, onNextFight }: { held: Bout[]; onPlayerStarted?: () => void; onNextFight?: () => void }) {
   const data = usePit();
   const signCommissioner = usePit((s) => s.signCommissioner);
   const fights = held.filter((bout) => saturdayFightKind(bout));
@@ -44,9 +45,10 @@ export function SaturdayGate({ held }: { held: Bout[] }) {
   const [playing, setPlaying] = useState(true);
   const [seek, setSeek] = useState(0);
   const [peek, setPeek] = useState<SaturdayPeek | null>(null);
+  const [opening, setOpening] = useState(false);
+  const [finished, setFinished] = useState(false);
   const [armed, setArmed] = useState<SaturdayFightName | null>(null);
 
-  if (!fights.length) return null;
   const controls = saturdayLockControls(data.session.role);
 
   const start = async (fight: SaturdayFightName) => {
@@ -61,6 +63,9 @@ export function SaturdayGate({ held }: { held: Bout[] }) {
       setSeek(0);
       setPlaying(true);
       setTape(res.bout);
+      onPlayerStarted?.();
+      setFinished(false);
+      setOpening(fight === "rumble");
     } catch (err) {
       setError(err instanceof Error ? err.message : "The Desk could not start that fight.");
     } finally {
@@ -74,7 +79,7 @@ export function SaturdayGate({ held }: { held: Bout[] }) {
     try {
       await publishSaturday({ data: { fight } });
       await takeLeagueSeason();
-      setTape(null);
+      setFinished(true);
       setArmed(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "The result stayed sealed.");
@@ -104,15 +109,18 @@ export function SaturdayGate({ held }: { held: Bout[] }) {
           <p className="font-display text-sm tracking-[0.18em] text-amber uppercase">Desk live watch · {fightCopy(kind).title}</p>
           <div className="flex flex-wrap gap-2">
             <Btn tone="line" onClick={() => { armBroadcastAudio(); setPlaying((on) => !on); }}>{playing ? "Pause" : "Play"}</Btn>
-            <Btn tone="line" onClick={() => { armBroadcastAudio(); setPlaying(true); setSeek((n) => n + 1); }}>Skip to the decision</Btn>
+            {!opening && !finished && <Btn tone="line" onClick={() => { armBroadcastAudio(); setPlaying(true); setSeek((n) => n + 1); }}>Skip to the decision</Btn>}
+            {finished && <Btn onClick={() => { setTape(null); setFinished(false); onNextFight?.(); }}>Next fight</Btn>}
           </div>
         </div>
-        <Broadcast bout={tape} playing={playing} speed={2} seek={seek} chromeless kicker="Live from the Desk" onComplete={() => void post(kind)} />
+        {opening ? <TeamJanelleOpening data={data} playing={playing} onComplete={() => setOpening(false)} /> : <Broadcast bout={tape} playing={playing} speed={2} seek={seek} commentaryPreview={desk} chromeless kicker="Live from the Desk" onComplete={() => void post(kind)} />}
         <p className="px-4 py-3 text-sm text-muted">The result posts for every store when this fight ends. Leaving early keeps it sealed.</p>
-        {error ? <p className="px-4 pb-3 text-sm text-bad">{error}</p> : null}
+        {error ? <div className="px-4 pb-3 text-sm text-bad">{error} <Btn disabled={busy} tone="line" onClick={() => void post(kind)}>Retry posting</Btn></div> : null}
       </section>
     );
   }
+
+  if (!fights.length) return null;
 
   return (
     <section className="border border-amber/70 bg-surface" data-testid="saturday-lock">

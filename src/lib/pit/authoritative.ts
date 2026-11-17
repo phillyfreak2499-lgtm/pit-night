@@ -3,6 +3,7 @@ import { z } from "zod";
 import { grantNov13Repairs, nov13RepairDue, nov13RepairDeploymentAllowed, NOV13_REPAIR_GIFT } from "./owner-repair-gift";
 import { reconcilePeriod12Finale, FINALE_EVENT, FINALE_POST_AFTER } from "./period12-finale";
 import { commandArgs, type Command } from "./commands";
+import { SHOWCASE_LOCK_AT } from "./showcase-model";
 export type SyncMode = "live" | "preview" | "off";
 export type PullResult = {
   mode: SyncMode;
@@ -31,8 +32,11 @@ async function services() {
   return { sql, store, auth, vanilla, mode };
 }
 async function load(options?: { deadlines?: boolean }) {
-  const deadlines = options?.deadlines !== false;
   const s = await services();
+  return loadSeasonFrom(s, options);
+}
+export async function loadSeasonFrom(s: Awaited<ReturnType<typeof services>>, options?: { deadlines?: boolean }) {
+  const deadlines = options?.deadlines !== false;
   const seed = s.vanilla.createStore(s.store.pitCreator).getState();
   await s.sql`insert into pit_season (id, rev, doc) values ('main', 1, ${JSON.stringify(s.store.sharedDoc(seed))}) on conflict (id) do nothing`;
   for (let attempt = 0; attempt < 8; attempt++) {
@@ -44,7 +48,7 @@ async function load(options?: { deadlines?: boolean }) {
     // This is intentionally additive: existing stores, work logs, builds, and results survive.
     const parsed = JSON.parse(row.doc) as import("./types").PitData;
     const normalized = s.store.applyLeague14(s.store.applyMondays(s.store.applyHulen(parsed)));
-    const merged = { ...seed, ...s.store.sharedDoc(normalized) };
+    const merged = { ...s.store.sharedDoc(seed), ...s.store.sharedDoc(normalized), tutorialSeen: false, session: s.auth.publicSession };
     // Run the owner-authorized roster cleanup once against the authoritative
     // season row; not against cached browser roster snapshots.
     const isNewCleanup = row.schema_tag !== SCHEMA_TAG;
@@ -66,7 +70,12 @@ async function load(options?: { deadlines?: boolean }) {
     const finalized = process.env.VERCEL_ENV === "production" ? reconcilePeriod12Finale(gifted, new Date()) : gifted;
     const finaleApplied = finalized !== gifted;
     const due = deadlines ? s.store.applyDueLock(finalized, new Date()) : null;
-    const effective = due ?? finalized;
+    let effective = due ?? finalized;
+    const showcaseNow = Date.now();
+    if (s.store.showcaseFreezeDue(effective, showcaseNow)) {
+      const { freezeShowcase } = await import("./showcase-state.server.ts");
+      effective = freezeShowcase(effective, showcaseNow);
+    }
     const normalizedDoc = JSON.stringify(s.store.sharedDoc(effective));
     let rev = Number(row.rev);
     let doc = row.doc;
@@ -169,6 +178,19 @@ async function load(options?: { deadlines?: boolean }) {
 export async function loadSeason() {
   return load();
 }
+/** Select-only loader for previews and cached presentation reads. */
+export async function readSeason() {
+  const s = await services();
+  return readSeasonFrom(s);
+}
+export async function readSeasonFrom(s: Awaited<ReturnType<typeof services>>) {
+  const row = (await s.sql<{rev:number; doc:string; schema_tag:string}>`select rev, doc, schema_tag from pit_season where id = 'main'`)[0];
+  if (!row) throw new Error('The league season has not been initialized.');
+  const parsed = JSON.parse(row.doc) as import('./types').PitData;
+  const normalized = s.store.applyLeague14(s.store.applyMondays(s.store.applyHulen(parsed)));
+  const data = {...s.store.sharedDoc(normalized),tutorialSeen:false,session:s.auth.publicSession};
+  return {...s,row,data};
+}
 /**
  * Server failures reach the browser as a plain message, and results as plain data.
  * An error the framework cannot package showed up only as "Seroval Error (step: 1)",
@@ -191,11 +213,11 @@ export const pullSeason = createServerFn({ method: "POST" })
     const meta = (
       await quick.sql<{
         rev: number; schema_tag: string; phase: import("./types").Phase | null;
-        season_name: string | null; week: string | null; owner_events: string | null;
+        season_name: string | null; week: string | null; owner_events: string | null; showcase_locked: string | null;
       }>`
         select rev, schema_tag, doc::json->>'phase' as phase,
           doc::json->>'seasonName' as season_name, doc::json->>'week' as week,
-          doc::json->>'ownerEvents' as owner_events
+          doc::json->>'ownerEvents' as owner_events, doc::json->'showcase'->>'lockedAt' as showcase_locked
         from pit_season where id = 'main'
       `
     )[0];
@@ -214,7 +236,8 @@ export const pullSeason = createServerFn({ method: "POST" })
     // An open week still loads once a scheduled lock can be due, so it freezes without a Desk button.
     const finalePending = process.env.VERCEL_ENV === "production" && meta?.season_name === "Period 12" && Number(meta.week) === 4 && Date.now() > FINALE_POST_AFTER &&
       !(meta.owner_events ? JSON.parse(meta.owner_events) as string[] : []).includes(FINALE_EVENT);
-    if (unchanged && !repairPending && !finalePending && (closed || !anyDeadlineDue(new Date()))) {
+    const showcasePending = Date.now() >= SHOWCASE_LOCK_AT && !meta?.showcase_locked;
+    if (unchanged && !repairPending && !finalePending && !showcasePending && (closed || !anyDeadlineDue(new Date()))) {
       // Verify expiry and credential generation on every pull, even unchanged ones.
       return { mode: quick.mode, rev: Number(meta.rev), doc: null, session: await quick.auth.session() };
     }
@@ -299,7 +322,10 @@ export const mutateSeason = createServerFn({ method: "POST" })
         args: input.args,
       });
       if (buildRejection) throw new Error(buildRejection);
-      const state = s.vanilla.createStore(s.store.pitCreator);
+      const creator = input.name === "runSaturday"
+        ? s.store.createPitCreator((await import("./run-card.server.ts")).runServerCard)
+        : s.store.pitCreator;
+      const state = s.vanilla.createStore(creator);
       state.setState({ ...s.data, session, flash: "" });
       if (input.name === "submitSpark") {
         const { programWeek } = await import("./training");

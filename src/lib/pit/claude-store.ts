@@ -22,6 +22,18 @@ export async function claimCopy(sql: Sql, kind: string, key: string, model: stri
   return Boolean(rows[0]);
 }
 
+/** Retry a previously reserved row without creating a new, unreserved claim. */
+export async function retryCopy(sql: Sql, kind: string, key: string, model: string) {
+  const rows = await sql<{ attempts: number }>`
+    update pit_claude_text
+    set status = 'pending', attempts = attempts + 1, claimed_at = now(), model = ${model}, error = null
+    where kind = ${kind} and key = ${key} and
+      ((status = 'pending' and claimed_at < now() - ${PENDING_STALE}::interval)
+       or (status = 'failed' and claimed_at < now() - ${FAILED_RETRY}::interval and attempts < ${MAX_ATTEMPTS}))
+    returning attempts`;
+  return Boolean(rows[0]);
+}
+
 export async function readCopy(sql: Sql, kind: string, key: string) {
   return (
     await sql<{ status: string; body: string | null }>`select status, body from pit_claude_text where kind = ${kind} and key = ${key}`

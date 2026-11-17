@@ -1,9 +1,12 @@
 import { createFrameLoop } from "@/lib/pit/frame-loop";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useEventCommentary } from './use-event-commentary';
+import { rumbleSegments } from '@/lib/pit/event-commentary';
+import { usePit } from '@/lib/pit/store';
 import { PAINT } from "@/lib/pit/catalog";
 import { methodLabel } from "@/lib/pit/engine";
 import { reactiveMoment, type ReactiveCue } from "@/lib/pit/reactive-commentary";
-import { armSound, playBell, playClank, playCount, playDecision, playFinisher, playWeaponHit } from "@/lib/pit/sound";
+import { armSound, playBell, playClank, playCount, playDecision, playFinisher, playWeaponHit, soundMuted, subscribeSound } from "@/lib/pit/sound";
 import type { Bout, Exchange, FightResult } from "@/lib/pit/types";
 import { Fx, drawSide, drawTop, impactPoints, project, stepBots } from "./cage-draw";
 import { arenaForWeek, arenaTheme, hazardCallout, type ArenaId } from "./arena-scenes";
@@ -27,6 +30,8 @@ export function Broadcast({
   chromeless = false,
   kicker,
   noDamage = false,
+  commentaryPreview = false,
+  commentaryEnabled = true,
   arena: arenaProp,
   /** Watch party: the cage fills the viewport and the overhead cam is a corner inset. */
   stage = false,
@@ -43,6 +48,9 @@ export function Broadcast({
   kicker?: string;
   /** Scrimmage tape. The decision line must not invent a damage quote. */
   noDamage?: boolean;
+  /** PIN-authenticated rehearsal uses the prepared cache before the public show. */
+  commentaryPreview?: boolean;
+  commentaryEnabled?: boolean;
   /** Override the week's arena (the Playground picks its own). */
   arena?: ArenaId;
   stage?: boolean;
@@ -73,6 +81,14 @@ export function Broadcast({
   const [hp, setHp] = useState<Record<string, number>>({});
   const [meters, setMeters] = useState<Record<string, MeterRead | null>>({});
   const [clock, setClock] = useState("0:00");
+  const [recordedTime, setRecordedTime] = useState(0);
+  const [decisionShown, setDecisionShown] = useState(false);
+  const [muted, setMuted] = useState(soundMuted);
+  const revealed = usePit(s => Boolean(s.saturdayWatch?.rumbleRevealedAt));
+  useEffect(() => subscribeSound(() => setMuted(soundMuted())), []);
+  const commentarySegments = useMemo(() => result?.rumbleEntries ? rumbleSegments(result) : [], [result]);
+  const preparedLine = useEventCommentary({ event:'rumble', seed:result?.seed ?? '', segments:commentarySegments, time:recordedTime, playing:playing && commentaryEnabled && Boolean(result?.rumbleEntries), muted, preview:commentaryPreview, revealed:revealed && decisionShown, closingReady:revealed && decisionShown });
+  const [enteredIds, setEnteredIds] = useState<string[]>(() => result?.rumbleEntries?.filter(e => e.at === 0).map(e => e.fighterId) ?? []);
   const [round, setRound] = useState<string>("");
   const timeRef = useRef(0);
   const cueRef = useRef("");
@@ -174,6 +190,10 @@ export function Broadcast({
         }
       }
       const drive = fightDrive(result, beat, local, time, { mainEvent });
+      if (result.rumbleEntries) {
+        setRecordedTime(Math.floor(time * 10) / 10);
+        setDecisionShown(beat.kind === 'decision');
+      }
       // Melee bouts get the count too.
       if (beat.kind === "countdown" && drive.countdown == null) drive.countdown = Math.max(0, 3 - Math.floor(local * 4));
       if (playing && drive.countdown != null && drive.countdown !== countSaid) {
@@ -273,6 +293,10 @@ export function Broadcast({
       if (finishPhase) paintChampionshipFinish(ctx, canvas.width, canvas.height, result, drive, finishPhase, playing ? dt : 0, titleFx, reduced, fx.cam);
       setCaption(titleEntrance ? `Championship finalist: ${heroSide.botName} from ${heroSide.storeName}. The spotlight is yours.` : captionFor(result, bout, beat, noDamage));
       // The bars follow the bots on screen; the replay shows where the fight ended.
+      if (result.rumbleEntries) {
+        const ids = drive.bots.map(b => b.bot.id);
+        setEnteredIds(previous => previous.length === ids.length && previous.every((id, i) => id === ids[i]) ? previous : ids);
+      }
       const bars = hpFor(result, beat, local);
       if (beat.kind === "replay") for (const f of result.fighters) bars[f.id] = result.hp[f.id] ?? bars[f.id] ?? 100;
       else for (const b of drive.bots) bars[b.bot.id] = Math.round(b.hp);
@@ -333,7 +357,8 @@ export function Broadcast({
   if (!result) return null;
   const group = result.fighters.length > 2;
   const largeField = result.fighters.length > 4;
-  const survivors = result.fighters.filter((f) => (hp[f.id] ?? 100) > 0).length;
+  const visibleFighters = result.rumbleEntries ? result.fighters.filter(f => enteredIds.includes(f.id)) : result.fighters;
+  const survivors = visibleFighters.filter((f) => (hp[f.id] ?? 100) > 0).length;
   const left = group ? undefined : result.fighters[0];
   const right = group ? undefined : result.fighters[1];
   const beats = broadcastBeats(bout, result);
@@ -347,7 +372,7 @@ export function Broadcast({
   const healthFor = (fighter: (typeof result.fighters)[number], align: "left" | "right") => largeField ? (
     <div className="min-w-0" aria-label={`${fighter.botName}: ${(hp[fighter.id] ?? 100) <= 0 ? "eliminated" : `${Math.round(hp[fighter.id] ?? 100)} health`}`}>
       <p className={`truncate font-display text-[11px] ${(hp[fighter.id] ?? 100) <= 0 ? "text-muted" : "text-fg"}`}>
-        <span className="text-amber">#{result.fighters.indexOf(fighter) + 1}</span> {fighter.botName}
+        <span className="text-amber">#{result.rumbleEntries ? result.rumbleEntries.findIndex(e => e.fighterId === fighter.id) + 1 : result.fighters.indexOf(fighter) + 1}</span> {fighter.botName}
       </p>
       <div className="flex items-center gap-1">
         <div className="h-1 flex-1 bg-white/10"><div className="h-full bg-amber" style={{ width: `${Math.max(0, hp[fighter.id] ?? 100)}%` }} /></div>
@@ -376,7 +401,7 @@ export function Broadcast({
       )}
       {group && !stage ? (
         <div className={`grid grid-cols-2 gap-3 border-b border-line p-3 ${largeField ? "sm:grid-cols-3 lg:grid-cols-4" : ""}`} aria-label="All fighters' health">
-          {result.fighters.map((fighter) => (
+          {visibleFighters.map((fighter) => (
             <div key={fighter.id} data-testid={`group-health-${fighter.id}`}>
               {healthFor(fighter, "left")}
             </div>
@@ -390,7 +415,7 @@ export function Broadcast({
             {group && stage ? (
               <div className={`grid max-h-[30vh] gap-2 overflow-y-auto ${largeField ? "grid-cols-3 lg:grid-cols-4" : "grid-cols-2"}`} aria-label="All fighters' health">
                 {largeField ? <p className="col-span-full font-display text-[11px] text-amber">{survivors} / {result.fighters.length} STILL STANDING</p> : null}
-                {result.fighters.map((fighter) => (
+                {visibleFighters.map((fighter) => (
                   <div key={fighter.id} data-testid={`group-health-${fighter.id}`}>
                     {healthFor(fighter, "left")}
                   </div>
@@ -407,7 +432,7 @@ export function Broadcast({
               </>
             )}
           </div>
-          <p className={`absolute inset-x-0 bottom-0 bg-deep/95 px-3 py-1.5 text-xs leading-relaxed md:py-3 md:text-base ${stage ? "pr-28 sm:pr-40" : ""}`}>{caption}</p>
+          <p className={`absolute inset-x-0 bottom-0 bg-deep/95 px-3 py-1.5 text-xs leading-relaxed md:py-3 md:text-base ${stage ? "pr-28 sm:pr-40" : ""}`}>{preparedLine || caption}</p>
         </div>
         <div hidden={Boolean(entranceId)} className={stage ? "pointer-events-none absolute right-2 bottom-14 z-20 w-24 sm:w-36 md:bottom-16 md:w-44" : "relative min-w-0 bg-deep lg:min-h-full"}>
           <canvas ref={topRef} aria-label="Overhead arena camera" className={stage ? "aspect-square w-full border border-white/25 bg-deep shadow-lg" : "aspect-square w-full bg-deep lg:absolute lg:inset-0 lg:h-full lg:w-full"} />
@@ -549,6 +574,7 @@ function meterPhase(beat: Beat, local: number): MeterPhase {
 }
 
 function captionFor(result: FightResult, bout: Bout, beat: Beat, noDamage: boolean) {
+  if (beat.kind === "rumble") return "The Rumble is underway.";
   if (beat.kind === "bumper" && bout.kind === "bye") return "Bye. It counts as a win. The bot does not take damage.";
   if (beat.kind === "bumper") return noDamage ? "Bay scrimmage. The house drill. Nothing posts." : `${bout.title}. Fourteen stores. This cage holds ${bout.kind === "melee" ? "the tie" : result.fighters.length > 2 ? `${result.fighters.length} bots` : "two"}.`;
   if (beat.kind === "intro") {

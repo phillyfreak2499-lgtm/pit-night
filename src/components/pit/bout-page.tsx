@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { TaleOfTape } from "./tale-of-tape";
 import { Link } from "@tanstack/react-router";
 import { programRecords, storeNameMap } from "@/lib/pit/fight-card";
@@ -10,16 +11,22 @@ import { coachStore } from "@/lib/pit/coach-tape";
 import { buildTape } from "@/lib/pit/replay";
 import { saturdayFightId } from "@/lib/pit/saturday-seal";
 import { SaturdayGate } from "./saturday-gate";
+import { keepDirectSaturdayGate } from "./playback-lifecycle";
 
 export function BoutPage({ boutId }: { boutId: string }) {
+  return <BoutPageContent key={boutId} boutId={boutId} />;
+}
+
+function BoutPageContent({ boutId }: { boutId: string }) {
   const data = usePit();
+  const [activeBoutId, setActiveBoutId] = useState<string | null>(null);
   const bout = data.bouts.find((b) => b.id === boutId) ?? data.replays?.flatMap((row) => row.bouts).find((b) => b.id === boutId);
   if (saturdayFightId(boutId)) {
     const held = buildTape(data, 5).held.filter((row) => row.id === boutId);
-    if (held.length) {
+    if (keepDirectSaturdayGate(boutId, held.length, activeBoutId)) {
       return (
         <div className="mx-auto max-w-5xl">
-          <SaturdayGate held={held} />
+          <SaturdayGate key={boutId} held={held} onPlayerStarted={() => setActiveBoutId(boutId)} onNextFight={() => setActiveBoutId(null)} />
         </div>
       );
     }

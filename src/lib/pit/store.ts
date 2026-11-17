@@ -50,7 +50,8 @@ import { blockedName } from "../../../scripts/copy-guard.mjs";
 import { bannerVerdict, cosmeticUnlocked, earnedRewardIds, garageThemeUnlocked, HALLOWEEN_REWARD_IDS, THANKSGIVING_REWARD_IDS, validBodyForClass } from "./cosmetics";
 import { boltCoinsLeft, boltsOf, lockerItem, sparkStreak } from "./week";
 import { checkedCosmeticLoadout } from "./cosmetic-loadout";
-import { authorize } from "./commands";
+import { authorize, showcaseBuildBlock } from "./commands";
+import { SHOWCASE_LOCK_AT, showcaseField } from "./showcase-model";
 import { showEffect } from "./halloween";
 import { thanksgivingShowEffect } from "./thanksgiving";
 import { buildLockMessage, deadlineDue, weekDeadline } from "./time";
@@ -205,9 +206,18 @@ function starterBodyGuard(data: PitData, storeId: string): string | null {
 }
 
 /** Captains and crew cannot move iron once this week's automatic deadline has passed. The Desk still can. */
-function captainBuildBlock(data: PitData): string | null {
-  if (isBoss(data) || !deadlineDue(data.week, new Date())) return null;
-  return buildLockMessage(data.week);
+function captainBuildBlock(data: PitData, storeId: string): string | null {
+  if (isBoss(data)) return null;
+  const now = new Date();
+  return showcaseBuildBlock(data, storeId, now) ?? (deadlineDue(data.week, now) ? buildLockMessage(data.week) : null);
+}
+
+/** Only a complete, distinct field with exactly one bot per store can be frozen. */
+export function showcaseFreezeDue(data: PitData, now: number): boolean {
+  if (now < SHOWCASE_LOCK_AT || data.showcase?.lockedAt) return false;
+  const field = showcaseField(data);
+  return field.length === 12 && new Set(field).size === 12 &&
+    field.every(id => data.bots.filter(bot => bot.storeId === id).length === 1);
 }
 
 function buildsFrozen(data: PitData): boolean {
@@ -403,7 +413,7 @@ export const TUTORIAL_REV = 3;
 export const SHARED_KEYS = [
   "version", "seasonName", "tagline", "week", "phase", "stores", "crew", "bots", "weeks", "storeCards", "bouts", "replays",
   "gazette", "quotes", "proposals", "mvps", "honors", "saturdayWatch", "saturdayBaseline", "craft", "log", "intel", "jobLog", "rallies", "sparkLog", "shouts", "picks",
-  "trainingOpenAll", "kickoff", "cosmeticProposals", "halloweenArcade", "ownerEvents",
+  "trainingOpenAll", "kickoff", "cosmeticProposals", "halloweenArcade", "ownerEvents", "showcase",
 ] as const satisfies readonly (keyof PitData)[];
 
 export type SharedDoc = Pick<PitData, (typeof SHARED_KEYS)[number]>;
@@ -428,6 +438,12 @@ export function sharedDoc(state: PitData): SharedDoc {
 export function clientDoc(state: PitData, session: Session): SharedDoc {
   const sealed = sealSaturday(state);
   const out = sharedDoc(sealed);
+  if (out.showcase) {
+    const showcase = out.showcase;
+    out.showcase = { field:showcase.field, teams:showcase.teams, createdAt:showcase.createdAt, lockedAt:showcase.lockedAt, preparedAt:showcase.preparedAt,
+      events:Object.fromEntries(Object.entries(showcase.events).map(([id,event])=>[id,event ? {...event,tape:event.revealedAt ? event.tape : null} : event])),
+      ...(showcase.events['team-gauntlet']?.revealedAt ? {entryOrder:showcase.entryOrder} : {}) };
+  }
   // The pre-Saturday snapshot is how the seal restores wear. It never leaves the server.
   delete out.saturdayBaseline;
   // Game solutions and attempt ledgers never travel in the shared client snapshot,
@@ -525,7 +541,7 @@ export function grantOwnerGifts(data: PitData, due: OwnerGiftDue): PitData {
   };
 }
 
-export const pitCreator: StateCreator<PitState> = (set, get) => ({
+export const createPitCreator = (runCard: typeof playCard = playCard): StateCreator<PitState> => (set, get) => ({
       ...fresh(),
       setSticker: (storeId, slot, decal) => {
         const data = get();
@@ -580,7 +596,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "Sign in to choose this store's starter body." });
           return;
         }
-        const buildBlock = captainBuildBlock(data);
+        const buildBlock = captainBuildBlock(data, storeId);
         if (buildBlock) {
           set({ flash: buildBlock });
           return;
@@ -632,7 +648,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "Only the captain can change the fighting class." });
           return;
         }
-        const buildBlock = captainBuildBlock(data);
+        const buildBlock = captainBuildBlock(data, storeId);
         if (buildBlock) { set({ flash: buildBlock }); return; }
         const check = classSwitchCheck(data, storeId, classId);
         if (!check.ok) { set({ flash: check.reason }); return; }
@@ -679,7 +695,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "Only the captain can change parts." });
           return;
         }
-        const buildBlock = captainBuildBlock(data);
+        const buildBlock = captainBuildBlock(data, storeId);
         if (buildBlock) {
           set({ flash: buildBlock });
           return;
@@ -736,7 +752,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "Only the captain can change parts." });
           return;
         }
-        const buildBlock = captainBuildBlock(data);
+        const buildBlock = captainBuildBlock(data, storeId);
         if (buildBlock) {
           set({ flash: buildBlock });
           return;
@@ -793,7 +809,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "Captain clipboard required." });
           return;
         }
-        const buildBlock = captainBuildBlock(data);
+        const buildBlock = captainBuildBlock(data, storeId);
         if (buildBlock) {
           set({ flash: buildBlock });
           return;
@@ -988,7 +1004,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "The wallet answers to the captain." });
           return;
         }
-        const buildBlock = captainBuildBlock(data);
+        const buildBlock = captainBuildBlock(data, storeId);
         if (buildBlock) {
           set({ flash: buildBlock });
           return;
@@ -1041,7 +1057,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "The wallet answers to the captain." });
           return;
         }
-        const buildBlock = captainBuildBlock(data);
+        const buildBlock = captainBuildBlock(data, storeId);
         if (buildBlock) {
           set({ flash: buildBlock });
           return;
@@ -1093,7 +1109,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "The wallet answers to the captain." });
           return;
         }
-        const buildBlock = captainBuildBlock(data);
+        const buildBlock = captainBuildBlock(data, storeId);
         if (buildBlock) {
           set({ flash: buildBlock });
           return;
@@ -1126,7 +1142,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           set({ flash: "Repairs go through the captain." });
           return;
         }
-        const buildBlock = captainBuildBlock(data);
+        const buildBlock = captainBuildBlock(data, storeId);
         if (buildBlock) {
           set({ flash: buildBlock });
           return;
@@ -1938,7 +1954,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
           ({ ...b, locked: { ...(b.locked ?? b.draft) }, equipped: { ...(b.locked ?? b.draft) } }),
         );
         const staged: PitData = { ...data, phase: "locked", bots: lockedBots };
-        const bouts = playCard(staged);
+        const bouts = runCard(staged);
         const gazette = [...writeGazette(staged, bouts), ...data.gazette.filter((g) => g.week !== data.week || g.kicker === "House call")];
         const craft = [
           ...data.craft.filter((c) => c.week !== data.week),
@@ -2143,6 +2159,7 @@ export const pitCreator: StateCreator<PitState> = (set, get) => ({
       },
     });
 
+export const pitCreator = createPitCreator();
 
 function spyReady(
   data: PitData,

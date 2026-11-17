@@ -9,6 +9,28 @@ const smooth = (n: number) => { const p = Math.max(0, Math.min(1, n)); return p 
 export function paintCelebration(ctx: CanvasRenderingContext2D, width: number, height: number, cast: FighterSnap[], seconds: number, reduced: boolean) {
   ctx.clearRect(0, 0, width, height);
   if (!width || !height) return;
+  // Arena rig, floor and crowd lights establish a distinct pre-fight celebration.
+  const backdrop = ctx.createLinearGradient(0, 0, 0, height);
+  backdrop.addColorStop(0, "#101324"); backdrop.addColorStop(0.55, "#302033"); backdrop.addColorStop(1, "#17191e");
+  ctx.fillStyle = backdrop; ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = "#39404b"; ctx.fillRect(0, height * 0.07, width, height * 0.015);
+  for (let i = 0; i < 9; i++) {
+    const x = width * (0.06 + i * 0.11), sweep = reduced ? 0 : Math.sin(seconds * 0.5 + i) * width * 0.06;
+    ctx.fillStyle = i % 2 ? "rgba(144,196,255,0.09)" : "rgba(255,149,205,0.09)";
+    ctx.beginPath(); ctx.moveTo(x, height * 0.09); ctx.lineTo(x - width * 0.11 + sweep, height * 0.9); ctx.lineTo(x + width * 0.11 + sweep, height * 0.9); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = i % 2 ? "#a8d8ff" : "#ffd0ea"; ctx.beginPath(); ctx.arc(x, height * 0.085, Math.max(2, width * 0.004), 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.strokeStyle = "rgba(244,182,216,0.32)"; ctx.lineWidth = Math.max(1, height * 0.004);
+  for (const y of [0.74, 0.88]) { ctx.beginPath(); ctx.moveTo(0, height * y); ctx.lineTo(width, height * y); ctx.stroke(); }
+  // Clock-driven fireworks freeze with playback; reduced motion shows a quiet static burst.
+  for (let burst = 0; burst < 4; burst++) {
+    const phase = reduced ? 0.65 : ((seconds + burst * 0.8) % 3.2) / 3.2;
+    const x = width * (0.13 + burst * 0.245), y = height * (0.18 + (burst % 2) * 0.1);
+    const radius = Math.min(width, height) * (0.025 + phase * 0.1);
+    ctx.save(); ctx.globalAlpha = reduced ? 0.6 : Math.sin(phase * Math.PI) * 0.85; ctx.strokeStyle = COLORS[burst % COLORS.length]!; ctx.lineWidth = Math.max(1, height * 0.004);
+    for (let ray = 0; ray < 12; ray++) { const angle = ray * Math.PI / 6; ctx.beginPath(); ctx.moveTo(x + Math.cos(angle) * radius * 0.48, y + Math.sin(angle) * radius * 0.48); ctx.lineTo(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius); ctx.stroke(); }
+    ctx.restore();
+  }
   for (const x of [0.12, 0.5, 0.88]) {
     const glow = ctx.createRadialGradient(width * x, height * 0.2, 0, width * x, height * 0.2, width * 0.4);
     glow.addColorStop(0, "rgba(224,132,195,0.12)"); glow.addColorStop(1, "rgba(224,132,195,0)");
