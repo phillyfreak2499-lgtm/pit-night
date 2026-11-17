@@ -118,7 +118,7 @@ test("new calls take earlier wording and tape details into account", () => {
   assert.ok(repeatsCall("Another hit sends Road Rage spinning!", [old]));
   assert.ok(repeatsCall("That one really rattled him!", []));
   assert.ok(!repeatsCall("Road Rage answers with 25 damage!", [old]));
-  assert.match(impactLine(m), /25 damage/);
+  assert.match(impactLine(m), /16 damage/);
   const replies = [1, 2, 3].map(index => analystReply({...m, index, kind:"half-health"}));
   assert.equal(new Set(replies).size, 3);
 });

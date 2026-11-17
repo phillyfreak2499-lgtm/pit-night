@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { ReactivePhase } from "./reactive-commentary";
 import type { BoothClip } from "./booth";
+import {resolvePlaybackBout} from "./playback-bout";
 
 export type ReactiveCommentaryResponse =
   | { status: "ready"; body: string; audio?: string; replyClip?: BoothClip; voicePending?: boolean }
@@ -12,6 +13,7 @@ export type ReactiveCommentaryResponse =
 export const getReactiveCommentary = createServerFn({ method: "POST" })
   .validator(z.object({
     boutId: z.string().min(1).max(160),
+    seed: z.string().min(1).max(16384),
     phase: z.enum(["exchange", "finisher"]),
     index: z.number().int().min(0).max(500),
     preview: z.boolean().optional(),
@@ -20,7 +22,7 @@ export const getReactiveCommentary = createServerFn({ method: "POST" })
     const [
       { loadSeason },
       { reactiveMoment, reactivePrompt, shortReactiveLine, repeatsCall, impactLine },
-      { hashString, previewSaturday },
+      { hashString },
       { sealSaturday, saturdayFightId },
       { askClaude, FEATURE_MODEL },
       { getSql },
@@ -38,18 +40,16 @@ export const getReactiveCommentary = createServerFn({ method: "POST" })
     ]);
     const { data: saved } = await loadSeason();
     const data = saturdayFightId(input.boutId) ? sealSaturday(saved) : saved;
-    const archived = data.replays?.flatMap(replay => replay.bouts).find(b => b.id === input.boutId && b.result);
-    const house = input.preview && !saturdayFightId(input.boutId) && !data.bouts.some(b => b.week === data.week && b.result);
-    const bout = house ? previewSaturday(data).find(b => b.id === input.boutId) : archived ?? data.bouts.find((b) => b.id === input.boutId);
-    if (!bout?.result || bout.kind === "bye" || (!house &&
-        !(data.week > bout.week || ["fought", "inspected", "complete"].includes(data.phase))))
-      return { status: "unavailable" };
+    const bout = resolvePlaybackBout(data,input.boutId,{preview:input.preview,seed:input.seed});
+    if (!bout?.result || bout.kind === "bye") return {status:"unavailable"};
+    const house = !data.replays?.some(r=>r.bouts.some(b=>b.id===bout.id)) && !data.bouts.some(b=>b.id===bout.id&&b.result);
 
     const moment = reactiveMoment(bout.result, { phase: input.phase as ReactivePhase, index: input.index });
     if (!moment) return { status: "unavailable" };
 
     const kind = "reactive";
-    const prefix = (house ? "house:" : "") + bout.id + ":" + hashString(bout.result.seed) + ":ringside-v3:";
+    const {createHash}=await import("node:crypto");
+    const prefix = (house ? "house:" : "") + bout.id + ":" + createHash("sha256").update(bout.result.seed).digest("hex") + ":ringside-v4:";
     const key = prefix + (house ? hashString(JSON.stringify(moment)) + ":" : "") + moment.beatId;
     const sql = await getSql();
     async function ready(body: string, leadKey = key): Promise<ReactiveCommentaryResponse> {

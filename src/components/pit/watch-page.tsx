@@ -52,7 +52,7 @@ export function WatchPage() {
   const [commentaryEnabled, setCommentaryEnabled] = useState(true);
   const muted = useSyncExternalStore(subscribeSound, soundMuted, () => false);
   const walkout = Boolean(stage === "intro" && bout?.result && bout.kind !== "bye" && commentaryEnabled && !muted);
-  const { line: commentaryLine, onNotableBeat } = useFightAudio(bout, stage === "fight" && !paused,
+  const { line: commentaryLine, onNotableBeat, onPlaybackMoment } = useFightAudio(bout, stage === "fight" && !paused,
     index + week - 1, commentaryEnabled, muted, !tape?.live);
 
   const next = useCallback(() => {
@@ -223,6 +223,7 @@ export function WatchPage() {
             kicker={replaying ? "Replay" : (tape ?? liveTape).live ? "Live card" : "House tape"}
             onComplete={next}
             onNotableBeat={onNotableBeat}
+          onPlaybackMoment={onPlaybackMoment}
           />
           {commentaryEnabled && commentaryLine ? <p className="absolute bottom-32 left-2 z-40 max-w-lg border-l-2 border-amber bg-deep/90 px-3 py-2 text-base" aria-live="polite" data-testid="reactive-commentary"><span className="mr-2 font-display text-xs tracking-widest text-amber uppercase">AI color</span>{commentaryLine}</p> : null}
           <div className="absolute bottom-[4.75rem] left-2 z-40 flex gap-1 sm:bottom-20">
