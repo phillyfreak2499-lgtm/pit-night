@@ -93,7 +93,7 @@ test("five-week release flow preserves vouchers, applies pending repair safely, 
 // The SQL adapter is entirely in memory: this test never imports the real database.
 const source = readFileSync(new URL("../src/lib/pit/authoritative.ts", import.meta.url), "utf8");
 const schemaLiteral = source.match(/const SCHEMA_TAG = ("[^"]+");/)![1]!;
-const loadBody = stripTypeScriptTypes(source.slice(source.indexOf("async function load("), source.indexOf("/** Server-only:")));
+const loadBody = stripTypeScriptTypes(source.slice(source.indexOf("async function load("), source.indexOf("/** Server-only:")).replace("export async function loadSeasonFrom", "async function loadSeasonFrom"));
 const loadFactory = new Function("reconcilePeriod12Finale", "FINALE_EVENT", "services", "grantNov13Repairs", "nov13RepairDue", "nov13RepairDeploymentAllowed", "NOV13_REPAIR_GIFT", "Date", "process", "console",
   `const SCHEMA_TAG = ${schemaLiteral}; ${loadBody}; return load;`);
 

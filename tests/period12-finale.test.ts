@@ -105,7 +105,7 @@ test("production settlement verifies its backup, retries concurrent writes and n
   const source = readFileSync(new URL("../src/lib/pit/authoritative.ts", import.meta.url), "utf8");
   const schema = JSON.parse(source.match(/const SCHEMA_TAG = ("[^"]+");/)![1]!);
   const body = stripTypeScriptTypes(
-    source.slice(source.indexOf("async function load("), source.indexOf("/** Server-only:")),
+    source.slice(source.indexOf("async function load("), source.indexOf("/** Server-only:")).replace("export async function loadSeasonFrom", "async function loadSeasonFrom"),
   );
   const factory = new Function(
     "services",
