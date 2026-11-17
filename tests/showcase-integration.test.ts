@@ -142,10 +142,18 @@ test('prize changes stop at Friday lock while ordinary edits and Desk override r
  state.setState({cosmeticProposals:[proposal]}); state.getState().acceptCosmetic('valid'); assert.equal(state.getState().cosmeticProposals[0]!.status,'accepted');
 });
 
-test('readSeasonFrom reads the actual row without any write',async()=>{
+test('readSeasonFrom produces cloneable data for a real rehearsal without writes',async()=>{
  const {readSeasonFrom}=await import('../src/lib/pit/authoritative.ts'); const store=await import('../src/lib/pit/store.ts'); const vanilla=await import('zustand/vanilla');
  const data=fixture(), doc=JSON.stringify(sharedDoc(data)); const calls:string[]=[];
  const sql=async (strings:TemplateStringsArray)=>{const query=strings.join('?'); calls.push(query); if(!/^select /i.test(query.trim())) throw new Error('unexpected write'); return [{rev:7,doc,schema_tag:'old'}];};
  const result=await readSeasonFrom({sql,store,vanilla,auth:{publicSession:{role:'public',storeId:null,crewId:null}},mode:'preview'} as never);
- assert.equal(result.row.rev,7); assert.equal(result.data.week,5); assert.equal(calls.length,1); assert.match(calls[0]!,/^select /i); assert.equal(result.data.showcase,undefined);
+ assert.equal(result.row.rev,7); assert.equal(result.data.week,5);
+ const hasFunction=(value:unknown):boolean => typeof value==='function' || (value!==null && typeof value==='object' && Object.values(value).some(hasFunction));
+ assert.equal(hasFunction(result.data),false);
+ assert.doesNotThrow(()=>structuredClone(result.data));
+ assert.equal(showcaseField(result.data).length,12);
+ const rehearsal=previewShowcase(result.data,'striker-race','rehearsal');
+ assert.ok(rehearsal.fighters.length>0);
+ assert.ok(rehearsal.fighters.every(f=>f.classId==='striker'));
+ assert.equal(calls.length,1); assert.match(calls[0]!,/^select /i); assert.equal(result.data.showcase,undefined);
 });

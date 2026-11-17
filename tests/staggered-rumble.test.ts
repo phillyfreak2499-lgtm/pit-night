@@ -62,11 +62,12 @@ test('recorded clock controls visible arrivals and health while seeking', () => 
   }
 });
 
-test('a strong first entrant can win and recorded health changes at the hit', () => {
-  const field=bots.map((b,i)=>({...b, stats:i===0 ? {power:10000,speed:30,armor:100,heat:20} : {power:5,speed:5,armor:5,heat:5}}));
-  const r=fightStaggeredRumble(field,'strong',field.map(b=>b.id));
+test('an ordinary first entrant can win and recorded health changes at the hit', () => {
+  const field=Array.from({length:12},(_,i)=>({...structuredClone(frontierFighters[i%2]!),id:`anon-${i}`}));
+  const r=fightStaggeredRumble(field,'bounded-18',field.map(b=>b.id));
   assert.equal(r.order[0],field[0]!.id);
-  const result={...r,fighters:field,rumbleEntries:r.entries,method:'melee',winnerIds:[r.order[0]!],seed:'strong'} as any;
+  assert.deepEqual(r.entries.map(e=>e.at),[0,0,3,6,9,12,15,18,21,24,27,30]);
+  const result={...r,fighters:field,rumbleEntries:r.entries,method:'melee',winnerIds:[r.order[0]!],seed:'bounded-18'} as any;
   const beat=buildBeats(result)[0]!;
   const ex=r.exchanges[0]!;
   const state=(at:number)=>fightDrive(result,beat,at/beat.dur,at);
