@@ -378,7 +378,7 @@ export const WEEK_META: WeekMeta[] = [
   {
     number: 5,
     name: "Rumble & Championship Prep",
-    blurb: "Nov 17–27. All fourteen stores prepare: eighteen jobs, nine Sparks and captain CARE. Every build locks Friday, Nov 27 at 6 PM CT. Saturday Nov 28 at 9:30 AM CT: the Desk PIN starts the Third Place Royal Rumble, then the championship. Zero health or a pit throw eliminates a bot.",
+    blurb: "Nov 17–27. All fourteen stores prepare: eighteen jobs, nine Sparks and captain CARE. The twelve nonfinalists lock Showcase builds Saturday, Nov 21 at 6 PM CT for the Tuesday, Nov 24 Showcase. Rumble and championship builds lock Friday, Nov 27 at 6 PM CT. Saturday Nov 28 at 9:30 AM CT: the Desk PIN starts the Third Place Royal Rumble, then the championship. Zero health or a pit throw eliminates a bot.",
     tagsEnabled: false,
   },
 ];

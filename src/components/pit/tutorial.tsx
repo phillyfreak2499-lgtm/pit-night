@@ -45,7 +45,7 @@ const STEPS = [
   {
     kicker: "The trophy",
     title: "Win your conference. Then survive Championship Saturday.",
-    body: "After four regular rounds, Metro and Frontier each crown one champion by win-loss record. Ties for first go straight to a fight: two bots duel, three or more battle together, automatically after the Week 4 card. All fourteen stores prepare their own bots November 17–27. The two conference winners enter the championship; the other twelve enter the Rumble. Rally is optional and cosmetic. Saturday starts with a larger-arena Royal Rumble: all non-finalists battle together for third place. The Waterman Championship follows with no judges or round cap, ending when a bot reaches zero health or is completely thrown into the pit.",
+    body: "After four regular rounds, Metro and Frontier each crown one champion by win-loss record. Ties for first go straight to a fight: two bots duel, three or more battle together, automatically after the Week 4 card. All fourteen stores prepare their own bots November 17–27. The two conference winners enter the championship; the other twelve enter the Rumble. Rally is optional and cosmetic. Saturday starts with a larger-arena Royal Rumble for third place: two nonfinalists start, then one enters every three seconds, with all twelve in by thirty seconds. The Waterman Championship follows with no judges or round cap, ending when a bot reaches zero health or is completely thrown into the pit.",
   },
 ];
 
