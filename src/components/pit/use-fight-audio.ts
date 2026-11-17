@@ -14,6 +14,6 @@ export function useFightAudio(bout: Bout | null, playing: boolean, track: number
     return () => { mix.current?.stop(); mix.current = null; };
   }, [bout?.id, playing, muted, track]);
   const duck = useCallback((speaking: boolean) => mix.current?.duck(speaking), []);
-  const { onBeat, line } = useReactiveCommentary(bout, playing && mic && !muted, duck, preview);
-  return { line, onNotableBeat(cue: ReactiveCue) { mix.current?.cheer(); onBeat(cue); } };
+  const { onBeat, line, onPlaybackMoment } = useReactiveCommentary(bout, playing && mic && !muted, duck, preview);
+  return { line, onPlaybackMoment, onNotableBeat(cue: ReactiveCue) { mix.current?.cheer(); onBeat(cue); } };
 }

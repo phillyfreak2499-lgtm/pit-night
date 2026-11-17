@@ -1,5 +1,5 @@
-import { conferencePlace, hashString, previewSaturday, recordOf, regularSeasonRecordOf } from "./engine";
-import { saturdayFightId } from "./saturday-seal";
+import { conferencePlace, hashString, recordOf, regularSeasonRecordOf } from "./engine";
+import { resolvePlaybackBout } from "./playback-bout";
 import { upcomingMatchups } from "./claude-copy";
 import type { ReactiveMoment } from "./reactive-commentary";
 import type { Bout, PitData } from "./types";
@@ -74,12 +74,7 @@ export function boothScript(data: PitData, scene: BoothScene, id = ""): BoothLin
       cathy(w + l ? `And this ${bot.classId} comes in with ${w} wins and ${l} losses.` : `First win still up for grabs. Keep an eye on this ${bot.classId}.`)];
   }
   if (scene === "walkout") {
-    const archived = data.replays?.flatMap(r => r.bouts).find(b => b.id === id);
-    const posted = data.bouts.find(b => b.id === id && b.result && (b.week < data.week ||
-      ["fought", "inspected", "complete"].includes(data.phase)));
-    if (saturdayFightId(id) && !archived?.result && !posted?.result) return [];
-    const preview = !archived && !posted && !data.bouts.some(b => b.week === data.week && b.result);
-    const bout = archived ?? posted ?? (preview && !saturdayFightId(id) ? previewSaturday(data).find(b => b.id === id) : undefined);
+    const bout = resolvePlaybackBout(data,id,{preview:true});
     if (!bout?.result || bout.kind === "bye") return [];
     const fighters = bout.result.fighters;
     if (fighters.length < 2) return [];
@@ -128,6 +123,7 @@ export function analystReply(m: ReactiveMoment, meterCall?: string): string | un
     "momentum-shift": [`${d} had the edge going in. Look who's chasing now.`, `That's the lead changing hands, Jim. ${d} needs an answer.`, `Watch ${d} on the next exchange. That cushion is gone.`],
     "near-knockout": [`${d} is hanging on with ${m.defenderHp} health.`, `There's precious little left for ${d} to trade with.`, `Jim, look at the health on ${d}. One clean shot could do it.`],
     "half-health": [`${d} is down to ${m.defenderHp}. That's an expensive trade.`, `Half the tank was the line, Jim. ${d} just went under it.`, `The next hit costs more when you're this low. Ask ${d}.`],
+    "ringout": [`${d} is completely out of the arena, Jim. That is a pit elimination.`],
     "knockout": [`Watch the health on ${d}, Jim. It goes straight to zero.`, `${d} couldn't absorb that last one.`, `That's where the tape ends for ${d}. Nothing left on the meter.`],
     "big-hit": [`Check the meter on ${d}, Jim. ${m.defenderHp} health left.`, `${d} paid ${m.damage} health for that exchange.`, `Look what that did to ${d}'s cushion. Down to ${m.defenderHp}.`],
   }[m.kind];

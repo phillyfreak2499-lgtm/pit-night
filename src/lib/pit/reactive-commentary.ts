@@ -1,8 +1,9 @@
+import {scoringDamage,isHeatFinisher,usesDuelPresentation,chipDamage} from "./impact-presentation";
 import type { FightResult } from "./types";
 
 export type ReactivePhase = "exchange" | "finisher";
 export type ReactiveCue = { phase: ReactivePhase; index: number };
-export type ReactiveKind = "big-hit" | "half-health" | "momentum-shift" | "near-knockout" | "knockout";
+export type ReactiveKind = "big-hit" | "half-health" | "momentum-shift" | "near-knockout" | "knockout" | "ringout";
 
 // Keep the setup intelligible and give a reversal or a finish a different read.
 export const announcerDelivery = {
@@ -10,6 +11,7 @@ export const announcerDelivery = {
   "half-health": { rate: 1.05, pitch: 1.01, direction: "Give the listener a breath, then land the change in health." },
   "momentum-shift": { rate: 1.16, pitch: 1.09, direction: "Sound surprised. Use a quick pivot and land on who just took the lead." },
   "near-knockout": { rate: 1.06, pitch: 1.07, direction: "Build suspense. Leave a beat before the last few words." },
+  ringout: {rate:1.12,pitch:1.12,direction:"Call the completed pit exit, not a health knockout."},
   knockout: { rate: 1.12, pitch: 1.12, direction: "Give the knockout a full arena call. End on a short, emphatic payoff." },
 } satisfies Record<ReactiveKind, { rate: number; pitch: number; direction: string }>;
 
@@ -62,17 +64,21 @@ export function reactiveMoment(result: FightResult, cue: ReactiveCue): ReactiveM
   if (!attacker || !defender || attackerId === defenderId) return null;
 
   const attackerBefore = exchange?.combat?.[attackerId]?.before.hp ?? before[attackerId] ?? 100;
-  const defenderBefore = exchange?.combat?.[defenderId]?.before.hp ?? before[defenderId] ?? 100;
+  const rawDefenderBefore = exchange?.combat?.[defenderId]?.before.hp ?? before[defenderId] ?? 100;
+  const defenderBefore=rawDefenderBefore-(exchange&&usesDuelPresentation(result)?chipDamage(exchange):0);
   const attackerAfter = exchange?.combat?.[attackerId]?.after.hp ??
     exchange?.attackerHp ?? result.hp[attackerId] ?? attackerBefore;
-  const defenderAfter = exchange?.combat?.[defenderId]?.after.hp ??
+  const defenderAfter = phase === "finisher" && result.method === "dump" ? 0 : exchange?.combat?.[defenderId]?.after.hp ??
     exchange?.defenderHp ?? result.hp[defenderId] ?? defenderBefore;
-  const damage = exchange?.damage ?? finisher!.damage;
+  const damage = exchange ? scoringDamage(result,exchange) : finisher!.damage;
+  if(exchange?.combat?.[attackerId] && exchange.combat[attackerId]!.hitCount===0) return null;
   if (![attackerBefore, defenderBefore, attackerAfter, defenderAfter, damage].every(Number.isFinite)) return null;
 
   let kind: ReactiveKind;
   let event: string;
-  if (defenderAfter <= 0 && defenderBefore > 0) {
+  if(phase === "finisher" && result.method === "dump") {
+    kind="ringout";event=defender.botName+" is eliminated in the pit by "+attacker.botName;
+  } else if (defenderAfter <= 0 && defenderBefore > 0) {
     kind = "knockout";
     event = defender.botName + " is knocked out by " + attacker.botName;
   } else if (defenderAfter <= 15 && defenderBefore > 15) {
@@ -84,7 +90,7 @@ export function reactiveMoment(result: FightResult, cue: ReactiveCue): ReactiveM
   } else if (attackerBefore <= defenderBefore - 5 && attackerAfter >= defenderAfter + 5) {
     kind = "momentum-shift";
     event = attacker.botName + " takes the health lead from " + defender.botName;
-  } else if (damage >= 20) {
+  } else if ((exchange?.damage??damage) >= 20) {
     kind = "big-hit";
     event = attacker.botName + " lands a big hit on " + defender.botName;
   } else {
@@ -100,13 +106,13 @@ export function reactiveMoment(result: FightResult, cue: ReactiveCue): ReactiveM
     index,
     beatId: phase === "exchange" ? "x" + index : "finisher",
     kind,
-    round: phase === "exchange" ? result.exchanges[index]!.index + 1 : index + 1,
+    round: index + 1,
     event,
     attacker: attacker.botName,
     defender: defender.botName,
     damage,
     defenderHp: defenderAfter,
-    weapon: attacker.weaponName,
+    weapon: phase === "finisher" && isHeatFinisher(result) ? "Heat finisher" : attacker.weaponName,
     hits: exchange?.combat?.[attackerId]?.hitCount,
     counterDamage: exchange?.combat?.[attackerId]?.reflectedDamageTaken,
     previous: prev && previousAttacker && previousDefender ? {
@@ -118,6 +124,7 @@ export function reactiveMoment(result: FightResult, cue: ReactiveCue): ReactiveM
 
 /** Angles apply only when the tape supplies the fact. Use tape order to vary the read on replays too. */
 export function impactLine(m: ReactiveMoment): string {
+  if(m.kind==='ringout')return m.event+'!';
   const options = [
     m.event + "!",
     `${m.damage} damage. ${m.defender} is at ${m.defenderHp}!`,

@@ -1,3 +1,5 @@
+import {DUEL_STRIKE_AT,IMPACT_AT,FINISH_VISIBLE_AT,usesDuelPresentation} from "@/lib/pit/impact-presentation";
+import {playbackMoment,type PlaybackMoment} from "@/lib/pit/reactive-playback";
 import { createFrameLoop } from "@/lib/pit/frame-loop";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useEventCommentary } from './use-event-commentary';
@@ -26,6 +28,7 @@ export function Broadcast({
   onPlayingChange,
   onComplete,
   onNotableBeat,
+  onPlaybackMoment,
   seek = 0,
   chromeless = false,
   kicker,
@@ -42,6 +45,7 @@ export function Broadcast({
   onPlayingChange?: (playing: boolean) => void;
   onComplete?: () => void;
   onNotableBeat?: (cue: ReactiveCue) => void;
+  onPlaybackMoment?: (moment:PlaybackMoment)=>void;
   /** Changes after mount jump the tape to the decision. */
   seek?: number;
   chromeless?: boolean;
@@ -99,14 +103,19 @@ export function Broadcast({
   const trailsRef = useRef(new Map<string, Spot[]>());
   const onCompleteRef = useRef(onComplete);
   const onNotableBeatRef = useRef(onNotableBeat);
+  const onPlaybackMomentRef=useRef(onPlaybackMoment);
+  const notableRef=useRef("");
   const doneRef = useRef(false);
   // Only a change in `seek` after mount jumps the tape (not a remount in dev).
   const lastSeek = useRef(seek);
+  const runningTape=useRef(tapeKey);
   onCompleteRef.current = onComplete;
   onNotableBeatRef.current = onNotableBeat;
+  onPlaybackMomentRef.current=onPlaybackMoment;
 
   useEffect(() => {
     if (!result) return;
+    if(runningTape.current!==tapeKey){runningTape.current=tapeKey;timeRef.current=0;notableRef.current="";cueRef.current="";hitRef.current="";doneRef.current=false;}
     const canvas = canvasRef.current;
     const top = topRef.current;
     if (!canvas || !top) return;
@@ -190,6 +199,12 @@ export function Broadcast({
         }
       }
       const drive = fightDrive(result, beat, local, time, { mainEvent });
+      const moment=playbackMoment(bout.id+":"+result.seed,result,beat,time,playing,speed);
+      onPlaybackMomentRef.current?.(moment);
+      if(playing && commentaryEnabled && moment.cue && time<moment.expiresAt && notableRef.current!==moment.beatKey) {
+        notableRef.current=moment.beatKey;
+        if(reactiveMoment(result,moment.cue))onNotableBeatRef.current?.(moment.cue);
+      }
       if (result.rumbleEntries) {
         setRecordedTime(Math.floor(time * 10) / 10);
         setDecisionShown(beat.kind === 'decision');
@@ -219,11 +234,6 @@ export function Broadcast({
       }
       if (playing && drive.hitKey && local >= drive.hitAt && local < drive.hitAt + 0.2 && hitRef.current !== drive.hitKey) {
         hitRef.current = drive.hitKey;
-        // Dispatch at the actual strike, not at the end of the round or tape.
-        if (beat.kind === "exchange" || beat.kind === "finisher") {
-          const cue: ReactiveCue = { phase: beat.kind, index: beat.kind === "exchange" ? beat.index : result.exchanges.length };
-          if (reactiveMoment(result, cue)) onNotableBeatRef.current?.(cue);
-        }
         const at = impactPoints(drive, canvas.width, canvas.height, top.width, top.height);
         const blocked = Boolean(drive.blocked);
         const crit = Boolean(drive.crit) && !blocked;
@@ -291,14 +301,14 @@ export function Broadcast({
       });
       if (!titleEntrance) drawTop(topCtx, top.width, top.height, drive, fx, trails, time, dt, reduced, arena);
       if (finishPhase) paintChampionshipFinish(ctx, canvas.width, canvas.height, result, drive, finishPhase, playing ? dt : 0, titleFx, reduced, fx.cam);
-      setCaption(titleEntrance ? `Championship finalist: ${heroSide.botName} from ${heroSide.storeName}. The spotlight is yours.` : captionFor(result, bout, beat, noDamage));
+      setCaption(titleEntrance ? `Championship finalist: ${heroSide.botName} from ${heroSide.storeName}. The spotlight is yours.` : captionFor(result, bout, beat, noDamage, local));
       // The bars follow the bots on screen; the replay shows where the fight ended.
       if (result.rumbleEntries) {
         const ids = drive.bots.map(b => b.bot.id);
         setEnteredIds(previous => previous.length === ids.length && previous.every((id, i) => id === ids[i]) ? previous : ids);
       }
       const bars = hpFor(result, beat, local);
-      if (beat.kind === "replay") for (const f of result.fighters) bars[f.id] = result.hp[f.id] ?? bars[f.id] ?? 100;
+      if (beat.kind === "replay") for (const f of result.fighters) bars[f.id] = result.method === "dump" && result.loserIds.includes(f.id) ? 0 : result.hp[f.id] ?? bars[f.id] ?? 100;
       else for (const b of drive.bots) bars[b.bot.id] = Math.round(b.hp);
       setHp(previous => Object.keys(bars).length === Object.keys(previous).length && Object.entries(bars).every(([id, value]) => previous[id] === value) ? previous : bars);
       const phase = meterPhase(beat, local);
@@ -351,7 +361,7 @@ export function Broadcast({
       document.removeEventListener("visibilitychange", visibility);
       observer.disconnect();
     };
-  }, [bout, playing, result, speed, noDamage, seek, arenaProp, championship]);
+  }, [bout, playing, result, speed, noDamage, seek, arenaProp, championship, commentaryEnabled]);
 
 
   if (!result) return null;
@@ -448,6 +458,7 @@ export function Broadcast({
             if (timeRef.current >= total - 0.05) {
               timeRef.current = 0;
               cueRef.current = "";
+              notableRef.current="";
               hitRef.current = "";
               doneRef.current = false;
             }
@@ -573,7 +584,7 @@ function meterPhase(beat: Beat, local: number): MeterPhase {
   return { kind: "bell" };
 }
 
-function captionFor(result: FightResult, bout: Bout, beat: Beat, noDamage: boolean) {
+function captionFor(result: FightResult, bout: Bout, beat: Beat, noDamage: boolean, local:number) {
   if (beat.kind === "rumble") return "The Rumble is underway.";
   if (beat.kind === "bumper" && bout.kind === "bye") return "Bye. It counts as a win. The bot does not take damage.";
   if (beat.kind === "bumper") return noDamage ? "Bay scrimmage. The house drill. Nothing posts." : `${bout.title}. Fourteen stores. This cage holds ${bout.kind === "melee" ? "the tie" : result.fighters.length > 2 ? `${result.fighters.length} bots` : "two"}.`;
@@ -591,8 +602,8 @@ function captionFor(result: FightResult, bout: Bout, beat: Beat, noDamage: boole
     return `Round ${beat.index + 1}. They close, circle, and feint. ${def?.botName ?? "The defender"} swings first and bounces off. ${atk?.botName ?? "The attacker"} answers.`;
   }
   if (beat.kind === "replay") return result.method === "dump" ? "One more time, slower. The throw into the pit that ended it." : "One more time, slower. That is the blow that ended it.";
-  if (beat.kind === "exchange") return result.exchanges[beat.index]?.call ?? "";
-  if (beat.kind === "finisher") return result.finisher?.call ?? "";
+  if (beat.kind === "exchange") return local < (usesDuelPresentation(result)?DUEL_STRIKE_AT:IMPACT_AT) ? "They line up the next strike." : result.exchanges[beat.index]?.call ?? "";
+  if (beat.kind === "finisher") return local < FINISH_VISIBLE_AT ? "They close for the finishing move." : result.finisher?.call ?? "";
   if (result.method === "bye" || bout.kind === "bye") {
     const store = result.fighters.find((fighter) => fighter.id !== "house");
     return `${store?.storeName ?? "The store"} draws the bye. It counts as a win.`;

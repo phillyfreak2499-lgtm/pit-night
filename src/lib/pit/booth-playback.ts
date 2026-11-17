@@ -2,10 +2,11 @@ import type { BoothClip, BoothLine } from "./booth";
 
 /** Schedule the whole exchange on one clock so the analysts never talk over one another. */
 export async function playBooth(context: AudioContext, clips: BoothClip[], signal: AbortSignal,
-  onLine: (line: BoothLine) => void, onSpeaking?: (speaking: boolean) => void) {
+  onLine: (line: BoothLine) => void, onSpeaking?: (speaking: boolean) => void, isCurrent:()=>boolean=()=>true, beforeStart:()=>Promise<boolean>=async()=>true) {
   const buffers = await Promise.all(clips.map(c =>
     context.decodeAudioData(Uint8Array.from(atob(c.audio), ch => ch.charCodeAt(0)).buffer)));
-  if (signal.aborted || !buffers.length || context.state !== "running") return;
+  if (signal.aborted || !isCurrent() || !buffers.length || context.state !== "running") return;
+  if(!await beforeStart() || signal.aborted || !isCurrent() || context.state!=="running")return;
   await new Promise<void>((resolve) => {
     const sources: AudioBufferSourceNode[] = [];
     const timers: number[] = [];
@@ -30,8 +31,8 @@ export async function playBooth(context: AudioContext, clips: BoothClip[], signa
       source.buffer = buffer;
       source.connect(context.destination);
       if (i === buffers.length - 1) source.onended = finish;
-      if (i === 0) onLine(clips[i]!);
-      else timers.push(window.setTimeout(() => onLine(clips[i]!), offset * 1000));
+      if (i === 0) {if(isCurrent())onLine(clips[i]!);else {finish();return;}}
+      else timers.push(window.setTimeout(() => {if(!signal.aborted&&isCurrent())onLine(clips[i]!);else finish();}, offset * 1000));
       source.start(start + offset);
       offset += buffer.duration + 0.18;
     });

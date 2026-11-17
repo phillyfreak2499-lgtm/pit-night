@@ -54,7 +54,7 @@ export function ShowPage() {
   const segment = segments[index] ?? segments[0]!;
   const fightCount = tape.bouts.length;
   const fightOrdinal = segment.kind === "fight" || segment.kind === "sting" || segment.kind === "card" ? tape.bouts.indexOf(segment.bout) + 1 : 0;
-  const { line, onNotableBeat } = useFightAudio(segment.kind === "fight" ? segment.bout : null,
+  const { line, onNotableBeat, onPlaybackMoment } = useFightAudio(segment.kind === "fight" ? segment.bout : null,
     rolling && segment.kind === "fight", fightOrdinal + weekPick - 2, mic, muted, !tape.live);
   const walkout = segment.kind === "card" && segment.bout.kind !== "bye" && mic && !muted;
 
@@ -274,6 +274,7 @@ export function ShowPage() {
           kicker={approvedHeld && weekPick === 4 ? "Approved finale" : tape.replay ? "Replay" : tape.live ? "On air" : "House tape"}
           onComplete={onFightDone}
           onNotableBeat={onNotableBeat}
+          onPlaybackMoment={onPlaybackMoment}
           commentaryEnabled={mic}
         />
       ) : null}

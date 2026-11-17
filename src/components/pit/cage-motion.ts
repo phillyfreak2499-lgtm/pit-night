@@ -1,3 +1,4 @@
+import {chipDamage,scoringDamage,usesDuelPresentation,DUEL_STRIKE_AT,FINISH_VISIBLE_AT,isHeatFinisher} from "@/lib/pit/impact-presentation";
 import { arenaBotScale, largeFieldSlot } from "./arena-layout";
 import type { ClassId, Exchange, FightResult, FighterSnap } from "@/lib/pit/types";
 
@@ -96,17 +97,18 @@ export type DriveStyle = { mainEvent?: boolean };
 
 /** A share of each exchange lands early as a chip hit, so the fight trades more blows. Totals never change. */
 export function chipOf(ex: Exchange) {
-  return ex.damage >= 6 ? Math.round(ex.damage * 0.35) : 0;
+  return chipDamage(ex);
 }
 
 function isDuel(result: FightResult) {
-  return result.fighters.length === 2 && result.method !== "melee" && result.method !== "bye" && result.exchanges.length > 0;
+  return usesDuelPresentation(result);
 }
 
 /** The blow that ended it, for the slow-motion replay. */
 function finalBlow(result: FightResult): "finisher" | number | null {
   const pitFinish = result.exchanges.findIndex((ex) => (ex.tags ?? []).includes("pit-elimination"));
   if (pitFinish >= 0 && result.fighters.length === 2) return pitFinish;
+  if(result.method === "dump" && result.finisher) return "finisher";
   if (result.method !== "ko") return null;
   if (result.finisher && (result.hp[result.finisher.against] ?? 1) <= 0) return "finisher";
   const i = result.exchanges.findIndex((ex) => ex.defenderHp <= 0);
@@ -149,7 +151,7 @@ const EX_STRIKE_END = (EX_STALK_SEC + EX_STRIKE_SEC) / DUEL_EXCHANGE_SEC;
 
 /** Beat fraction where a duel exchange's scoring blow connects. */
 export function duelExchangeHitAt() {
-  return EX_STALK_END + HIT_AT * EX_STRIKE_SPAN;
+  return DUEL_STRIKE_AT;
 }
 
 function clashWindowHit(start: number, end: number) {
@@ -480,22 +482,15 @@ function strike(
 }
 
 function beforeHp(result: FightResult, ex: Exchange) {
-  const prior = [...result.exchanges]
-    .reverse()
-    .find((item) => item.index < ex.index && item.defenderId === ex.defenderId);
-  if (prior) return prior.defenderHp;
-  const asAttacker = [...result.exchanges]
-    .reverse()
-    .find((item) => item.index < ex.index && item.attackerId === ex.defenderId);
-  return asAttacker ? asAttacker.attackerHp : 100;
+  return hpBefore(result,ex.defenderId,result.exchanges.indexOf(ex));
 }
 
+/** Index is an array boundary, independent of the tape's historical round numbering. */
 function hpBefore(result: FightResult, id: string, index: number) {
-  let hp = 100;
-  for (const ex of result.exchanges) {
-    if (ex.index >= index) break;
-    if (ex.defenderId === id) hp = ex.defenderHp;
-    if (ex.attackerId === id) hp = ex.attackerHp;
+  let hp=100;
+  for(const ex of result.exchanges.slice(0,index)) {
+    if(ex.defenderId===id) hp=ex.defenderHp;
+    if(ex.attackerId===id) hp=ex.attackerHp;
   }
   return hp;
 }
@@ -704,13 +699,15 @@ function exchangeStrike(result: FightResult, index: number, local: number, time:
     Q1,
     local,
     time,
-    ex.damage - chipOf(ex),
+    scoringDamage(result,ex),
     ex.attackerHp,
     beforeHp(result, ex) - chipOf(ex),
     ex.defenderHp,
     false,
     drivePace(result, atkBot.id, index),
   );
+  // Logical health commits at contact; motion and impact effects continue independently.
+  out.def.hp=local>=HIT_AT?ex.defenderHp:beforeHp(result,ex)-chipOf(ex);
   pitFall(out, ex, local, result);
   return aAttacks ? { a: out.atk, b: out.def, out } : { a: out.def, b: out.atk, out };
 }
@@ -927,7 +924,8 @@ function finisherState(result: FightResult, local: number, time: number) {
   const atkBot = aAttacks ? a : b;
   const defBot = aAttacks ? b : a;
   const hpDef = hpBefore(result, defBot.id, n);
-  const hpAfter = result.hp[defBot.id] ?? Math.max(0, hpDef - fin.damage);
+  const pit = result.method === "dump";
+  const hpAfter = pit ? 0 : result.hp[defBot.id] ?? Math.max(0, hpDef - fin.damage);
   const P1 = { x: lerp(P0.x, 0.5, 0.3), y: lerp(P0.y, 0.6, 0.3) };
   const out = strike(
     atkBot,
@@ -942,11 +940,21 @@ function finisherState(result: FightResult, local: number, time: number) {
     hpBefore(result, atkBot.id, n),
     hpDef,
     hpAfter,
-    true,
+    isHeatFinisher(result),
     drivePace(result, atkBot.id, n),
   );
-  if (local > HIT_AT) {
-    out.def.hp = lerp(hpDef, hpAfter, clamp((local - HIT_AT) / 0.3, 0, 1));
+  const eliminated=local>=FINISH_VISIBLE_AT;
+  out.def.hp=eliminated?hpAfter:hpDef;
+  out.def.dead=eliminated&&hpAfter<=0;
+  if(!eliminated) out.def.rev=.45;
+  if(pit) {
+    const t=ease(clamp((local-.1)/(FINISH_VISIBLE_AT-.1),0,1));
+    out.def.spot=mix(Q0,result.pitTarget??{x:PIT.x,y:PIT.y},t);
+    out.def.lift=Math.sin(t*Math.PI)*.7;out.def.pitch=t*Math.PI;
+    out.def.gone=clamp((t-.65)/.35,0,1);
+    out.atk.flame=0;out.def.flame=0;
+    if(eliminated){out.def.gone=1;out.def.rev=0;}
+    out.focus=mix(out.atk.spot,out.def.spot,.5);
   }
   return aAttacks ? { a: out.atk, b: out.def, out } : { a: out.def, b: out.atk, out };
 }
@@ -1078,7 +1086,7 @@ export function fightDrive(result: FightResult, beat: Beat, local: number, time:
   if (beat.kind === "exchange") {
     const s = exchangeState(result, beat.index, local, time);
     const ex = result.exchanges[beat.index]!;
-    const dmg = ex.damage - chipOf(ex);
+    const dmg = scoringDamage(result,ex);
     return {
       bots: [s.a, s.b],
       impact: s.out.impact,
@@ -1104,7 +1112,7 @@ export function fightDrive(result: FightResult, beat: Beat, local: number, time:
       power: s.out.power,
       hitKey: "fin",
       hitAt: HIT_AT,
-      weapon: "burn",
+      weapon: isHeatFinisher(result)?"burn":(result.fighters.find(f=>f.id===result.finisher!.by)!.weaponFamily),
       victim: result.finisher.against,
       focus: s.out.focus,
       tight: s.out.tight,
@@ -1121,7 +1129,7 @@ export function fightDrive(result: FightResult, beat: Beat, local: number, time:
     const replayLead = 0.12;
     const replaySpan = 0.34;
     const replayHold = 0.92;
-    const pitReplay = typeof blow === "number" && (result.exchanges[blow]?.tags ?? []).includes("pit-elimination");
+    const pitReplay = (blow === "finisher" && result.method === "dump") || typeof blow === "number" && (result.exchanges[blow]?.tags ?? []).includes("pit-elimination");
     const u = pitReplay ? lerp(HIT_AT - replayLead, 1, clamp(local / replayHold, 0, 1)) : HIT_AT - replayLead + clamp(local / replayHold, 0, 1) * replaySpan;
     const s = blow === "finisher" ? finisherState(result, u, time) : exchangeStrike(result, blow ?? 0, u, time);
     const ex = typeof blow === "number" ? result.exchanges[blow] : undefined;
@@ -1131,7 +1139,7 @@ export function fightDrive(result: FightResult, beat: Beat, local: number, time:
       power: s.out.power,
       hitKey: "replay",
       hitAt: (replayLead / (pitReplay ? 1 - HIT_AT + replayLead : replaySpan)) * replayHold,
-      weapon: blow === "finisher" ? "burn" : (ex?.attackerId === a.id ? a : b).weaponFamily,
+      weapon: blow === "finisher" ? (isHeatFinisher(result)?"burn":result.fighters.find(f=>f.id===result.finisher!.by)!.weaponFamily) : (ex?.attackerId === a.id ? a : b).weaponFamily,
       victim: blow === "finisher" ? (result.finisher?.against ?? null) : (ex?.defenderId ?? null),
       focus: s.out.focus,
       tight: Math.max(0.95, s.out.tight),
@@ -1161,7 +1169,10 @@ export function fightDrive(result: FightResult, beat: Beat, local: number, time:
   let impact: Spot | null = null;
   let power = 0;
 
-  if (result.method === "dump" && !result.exchanges.some((ex) => (ex.tags ?? []).includes("pit-elimination"))) {
+  if(result.method === "dump" && result.finisher) {
+    lose.hp=0;lose.dead=true;lose.gone=1;lose.rev=0;
+    win.celebrate=local>.2;
+  } else if (result.method === "dump" && !result.exchanges.some((ex) => (ex.tags ?? []).includes("pit-elimination"))) {
     // Shove the loser across the floor and into the pit.
     const pit = { x: PIT.x, y: PIT.y + 0.02 };
     const start = lose.spot;
@@ -1387,7 +1398,7 @@ function recordedRumbleHp(result: FightResult, clock: number) {
 }
 
 function meleeBefore(result: FightResult, ex: Exchange) {
-  return hpBefore(result, ex.defenderId, ex.index);
+  return beforeHp(result, ex);
 }
 
 function meleeHp(result: FightResult, beat: Beat, local: number) {
