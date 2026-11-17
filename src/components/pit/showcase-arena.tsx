@@ -4,6 +4,7 @@ import { armSound, playBell, setSoundMuted, soundMuted } from "@/lib/pit/sound";
 import { showcaseSegments } from "@/lib/pit/event-commentary";
 import { useEventCommentary } from "./use-event-commentary";
 import type { ShowcaseFrame, ShowcaseTape } from "@/lib/pit/showcase-model";
+import { showcaseFinishVisible } from "./playback-lifecycle";
 
 function frameAt(frames: ShowcaseFrame[], t: number, reduced: boolean): ShowcaseFrame | undefined {
   if (!frames.length) return undefined;
@@ -15,16 +16,15 @@ function frameAt(frames: ShowcaseFrame[], t: number, reduced: boolean): Showcase
   return { ...a, x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
 }
 
-export function ShowcaseArena({ tape, label = "RECORDED EVENT", onComplete, onMoment, preview = false, revealed = false }: { tape: ShowcaseTape; label?: string; preview?: boolean; revealed?: boolean; onComplete?: () => void; onMoment?: (moment: { eventId: ShowcaseTape["eventId"]; seed: string; at: number }) => void }) {
-  const [time, setTime] = useState(0);
+export function ShowcaseArena({ tape, time, setTime, label = "RECORDED EVENT", onMoment, preview = false, revealed = false }: { tape: ShowcaseTape; time: number; setTime: React.Dispatch<React.SetStateAction<number>>; label?: string; preview?: boolean; revealed?: boolean; onMoment?: (moment: { eventId: ShowcaseTape["eventId"]; seed: string; at: number }) => void }) {
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [muted, setMuted] = useState(soundMuted);
   const [reduced, setReduced] = useState(() => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   useEffect(() => { const mq = window.matchMedia("(prefers-reduced-motion: reduce)"); const change = () => setReduced(mq.matches); mq.addEventListener("change", change); return () => mq.removeEventListener("change", change); }, []);
   const segments = useMemo(() => showcaseSegments(tape), [tape]);
-  const caption = useEventCommentary({event:tape.eventId, seed:tape.seed, segments, time, playing, muted, preview, revealed, closingReady: time >= tape.duration, allowStoppedClosing:true});
-  useEffect(() => { setTime(0); setPlaying(false); }, [tape]);
+  const caption = useEventCommentary({event:tape.eventId, seed:tape.seed, segments, time, playing, muted, preview, revealed, closingReady: showcaseFinishVisible(time, tape.duration), allowStoppedClosing:true});
+  useEffect(() => { setPlaying(false); }, [tape]);
   useEffect(() => {
     if (!playing) return;
     let last = 0, id = 0;
@@ -35,7 +35,7 @@ export function ShowcaseArena({ tape, label = "RECORDED EVENT", onComplete, onMo
     id = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(id);
   }, [playing, speed, tape.duration]);
-  useEffect(() => { if (time >= tape.duration && playing) { setPlaying(false); onComplete?.(); } }, [time, tape.duration, playing, onComplete]);
+  useEffect(() => { if (time >= tape.duration && playing) setPlaying(false); }, [time, tape.duration, playing]);
   useEffect(() => { if (playing) onMoment?.({ eventId: tape.eventId, seed: tape.seed, at: Math.floor(time) }); }, [Math.floor(time), playing, tape.eventId, tape.seed, onMoment]);
   const actors = useMemo(() => tape.runs.map(run => ({ run, fighter: tape.fighters.find(f => f.id === run.storeId), frame: frameAt(run.frames, time, reduced) })).filter(a => a.frame && a.fighter), [tape, time, reduced]);
   const race = tape.eventId === "striker-race", pull = tape.eventId === "tank-pull", team = tape.eventId === "team-gauntlet";

@@ -32,7 +32,7 @@ function fightCopy(fight: SaturdayFightName) {
  * commissioner sign-in. Starting a fight fetches that one tape for this screen
  * only; the rest of the site updates when the fight ends or the Desk posts it.
  */
-export function SaturdayGate({ held }: { held: Bout[] }) {
+export function SaturdayGate({ held, onPlayerStarted, onNextFight }: { held: Bout[]; onPlayerStarted?: () => void; onNextFight?: () => void }) {
   const data = usePit();
   const signCommissioner = usePit((s) => s.signCommissioner);
   const fights = held.filter((bout) => saturdayFightKind(bout));
@@ -49,7 +49,6 @@ export function SaturdayGate({ held }: { held: Bout[] }) {
   const [finished, setFinished] = useState(false);
   const [armed, setArmed] = useState<SaturdayFightName | null>(null);
 
-  if (!fights.length) return null;
   const controls = saturdayLockControls(data.session.role);
 
   const start = async (fight: SaturdayFightName) => {
@@ -64,6 +63,7 @@ export function SaturdayGate({ held }: { held: Bout[] }) {
       setSeek(0);
       setPlaying(true);
       setTape(res.bout);
+      onPlayerStarted?.();
       setFinished(false);
       setOpening(fight === "rumble");
     } catch (err) {
@@ -110,7 +110,7 @@ export function SaturdayGate({ held }: { held: Bout[] }) {
           <div className="flex flex-wrap gap-2">
             <Btn tone="line" onClick={() => { armBroadcastAudio(); setPlaying((on) => !on); }}>{playing ? "Pause" : "Play"}</Btn>
             {!opening && !finished && <Btn tone="line" onClick={() => { armBroadcastAudio(); setPlaying(true); setSeek((n) => n + 1); }}>Skip to the decision</Btn>}
-            {finished && <Btn onClick={() => { setTape(null); setFinished(false); }}>Next fight</Btn>}
+            {finished && <Btn onClick={() => { setTape(null); setFinished(false); onNextFight?.(); }}>Next fight</Btn>}
           </div>
         </div>
         {opening ? <TeamJanelleOpening data={data} playing={playing} onComplete={() => setOpening(false)} /> : <Broadcast bout={tape} playing={playing} speed={2} seek={seek} chromeless kicker="Live from the Desk" onComplete={() => void post(kind)} />}
@@ -119,6 +119,8 @@ export function SaturdayGate({ held }: { held: Bout[] }) {
       </section>
     );
   }
+
+  if (!fights.length) return null;
 
   return (
     <section className="border border-amber/70 bg-surface" data-testid="saturday-lock">
