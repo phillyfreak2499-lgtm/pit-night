@@ -80,8 +80,8 @@ test('Gauntlet recorded lanes and race starting lanes leave room for distinct po
  for(const team of teams) {
   const runs=tape.runs.filter(r=>r.teamId===team.id);
   for(let at=0;at<=tape.duration;at++) for(let i=1;i<runs.length;i++) {
-   const a=runs[i-1]!.frames[Math.min(at,runs[i-1]!.frames.length-1)]!;
-   const b=runs[i]!.frames[Math.min(at,runs[i]!.frames.length-1)]!;
+   const a=runs[i-1]!.frames.filter(f=>f.at<=at).at(-1)!;
+   const b=runs[i]!.frames.filter(f=>f.at<=at).at(-1)!;
    assert.ok(Math.abs(b.y-a.y)*560>=42,'crew portraits need vertical separation at every phase');
   }
  }

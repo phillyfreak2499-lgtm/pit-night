@@ -1,10 +1,11 @@
 import type { FightResult } from './types';
 import type { ShowcaseTape, ShowcaseEventId } from './showcase-model';
+import {gauntletAt,gauntletTask} from './showcase-gauntlet';
 
 export type EventId = 'rumble' | ShowcaseEventId;
 export type EventSegment = { id: string; index: number; at: number; phase: 'exchange' | 'closing'; facts: string };
 export function eventKey(event: EventId, seed: string, index: number) {
-  return `event-v2:${encodeURIComponent(event)}:${encodeURIComponent(seed)}:${index}`;
+  return `${event==='team-gauntlet'?'event-v3-gauntlet':'event-v2'}:${encodeURIComponent(event)}:${encodeURIComponent(seed)}:${index}`;
 }
 export function rumbleSegments(result: FightResult): EventSegment[] {
   const entries = result.rumbleEntries ?? [];
@@ -46,6 +47,18 @@ export function rumbleSegments(result: FightResult): EventSegment[] {
 }
 export function showcaseSegments(tape: ShowcaseTape): EventSegment[] {
   const times = [...new Set([0, tape.duration / 3, tape.duration * 2 / 3, Math.max(0, tape.duration - 1)])].sort((a,b)=>a-b);
+  if(tape.eventId==='team-gauntlet'){
+    const segments:EventSegment[]=times.map((at,index)=>{
+      const view=gauntletAt(tape,at,true);
+      const details=view.crews.map(c=>`${c.team.name}: ${gauntletTask(c)}; ${c.frame.checkpoints} of 4 checkpoints complete; ${c.frame.coresDelivered} of 3 cores delivered; progress ${Math.round(c.frame.progress*1000)/10}%`);
+      if(view.leaderIds.length)details.push(`Current lead: ${view.crews.filter(c=>view.leaderIds.includes(c.team.id)).map(c=>c.team.name).join(', ')}`);
+      return {id:`checkpoint-${index}`,index,at,phase:'exchange',facts:`At ${at.toFixed(1)} seconds: ${details.join('; ')}.`};
+    });
+    const crew=tape.teams?.find(t=>t.storeIds.length===4&&t.storeIds.every(id=>tape.winnerIds.includes(id)));
+    const names=tape.winnerIds.map(id=>tape.fighters.find(f=>f.id===id)?.botName??id);
+    segments.push({id:'closing',index:segments.length,at:tape.duration,phase:'closing',facts:`Result: ${crew?.name??'The recorded crew'}: ${names.join(', ')}. Prize: Rumble entry slots 9–12, with the four members' relative order agreed through the Desk.${tape.tieBreak?' An exact sporting tie was settled by the recorded seeded draw.':''}`});
+    return segments;
+  }
   const segments: EventSegment[] = times.map((at,index) => {
     const visible = tape.runs.flatMap(run => {
       const frame = run.frames.filter(f => f.at <= at).at(-1);

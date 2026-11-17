@@ -1,3 +1,4 @@
+import {buildGauntletTape} from "./showcase-gauntlet";
 import { SHOWCASE_EVENTS } from './showcase-model';
 import type { ShowcaseEventId, ShowcaseFrame, ShowcaseRun, ShowcaseTeam, ShowcaseTape, ShowcaseObstacle } from './showcase-model';
 import type { FighterSnap } from './types';
@@ -37,6 +38,7 @@ const frame=(at:number,x:number,y:number,progress:number,cargo=0,stage=0,carryin
 const blank=(f:FighterSnap,frames:ShowcaseFrame[],score:number,distance:number,finishAt:number|null,teamId?:string):ShowcaseRun=>({storeId:f.id,teamId,rank:0,score,distance,finishAt,frames});
 export function simulateShowcaseEvent(fighters:FighterSnap[],eventId:ShowcaseEventId,teams:ShowcaseTeam[],seed:string):ShowcaseTape {
  const meta=SHOWCASE_EVENTS.find(e=>e.id===eventId); if(!meta) throw new Error('Unknown showcase event');
+ if(eventId==='team-gauntlet')return buildGauntletTape(fighters,teams,seed);
  const field=meta.classId?fighters.filter(f=>f.classId===meta.classId):fighters.slice();
  const objects:ShowcaseObstacle[]=[]; let stages:string[]=[]; let runs:ShowcaseRun[]=[]; let duration=0; let tieBreak:ShowcaseTape['tieBreak']; let winnerIds:string[]=[];
  if(eventId==='striker-race'){
@@ -72,40 +74,10 @@ export function simulateShowcaseEvent(fighters:FighterSnap[],eventId:ShowcaseEve
   });
   runs.sort((a,b)=>{const af=a.frames.at(-1)!,bf=b.frames.at(-1)!;return bf.cargo-af.cargo||(a.finishAt??Infinity)-(b.finishAt??Infinity)||bf.progress-af.progress;});
   if(runs.length){const first=runs[0]!;const last=first.frames.at(-1)!;winnerIds=runs.filter(r=>{const f=r.frames.at(-1)!;return f.cargo===last.cargo&&r.finishAt===first.finishAt&&f.progress===last.progress;}).map(r=>r.storeId);}
- } else {
-  stages=['Scout','Clear','Recover','Exit'];
-  const summaries:{team:ShowcaseTeam;finish:number|null;progress:number;runs:ShowcaseRun[]}[]=[];
-  for(let ti=0;ti<teams.length;ti++){
-   const team=teams[ti]!;const members=team.storeIds.map(id=>field.find(f=>f.id===id)).filter((f):f is FighterSnap=>!!f); if(members.length!==4) continue;
-   const assigned=team.roles??{};const byRole=roles.map((r,i)=>members.find(f=>assigned[f.id]===r)??members[i]!);
-   const lane=.18+ti*.32; const gateWindows:{from:number;to:number}[]=[]; const teamRuns=members.map(f=>blank(f,[],0,0,null,team.id)); let phase=0,work=0,finish:number|null=null;
-   for(let at=0;at<=120;at++){
-    // Each phase cannot start until the previous role completes its task. Exit is a shared convoy.
-    if(finish===null){const active=byRole[Math.min(phase,3)]!;let rate=phase===3?(members.reduce((sum,f)=>sum+f.stats.speed,0)/4+roleValue(active,'operator')/3)/2:roleValue(active,roles[phase]!)/3;
-     work+=Math.max(.006,(.010+rate*.00048));if(work>=1){if(phase===1)gateWindows.push({from:at,to:121});phase++;work=0;if(phase===4)finish=at;}}
-    const p=finish!==null?1:(phase+work)/4;
-    for(let j=0;j<members.length;j++){const member=members[j]!,role=roles.indexOf((assigned[member.id]??roles[j]) as Role); const local=finish!==null?1:role<phase?1:role===phase?work:0;
-     const x=finish!==null?.88:phase===3?.68+.2*work:role<phase?.2+Math.min(phase,3)*.16:role===phase?.2+phase*.16+.16*local:.2+Math.max(0,phase-1)*.16;
-     teamRuns[j]!.frames.push(frame(at,x,lane+(j-1.5)*.08,p,phase>=3?3:phase===2?Math.floor(work*3):0,Math.min(3,phase),phase===2&&role===2));
-    } if(finish!==null)break;
-   }
-   objects.push({id:`gate-${team.id}`,kind:'gate',teamId:team.id,x:.53,y:lane,w:.025,h:.12,openWindows:gateWindows});
-   const progress=teamRuns[0]!.frames.at(-1)!.progress; for(const r of teamRuns){r.finishAt=finish;r.score=finish??120+(1-progress)*100;r.distance=progress*100;}
-   summaries.push({team,finish,progress,runs:teamRuns});
-  }
-  summaries.sort((a,b)=>(a.finish??Infinity)-(b.finish??Infinity)||b.progress-a.progress);
-  if(summaries.length){const best=summaries[0]!,tied=summaries.filter(s=>s.finish===best.finish&&s.progress===best.progress);let winner=best;
-   if(tied.length>1){const contenders=tied.map(s=>s.team.id).sort();const id=contenders[hash(seed+':gauntlet-draw')%contenders.length]!;winner=tied.find(s=>s.team.id===id)!;tieBreak={kind:'draw',contenders,winnerId:id};}
-   winnerIds=winner.team.storeIds.slice();
-  }
-  let previousRank=1;
-  const winner=winnerIds.length ? summaries.find(s=>s.team.storeIds.every(id=>winnerIds.includes(id))) : undefined;
-  const ordered=winner ? [winner,...summaries.filter(s=>s!==winner)] : summaries;
-  ordered.forEach((s,i)=>{ const prior=ordered[i-1]; const tied=i>1 && prior && s.finish===prior.finish && s.progress===prior.progress; const rank=tied?previousRank:i+1; previousRank=rank; s.runs.forEach(r=>{r.rank=rank;runs.push(r);}); });
  }
- if(eventId!=='team-gauntlet') runs.forEach((r,i)=>{ const previous=runs[i-1]; const tied=previous && (eventId==='specialist-rescue' ? previous.frames.at(-1)!.cargo===r.frames.at(-1)!.cargo && previous.finishAt===r.finishAt && previous.frames.at(-1)!.progress===r.frames.at(-1)!.progress : previous.score===r.score); r.rank=tied?previous!.rank:i+1; });
+ runs.forEach((r,i)=>{ const previous=runs[i-1]; const tied=previous && (eventId==='specialist-rescue' ? previous.frames.at(-1)!.cargo===r.frames.at(-1)!.cargo && previous.finishAt===r.finishAt && previous.frames.at(-1)!.progress===r.frames.at(-1)!.progress : previous.score===r.score); r.rank=tied?previous!.rank:i+1; });
  duration=Math.max(0,...runs.map(r=>r.frames.at(-1)?.at??0));
- return {eventId,title:meta.title,seed,duration,fighters:field,runs,winnerIds,teams:eventId==='team-gauntlet'?teams:undefined,prize:meta.prize,course:{objects,stages},tieBreak};
+ return {eventId,title:meta.title,seed,duration,fighters:field,runs,winnerIds,teams:undefined,prize:meta.prize,course:{objects,stages},tieBreak};
 }
 
 

@@ -18,3 +18,9 @@ export function updateShowcaseClock(current: number, generation: number, activeG
   if (generation !== activeGeneration) return current;
   return typeof update === "function" ? update(current) : update;
 }
+
+/** Snapshot RAF elapsed time before React can defer applying the state updater. */
+export function showcaseFrameUpdate(previous:number,now:number,speed:number,duration:number):(time:number)=>number {
+  const delta=Math.max(0,now-previous)/1000*speed;
+  return time=>Math.min(duration,time+delta);
+}

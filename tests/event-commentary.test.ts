@@ -84,3 +84,17 @@ test('preparation does not voice an old cached numerical invention',async()=>{
  assert.deepEqual(response,{status:'unavailable',audioReady:false});
  assert.equal(voiced,0); assert.equal(generated,0);
 });
+
+test('Gauntlet cache repair ignores old individual/none-prize copy while other event caches remain reusable',async()=>{
+ const {createHash}=await import('node:crypto');
+ const seed='immutable-old-tape',digest=createHash('sha256').update(seed).digest('hex');
+ const rows=new Map<string,{status:string;body:string|null}>();
+ const read=async(kind:string,key:string)=>rows.get(kind+':'+key);
+ for(const event of ['rumble','striker-race','tank-pull','specialist-rescue','team-gauntlet'] as const)rows.set(`event-commentary:event-v2:${event}:${digest}:0`,{status:'ready',body:event==='team-gauntlet'?'Individual result. Prize: none.':'Existing verified event copy.'});
+ for(const event of ['rumble','striker-race','tank-pull','specialist-rescue'] as const)assert.equal((await readEventCache({event,seed,index:0},read)).status,'ready');
+ assert.deepEqual(await readEventCache({event:'team-gauntlet',seed,index:0},read),{status:'unavailable'});
+ const body='Crew advances through the recorded checkpoint.';
+ const prepared=await prepareEventCache({event:'team-gauntlet',seed,index:0,segment:{id:'crew',index:0,at:0,phase:'exchange',facts:body}},{read,reserve:async()=> 'claimed',claim:async()=>false,generate:async()=>body,finish:async(key,result)=>{if('body' in result)rows.set('event-commentary:'+key,{status:'ready',body:result.body});},voice:async()=>({audio:'fixture'})});
+ assert.equal(prepared.status,'ready');assert.equal((await readEventCache({event:'team-gauntlet',seed,index:0},read) as {body:string}).body,body);
+ assert.equal(rows.get(`event-commentary:event-v2:team-gauntlet:${digest}:0`)!.body,'Individual result. Prize: none.');
+});
